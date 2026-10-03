@@ -76,6 +76,54 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
     assert Locale.resolve(nil).language == "fr"
   end
 
+  test "an open page does not look up the operator address again", %{conn: conn} do
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    AddressFixtures.insert_country!(%{iso: "FR"})
+    AddressFixtures.assign_primary_company!(41, 73)
+
+    {:ok, operator} = Tenancy.scope(41)
+
+    assert {:ok, _address} =
+             Address.create_and_attach_to_company(
+               operator,
+               73,
+               %{label: "HQ", line1: "1 Rue de Rivoli", country_iso: "FR"},
+               %{is_primary: true}
+             )
+
+    assert {:ok, "de-CH"} = Locale.put(SettingsScope.user(91, 73, 41), "de-CH")
+    refute Locale.overridden?(nil)
+
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, owner ->
+        if metadata.source == "addresses" and match?({:ok, %{command: :select}}, metadata.result) do
+          send(owner, :address_read)
+        end
+      end,
+      owner
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+    assert address_reads() > 0
+    assert process_gettext_locale(view.pid, BilimbiWeb.Gettext) == "de"
+    refute Locale.overridden?(nil)
+
+    view |> element("#customize-layout") |> render_click()
+    render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+
+    assert address_reads() == 0
+    assert process_gettext_locale(view.pid, BilimbiWeb.Gettext) == "de"
+    refute Locale.overridden?(nil)
+  end
+
   test "keeps concurrent LiveView languages isolated by account" do
     assert {:ok, "de-CH"} = Locale.put(SettingsScope.user(91, 73, 41), "de-CH")
     assert {:ok, "zh-TW"} = Locale.put(SettingsScope.user(92, 73, 41), "zh-TW")
@@ -92,6 +140,14 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
     assert process_gettext_locale(first_view.pid, Bilimbi.Base.UI.Gettext) == "de"
     assert process_gettext_locale(second_view.pid, Bilimbi.Base.UI.Gettext) == "zh"
+  end
+
+  defp address_reads(count \\ 0) do
+    receive do
+      :address_read -> address_reads(count + 1)
+    after
+      0 -> count
+    end
   end
 
   defp process_gettext_locale(pid, backend) do

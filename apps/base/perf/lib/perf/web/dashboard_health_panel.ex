@@ -4,13 +4,16 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
 
   Contributed as the `"dashboard.performance"` embed; the dashboard renders it
   by that key and never names this module (ADR 0009). Health is read again
-  each time the dashboard counts a refresh, and only after the socket is
-  connected. Until then the strip shows an em dash and does not query.
+  each time the dashboard counts a refresh, only after the socket is
+  connected, and only while `admin.system.perf.view` is on the in-memory
+  capability list. Otherwise the strip shows an em dash and does not query.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Perf
+
+  @capability "admin.system.perf.view"
 
   @impl true
   def update(assigns, socket) do
@@ -20,6 +23,9 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
     {:ok,
      cond do
        not socket.assigns.connected -> assign(socket, :diagnostics, :not_loaded)
+       not allowed?(socket.assigns.current_scope, @capability) ->
+         assign(socket, :diagnostics, :not_loaded)
+
        stale? -> assign(socket, :diagnostics, Perf.diagnostics())
        true -> socket
      end}

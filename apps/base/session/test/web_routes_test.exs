@@ -14,8 +14,7 @@ defmodule Bilimbi.Base.Session.WebRoutesTest do
              },
              %{
                embed: "dashboard.sessions",
-               live_component: Bilimbi.Base.Session.Web.DashboardStatsPanel,
-               capability: "admin.system.session.list"
+               live_component: Bilimbi.Base.Session.Web.DashboardStatsPanel
              }
            ] = routes
   end

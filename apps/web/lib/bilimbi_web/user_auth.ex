@@ -292,8 +292,9 @@ defmodule BilimbiWeb.UserAuth do
   `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
   `shell_preferences` is the single resolved theme, timestamp display, locale,
   and language snapshot for the request or LiveView process. The shell pin
-  list is not part of this assign: an authenticated LiveView attaches it once
-  at mount, and a controller that never renders the shell does not query it.
+  list is not part of this assign: the full shell attaches it once at mount.
+  A framed LiveView, and a controller that never renders the shell, do not
+  query it.
 
   A cookie whose session, user, company, or tenant no longer proves out is
   dropped: the request falls through as unauthenticated.
@@ -301,7 +302,7 @@ defmodule BilimbiWeb.UserAuth do
   def fetch_current_scope(conn, _opts) do
     session_user = get_session(conn, @session_key)
     impersonation = get_session(conn, @impersonation_key)
-    current_scope = current_scope_from(session_user, impersonation)
+    current_scope = current_scope_from(session_user, impersonation, :bootstrap)
 
     RequestContext.apply(current_scope, conn)
 
@@ -455,7 +456,7 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   def on_mount(:require_authenticated, _params, session, socket) do
-    socket = socket |> mount_current_scope(session) |> put_shell_pins()
+    socket = socket |> mount_current_scope(session) |> put_shell_pins(session)
 
     if socket.assigns.current_scope do
       current_scope = socket.assigns.current_scope
@@ -546,7 +547,7 @@ defmodule BilimbiWeb.UserAuth do
     # conn assigns and must resolve the durable session and permissions anew.
     socket =
       Phoenix.Component.assign_new(socket, :current_scope, fn ->
-        current_scope_from(session[@session_key], session[@impersonation_key])
+        current_scope_from(session[@session_key], session[@impersonation_key], :bootstrap)
       end)
 
     RequestContext.apply(socket.assigns.current_scope, socket)
@@ -558,7 +559,7 @@ defmodule BilimbiWeb.UserAuth do
       if impersonator,
         do: %{"original_user_id" => impersonator.id, "original_user_name" => impersonator.name}
 
-    case current_scope_from(identity, impersonation) do
+    case current_scope_from(identity, impersonation, nil) do
       nil -> {:error, :unauthenticated}
       scope -> {:ok, scope}
     end
@@ -585,7 +586,8 @@ defmodule BilimbiWeb.UserAuth do
            "user_id" => user_id,
            "company_id" => company_id
          },
-         impersonation
+         impersonation,
+         bootstrap_mode
        )
        when is_binary(session_id) and session_id != "" and is_integer(user_id) and user_id > 0 and
               is_integer(company_id) and company_id > 0 do
@@ -630,19 +632,25 @@ defmodule BilimbiWeb.UserAuth do
       Map.put(
         current_scope,
         :shell_preferences,
-        DisplayPreferences.presentation(current_scope, locale_bootstrap())
+        DisplayPreferences.presentation(
+          current_scope,
+          if(bootstrap_mode == :bootstrap, do: locale_bootstrap(), else: nil)
+        )
       )
     else
       _ -> nil
     end
   end
 
-  defp current_scope_from(_session_user, _impersonation), do: nil
+  defp current_scope_from(_session_user, _impersonation, _bootstrap_mode), do: nil
 
-  defp put_shell_pins(%{assigns: %{current_scope: %{pins: pins}}} = socket) when is_list(pins),
-    do: socket
+  defp put_shell_pins(socket, %{"bilimbi_framed" => true}), do: socket
 
-  defp put_shell_pins(%{assigns: %{current_scope: current_scope}} = socket)
+  defp put_shell_pins(%{assigns: %{current_scope: %{pins: pins}}} = socket, _session)
+       when is_list(pins),
+       do: socket
+
+  defp put_shell_pins(%{assigns: %{current_scope: current_scope}} = socket, _session)
        when is_map(current_scope) do
     Phoenix.Component.assign(
       socket,
@@ -651,7 +659,7 @@ defmodule BilimbiWeb.UserAuth do
     )
   end
 
-  defp put_shell_pins(socket), do: socket
+  defp put_shell_pins(socket, _session), do: socket
 
   defp shell_pins(%{scope: %Scope{} = scope}) do
     case BilimbiWeb.PinController.shell_pins(scope) do

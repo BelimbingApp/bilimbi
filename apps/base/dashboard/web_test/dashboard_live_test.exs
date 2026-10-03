@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Dashboard
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Session
@@ -747,6 +748,48 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
       assert has_element?(view, "#audit-entry-#{mutation.id}")
       assert render(view) =~ "updated"
       assert render(view) =~ "User"
+    end
+
+    test "a revoked audit grant leaves the visible widget unmarked", %{conn: conn, scope: scope} do
+      grant_capabilities!(["admin.audit.log.list"])
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+
+      assert {:ok, :stored} =
+               Authz.put_principal_capability(
+                 scope,
+                 73,
+                 :user,
+                 91,
+                 "admin.audit.log.list",
+                 false
+               )
+
+      view |> element("#customize-layout") |> render_click()
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#audit-entry-#{mutation.id}")
+
+      view |> element("#remove-base-dashboard-recent-audit") |> render_click()
+      view |> element("#add-widget-base-dashboard-recent-audit") |> render_click()
+
+      assert has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#audit-entry-#{mutation.id}")
     end
 
     test "refresh recomputes the session count", %{conn: conn} do

@@ -37,14 +37,15 @@ def contributions do
 end
 ```
 
-`priv/web_routes.exs` declares the panel under the same key and the same
-capability:
+`priv/web_routes.exs` declares the panel under the same key. The catalogue
+entry's capability is what offers the widget. The embed leaves capability
+unset, so a card the page is already showing stays mounted after that grant
+is removed and the panel skips the read:
 
 ```elixir
 %{
   embed: "dashboard.open-orders",
-  live_component: MyModule.Web.DashboardOrdersPanel,
-  capability: "admin.order.list"
+  live_component: MyModule.Web.DashboardOrdersPanel
 }
 ```
 

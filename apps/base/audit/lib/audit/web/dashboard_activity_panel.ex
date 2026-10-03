@@ -4,13 +4,16 @@ defmodule Bilimbi.Base.Audit.Web.DashboardActivityPanel do
 
   Contributed as the `"dashboard.activity"` embed; the dashboard renders it by
   that key and never names this module (ADR 0009). The feed is read again each
-  time the dashboard counts a refresh, and only after the socket is connected.
-  Until then the card shows an em dash and does not query.
+  time the dashboard counts a refresh, only after the socket is connected, and
+  only while `admin.audit.log.list` is on the in-memory capability list.
+  Otherwise the card shows an em dash and does not query.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Audit
+
+  @capability "admin.audit.log.list"
 
   @impl true
   def update(assigns, socket) do
@@ -20,6 +23,9 @@ defmodule Bilimbi.Base.Audit.Web.DashboardActivityPanel do
     {:ok,
      cond do
        not socket.assigns.connected -> assign(socket, :entries, :not_loaded)
+       not allowed?(socket.assigns.current_scope, @capability) ->
+         assign(socket, :entries, :not_loaded)
+
        stale? -> load(socket)
        true -> socket
      end}
