@@ -77,7 +77,7 @@ and lifecycle contracts; they do not replace deep Module APIs.
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
 host. Base Session, Base Settings, Base Tenancy, Base Authz, Base Audit, Base
-Queue, Base Locale, Base Principal Directory, Core Company, Core Geonames, Core
+Queue, Base Locale, Base Principal Directory, Base Workflow, Core Company, Core Geonames, Core
 Address, Core Employee, and Core User are active foundation slices:
 
 ```text
@@ -90,6 +90,7 @@ apps/base/audit/
 apps/base/queue/
 apps/base/locale/
 apps/base/principal_directory/
+apps/base/workflow/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
@@ -264,6 +265,7 @@ apps/base/tenancy/priv/repo/migrations/
 apps/base/authz/priv/repo/migrations/
 apps/base/audit/priv/repo/migrations/
 apps/base/queue/priv/repo/migrations/
+apps/base/workflow/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
@@ -364,8 +366,8 @@ route file. Every descriptor also carries `contribution_provider`; use `nil`
 when the module contributes nothing. A non-nil provider implements the
 ModuleRegistry behavior and returns immutable plain terms below only
 `:settings`, `:authz`, `:menu`, `:dashboard`, `:principal_directory`,
-`:schedule`, `:actor_verifier`, and `:system_principals`, as decided by ADR
-0004, ADR 0009, ADR 0011, ADR 0012, ADR 0016, and ADR 0017. Its
+`:schedule`, `:actor_verifier`, `:system_principals`, and `:workflow`, as decided by ADR
+0004, ADR 0009, ADR 0011, ADR 0012, ADR 0016, ADR 0017, and ADR 0018. Its
 `mix.exs` derives local module path dependencies and application metadata from
 that descriptor; do not repeat module dependency names manually.
 
