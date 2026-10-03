@@ -7,7 +7,7 @@
 **Purpose:** Define Bilimbi's database ownership, dependency, migration,
 compatibility, verification, adoption, and seeding rules.
 
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-10-03
 
 ## Purpose and authority
 
@@ -271,7 +271,16 @@ Each persistence owner exposes its structural contract through the
 `schema_contract` named in its descriptor. Contracts describe the exact owned
 tables and contributions that Compatibility can verify generically, including
 columns, PostgreSQL types, nullability, defaults, named indexes, predicates,
-foreign keys, and checks supported by the verifier.
+foreign keys, and checks supported by the verifier. Index specs include an
+optional `:order` key: a boolean list aligned with `:columns` where `true`
+means descending and an absent or `nil` value means all columns ascend.
+
+Contracts may declare `optional_indexes` alongside the mandatory `indexes`.
+Optional indexes may be absent (an adopted Belimbing database without them
+still verifies), but a present index must match its columns, ordering, and
+predicate exactly. The same contract may implement `verify_runtime/2` for
+tables that only exist after Bilimbi-only migrations have run; baseline
+verification and adoption skip those tables.
 
 The same contract owns any live-data invariant understood by the module.
 Compatibility discovers contracts and aggregates their results; it must not

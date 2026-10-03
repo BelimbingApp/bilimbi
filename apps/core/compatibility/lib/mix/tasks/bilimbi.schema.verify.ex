@@ -1,7 +1,6 @@
 defmodule Mix.Tasks.Bilimbi.Schema.Verify do
   @moduledoc """
-  Verifies the live Base Tenancy and Core Company tables against Bilimbi's
-  pinned Belimbing compatibility contract.
+  Verifies every installed module's schema contract and live-data invariants.
 
       mix bilimbi.schema.verify
       mix bilimbi.schema.verify --prefix custom_schema
@@ -12,7 +11,7 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
 
   use Mix.Task
 
-  @shortdoc "Verifies the pinned Belimbing-compatible Base and Company schema"
+  @shortdoc "Verifies every installed module's schema contract"
   @requirements ["app.config"]
 
   @impl Mix.Task
