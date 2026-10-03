@@ -5,8 +5,20 @@ defmodule Bilimbi.Base.QueueTest do
   alias Bilimbi.Base.Queue.JobRef
   alias Bilimbi.Base.Queue.TestWorkers.Success
   alias Bilimbi.Base.Queue.TestWorkers.Unique
+  alias Bilimbi.Base.Audit.MutationSchema
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Repo
+  alias Ecto.Adapters.SQL
   alias Ecto.Multi
+
+  import Bilimbi.Base.Tenancy.TestFixtures
+
+  setup do
+    create_tenants_table!()
+    insert_tenant!(%{id: 41})
+    :ok
+  end
 
   test "enqueue returns a stable reference without transport state" do
     assert {:ok,
@@ -22,6 +34,49 @@ defmodule Bilimbi.Base.QueueTest do
     refute Map.has_key?(
              Map.from_struct(Queue.enqueue(Success, %{"value" => 8}) |> elem(1)),
              :args
+           )
+  end
+
+  test "enqueue excludes Oban job data from audit mutations" do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE base_audit_mutations (
+        id bigserial PRIMARY KEY, company_id bigint, tenant_id bigint,
+        actor_type varchar(40), actor_id bigint, actor_role varchar(100),
+        impersonator_id bigint, system_principal varchar(100), ip_address inet,
+        url text, user_agent varchar(80), auditable_type varchar(255),
+        auditable_id varchar(128), subject_name varchar(255), subject_id varchar(128),
+        subject_identifier varchar(255), source varchar(20), event varchar(20),
+        old_values jsonb, new_values jsonb, trace_id varchar(12),
+        occurred_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    {:ok, scope} = Tenancy.scope(41)
+    scope = Authentication.sign_in(scope, 7, 10)
+    assert {:ok, %JobRef{}} = Queue.enqueue(Success, %{"value" => 7})
+
+    assert Repo.aggregate(MutationSchema, :count, :id) == 0
+
+    assert {:ok, %JobRef{id: delegated_id}} =
+             Queue.enqueue_for(scope, Success, %{"value" => 8})
+
+    delegated_job = Repo.get!(Oban.Job, delegated_id)
+    assert is_binary(delegated_job.meta["bilimbi_delegated_actor"])
+
+    assert Repo.aggregate(MutationSchema, :count, :id) == 0
+
+    refute Repo.exists?(
+             from(mutation in MutationSchema,
+               where:
+                 like(
+                   fragment("to_jsonb(?)::text", mutation),
+                   ^"%#{delegated_job.meta["bilimbi_delegated_actor"]}%"
+                 )
+             )
            )
   end
 
@@ -45,7 +100,7 @@ defmodule Bilimbi.Base.QueueTest do
              |> Queue.enqueue(:job, Success, %{"value" => 1})
              |> Repo.transaction()
 
-    assert Repo.exists?(from job in Oban.Job, where: job.id == ^committed_id)
+    assert Repo.exists?(from(job in Oban.Job, where: job.id == ^committed_id))
 
     assert {:error, :stop, :rollback, _changes} =
              Multi.new()
