@@ -66,7 +66,8 @@ jobs:
       # applies to the current project, and every module compiles as a dependency
       # of the root. A missing required attr warned and exited 0 (#176). Compiling
       # each module in its own project context is what makes those warnings fatal.
-      # The root alias compiles every discovered module, mounted ones included.
+      # The root alias compiles every discovered module, mounted ones included,
+      # and the Web host. Discovery does not list the host.
       - name: Compile each module strictly
         run: mix compile.strict
 
