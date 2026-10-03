@@ -10,29 +10,30 @@ defmodule Bilimbi.Base.Queue.ApplicationTest do
   alias Ecto.Adapters.SQL
 
   test "production configuration defines a validated graceful shutdown policy" do
-    config = Queue.oban_config() |> Keyword.delete(:testing)
+    config =
+      [
+        name: Bilimbi.Base.Queue.Oban,
+        repo: Repo,
+        prefix: "public",
+        queues: [default: 10],
+        plugins: [{Oban.Plugins.Pruner, max_age: 604_800}],
+        shutdown_grace_period: 15_000
+      ]
 
-    assert config[:repo] == Bilimbi.Base.Repo
-    assert config[:name] == Bilimbi.Base.Queue.Oban
-    assert config[:prefix] == "public"
-    assert config[:queues] == [default: 10]
-    assert config[:plugins] == [{Oban.Plugins.Pruner, max_age: 604_800}]
-    assert config[:shutdown_grace_period] == 15_000
     assert :ok = Oban.Config.validate(config)
     assert [{Oban, ^config}] = QueueApplication.children(config)
   end
 
-  test "manual test mode supervises Oban without consumers or plugins" do
+  test "test env supervises Oban without consumers or plugins" do
     config = Queue.oban_config()
 
-    assert config[:testing] == :manual
+    assert config[:testing] == :disabled
+    assert config[:queues] == []
+    assert config[:plugins] == []
+    assert config[:stage_interval] == :infinity
+    assert config[:peer] == {Oban.Peers.Isolated, [leader?: false]}
     assert [{Oban, ^config}] = QueueApplication.children(config)
     assert is_pid(Oban.whereis(config[:name]))
-
-    normalized = Oban.Config.new(config)
-    assert normalized.queues == []
-    assert normalized.plugins == []
-    assert normalized.stage_interval == :infinity
   end
 
   test "shutdown drains an in-flight job within the configured grace period" do
