@@ -46,10 +46,6 @@ defmodule BilimbiWeb.Router do
     post "/:identifier", WebhookController, :create
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
-  end
-
   # The homepage is the sign-in screen; authenticated visitors are forwarded
   # to their workspace.
   scope "/", BilimbiWeb do
