@@ -1,6 +1,6 @@
 defmodule Bilimbi.Base.Workflow do
   @moduledoc """
-  Tenant-scoped status transitions and compatible history.
+  Tenant-scoped status transitions, durable processes and compatible history.
 
   Subjects are `%{type: stable_key, id: bigint_or_decimal_string}`. Installed
   owners contribute definitions and adapters through `:workflow`; callers
@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Workflow do
   Named system principals remain subject to owner policy and Authz.
   """
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Base.Workflow.{Definitions, Engine}
+  alias Bilimbi.Base.Workflow.{Coordination, Definitions, Engine, PendingWork}
 
   @type subject_ref :: %{type: String.t(), id: pos_integer() | String.t()}
   @spec transition(Scope.t(), subject_ref(), String.t(), map()) :: {:ok, map()} | {:error, term()}
@@ -52,4 +52,44 @@ defmodule Bilimbi.Base.Workflow do
   """
   @spec seed_definitions() :: {:ok, :seeded} | {:error, term()}
   def seed_definitions, do: Definitions.seed()
+
+  @doc "Starts an owner-proven process; :idempotency_key is required. Versions are immutable."
+  @spec start_run(Scope.t(), String.t(), subject_ref(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def start_run(%Scope{} = scope, definition, subject, opts),
+    do: Coordination.start(scope, definition, subject, opts)
+
+  @doc "Reads the proven run and its bounded materialized graph without exposing Ecto schemas or lease tokens."
+  @spec get_run(Scope.t(), pos_integer()) :: {:ok, map()} | {:error, term()}
+  def get_run(%Scope{} = scope, run_id), do: Coordination.get(scope, run_id)
+
+  @doc "Completes due available work with the expected version and executor; accepts an item ID or %{step_key: key}."
+  @spec complete_work(Scope.t(), pos_integer(), pos_integer() | map(), map()) ::
+          {:ok, map()} | {:error, term()}
+  def complete_work(%Scope{} = scope, run_id, item, request),
+    do: Coordination.complete(scope, run_id, item, request)
+
+  @doc "Blocks unfinished work and emits process.superseded; refuses live worker leases."
+  @spec supersede_run(Scope.t(), pos_integer(), String.t()) :: {:ok, map()} | {:error, term()}
+  def supersede_run(%Scope{} = scope, run_id, reason),
+    do: Coordination.supersede(scope, run_id, reason)
+
+  @doc "Recovers expired leases and releases dependencies/timers on the existing graph. Paused and terminal runs are retained."
+  @spec reconcile_run(Scope.t(), pos_integer()) :: {:ok, map()} | {:error, term()}
+  def reconcile_run(%Scope{} = scope, run_id), do: Coordination.reconcile(scope, run_id)
+
+  @doc "Records an idempotent external fact, releasing matching signal gates. Same key with different content conflicts."
+  @spec signal_run(Scope.t(), pos_integer(), String.t(), term(), String.t()) ::
+          {:ok, map()} | {:error, term()}
+  def signal_run(%Scope{} = scope, run_id, name, payload, idempotency_key),
+    do: Coordination.signal(scope, run_id, name, payload, idempotency_key)
+
+  @doc "Bounded due work ordered by item priority descending, availability and ID. Cursor advances over scanned candidates."
+  @spec pending_work(Scope.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  def pending_work(%Scope{} = scope, opts \\ []), do: PendingWork.list(scope, opts)
+
+  @doc "Bounded retained process event facts, ordered by run sequence; :after is the last sequence."
+  @spec run_events(Scope.t(), pos_integer(), keyword()) :: {:ok, map()} | {:error, term()}
+  def run_events(%Scope{} = scope, run_id, opts \\ []),
+    do: Coordination.events(scope, run_id, opts)
 end

@@ -1,9 +1,9 @@
-# Base Workflow status kernel
+# Base Workflow
 
 Workflow owns status configuration and history. Its public facade accepts a
 `Bilimbi.Base.Tenancy.Scope` and `%{type: "owner.record", id: 42}`. It never
-queries an owner's subject table. UI, durable coordination, human actions and
-outbox dispatch are outside this slice.
+queries an owner's subject table. The status kernel and durable coordinator share
+this boundary. UI, human-action routing and external/outbox dispatch are later slices.
 
 An owner declares `base/workflow` and contributes immutable defaults:
 
@@ -62,7 +62,8 @@ Fresh databases use umbrella-root `mix bilimbi.migrate`. Existing databases use
 `mix bilimbi.migrate` for the pending subject-binding addition. Verification
 checks exact types, indexes, constraints, sequence ownership/state and triggers.
 The compatible baseline includes kanban rows even though no UI ships here.
-The other source Workflow tables are untouched and remain for later slices.
+The coordination baseline also owns the six compatible process/outbox tables;
+source outbox rows are preserved, with dispatch deferred to its delivery slice.
 
 After migration, an installed owner calls `adopt_subject/2` under its explicit
 adoption policy. This locks/proves the subject and binds existing history without
@@ -76,3 +77,94 @@ operator configuration always wins, including inactive flags and legacy aliases.
 New identities use stable public keys; no business flow is hard-coded in Base.
 
 The architectural ownership decision is [ADR 0018](../../../../docs/architecture/decisions/0018-workflow-status-contribution-consumer.md).
+
+
+## Durable coordination
+
+An owner contributes versioned process definitions under `workflow.processes`:
+
+```elixir
+%{key: "owner.review", version: 1, subject: "owner.record",
+  adapter: Owner.ProcessPolicy,
+  steps: [
+    %{key: "first", label: "First review", executor_key: "owner.first"},
+    %{key: "second", label: "Second review", executor_key: "owner.second"},
+    %{key: "finish", label: "Finish",
+      dependencies: [%{step_key: "first"}, %{step_key: "second"}]}]}
+```
+
+The validator proves descriptor/adapter ownership and subject ownership, checks
+positive versions and acyclic dependencies, and fixes the complete executable
+contract's fingerprint. A persisted key/version is immutable: change the version
+when changing any step contract. Old executable versions stay installed while
+in-flight runs need them. Definitions are plain terms with no I/O and are saved
+insert-only when an authorized owner starts a run; boot never starts runs.
+
+`ProcessAdapter.authorize/4` receives the locked subject and plain run facts for
+`:start`, `:read`, `:complete`, `:supersede`, `:reconcile` and `:signal`. A new start
+has no saved ID; replay repeats `:start` with the saved ID and input. Both the
+subject and process adapters must enforce access. The owner enforces capabilities,
+company eligibility, and current round/attempt binding, using its own public
+boundary; Workflow does not query those relations. `:read` does not authorize
+completion. Owners perform business writes and `complete_work/4` in one shared
+Repo transaction so a later refusal rolls back owner and Workflow effects.
+
+Start with `start_run(scope, "owner.review", ref, idempotency_key: "attempt:2",
+input: %{"carried_fact_ids" => %{}})`. `:version` selects an installed version;
+omission selects the highest. Other options are `:correlation_key`, `:priority`
+and a UTC `NaiveDateTime` in whole seconds for `:available_at`. Start keys use the
+legacy tenant/definition namespace and long-key SHA-256 shortening. Repeating a
+start preserves the run and work IDs; changed input, subject or definition
+conflicts. Legacy subject aliases and saved payloads remain intact.
+
+`get_run/2` returns `%{run: facts, work_items: facts}` after owner proof and exact
+saved graph/fingerprint checks. Its size is bounded by the installed definition,
+not a growing run list. Complete an available, due item by ID or `%{step_key: key}`:
+
+```elixir
+complete_work(scope, run_id, %{step_key: "first"}, %{
+  expected_version: 1, executor_key: "owner.first", outcome: "completed",
+  output: %{"fact_id" => 42}, result_ref: "owner-result:42"
+})
+```
+
+Completion checks the current run, work version, executor and due time under the
+subject/run/item locks. Events allocate consecutive per-run sequences in the
+same transaction and carry sealed Audit attribution. Parallel independent work
+becomes available together. Dependencies default to `"all"` and acceptable outcome
+`["completed"]`; `"any"` releases after one accepted outcome. Rejected terminal
+prerequisites block work when no acceptable outcome remains. Signal gates use
+`:required_signal`; `signal_run/5` records an idempotent owner fact. Reusing its
+key with changed content conflicts. `:delay_seconds` starts a persisted timer
+once dependencies and any signal are satisfied.
+
+`reconcile_run/2` repairs expired leases, fences stale completions by incrementing
+the saved version, and releases satisfied dependencies/timers. It operates on the
+same saved graph after process/Repo restart. Final-attempt expiry fails work;
+remaining attempts return it to pending. Live leases remain untouched.
+`supersede_run/3` requires a reason and refuses live leases. It preserves completed
+facts, blocks unfinished work, aggregates the terminal run state, and appends
+`process.superseded`. Supersede's durable state is `"blocked"`; there is no new
+`"superseded"` status. Paused runs remain paused, including reasons and work state.
+
+`pending_work/2` returns `%{entries: facts, next_cursor: cursor}`. Pass `:after`,
+`:limit` (1..500, default 50), and optional `:subject`, `:run_id`, `:definition_key`
+or `:executor_keys`. Candidates must be tenant-scoped, running and due, with due
+available work and no run error. Owner proof and current state are repeated before
+returning facts; lease ownership/tokens are hidden. Ordering is work priority
+descending, availability then ID. The cursor advances over scanned candidates,
+including owner-policy exclusions, so a page can be empty with a next cursor.
+This bounded worklist supplies no relational owner-workbench count.
+`run_events/3` provides bounded event pages ordered by saved run sequence.
+
+Verify-then-adopt preserves all compatible run/work states, definition rows,
+leases, dependency edges, events, JSON shapes, timestamps and sequences. It
+rejects structural drift or contradictory graph tenant identity, without guessing
+an unresolved run's tenant or translating its owner. Unknown/retired definitions,
+aliases, fingerprints and unresolved runs stay preserved and fail execution;
+they are never replaced by a fresh run. The default `:legacy_v1` fingerprints
+match ordered PHP v1 JSON for supported values, including empty lists, sorted
+objects and Unicode separators. Floating values fail explicitly because PHP's
+number serialization differs. Numeric object keys also refuse explicitly because
+PHP arrays coerce/sort them and can become lists; express those as lists or use a new `:bilimbi_v1` version supports those values with a distinct fingerprint domain. Compatible owner mappings belong in private
+extensions, not the public platform.

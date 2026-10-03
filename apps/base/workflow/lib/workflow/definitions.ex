@@ -11,10 +11,11 @@ defmodule Bilimbi.Base.Workflow.Definitions do
     with %{type: type, id: id} <- ref,
          {:ok, id} <- numeric_id(id),
          {:ok, key} <- Map.fetch(registry!().aliases, {:subjects, type}),
-         {:ok, adapter} <- Map.fetch(registry!().subjects, key),
-         {_code, flow} <-
-           Enum.find(registry!().flows, fn {_code, flow} -> flow.subject == key end) do
-      {:ok, %{type: key, id: id, adapter: adapter.adapter, owner: adapter.owner, flow: flow.code}}
+         {:ok, adapter} <- Map.fetch(registry!().subjects, key) do
+      flow =
+        Enum.find_value(registry!().flows, fn {code, flow} -> if flow.subject == key, do: code end)
+
+      {:ok, %{type: key, id: id, adapter: adapter.adapter, owner: adapter.owner, flow: flow}}
     else
       _ -> {:error, :unknown_subject}
     end
@@ -31,8 +32,10 @@ defmodule Bilimbi.Base.Workflow.Definitions do
     end
   end
 
+  def flow(%{flow: nil}, _mode), do: {:error, :flow_unavailable}
+
   def flow(ref, mode) do
-    query = from f in FlowSchema, where: f.code == ^ref.flow
+    query = from(f in FlowSchema, where: f.code == ^ref.flow)
     # Inactive legacy flows still contain history the proven owner may adopt.
     query = if mode == :adopt, do: query, else: from(f in query, where: f.is_active)
     query = if mode in [:lock, :adopt], do: from(f in query, lock: "FOR SHARE"), else: query
@@ -52,16 +55,17 @@ defmodule Bilimbi.Base.Workflow.Definitions do
   end
 
   def status?(flow, status, mode) do
-    query = from s in StatusSchema, where: s.flow == ^flow and s.code == ^status and s.is_active
+    query = from(s in StatusSchema, where: s.flow == ^flow and s.code == ^status and s.is_active)
     query = if mode == :lock, do: from(s in query, lock: "FOR SHARE"), else: query
     not is_nil(Repo.one(query))
   end
 
   def edges(flow, status, mode) do
     query =
-      from e in EdgeSchema,
+      from(e in EdgeSchema,
         where: e.flow == ^flow and e.from_code == ^status and e.is_active,
         order_by: [asc: e.position, asc: e.id]
+      )
 
     query = if mode == :lock, do: from(e in query, lock: "FOR SHARE"), else: query
     Repo.all(query)

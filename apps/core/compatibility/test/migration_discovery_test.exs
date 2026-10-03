@@ -88,6 +88,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities,
              Bilimbi.Base.Artifacts.Migrations.CreateArtifacts,
              Bilimbi.Base.Workflow.Migrations.CreateStatusCompatibilityBaseline,
+             Bilimbi.Base.Workflow.Migrations.CreateCoordinationCompatibilityBaseline,
              Bilimbi.Base.Workflow.Migrations.CreateSubjectBindings
            ]
 
@@ -115,6 +116,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
+             :compatible_baseline,
              :compatible_baseline,
              :bilimbi_only
            ]

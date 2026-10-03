@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Scope:** Status kernel, ownership and source-data adoption
+**Scope:** Status kernel, durable coordination, ownership and source-data adoption
 **Last Updated:** 2026-10-03
 
 ## Context
@@ -15,8 +15,7 @@ actor authority without Base reading optional owners' private relations.
 ## Decision
 
 `:workflow` is a peer consumer in the descriptor-owned contribution snapshot.
-Base Workflow validates immutable plain maps for subjects, guards, actions and
-flow defaults. Adapter modules must implement the corresponding public behaviour
+Base Workflow validates immutable plain maps for subjects, guards, actions, flow defaults and versioned processes. Adapter modules must implement the corresponding public behaviour
 and belong to the contributing OTP application. Owners declare `base/workflow`.
 Stable keys and exact legacy aliases are unique; a flow's subject and hooks
 belong to its owner. Aliases are data, never executable class names.
@@ -40,6 +39,21 @@ Audit fact in one transaction. The sealed Scope actor supplies attribution,
 including impersonation. Arbitrary actor/tenant context is refused. Hook failures
 roll back all effects. Owners retain responsibility for business rules and locks.
 
+Durable coordination owns compatible definition-version, run, work, dependency,
+event and transition-outbox tables. A process contribution binds its registered
+subject and descriptor-owned `ProcessAdapter`; the owner proves company and
+current round/attempt authority. Start materializes one graph, binds an immutable
+fingerprint, and preserves legacy namespaced idempotency keys. Reconciliation
+uses the existing graph. Subject -> run -> ordered item locking serializes
+parallel completions and per-run event allocation. All state, owner database
+effects, events and semantic Audit facts commit in the shared Repo transaction.
+
+Verification/adoption retains in-flight and paused states, work versions, leases,
+JSON, timestamps and sequences without executing owner code. Unknown owners,
+unresolved scope and unavailable version/fingerprint contracts stay retained and
+fail execution. Supersede uses the source `blocked` state plus its event. A bounded
+scoped worklist rechecks owner policy and exposes no sibling-private relations.
+
 ## Consequences
 
 - Base gains no dependency on Core, Domain or Extension implementations.
@@ -47,8 +61,8 @@ roll back all effects. Owners retain responsibility for business rules and locks
   mappings. Unknown mappings fail at runtime without invalidating preserved data.
 - Bounded scoped history retains initial entries, comments, inactive codes and
   nullable or agent actor identities with deterministic timestamp/id cursors.
-- Coordination runs, work items, human actions and external dispatch are later
-  slices. This status kernel does not claim to resume durable runs or deliver
-  pending legacy outbox messages.
+- Human actions and external dispatch remain later slices. The coordinator
+  resumes supported durable runs; pending legacy outbox rows remain retained
+  without delivery in this slice.
 - The public API and contribution shape are documented in
   `apps/base/workflow/docs/README.md`; validation owns the executable contract.

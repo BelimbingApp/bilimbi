@@ -8,7 +8,12 @@ defmodule Bilimbi.Base.Workflow.SchemaInvariants do
     prefix = Keyword.get(opts, :prefix, "public")
     quoted = SchemaVerifier.quote_identifier!(prefix)
     errors = Enum.flat_map(SchemaContract.tables(), &table_errors(repo, prefix, quoted, &1))
-    errors = errors ++ binding_errors(repo, prefix, opts)
+
+    errors =
+      errors ++
+        binding_errors(repo, prefix, opts) ++
+        Bilimbi.Base.Workflow.CoordinationInvariants.errors(repo, quoted)
+
     if errors == [], do: :ok, else: {:error, errors}
   end
 
