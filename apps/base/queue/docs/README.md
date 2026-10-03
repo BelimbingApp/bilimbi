@@ -111,6 +111,11 @@ queue/state/attempt counts, timestamps, availability, and fixed aggregates.
 They never return arguments, metadata beyond the stable ID, error text, stack
 traces, database URLs, or legacy Laravel payloads.
 
+Oban job writes are excluded from audit mutation capture: they are machine
+transport lifecycle, while actor business decisions are audited by the
+capability that performs them. This also keeps job arguments and signed actor
+tokens out of `base_audit_mutations`.
+
 Completed, cancelled, and discarded jobs are retained for seven days by the
 Pruner plugin. This is deliberately fixed transport retention, not an operator
 setting: it keeps the Queue diagnostic and recovery window bounded and

@@ -1,12 +1,23 @@
 defmodule Bilimbi.Base.QueueTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.JobRef
   alias Bilimbi.Base.Queue.TestWorkers.Success
   alias Bilimbi.Base.Queue.TestWorkers.Unique
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Ecto.Multi
+
+  import Bilimbi.Base.Tenancy.TestFixtures
+
+  setup do
+    create_tenants_table!()
+    insert_tenant!(%{id: 41})
+    :ok
+  end
 
   test "enqueue returns a stable reference without transport state" do
     assert {:ok,
@@ -22,6 +33,34 @@ defmodule Bilimbi.Base.QueueTest do
     refute Map.has_key?(
              Map.from_struct(Queue.enqueue(Success, %{"value" => 8}) |> elem(1)),
              :args
+           )
+  end
+
+  test "enqueue excludes Oban job data from audit mutations" do
+    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
+
+    {:ok, scope} = Tenancy.scope(41)
+    scope = Authentication.sign_in(scope, 7, 10)
+    assert {:ok, %JobRef{}} = Queue.enqueue(Success, %{"value" => 7})
+
+    assert Repo.aggregate(MutationSchema, :count, :id) == 0
+
+    assert {:ok, %JobRef{id: delegated_id}} =
+             Queue.enqueue_for(scope, Success, %{"value" => 8})
+
+    delegated_job = Repo.get!(Oban.Job, delegated_id)
+    assert is_binary(delegated_job.meta["bilimbi_delegated_actor"])
+
+    assert Repo.aggregate(MutationSchema, :count, :id) == 0
+
+    refute Repo.exists?(
+             from(mutation in MutationSchema,
+               where:
+                 like(
+                   fragment("to_jsonb(?)::text", mutation),
+                   ^"%#{delegated_job.meta["bilimbi_delegated_actor"]}%"
+                 )
+             )
            )
   end
 
@@ -45,7 +84,7 @@ defmodule Bilimbi.Base.QueueTest do
              |> Queue.enqueue(:job, Success, %{"value" => 1})
              |> Repo.transaction()
 
-    assert Repo.exists?(from job in Oban.Job, where: job.id == ^committed_id)
+    assert Repo.exists?(from(job in Oban.Job, where: job.id == ^committed_id))
 
     assert {:error, :stop, :rollback, _changes} =
              Multi.new()
