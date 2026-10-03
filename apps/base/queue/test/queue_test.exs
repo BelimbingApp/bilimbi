@@ -9,7 +9,6 @@ defmodule Bilimbi.Base.QueueTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Repo
-  alias Ecto.Adapters.SQL
   alias Ecto.Multi
 
   import Bilimbi.Base.Tenancy.TestFixtures
@@ -38,22 +37,7 @@ defmodule Bilimbi.Base.QueueTest do
   end
 
   test "enqueue excludes Oban job data from audit mutations" do
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE base_audit_mutations (
-        id bigserial PRIMARY KEY, company_id bigint, tenant_id bigint,
-        actor_type varchar(40), actor_id bigint, actor_role varchar(100),
-        impersonator_id bigint, system_principal varchar(100), ip_address inet,
-        url text, user_agent varchar(80), auditable_type varchar(255),
-        auditable_id varchar(128), subject_name varchar(255), subject_id varchar(128),
-        subject_identifier varchar(255), source varchar(20), event varchar(20),
-        old_values jsonb, new_values jsonb, trace_id varchar(12),
-        occurred_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
+    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
 
     {:ok, scope} = Tenancy.scope(41)
     scope = Authentication.sign_in(scope, 7, 10)
