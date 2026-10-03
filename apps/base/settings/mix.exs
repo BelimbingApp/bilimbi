@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Settings.MixProject do
 
   def application do
     [
+      mod: {Bilimbi.Base.Settings.Application, []},
       extra_applications: [:crypto, :logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]

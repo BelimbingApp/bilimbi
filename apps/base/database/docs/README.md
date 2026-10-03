@@ -124,3 +124,11 @@ capture module comes from `config :bilimbi_base_database, :console_capture`
 capture-failure telemetry event and never changes the command's answer.
 Because the seam sits in the executor, a screen or caller cannot run console
 SQL unrecorded.
+
+## Commit callbacks
+
+`Repo.after_commit/1` runs immediately outside a transaction and queues a
+callback inside `Repo.transaction/2` or `Repo.transact/2`, including Multi
+and nested calls. Queued callbacks run only after the outer commit succeeds;
+rollback or an exception discards them. Settings uses this boundary to
+invalidate cached rows without exposing uncommitted values.
