@@ -22,7 +22,13 @@ defmodule BilimbiWeb.TenantsLiveTest do
   test "a non-operator tenant cannot list or create platform tenants", %{conn: conn} do
     CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
-    UserFixtures.insert_user!(%{id: 92, company_id: 74, name: "Grace Hopper", email: "grace@example.com"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
 
     grant_capabilities!(["admin.tenancy.tenant.list", "admin.tenancy.tenant.create"],
       tenant_id: 42,

@@ -72,7 +72,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
     })
 
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
-    UserFixtures.insert_user!(%{id: 96, company_id: 75, name: "Grace Hopper", email: "grace.hopper@example.com"})
+
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: 75,
+      name: "Grace Hopper",
+      email: "grace.hopper@example.com"
+    })
+
     :ok
   end
 

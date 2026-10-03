@@ -20,7 +20,13 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
     CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
-    UserFixtures.insert_user!(%{id: 92, company_id: 74, name: "Grace Hopper", email: "grace@example.com"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
 
     GeonamesFixtures.insert_country!(%{updated_at: ~N[2026-07-24 12:34:56]})
 
