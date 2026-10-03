@@ -396,6 +396,48 @@ defmodule BilimbiWeb.DashboardLiveTest do
   end
 
   describe "widget layout customization and persistence" do
+    test "adding hidden activity loads entries immediately, including after a hidden refresh", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!(["admin.audit.log.list"])
+      Settings.put("ui.dashboard.layout", [], Settings.Scope.user(91, 73, 41))
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+      refute has_element?(view, "#stat-recent-audit")
+      view |> element("#customize-layout") |> render_click()
+      view |> element("#add-widget-base-dashboard-recent-audit") |> render_click()
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+
+      view |> element("#remove-base-dashboard-recent-audit") |> render_click()
+      send(view.pid, :refresh_widgets)
+      refute has_element?(view, "#stat-recent-audit")
+      view |> element("#add-widget-base-dashboard-recent-audit") |> render_click()
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+    end
+
+    test "adding hidden sessions loads the count immediately", %{conn: conn} do
+      grant_capabilities!(["admin.system.session.list"])
+      Settings.put("ui.dashboard.layout", [], Settings.Scope.user(91, 73, 41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+      view |> element("#customize-layout") |> render_click()
+      view |> element("#add-widget-base-dashboard-session-stats") |> render_click()
+
+      assert has_element?(view, "#stat-sessions", "1")
+    end
+
     test "removes and re-adds widgets, persisting layout to settings", %{conn: conn} do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
