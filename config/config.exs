@@ -56,6 +56,11 @@ config :bilimbi_base_database, write_capture: Bilimbi.Base.Audit.MutationCapture
 # no login of its own; the record is its control. Same seam shape as above.
 config :bilimbi_base_database, console_capture: Bilimbi.Base.Audit.ConsoleCapture
 
+# Retention changes ask this module whether the sealed scope holds
+# admin.audit.log.manage. Base Authz answers. Audit does not depend on
+# Authz: Authz already depends on Audit, and discovery rejects that cycle.
+config :bilimbi_base_audit, authorization: Bilimbi.Base.Authz.AuditAuthorization
+
 # ADR 0013 (#785): the port of Belimbing's `audit.exclude_models`. Capture
 # is comprehensive by default, so silence is explicit and justified here,
 # one entry at a time. A schema belongs on this list only when *nothing*
@@ -100,7 +105,12 @@ config :bilimbi_base_audit,
     # The password change they complete is audited on the user row; the
     # token rows are secrets, and the trail is better off not holding
     # their metadata at all.
-    Bilimbi.Core.User.PasswordResetToken
+    Bilimbi.Core.User.PasswordResetToken,
+
+    # Oban jobs are machine transport state, not actor decisions. Their
+    # lifecycle is visible in Queue diagnostics; captured args and metadata
+    # could otherwise copy delegated actor tokens into the audit trail.
+    Oban.Job
   ]
 
 config :esbuild,
