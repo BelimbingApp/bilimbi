@@ -16,8 +16,10 @@ defmodule Bilimbi.Core.Employee do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee.AdministrationIndex
@@ -118,20 +120,49 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
-  @doc "Resolves an employee through any live company visible to the tenant scope."
+  @doc """
+  Resolves an employee through any live company visible to the tenant scope.
+
+  The company check is `Company.live_company_ids_query/1` inside this
+  statement. Do not load `Company.list_companies/1` and filter the ids in
+  memory: that reads every company row in the tenant for one employee.
+  """
   @spec get_employee(Scope.t(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, :employee_not_found}
   def get_employee(%Scope{} = scope, employee_id) do
-    {:ok, companies} = Company.list_companies(scope)
-    company_ids = Enum.map(companies, & &1.id)
-
     case Repo.one(
            from(employee in Schema,
-             where: employee.id == ^employee_id and employee.company_id in ^company_ids
+             where:
+               employee.id == ^employee_id and
+                 employee.company_id in subquery(Company.live_company_ids_query(scope))
            )
          ) do
       nil -> {:error, :employee_not_found}
       employee -> {:ok, Summary.from_schema(employee)}
+    end
+  end
+
+  @doc """
+  Full names of the given employees whose company is still live in the tenant.
+
+  Same visibility as `get_employee/2`: an employee of a soft-deleted or
+  other-tenant company is omitted. An empty id list does not touch the database.
+  """
+  @spec live_full_names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
+  def live_full_names(%Scope{} = scope, employee_ids) when is_list(employee_ids) do
+    employee_ids = for id <- employee_ids, is_integer(id) and id > 0, uniq: true, do: id
+
+    if employee_ids == [] do
+      %{}
+    else
+      from(employee in Schema,
+        where:
+          employee.id in ^employee_ids and
+            employee.company_id in subquery(Company.live_company_ids_query(scope)),
+        select: {employee.id, employee.full_name}
+      )
+      |> Repo.all()
+      |> Map.new()
     end
   end
 
@@ -149,8 +180,9 @@ defmodule Bilimbi.Core.Employee do
   know whose it is in order to revoke it. Archiving a company does not unmake
   the grant, so it must not hide the name.
 
-  That differs from `get_employee/2`, which uses `Company.list_companies/1` and
-  sees live companies only. The difference is intended: that function answers
+  That differs from `get_employee/2`, which keeps an employee only when the
+  company is still live (`Company.live_company_ids_query/1`). The difference
+  is intended: that function answers
   "may this actor work with this employee", this one answers "who is this
   principal a grant already names".
   """
@@ -317,9 +349,10 @@ defmodule Bilimbi.Core.Employee do
   end
 
   @spec delete_employee(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, lookup_error()}
+          :ok | {:error, lookup_error() | :forbidden}
   def delete_employee(%Scope{} = scope, company_id, employee_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with :ok <- authorize(scope, "admin.employee.delete"),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
@@ -330,6 +363,7 @@ defmodule Bilimbi.Core.Employee do
         end
       end
     else
+      {:error, :forbidden} = error -> error
       {:error, :company_not_found} = error -> error
       nil -> {:error, :employee_not_found}
     end
@@ -488,10 +522,12 @@ defmodule Bilimbi.Core.Employee do
   end
 
   @spec delete_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :company_not_found | :type_not_found | :is_system | :in_use}
+          :ok
+          | {:error, :company_not_found | :type_not_found | :is_system | :in_use | :forbidden}
   def delete_employee_type(%Scope{} = scope, company_id, type_id)
       when is_integer(company_id) and is_integer(type_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with :ok <- authorize(scope, "admin.employee-type.delete"),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
       Repo.transaction(fn ->
         case Repo.one(
                from(type in EmployeeType,
@@ -529,6 +565,25 @@ defmodule Bilimbi.Core.Employee do
       |> case do
         {:ok, :ok} -> :ok
         {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :forbidden} = error -> error
+      {:error, :company_not_found} = error -> error
+    end
+  end
+
+  # The delete screens already ask for these capabilities. Seeds, mix tasks,
+  # and `Tenancy.scope/1` pass the anonymous system actor, which holds no
+  # grants; a person and a named system principal are decided by Authz.
+  defp authorize(%Scope{} = scope, capability) do
+    actor = Scope.actor(scope)
+
+    if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
+      :ok
+    else
+      case Authz.can(scope, capability) do
+        %{allowed: true} -> :ok
+        %{allowed: false} -> {:error, :forbidden}
       end
     end
   end

@@ -281,6 +281,46 @@ defmodule Bilimbi.Core.Company do
     {:ok, ids}
   end
 
+  @doc """
+  Live company ids in this tenant, as a query a sibling may compose.
+
+  This is the only company query another module may embed, and only as
+  `where: other.company_id in subquery(live_company_ids_query(scope))`.
+  It replaces loading every company row to throw the rows away. The query
+  selects ids of companies that are not soft-deleted, the same set as
+  `list_companies/1`.
+  """
+  @spec live_company_ids_query(Scope.t()) :: Ecto.Query.t()
+  def live_company_ids_query(%Scope{} = scope) do
+    from(company in Tenancy.scope_query(Schema, scope),
+      where: is_nil(company.deleted_at),
+      select: company.id
+    )
+  end
+
+  @doc """
+  Names of the given live companies in this tenant.
+
+  Missing, soft-deleted, and other-tenant ids are omitted. The value is
+  `companies.name`, the same field `get_company/2` exposes as `Summary.name`.
+  An empty id list does not touch the database.
+  """
+  @spec live_company_names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
+  def live_company_names(%Scope{} = scope, company_ids) when is_list(company_ids) do
+    company_ids = for id <- company_ids, is_integer(id) and id > 0, uniq: true, do: id
+
+    if company_ids == [] do
+      %{}
+    else
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id in ^company_ids and is_nil(company.deleted_at),
+        select: {company.id, company.name}
+      )
+      |> Repo.all()
+      |> Map.new()
+    end
+  end
+
   @spec platform_operator_company() :: {:ok, Summary.t()} | {:error, lookup_error()}
   def platform_operator_company do
     {:ok, PrimaryCompanyManager.platform_operator_company!()}

@@ -663,31 +663,58 @@ defmodule Bilimbi.Core.Address do
     Repo.exists?(from(attachment in Addressable, where: attachment.address_id == ^address_id))
   end
 
+  # One read of the attachments, then at most two name reads: live company
+  # names and live employee names. A per-owner `get_company` or `get_employee`
+  # repeats those lookups once per row.
   defp list_linked_owners(%Scope{} = scope, address_id, sort_by, sort_dir) do
-    from(attachment in Addressable,
-      where: attachment.address_id == ^address_id,
-      order_by: attachment.id
-    )
-    |> Repo.all()
-    |> Enum.flat_map(&linked_owner(scope, &1))
-    |> Enum.sort(&linked_owner_before?(&1, &2, sort_by, sort_dir))
-  end
+    attachments =
+      from(attachment in Addressable,
+        where: attachment.address_id == ^address_id,
+        order_by: attachment.id
+      )
+      |> Repo.all()
 
-  defp linked_owner(%Scope{} = scope, attachment) do
     company_identity = Company.addressable_identity()
     employee_identity = Employee.addressable_identity()
 
+    company_ids =
+      for attachment <- attachments,
+          attachment.addressable_type == company_identity,
+          do: attachment.addressable_id
+
+    employee_ids =
+      for attachment <- attachments,
+          attachment.addressable_type == employee_identity,
+          do: attachment.addressable_id
+
+    company_names = Company.live_company_names(scope, company_ids)
+    employee_names = Employee.live_full_names(scope, employee_ids)
+
+    attachments
+    |> Enum.flat_map(
+      &linked_owner(&1, company_identity, employee_identity, company_names, employee_names)
+    )
+    |> Enum.sort(&linked_owner_before?(&1, &2, sort_by, sort_dir))
+  end
+
+  defp linked_owner(
+         attachment,
+         company_identity,
+         employee_identity,
+         company_names,
+         employee_names
+       ) do
     case attachment.addressable_type do
       ^company_identity ->
-        case Company.get_company(scope, attachment.addressable_id) do
-          {:ok, company} -> [linked_owner(attachment, :company, company.name)]
-          {:error, :not_found} -> []
+        case Map.fetch(company_names, attachment.addressable_id) do
+          {:ok, name} -> [linked_owner(attachment, :company, name)]
+          :error -> []
         end
 
       ^employee_identity ->
-        case Employee.get_employee(scope, attachment.addressable_id) do
-          {:ok, employee} -> [linked_owner(attachment, :employee, employee.full_name)]
-          {:error, :employee_not_found} -> []
+        case Map.fetch(employee_names, attachment.addressable_id) do
+          {:ok, name} -> [linked_owner(attachment, :employee, name)]
+          :error -> []
         end
 
       _unknown_type ->
@@ -748,9 +775,7 @@ defmodule Bilimbi.Core.Address do
   defp admin1_name(nil), do: nil
 
   defp admin1_name(admin1_code) do
-    country_iso = admin1_code |> String.split(".", parts: 2) |> hd()
-
-    case Enum.find(Geonames.list_admin1(country_iso), &(&1.code == admin1_code)) do
+    case Geonames.get_admin1(admin1_code) do
       nil -> nil
       admin1 -> admin1.name
     end

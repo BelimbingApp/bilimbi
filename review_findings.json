@@ -1,0 +1,22 @@
+{
+  "findings": [],
+  "reviewed_paths": [
+    "apps/base/authz/lib/authz.ex",
+    "apps/base/authz/lib/authz/role_service.ex",
+    "apps/base/authz/test/authz_test.exs",
+    "apps/core/address/lib/address.ex",
+    "apps/core/address/lib/address/web/show_live.ex",
+    "apps/core/address/test/address_test.exs",
+    "apps/core/company/lib/company.ex",
+    "apps/core/employee/lib/employee.ex",
+    "apps/core/employee/test/employee_test.exs",
+    "apps/core/geonames/lib/geonames.ex",
+    "apps/core/geonames/test/geonames_test.exs",
+    "apps/core/user/lib/user/web/show_live.ex"
+  ],
+  "tested": [],
+  "testing_summary": "",
+  "risk_level": "low",
+  "risk_rationale": "All changes are well-scoped performance optimizations targeting measured N+1 reads, each with a correct, bounded implementation; the stale-capabilities tradeoff in acting_allowed_capabilities is explicitly required by the user intent.",
+  "risk_scope": "source-or-external"
+}

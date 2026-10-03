@@ -57,12 +57,14 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Base.UI.Workspace
   alias Phoenix.LiveView.JS
 
   @manage_capability "admin.employee.update"
+  @delete_capability "admin.employee.delete"
 
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
@@ -495,10 +497,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # Deleting confirms through the shared dialog, which states what happens to
   # this employee's record; `delete` runs only once a request is held.
   def handle_event("request_delete", _params, socket) do
-    if socket.assigns.can_delete? do
-      {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
-    else
-      {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+    case authorize_delete(socket) do
+      {:ok, socket} ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
+
+      {:denied, socket} ->
+        {:noreply, present_delete(socket)}
     end
   end
 
@@ -511,38 +515,45 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     employee = socket.assigns.employee
     company_id = socket.assigns.current_scope.user["company_id"]
 
-    cond do
-      not socket.assigns.can_delete? ->
-        {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+    case authorize_delete(socket) do
+      {:denied, socket} ->
+        {:noreply, socket |> assign(:pending_delete?, false) |> present_delete()}
 
-      not socket.assigns.pending_delete? ->
-        {:noreply, socket}
+      {:ok, socket} ->
+        if socket.assigns.pending_delete? do
+          socket = assign(socket, :pending_delete?, false)
 
-      true ->
-        socket = assign(socket, :pending_delete?, false)
+          case Employee.delete_employee(scope, company_id, employee.id) do
+            :ok ->
+              {:noreply,
+               socket
+               |> put_flash(:success, "#{employee.full_name} was deleted.")
+               |> push_navigate(to: ~p"/employees")}
 
-        case Employee.delete_employee(scope, company_id, employee.id) do
-          :ok ->
-            {:noreply,
-             socket
-             |> put_flash(:success, "#{employee.full_name} was deleted.")
-             |> push_navigate(to: ~p"/employees")}
+            {:error, :invariant_violation} ->
+              {:noreply,
+               put_flash(
+                 socket,
+                 :error,
+                 "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
+               )}
 
-          {:error, :invariant_violation} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
-             )}
+            {:error, :forbidden} ->
+              {:noreply,
+               socket
+               |> present_delete()
+               |> put_flash(:error, LiveAuthorization.denied_message())}
 
-          {:error, _reason} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "#{employee.full_name} was not deleted. Reload the page and try again."
-             )}
+            {:error, _reason} ->
+              {:noreply,
+               put_flash(
+                 socket,
+                 :error,
+                 "#{employee.full_name} was not deleted. Reload the page and try again."
+               )}
+          end
+        else
+          {:noreply, socket}
         end
     end
   end
@@ -1350,5 +1361,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # pattern).
   defp can_manage?(socket) do
     Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+  end
+
+  # `can_delete?` only decides whether the danger zone is shown. The event
+  # re-asks, and a refusal drops the key from the scope the zone reads.
+  defp authorize_delete(socket) do
+    LiveAuthorization.authorize_event(socket, @delete_capability)
+  end
+
+  defp present_delete(socket) do
+    assign(socket, :can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
   end
 end

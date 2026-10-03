@@ -200,6 +200,30 @@ defmodule Bilimbi.Core.Geonames do
     |> Enum.map(fn {iso, country} -> CountryOption.new(iso, country) end)
   end
 
+  @doc """
+  Returns one first-level division by its stored code, or nil when the code
+  is blank or unknown.
+
+  Prefer this over `list_admin1/1` when the caller already has the code.
+  Listing every division of the country and searching the list reads the
+  whole country for one name.
+  """
+  @spec get_admin1(term()) :: Admin1Summary.t() | nil
+  def get_admin1(code) when is_binary(code) do
+    case String.trim(code) do
+      "" ->
+        nil
+
+      trimmed ->
+        case Repo.get_by(Admin1, code: trimmed) do
+          nil -> nil
+          admin1 -> Admin1Summary.from_schema(admin1)
+        end
+    end
+  end
+
+  def get_admin1(_code), do: nil
+
   @spec list_admin1(String.t()) :: [Admin1Summary.t()]
   def list_admin1(country_iso) do
     case normalize_iso(country_iso) do
