@@ -232,6 +232,31 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#flash-success", "Managed User's account was deleted.")
   end
 
+  test "refuses an index deletion when admin.user.delete is revoked after mount", %{conn: conn} do
+    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
+    insert_user!(%{id: 92, company_id: 73, name: "Managed User", email: "managed@example.com"})
+    grant_capabilities!(["admin.user.list", "admin.user.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+    assert has_element?(view, "#user-92-delete")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.user.delete"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    view |> element("#user-92-delete") |> render_click()
+
+    assert has_element?(view, "#flash-error", "You do not have permission to delete users.")
+    refute has_element?(view, "#delete-user-confirm")
+    assert has_element?(view, "#user-92")
+  end
+
   test "preserves PostgreSQL LIKE contains, case, wildcard, and PHP-falsey search behavior", %{
     conn: conn
   } do

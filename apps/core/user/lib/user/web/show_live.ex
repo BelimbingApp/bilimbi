@@ -800,7 +800,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # `delete` runs only once a request is held.
   def handle_event("request_delete", _params, socket) do
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+      not delete_allowed?(socket) ->
         {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
 
       own_account?(socket) ->
@@ -823,7 +823,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     user = socket.assigns.user
 
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+      not delete_allowed?(socket) ->
         {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
 
       own_account?(socket) ->
@@ -841,6 +841,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
              socket
              |> put_flash(:success, "#{user.name}'s account was deleted.")
              |> push_navigate(to: ~p"/users")}
+
+          {:error, :forbidden} ->
+            {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
 
           {:error, :company_not_found} ->
             {:noreply,
@@ -2769,6 +2772,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # pattern).
   defp can_manage?(socket) do
     Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+  end
+
+  # The delete control is presentation. The write asks Authz with the sealed
+  # scope, and `User.delete_user/3` asks again.
+  defp delete_allowed?(socket) do
+    Authz.can(socket.assigns.current_scope.scope, "admin.user.delete").allowed
   end
 
   # The same freshness for the account's company: the mount-time

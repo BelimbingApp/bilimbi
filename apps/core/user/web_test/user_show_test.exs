@@ -4,6 +4,8 @@ defmodule BilimbiWeb.UserShowTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -464,6 +466,40 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
     refute has_element?(view, "#users td", "Grace Hopper")
+  end
+
+  test "refuses deletion when admin.user.delete is revoked after the dialog opens", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.list", "admin.user.view", "admin.user.delete"])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    view |> element("#user-delete") |> render_click()
+    assert has_element?(view, "#delete-user-confirm-confirm")
+
+    {:ok, scope} = Tenancy.scope(41)
+    revoke_user_delete!(scope)
+
+    view |> element("#delete-user-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", "You do not have permission to delete users.")
+    assert {:ok, %{name: "Grace Hopper"}} = User.get_user(scope, 73, 92)
+  end
+
+  defp revoke_user_delete!(scope) do
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.user.delete"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "shows a user whose company is archived, matching index visibility", %{conn: conn} do
