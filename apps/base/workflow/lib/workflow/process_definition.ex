@@ -20,9 +20,10 @@ defmodule Bilimbi.Base.Workflow.ProcessDefinition do
         do: invalid!("invalid dependency #{dependency.step_key}")
     end
 
-    Enum.reduce(steps, MapSet.new(), fn step, visited ->
-      visit!(by_key, step.key, MapSet.new(), visited)
-    end)
+    _ =
+      Enum.reduce(steps, MapSet.new(), fn step, visited ->
+        visit!(by_key, step.key, MapSet.new(), visited)
+      end)
 
     if Enum.any?(steps, &(float?(&1.input) or float?(&1.metadata))),
       do: invalid!("legacy_v1 cannot fingerprint floats exactly; use integers or strings")

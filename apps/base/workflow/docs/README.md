@@ -190,13 +190,13 @@ leases, dependency edges, events, JSON shapes, timestamps and sequences. It
 rejects structural drift or contradictory graph tenant identity, without guessing
 an unresolved run's tenant or translating its owner. Unknown/retired definitions,
 aliases, fingerprints and unresolved runs stay preserved and fail execution;
-they are never replaced by a fresh run. `:legacy_v1` fingerprints
-match ordered PHP v1 JSON for supported values, including empty lists, sorted
-objects and Unicode separators. Floating values fail explicitly because PHP's
-number serialization differs. Numeric object keys also refuse explicitly because
-PHP arrays coerce/sort them and can become lists; express those as lists.
-`:legacy_v1` is the only fingerprint format. Compatible owner mappings belong in private
-extensions, not the public platform.
+they are never replaced by a fresh run. Fingerprints use Belimbing's legacy v1
+format, the only format, and match ordered PHP v1 JSON for supported values,
+including empty lists, sorted objects and Unicode separators. Floating values
+fail explicitly because PHP's number serialization differs. Numeric object keys
+also refuse explicitly because PHP arrays coerce/sort them and can become lists;
+express those as lists. Compatible owner mappings belong in private extensions,
+not the public platform.
 
 `base_workflow_human_action_requests` belongs to slice 3, the human action
 gate. This baseline neither creates nor reads it; adopting a database that has
