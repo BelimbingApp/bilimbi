@@ -6,6 +6,8 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
   callback, so they cannot rescue a failure raised by that callback. This
   compile-time wrapper surrounds the completed callback instead. Rendering and
   every other lifecycle callback remain outside the recovery boundary.
+  Component dispatch first runs the host callback in `EventAuthorization`;
+  a refusal returns without invoking the component handler.
 
   A LiveView reports the failure through its own flash. A LiveComponent cannot,
   so it reports through `report_action_failure/2`, which this module defines
@@ -49,11 +51,25 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
     if Module.defines?(env.module, {:handle_event, 3}, :def) do
       kind = Module.get_attribute(env.module, :bilimbi_action_failure_kind)
 
+      dispatch =
+        if kind == :live_component do
+          quote do
+            case Bilimbi.Base.UI.EventAuthorization.authorize(socket) do
+              {:cont, socket} -> super(event, params, socket)
+              {:halt, socket} -> {:noreply, socket}
+            end
+          end
+        else
+          quote do
+            super(event, params, socket)
+          end
+        end
+
       quote do
         defoverridable handle_event: 3
 
         def handle_event(event, params, socket) do
-          super(event, params, socket)
+          unquote(dispatch)
         rescue
           exception ->
             Bilimbi.Base.UI.ActionFailureRecovery.recover(
