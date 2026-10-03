@@ -6,6 +6,10 @@ Code.require_file(
   Path.expand("../../../base/workflow/test/support/legacy_status_fixture.ex", __DIR__)
 )
 
+Code.require_file(
+  Path.expand("../../../base/workflow/test/support/legacy_human_action_fixture.ex", __DIR__)
+)
+
 defmodule Bilimbi.Core.CompatibilityTest do
   use ExUnit.Case, async: false
 
@@ -625,13 +629,14 @@ defmodule Bilimbi.Core.CompatibilityTest do
     Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
 
     tables =
-      ~w(base_workflow_process_events base_workflow_process_dependencies base_workflow_process_work_items base_workflow_process_runs base_workflow_process_definition_versions base_workflow_transition_outbox)
+      ~w(base_workflow_human_action_requests base_workflow_process_events base_workflow_process_dependencies base_workflow_process_work_items base_workflow_process_runs base_workflow_process_definition_versions base_workflow_transition_outbox)
 
     for table <- tables,
         do: SQL.query!(MigrationTestRepo, ~s(DROP TABLE "#{schema}"."#{table}"), [])
 
     fixture = Bilimbi.Base.Workflow.LegacyCoordinationFixture
     fixture.create!(MigrationTestRepo, schema)
+    Bilimbi.Base.Workflow.LegacyHumanActionFixture.create!(MigrationTestRepo, schema)
     saved = fixture.insert_in_flight!(MigrationTestRepo, schema)
 
     SQL.query!(
@@ -698,31 +703,6 @@ defmodule Bilimbi.Core.CompatibilityTest do
     SQL.query!(
       MigrationTestRepo,
       """
-      CREATE TABLE "#{schema}".base_workflow_human_action_requests (
-        id bigserial PRIMARY KEY,
-        tenant_id bigint NOT NULL,
-        idempotency_key varchar(255) NOT NULL,
-        intent_hash char(64) NOT NULL,
-        action_key varchar(255) NOT NULL,
-        subject_type varchar(255) NOT NULL,
-        subject_id varchar(255) NOT NULL,
-        process_run_id bigint,
-        work_item_id bigint,
-        actor_type varchar(255) NOT NULL,
-        actor_id bigint NOT NULL,
-        result json,
-        completed_at timestamp(0) without time zone,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone,
-        CONSTRAINT base_workflow_human_request_unique UNIQUE (tenant_id, idempotency_key)
-      )
-      """,
-      []
-    )
-
-    SQL.query!(
-      MigrationTestRepo,
-      """
       INSERT INTO "#{schema}".base_workflow_human_action_requests
         (tenant_id, idempotency_key, intent_hash, action_key, subject_type, subject_id,
          process_run_id, work_item_id, actor_type, actor_id, result, completed_at)
@@ -732,15 +712,14 @@ defmodule Bilimbi.Core.CompatibilityTest do
       [String.duplicate("c", 64), saved.run_id, saved.items["second"]]
     )
 
-    retained = ["base_workflow_human_action_requests" | tables]
-    before = workflow_snapshot(MigrationTestRepo, schema, retained)
+    before = workflow_snapshot(MigrationTestRepo, schema, tables)
     drop_bilimbi_ledger!(MigrationTestRepo, schema)
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
-    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
+    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
     assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) != []
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
-    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
+    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
 
     SQL.query!(
       MigrationTestRepo,

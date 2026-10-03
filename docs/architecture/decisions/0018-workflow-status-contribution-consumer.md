@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Scope:** Status kernel, durable coordination, ownership and source-data adoption
+**Scope:** Status kernel, durable coordination, human action gate, ownership and source-data adoption
 **Last Updated:** 2026-10-03
 
 ## Context
@@ -48,6 +48,18 @@ uses the existing graph. Subject -> run -> ordered item locking serializes
 parallel completions and per-run event allocation. All state, owner database
 effects, events and semantic Audit facts commit in the shared Repo transaction.
 
+Human actions are owner contributions under `workflow.human_actions`: a stable
+key per subject, the capability a signed-in person must hold, a
+descriptor-owned handler and optionally the executor of the work the action
+completes. The gate requires a user actor, locks the subject, checks the
+capability, then settles idempotency on the compatible tenant/key request table
+using Belimbing's own intent digest, so retained requests replay by their stored
+alias without executing. Only a new request compares the expected subject and
+work versions, runs the handler and completes the bound item through the
+coordinator's lock path, all in one transaction. Payload values PHP serializes
+differently are refused rather than hashed differently; no second digest format
+or schema addition exists.
+
 Verification/adoption retains in-flight and paused states, work versions, leases,
 JSON, timestamps and sequences without executing owner code. Unknown owners,
 unresolved scope and unavailable version/fingerprint contracts stay retained and
@@ -61,12 +73,13 @@ scoped worklist rechecks owner policy and exposes no sibling-private relations.
   mappings. Unknown mappings fail at runtime without invalidating preserved data.
 - Bounded scoped history retains initial entries, comments, inactive codes and
   nullable or agent actor identities with deterministic timestamp/id cursors.
-- Human actions and external dispatch remain later slices. The coordinator
-  resumes supported durable runs, including pause/resume and the worker lease
-  API (claim, heartbeat, leaseholder completion, failure with retry, waive,
-  block and claimed block); pending legacy outbox rows remain retained without
-  delivery in this slice. `base_workflow_human_action_requests` belongs to
-  slice 3, the human action gate: this baseline does not create or read it, and
-  adoption leaves its rows untouched.
+- External dispatch remains a later slice. The coordinator resumes supported
+  durable runs, including pause/resume and the worker lease API (claim,
+  heartbeat, leaseholder completion, failure with retry, waive, block and
+  claimed block); pending legacy outbox rows remain retained without delivery.
+- The human request table is the third compatible baseline. Its rows, digests,
+  aliases and results are adopted intact; a row whose completion and result
+  disagree fails verification. Owner UI echoes the subject and work version
+  tokens it was shown; a stale page refuses without business effect.
 - The public API and contribution shape are documented in
   `apps/base/workflow/docs/README.md`; validation owns the executable contract.
