@@ -8,22 +8,9 @@ Each immediate child is one independently sourced Extension repository and insta
 
 An Extension adapts installed capabilities through declared public contracts and supported contributions. It may depend on Base, Core, or installed Domains; another Extension dependency needs a concrete business invariant. It must not read private tables or queries, take ownership of another module's durable records, or make that module fail when the Extension is absent. Repository ownership, visibility, and licensing do not determine whether a capability is an Extension.
 
-## Repository names
+## Naming, cloning, mounting, unmounting
 
-An optional Domain repository is named `b-dom-<id>` and an Extension repository `b-ext-<id>`, in whichever GitHub organization owns it. Clone it into a folder named after the container ID, with hyphens turned into underscores, because discovery requires the folder name to equal the snake_case container ID.
-
-```bash
-git clone https://github.com/<owner>/b-dom-<id>.git apps/domains/<id_with_underscores>
-git clone https://github.com/<owner>/b-ext-<id>.git apps/extensions/<id_with_underscores>
-```
-
-`BelimbingApp/b-dom-factory` mounts at `apps/domains/factory`. A customer Extension mounts under `apps/extensions/` from the organization that owns it.
-
-## Mounting
-
-Name the mounted directory after its container `id`, and give the container `mix.exs` that same `app:`. Discovery rejects a mismatched name or a container in the wrong role folder; the rules are in `apps/base/module_registry/docs/README.md`. Run `mix bilimbi.migrate` and the other database tasks from the umbrella root, not from inside the Extension: that runtime cannot see the whole graph, so `ModuleRegistry.complete_modules!/0` refuses it.
-
-Unmounting an Extension keeps its tables, rows, and ledger rows; `bilimbi_migration_provenance` is what lets `mix bilimbi.migrate` accept them afterwards (`apps/core/compatibility/lib/compatibility/migration_provenance.ex`). Never edit or renumber an applied migration: a remount that ships a different file under an applied version is refused.
+`apps/domains/AGENTS.md` "Repository names" and "Mounting" own these rules for both roles: `b-ext-<id>` repositories, the snake_case folder name, the container `id` and `app:` match, database tasks from the umbrella root, and applied migrations that never change. They apply to an Extension unchanged.
 
 ## Maintaining this file
 
