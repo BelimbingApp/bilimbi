@@ -39,7 +39,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/workspace/orders")
   end
 
-  test "an empty workspace opens the picker and is the sidebar's current page", %{conn: conn} do
+  test "an empty workspace stays usable until the picker is requested", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
     assert has_element?(view, "#nav-workspace[aria-current='page']")
@@ -54,6 +54,9 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     refute has_element?(view, "#nav-tile-workspace")
     assert has_element?(view, "#workspace-empty-state", "No pages open")
     assert has_element?(view, "#workspace-add-page")
+    refute has_element?(view, "#workspace-picker")
+
+    view |> element("#workspace-empty-add") |> render_click()
     assert_modal_dialog(view, "workspace-picker", "Add a page")
     assert has_element?(view, "#workspace-pick-admin-company", "Companies")
     refute has_element?(view, "#workspace-pick-workspace")
@@ -62,6 +65,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "the picker lists only pages this account may open", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/workspace")
 
+    view |> element("#workspace-empty-add") |> render_click()
     refute has_element?(view, "#workspace-pick-admin-company")
     assert has_element?(view, "#workspace-picker-empty", "No pages to add")
   end
@@ -69,6 +73,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "adding pages splits the focused tile and writes the tree into the URL", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
+    view |> element("#workspace-empty-add") |> render_click()
     view |> element("#workspace-pick-admin-company") |> render_click()
     assert_patch(view, "/workspace?t=%2Fcompanies")
 

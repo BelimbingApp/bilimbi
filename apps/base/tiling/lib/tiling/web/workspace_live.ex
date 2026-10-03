@@ -14,7 +14,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   The tree is always in the URL: `?t=` carries the ad-hoc layout after every
   change, so Back and Forward work at the workspace level and a copied URL
   reproduces the screen. `/workspace/:slug` opens a saved layout, and
-  `/workspace` alone opens the account's default one, else the page picker.
+  `/workspace` alone opens the account's default one, else an empty workspace;
+  the page picker opens only when requested.
 
   `?open=` is how a page is tiled in place. The sidebar's tile control on
   any page links to `/workspace?t=<that page>&inplace=1&open=<the clicked
@@ -235,7 +236,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
           |> assign(:encoded, nil)
           |> keep_focus()
 
-        {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
+        {:noreply, socket}
 
       slug ->
         {:noreply, push_navigate(socket, to: ~p"/workspace/#{slug}")}
