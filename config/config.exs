@@ -27,6 +27,11 @@ config :web, BilimbiWeb.Endpoint,
 config :bilimbi_core_user,
   pubsub_server: BilimbiWeb.PubSub
 
+# Session terminations ride the host's PubSub so the host can end the live
+# sockets of a session that ended (BilimbiWeb.SessionDisconnect).
+config :bilimbi_base_session,
+  pubsub_server: BilimbiWeb.PubSub
+
 # Web owns reauthentication, request throttling, and company authorization.
 # Base Settings calls host seams without depending on Core implementations.
 config :bilimbi_base_settings,

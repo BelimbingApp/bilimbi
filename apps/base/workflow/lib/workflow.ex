@@ -12,9 +12,14 @@ defmodule Bilimbi.Base.Workflow do
   Context carries comment, comment_tag, assignees, attachments, metadata and
   owner input; it cannot name an actor or tenant. Anonymous system writes fail.
   Named system principals remain subject to owner policy and Authz.
+
+  Human actions are registered owner contributions a signed-in person
+  executes once: the gate binds the actor's capability, the proven subject
+  and any bound work item, enforces the expected subject and work versions,
+  and keeps one result per tenant and idempotency key with an intent digest.
   """
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Base.Workflow.{Coordination, Definitions, Engine, PendingWork}
+  alias Bilimbi.Base.Workflow.{Coordination, Definitions, Engine, HumanActionGate, PendingWork}
 
   @type subject_ref :: %{type: String.t(), id: pos_integer() | String.t()}
   @spec transition(Scope.t(), subject_ref(), String.t(), map()) :: {:ok, map()} | {:error, term()}
@@ -149,4 +154,34 @@ defmodule Bilimbi.Base.Workflow do
   @spec run_events(Scope.t(), pos_integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def run_events(%Scope{} = scope, run_id, opts \\ []),
     do: Coordination.events(scope, run_id, opts)
+
+  @doc """
+  Lists the human actions the signed-in actor may execute on a subject.
+
+  Returns `%{subject_version: token, actions: entries}`. Each entry carries
+  the action's `key`, `label`, `capability` and `executor_key`; a work-bound
+  action appears once per due available work item with `process_run_id`,
+  `work_item_id` and `work_version`. A page echoes the tokens back through
+  `execute_action/3`. Availability is not business eligibility: execution
+  repeats every check under the subject lock.
+  """
+  @spec available_actions(Scope.t(), subject_ref()) :: {:ok, map()} | {:error, term()}
+  def available_actions(%Scope{} = scope, subject),
+    do: HumanActionGate.available(scope, subject)
+
+  @doc """
+  Executes one human action exactly once per tenant and idempotency key.
+
+  The request map carries `:action_key`, `:idempotency_key`,
+  `:expected_subject_version`, an optional JSON `:payload` and, for a
+  work-bound action, `:process_run_id`, `:work_item_id` and
+  `:expected_work_version`. A repeated request with the same intent returns
+  the saved result with `replayed: true`; the same key with different intent
+  conflicts. A stale subject or work version, a missing capability, another
+  tenant or a system actor refuses, and every refusal rolls back the owner
+  handler, the request row and the work completion together.
+  """
+  @spec execute_action(Scope.t(), subject_ref(), map()) :: {:ok, map()} | {:error, term()}
+  def execute_action(%Scope{} = scope, subject, request),
+    do: HumanActionGate.execute(scope, subject, request)
 end
