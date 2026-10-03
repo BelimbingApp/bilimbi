@@ -73,9 +73,9 @@ bytes. For example, on a trusted machine use
 `printf 'base64:'; openssl rand -base64 32` and remove any trailing newline
 from the generated value. When adopting a Belimbing database, set
 `BELIMBING_APP_KEY` to that database's legacy `APP_KEY` so existing encrypted
-settings remain readable. Rotating this key requires decrypting and
-re-encrypting every stored encrypted setting with the new key before deploying
-it; otherwise those settings cannot be read. Passwords in `DATABASE_URL`
+settings remain readable. Preserve this key across deployments. Rotating it
+requires decrypting and re-encrypting every stored encrypted setting with the
+new key before deploying it; otherwise those settings cannot be read. Passwords in `DATABASE_URL`
 must be percent-encoded. Restrict the file:
 
 ```bash
@@ -90,8 +90,6 @@ mail adapter has not yet moved them into operator settings. Keep these secrets
 only in the protected environment file, never in Git. Other operational
 settings belong in Bilimbi's operator UI. Preserve `SECRET_KEY_BASE` across
 deployments; rotating it invalidates signed sessions and queued actor jobs.
-Preserve `BELIMBING_APP_KEY` across deployments as well; rotating it requires
-re-encrypting stored encrypted settings with the replacement key.
 
 Install the unit and Caddy site:
 
