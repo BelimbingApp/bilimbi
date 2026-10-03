@@ -81,6 +81,36 @@ These are single samples on a shared machine, not a guarantee for a particular
 CI runner. The deterministic build-retention regressions support the mechanism;
 remote CI timing should be compared after publication.
 
+## Lane G build-loop follow-up
+
+The performance audit's hook collector baseline loaded 428 compiled modules in
+a fresh Mix VM and spent **2,756 ms** doing so, despite finding no colocated
+hooks. The collector now intersects the compiled application's module list with
+the extracted `phoenix-colocated/<otp_app>/` directories and loads only those
+owners. A fresh-VM direct collector call in the isolated implementation
+worktree took **224 ms** and returned `{:noop, []}`. The existing unmount test
+still retains extracted files and proves they do not re-enter the bundle.
+
+The webhook registry lookup's empty-registry constraint is documented beside
+`BilimbiWeb.Webhooks.deliver/2`. For the separate `compile.strict` requirement,
+see [mounted-code traversal](architecture/0010_composition-model.md#realization-outcome).
+
+| Measurement | Audit baseline | Implementation worktree |
+| --- | ---: | ---: |
+| Hook collector, fresh VM | 2,756 ms | 224 ms |
+| Root no-op `mix compile` | 11.0 s | 25.84 s |
+| Focused colocated-hook tests | existing behavior | 4 passed |
+
+The root compile samples are not a matched timing comparison: the audit had a
+warm, mounted composition and its own shared build cache, while this disposable
+worktree began without dependencies or compiled applications and does not have
+the optional mounted repositories. The 25.84 s figure is reported as observed,
+not as an improvement. The audit's mtime-keyed graph cache proposal was not
+adopted: module discovery must keep reading changed file contents and
+revalidating directories and migrations on every call, as specified in the
+Module Registry guide. The existing full-content literal-data cache remains in
+place.
+
 ## Changes
 
 Local path dependencies now consistently use `:test` during test builds.
