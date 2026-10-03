@@ -226,6 +226,8 @@ running tenant run of that subject with `process_run_id`, `work_item_id` and
 `work_version`. System actors, named principals included, get
 `:human_actor_required`; a person is required. Availability rechecks owner
 proof and due times but is not business eligibility.
+The gate follows every candidate page, including empty pages with a next cursor;
+the returned action list is not capped at the worklist's page size.
 
 ```elixir
 execute_action(scope, ref, %{
@@ -234,6 +236,11 @@ execute_action(scope, ref, %{
   process_run_id: 12, work_item_id: 34, expected_work_version: 1
 })
 ```
+
+The request uses atom keys. `action_key`, `idempotency_key` and
+`expected_subject_version` are required; omitting any of them returns
+`{:error, :invalid_request}`. `payload` defaults to `%{}`. Work-bound actions
+require all three work-binding fields shown above; unbound actions omit them.
 
 Execution locks the subject through its adapter (`:execute_action`), checks the
 capability, then locks the tenant/key request row. A row with the same intent
@@ -255,9 +262,11 @@ over the recursively key-sorted intent (`subject_type`, `subject_id`,
 canonical form serves legacy and new requests; a legacy row is compared under
 its stored class alias and replayed without executing. Floats and
 PHP-numeric object keys serialize differently in PHP and are refused as
-`:unreproducible_intent` before any write; express such values as strings. A
-retained request whose completion and result disagree fails verification, and
-one the source left open is `:request_incomplete`, never re-executed.
+`:unreproducible_intent` before any write. Express floating values as strings;
+replace numeric object keys with nonnumeric keys or represent the collection
+as a list. A retained request whose completion and result disagree fails
+verification, and one the source left open is `:request_incomplete`, never
+re-executed.
 
 The human request baseline is the third compatible migration. Adoption keeps
 every row, hash, alias, actor type and result JSON; `actor_type` values other

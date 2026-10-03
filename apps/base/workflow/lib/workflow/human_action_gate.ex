@@ -283,7 +283,8 @@ defmodule Bilimbi.Base.Workflow.HumanActionGate do
       not (text?(request[:action_key]) and text?(request[:idempotency_key])) ->
         {:error, :invalid_request}
 
-      not (is_binary(request[:expected_subject_version]) and request[:expected_subject_version] != "") ->
+      not (is_binary(request[:expected_subject_version]) and
+               request[:expected_subject_version] != "") ->
         {:error, :invalid_request}
 
       not Enum.all?(
