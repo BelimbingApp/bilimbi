@@ -59,6 +59,28 @@ commands capture their own output. The after run includes rebuilding the test
 closure following the baseline's production dependency builds. No test timeout,
 assertion, password-hash setting, or database lifecycle check was relaxed.
 
+ExUnit-reported durations by layer, separate from process/setup wall time:
+
+| Suite | Before | After | After package wall time |
+| --- | ---: | ---: | ---: |
+| Core | 895.00 s | 894.00 s | 930.76 s |
+| Base | 40.53 s | 55.28 s | 131.86 s |
+| Web integrations | 186.00 s | 206.60 s | 225.00 s |
+| Mounted Domains | 25.30 s | 30.10 s | 90.82 s |
+
+Compatibility alone reported 861.4 seconds before and 866.2 seconds after;
+it remains the largest cost. Summed ExUnit time increased from 1,146.83 to
+1,185.98 seconds, including the added regressions. The remainder of the full
+command fell from about 419.15 to 246.69 seconds, consistent with reduced build
+and setup work rather than less test execution.
+
+The baseline ran from 21:44:31 to 22:10:37 UTC on 2026-10-02; the implementation
+ran immediately afterward until 22:34:30 UTC. One-minute machine load was 28.63
+at baseline start, 11.38 at the transition, and 17.21 at implementation finish.
+These are single samples on a shared machine, not a guarantee for a particular
+CI runner. The deterministic build-retention regressions support the mechanism;
+remote CI timing should be compared after publication.
+
 ## Lane G build-loop follow-up
 
 The performance audit's hook collector baseline loaded 428 compiled modules in
@@ -90,28 +112,6 @@ adopted: module discovery must keep reading changed file contents and
 revalidating directories and migrations on every call, as specified in the
 Module Registry guide. The existing full-content literal-data cache remains in
 place.
-
-ExUnit-reported durations by layer, separate from process/setup wall time:
-
-| Suite | Before | After | After package wall time |
-| --- | ---: | ---: | ---: |
-| Core | 895.00 s | 894.00 s | 930.76 s |
-| Base | 40.53 s | 55.28 s | 131.86 s |
-| Web integrations | 186.00 s | 206.60 s | 225.00 s |
-| Mounted Domains | 25.30 s | 30.10 s | 90.82 s |
-
-Compatibility alone reported 861.4 seconds before and 866.2 seconds after;
-it remains the largest cost. Summed ExUnit time increased from 1,146.83 to
-1,185.98 seconds, including the added regressions. The remainder of the full
-command fell from about 419.15 to 246.69 seconds, consistent with reduced build
-and setup work rather than less test execution.
-
-The baseline ran from 21:44:31 to 22:10:37 UTC on 2026-10-02; the implementation
-ran immediately afterward until 22:34:30 UTC. One-minute machine load was 28.63
-at baseline start, 11.38 at the transition, and 17.21 at implementation finish.
-These are single samples on a shared machine, not a guarantee for a particular
-CI runner. The deterministic build-retention regressions support the mechanism;
-remote CI timing should be compared after publication.
 
 ## Changes
 

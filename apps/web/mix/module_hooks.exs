@@ -2,10 +2,11 @@ defmodule BilimbiWeb.ModuleHooks do
   @moduledoc """
   Build-time hook composition for the validated workspace.
 
-  Read compiled HEEx macro-component metadata, never glob phoenix-colocated:
-  that directory can retain files belonging to unmounted applications. Import
-  extracted hook files directly so duplicate names within a Phoenix manifest
-  cannot be silently overwritten before we check them.
+  Read compiled HEEx macro-component metadata only for selected application
+  modules with extracted assets. Extraction directories narrow that selection;
+  they cannot establish ownership because they may retain unmounted files.
+  Import extracted hook files directly so duplicate names within a Phoenix
+  manifest cannot be silently overwritten before we check them.
 
   This adapter uses LiveView 1.2.9's ColocatedAssets.Entry metadata contract.
   Recheck it and the extraction path when upgrading LiveView. The hook name is
