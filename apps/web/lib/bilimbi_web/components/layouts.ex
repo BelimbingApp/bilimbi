@@ -4,8 +4,6 @@ defmodule BilimbiWeb.Layouts do
   use Phoenix.Component
 
   defdelegate auth(assigns), to: Bilimbi.Base.UI.Layouts
-  defdelegate flash_group(assigns), to: Bilimbi.Base.UI.Layouts
-  def root(assigns), do: Bilimbi.Base.UI.Layouts.root(assigns)
 
   attr(:flash, :map, required: true)
   attr(:current_scope, :map, required: true)
