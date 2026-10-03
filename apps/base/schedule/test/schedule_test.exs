@@ -609,7 +609,7 @@ defmodule Bilimbi.Base.ScheduleTest do
         finished_at: old
       })
 
-    assert {:ok, 0} = Schedule.set_history_retention(actor(), 0)
+    assert {:ok, 0} = Schedule.set_history_retention(granted_operator([@manage]), 0)
     assert Schedule.prune_occurrences() == 0
     assert :ok = Bilimbi.Base.Schedule.OccurrenceRetentionWorker.handle_scheduled_job(%{}, %{})
     assert Repo.get(Occurrence, occurrence.id)
