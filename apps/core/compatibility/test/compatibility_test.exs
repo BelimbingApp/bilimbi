@@ -624,6 +624,60 @@ defmodule Bilimbi.Core.CompatibilityTest do
              ).rows
   end
 
+  test "Workflow verify then adopt preserves retained rows when advancing an existing ledger prefix",
+       %{schema: schema} do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+
+    tables =
+      ~w(base_workflow base_workflow_status_configs base_workflow_status_transitions base_workflow_status_history base_workflow_kanban_columns base_workflow_human_action_requests base_workflow_process_events base_workflow_process_dependencies base_workflow_process_work_items base_workflow_process_runs base_workflow_process_definition_versions base_workflow_transition_outbox)
+
+    for table <- tables,
+        do: SQL.query!(MigrationTestRepo, ~s(DROP TABLE "#{schema}"."#{table}"), [])
+
+    Bilimbi.Base.Workflow.LegacyStatusFixture.create!(MigrationTestRepo, schema)
+    Bilimbi.Base.Workflow.LegacyCoordinationFixture.create!(MigrationTestRepo, schema)
+    Bilimbi.Base.Workflow.LegacyHumanActionFixture.create!(MigrationTestRepo, schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      "INSERT INTO \"#{schema}\".base_workflow (code, label, model_class) VALUES ('reference_flow', 'Reference review', 'Legacy\\\\Reference\\\\Record')",
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      "INSERT INTO \"#{schema}\".base_workflow_status_history (flow, flow_id, status, transitioned_at) VALUES ('reference_flow', 41, 'review', '2026-01-01')",
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      "INSERT INTO \"#{schema}\".base_workflow_human_action_requests (tenant_id, idempotency_key, intent_hash, action_key, subject_type, subject_id, actor_type, actor_id, result, completed_at) VALUES (1, 'retained', $1, 'reference.complete', 'Legacy\\\\Reference\\\\Record', '41', 'user', 7, '{\"saved\":true}', '2026-01-01')",
+      [String.duplicate("a", 64)]
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      "INSERT INTO \"#{schema}\".base_workflow_process_runs (definition_key, definition_version, definition_fingerprint, status, started_at, available_at, scope_type, tenant_id, input) VALUES ('reference.review', 1, $1, 'running', '2026-01-01', '2026-01-01', 'tenant', 1, '{\"carried\":true}')",
+      [String.duplicate("b", 64)]
+    )
+
+    before = workflow_snapshot(MigrationTestRepo, schema, tables)
+    previous = Enum.take(Compatibility.baseline_versions(), 2)
+
+    SQL.query!(
+      MigrationTestRepo,
+      "DELETE FROM \"#{schema}\".bilimbi_schema_migrations WHERE version > $1",
+      [List.last(previous)]
+    )
+
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert {:ok, :advanced} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
+    assert recorded_versions(MigrationTestRepo, schema) == Compatibility.baseline_versions()
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+  end
+
   test "verify then adopt preserves legacy coordination rows, in-flight work, states and sequences",
        %{schema: schema} do
     Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)

@@ -19,8 +19,8 @@
     20_261_003_092_000 => :compatible_baseline,
     20_261_003_100_000 => :bilimbi_only
   },
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Base.Workflow.SchemaContract,
-  contribution_provider: nil,
+  contribution_provider: Bilimbi.Base.Workflow.Contributions,
   dev_seed: nil
 ]

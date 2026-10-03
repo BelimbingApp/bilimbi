@@ -89,10 +89,45 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
     )
   end
 
+  def create_reference_tables! do
+    schema = Bilimbi.Base.Database.DataCase.temporary_schema!()
+    LegacyStatusFixture.create!(Repo, schema)
+    Bilimbi.Base.Workflow.LegacyCoordinationFixture.create!(Repo, schema)
+    Bilimbi.Base.Workflow.LegacyHumanActionFixture.create!(Repo, schema)
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE base_workflow_subject_bindings (
+        id bigserial PRIMARY KEY, tenant_id bigint NOT NULL, flow varchar(255) NOT NULL,
+        flow_id bigint NOT NULL, subject_type varchar(255) NOT NULL, subject_id varchar(255) NOT NULL,
+        owner varchar(255) NOT NULL, created_at timestamp(0) NOT NULL,
+        CONSTRAINT base_workflow_subject_binding_unique UNIQUE(flow, flow_id),
+        CONSTRAINT base_workflow_subject_identity_unique UNIQUE(tenant_id, subject_type, subject_id)
+      )
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE TEMPORARY TABLE workflow_test_subjects (id bigserial PRIMARY KEY, tenant_id bigint NOT NULL, company_id bigint, status varchar(255), marker varchar(255)) ON COMMIT PRESERVE ROWS",
+      []
+    )
+  end
+
   def subject!(attrs \\ %{}) do
     attrs = Map.merge(%{tenant_id: 1, company_id: 10, status: "draft", marker: "original"}, attrs)
     row = %TestSubjectSchema{} |> Ecto.Changeset.change(attrs) |> Repo.insert!()
     %{type: "example.record", id: row.id}
+  end
+
+  def reference_subject!(attrs \\ %{}) do
+    attrs =
+      Map.merge(%{tenant_id: 41, company_id: 73, status: "draft", marker: "original"}, attrs)
+
+    row = %TestSubjectSchema{} |> Ecto.Changeset.change(attrs) |> Repo.insert!()
+    %{type: "reference.record", id: row.id}
   end
 
   def state(id), do: Repo.get!(TestSubjectSchema, id)

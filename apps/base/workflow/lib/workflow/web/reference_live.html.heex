@@ -1,0 +1,80 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={nil}>
+  <.page id="workflow-reference-page" variant={:detail}>
+    <.header>
+      Workflow reference
+      <:subtitle>
+        A generic review subject exercises status, durable work, human actions and history.
+      </:subtitle>
+    </.header>
+    <section id="workflow-reference-actions" class="mt-6">
+      <.section_heading id="workflow-reference-actions-heading" title="Available actions" />
+      <.panel_notice
+        :if={@failure}
+        id="workflow-reference-failure"
+        kind={:error}
+        on_dismiss={JS.push("clear_failure")}
+        class="mb-4"
+      >
+        {@failure}
+      </.panel_notice>
+      <.empty_state
+        :if={@actions == [] and is_nil(@failure)}
+        title="No actions available"
+        reason="Actions appear when your role and the current work allow them."
+      />
+      <div
+        :for={{action, index} <- Enum.with_index(@actions)}
+        id={"workflow-action-#{index}"}
+        class="flex items-center justify-between gap-4 border-b border-line py-3"
+      >
+        <div>
+          <p class="font-medium text-ink">{action.label}</p>
+          <p :if={action.work_item_id} class="text-sm text-ink-muted">
+            Review work item {action.work_item_id}
+          </p>
+        </div>
+        <.button
+          id={"execute-workflow-action-#{index}"}
+          phx-click="execute"
+          phx-value-action={action.key}
+          phx-value-work_item_id={action.work_item_id}
+          variant="primary"
+        >
+          {action.label}
+        </.button>
+      </div>
+    </section>
+    <section id="workflow-reference-work" class="mt-8">
+      <.section_heading id="workflow-reference-work-heading" title="Pending work" count={length(@work)} />
+      <.table
+        id="workflow-reference-work-rows"
+        rows={@work}
+        row_id={fn item -> "workflow-work-#{item.id}" end}
+        caption="Pending work"
+      >
+        <:col :let={item} label="Work">{item.label}</:col>
+        <:col :let={item} label="Status">{item.status}</:col>
+        <:empty :if={@work == []} title="No pending work" reason="Due review work appears here." />
+      </.table>
+    </section>
+    <section id="workflow-reference-history" class="mt-8">
+      <.section_heading id="workflow-reference-history-heading" title="History" />
+      <.table
+        id="workflow-reference-history-rows"
+        rows={@history}
+        row_id={fn entry -> "workflow-history-#{entry.id}" end}
+        caption="Status history"
+      >
+        <:col :let={entry} label="Status">{entry.status}</:col>
+        <:col :let={entry} label="When">
+          <.datetime id={"workflow-history-time-#{entry.id}"} value={entry.transitioned_at} />
+        </:col>
+        <:empty
+          :if={@history == []}
+          title="No history yet"
+          reason="Completed status changes and actions appear here."
+        />
+      </.table>
+    </section>
+  </.page>
+</Layouts.app>
