@@ -19,7 +19,8 @@ how session termination affects open pages.
 
 The Web authentication edge calls `touch_session/2` only after validating the
 session identity, including authenticated LiveView events and live-patch
-navigation. These use the server-held session identity, so a continuously used
+navigation. Component-targeted events reach the authenticated host through
+Base UI's shared component event wrapper. These use the server-held session identity, so a continuously used
 LiveView refreshes activity without requiring a remount. It writes at most once
 per configured interval and bypasses
 audit capture because this is machine housekeeping. `session.retention_days`

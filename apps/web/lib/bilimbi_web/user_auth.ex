@@ -621,6 +621,16 @@ defmodule BilimbiWeb.UserAuth do
           {:cont, socket}
         end)
 
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :component_session_activity, :handle_info, fn
+          {Bilimbi.Base.UI.ComponentActivity, :activity}, socket ->
+            _ = Session.touch_session(socket.assigns.current_scope.session_identity["session_id"])
+            {:halt, socket}
+
+          _message, socket ->
+            {:cont, socket}
+        end)
+
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}

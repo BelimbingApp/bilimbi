@@ -43,6 +43,27 @@ defmodule BilimbiWeb.SessionActivityTest do
     end
   end
 
+  test "component-targeted events preserve activity without audit writes", %{
+    view: view,
+    session_id: session_id
+  } do
+    for open? <- [true, false] do
+      age_session(session_id, System.system_time(:second) - 2 * 86_400)
+      audit_count = Repo.aggregate(MutationSchema, :count)
+      before_event = System.system_time(:second)
+
+      view |> element("#app-notifications-bell") |> render_click()
+      _ = :sys.get_state(view.pid)
+
+      assert has_element?(view, "#app-notifications-bell[aria-expanded='#{open?}']")
+      assert {:ok, entry} = Session.fetch_session(session_id)
+      assert entry.last_activity >= before_event
+      assert Repo.aggregate(MutationSchema, :count) == audit_count
+      assert Session.prune_by_retention() == 0
+      assert {:ok, _entry} = Session.fetch_session(session_id)
+    end
+  end
+
   test "events within the configured interval do not rewrite activity", %{
     view: view,
     session_id: session_id
@@ -50,6 +71,9 @@ defmodule BilimbiWeb.SessionActivityTest do
     recent = System.system_time(:second) - 30
     age_session(session_id, recent)
     render_click(view, "toggle-layout-edit")
+    assert {:ok, %{last_activity: ^recent}} = Session.fetch_session(session_id)
+    view |> element("#app-notifications-bell") |> render_click()
+    _ = :sys.get_state(view.pid)
     assert {:ok, %{last_activity: ^recent}} = Session.fetch_session(session_id)
   end
 
@@ -72,6 +96,9 @@ defmodule BilimbiWeb.SessionActivityTest do
   test "activity does not recreate a terminated session", %{view: view, session_id: session_id} do
     assert :ok = Session.delete_session(session_id)
     render_click(view, "toggle-layout-edit")
+    assert {:error, :not_found} = Session.fetch_session(session_id)
+    view |> element("#app-notifications-bell") |> render_click()
+    _ = :sys.get_state(view.pid)
     assert {:error, :not_found} = Session.fetch_session(session_id)
   end
 
