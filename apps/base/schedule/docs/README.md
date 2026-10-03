@@ -73,10 +73,14 @@ The runtime contributes installation-global `admin.system.schedule.view`,
 `.execute`, and `.manage` capabilities. The Schedule operator board keeps
 these capabilities distinct: view reads bounded task, history, and diagnostic
 facts; execute queues run-now; manage reviews definitions, pauses or resumes
-them, and changes retention. Every handler re-authorizes against current Authz
-state. Successful operator commands and their actor are recorded through Base
-Audit in the same transaction as the controlled state change; operational run
-rows remain separate best-effort evidence.
+them, and changes retention. Those operator functions take the sealed scope
+and check that same capability; the board's `can_*` assigns only choose which
+controls to show, and `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`
+re-asks before the event. A system actor is refused. The scheduler enqueues
+through `enqueue_due/2`, not the operator functions. Successful operator
+commands and their actor are recorded through Base Audit in the same
+transaction as the controlled state change; operational run rows remain
+separate best-effort evidence.
 
 History filtering, ordering, exact totals, and pagination happen in PostgreSQL
 before rows reach the LiveView. The start and end date filters bound calendar

@@ -7,7 +7,10 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Core.Employee
+
+  @delete_capability "admin.employee-type.delete"
 
   @active_nav "admin.employee-type"
   @default_page 1
@@ -114,16 +117,19 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   # is refused before any dialog opens, so nobody confirms a delete that would
   # not be served.
   def handle_event("request_delete", %{"id" => id_str}, socket) do
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.employee-type.delete") ->
-        delete_forbidden(socket)
+    case authorize_delete(socket) do
+      {:denied, socket} ->
+        {:noreply, assign(socket, :pending_delete, nil)}
 
-      type = find_listed(socket, id_str) ->
-        request_delete(socket, type)
+      {:ok, socket} ->
+        type = find_listed(socket, id_str)
 
-      true ->
-        {:noreply,
-         put_flash(socket, :error, "That employee type does not exist in this company.")}
+        if type do
+          request_delete(socket, type)
+        else
+          {:noreply,
+           put_flash(socket, :error, "That employee type does not exist in this company.")}
+        end
     end
   end
 
@@ -132,24 +138,26 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   end
 
   def handle_event("delete", _params, socket) do
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.employee-type.delete") ->
-        delete_forbidden(socket)
+    case authorize_delete(socket) do
+      {:denied, socket} ->
+        {:noreply, assign(socket, :pending_delete, nil)}
 
-      is_nil(socket.assigns.pending_delete) ->
-        {:noreply, socket}
+      {:ok, socket} ->
+        if is_nil(socket.assigns.pending_delete) do
+          {:noreply, socket}
+        else
+          type = socket.assigns.pending_delete
 
-      true ->
-        type = socket.assigns.pending_delete
-
-        socket
-        |> assign(:pending_delete, nil)
-        |> start_delete(type.id)
+          socket
+          |> assign(:pending_delete, nil)
+          |> start_delete(type.id)
+        end
     end
   end
 
-  defp delete_forbidden(socket) do
-    {:noreply, put_flash(socket, :error, "You do not have permission to delete employee types.")}
+  # `allowed?/2` on the row only decides whether the control is shown.
+  defp authorize_delete(socket) do
+    LiveAuthorization.authorize_event(socket, @delete_capability)
   end
 
   defp find_listed(socket, id_str) do
@@ -179,6 +187,10 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   def handle_async(:delete_employee_type, {:ok, {:error, :type_not_found}}, socket) do
     {:noreply, delete_failed(socket, "That employee type does not exist in this company.")}
+  end
+
+  def handle_async(:delete_employee_type, {:ok, {:error, :forbidden}}, socket) do
+    {:noreply, delete_failed(socket, LiveAuthorization.denied_message())}
   end
 
   def handle_async(:delete_employee_type, {:ok, {:error, :company_not_found}}, socket) do

@@ -81,9 +81,10 @@ Core Employee exposes the following public functions without leaking schemas or 
 - `list_employee_types(scope, company_id)`: Returns all system types and the specified company's custom types, ordered by `[desc: is_system, asc: label, asc: code]`.
 - `create_employee_type(scope, company_id, attributes)`: Creates a custom employee type for `company_id` after validating that the code is not reserved.
 - `update_employee_type(scope, company_id, type_id, attributes)`: Updates a company's custom employee type. Only `:label` is mutable; `:code` and `:is_system` are immutable. Returns `{:error, :is_system}` if attempting to update a system type.
-- `delete_employee_type(scope, company_id, type_id)`: Deletes a custom employee type after verifying under row lock that:
+- `delete_employee_type(scope, company_id, type_id)`: Checks the `admin.employee-type.delete` capability, then deletes a custom employee type after verifying under row lock that:
   1. The type belongs to `company_id` and `is_system = false` (returns `{:error, :is_system}` otherwise).
   2. No employee in `company_id` references the type's `code` (returns `{:error, :in_use}` otherwise).
+  Returns `{:error, :forbidden}` when the actor lacks the `admin.employee-type.delete` capability. Anonymous system actors bypass the check.
 
 ## Consequences
 

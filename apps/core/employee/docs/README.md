@@ -106,6 +106,8 @@ types. System types (`is_system = true, company_id = nil`) are immutable,
 platform-wide, and cannot be modified or deleted. Custom employee types
 (`is_system = false, company_id = company_id`) belong to one explicit company.
 `update_employee_type/4` permits label updates only; codes are immutable.
-`delete_employee_type/3` verifies under row lock that the custom type is not
-referenced by any employee in the company (`:in_use`).
+`delete_employee_type/3` checks the `admin.employee-type.delete` capability
+(anonymous system actors bypass the check) and then verifies under row lock
+that the custom type is not referenced by any employee in the company
+(`:in_use`).
 
