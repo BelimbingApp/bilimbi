@@ -247,7 +247,7 @@ the ownership, migration, verification, and adoption semantics are defined in
 [Database Architecture](./database.md). Do not create a separate database
 dependency graph beside the module descriptors.
 
-Workflow status and process definitions use the same snapshot through the `:workflow`
+Workflow status, process and human action definitions use the same snapshot through the `:workflow`
 consumer ([ADR 0018](./decisions/0018-workflow-status-contribution-consumer.md)).
 Owner-proven adapters execute business rules; exact legacy aliases interpret
 retained data without introducing an upward dependency or another registry.
@@ -338,7 +338,9 @@ The chosen mechanisms, each owned where it is enforced:
   build gate for this rule.
 - **Mounted-code traversal.** Formatter subdirectories, guard scans, Tailwind
   sources, `precommit.test`, and `compile.strict` derive their paths from
-  discovery rather than fixed-depth globs.
+  discovery rather than fixed-depth globs. The strict task compiles each path
+  package in its own project context because root compilation does not pass
+  `--warnings-as-errors` into path dependencies.
 - **Repository CI.** A mounted repository's CI checks out the Platform at a
   pinned revision, mounts itself, resolves the composition lock, and runs the
   Platform's precommit, once mounted and once absent; the Factory workflow is

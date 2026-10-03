@@ -9,8 +9,8 @@ defmodule Bilimbi.Base.Settings.Form do
   concern. A module that declares a new editable setting gets it on screen with
   no UI change, which is the whole point of generating the form.
 
-  Everything here is pure except `load/2` and `save/3`, which read and write
-  through `Bilimbi.Base.Settings`. There is no Phoenix dependency: rendering
+  Storage reads and writes go through `Bilimbi.Base.Settings`.
+  There is no Phoenix dependency: rendering
   belongs to the screen, and the rules below belong to every screen equally.
 
   ## The three rules that are easy to get wrong
@@ -21,10 +21,10 @@ defmodule Bilimbi.Base.Settings.Form do
   instead would pin an empty string *as* the override, and the field would look
   cleared while permanently shadowing the value it should have inherited.
 
-  **Inherited is not the same as set here.** `Settings.overridden?/2` is the
-  only thing that distinguishes them, and a screen that does not show the
-  difference makes clearing a field look like it did nothing — the value comes
-  straight back, because it was always inherited.
+  **Inherited is not the same as set here.** The override metadata returned
+  by `Settings.resolve_many/2` distinguishes them, and a screen that does not
+  show the difference makes clearing a field look like it did nothing — the
+  value comes straight back, because it was always inherited.
 
   **An encrypted value never reaches the browser.** A stored secret renders as
   a mask, and a submission still equal to that mask means "unchanged", not
@@ -73,19 +73,24 @@ defmodule Bilimbi.Base.Settings.Form do
   def fields(groups, scope) when is_list(groups) do
     definitions = Settings.definitions()
 
-    groups
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {group, position} ->
-      definitions
-      |> Enum.filter(fn {_key, definition} ->
-        definition.editable == group and
-          Enum.any?(Scope.chain(scope), &Definition.allows_scope?(definition, &1))
+    selected =
+      groups
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {group, position} ->
+        definitions
+        |> Enum.filter(fn {_key, definition} ->
+          definition.editable == group and
+            Enum.any?(Scope.chain(scope), &Definition.allows_scope?(definition, &1))
+        end)
+        |> Enum.map(fn {key, definition} -> {position, key, definition} end)
       end)
-      |> Enum.sort_by(fn {key, _definition} -> key end)
-      |> Enum.map(fn {key, definition} -> {position, build_field(key, definition, scope)} end)
+      |> Enum.sort_by(fn {position, key, _definition} -> {position, key} end)
+
+    values = Settings.resolve_many(Enum.map(selected, &elem(&1, 1)), scope)
+
+    Enum.map(selected, fn {_position, key, definition} ->
+      build_field(key, definition, values)
     end)
-    |> Enum.sort_by(fn {position, field} -> {position, field.key} end)
-    |> Enum.map(fn {_position, field} -> field end)
   end
 
   @doc """
@@ -247,16 +252,16 @@ defmodule Bilimbi.Base.Settings.Form do
     {:ok, cleared}
   end
 
-  defp build_field(key, definition, scope) do
-    scope = narrow_to_allowed(scope, definition)
-    stored = Settings.get(key, scope)
+  defp build_field(key, definition, values) do
+    %{value: stored, overridden?: overridden?, source_scope: source_scope} =
+      Map.fetch!(values, key)
 
     %{
       key: key,
       definition: definition,
-      value: display_value(stored, definition, key, scope),
-      overridden?: Settings.overridden?(key, scope),
-      source_scope: source_scope(key, scope, definition),
+      value: display_value(stored, definition, overridden?),
+      overridden?: overridden?,
+      source_scope: source_scope,
       encrypted?: definition.encrypted
     }
   end
@@ -276,21 +281,11 @@ defmodule Bilimbi.Base.Settings.Form do
 
   # Never hand a stored secret to the caller: a screen that receives it will
   # eventually render it.
-  defp display_value(stored, %Definition{encrypted: true}, key, scope) do
-    if Settings.overridden?(key, scope) or present?(stored), do: secret_mask(), else: ""
+  defp display_value(stored, %Definition{encrypted: true}, overridden?) do
+    if overridden? or present?(stored), do: secret_mask(), else: ""
   end
 
-  defp display_value(stored, _definition, _key, _scope), do: stored
-
-  # Which scope the visible value actually came from -- the first in the
-  # cascade that holds an override, or the definition's default at the end.
-  defp source_scope(key, scope, definition) do
-    scope
-    |> Scope.chain()
-    |> Enum.filter(&(scope_type(&1) in definition.scopes))
-    |> Enum.find(fn candidate -> Settings.overridden?(key, candidate) end)
-    |> scope_type()
-  end
+  defp display_value(stored, _definition, _overridden?), do: stored
 
   @doc """
   Casts one submitted value to the type its definition declares.

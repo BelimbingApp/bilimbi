@@ -2,10 +2,10 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   @moduledoc false
   import Ecto.Query
   alias Bilimbi.Base.{Audit, Repo, Tenancy}
-  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Tenancy.Scope
 
   alias Bilimbi.Base.Workflow.{
+    Attribution,
     Definitions,
     DependencySchema,
     EventSchema,
@@ -103,6 +103,34 @@ defmodule Bilimbi.Base.Workflow.Coordination do
           complete_item(scope, run, items, dependencies, item, request, time)
         end
       end)
+    end
+  end
+
+  # The human action gate holds the subject lock and its request row; this
+  # proves the run belongs to that same subject, then availability, executor
+  # and version before the owner handler runs, so a stale page refuses with no
+  # business effect. The handler's outcome completes the item in the same
+  # transaction, with the request attribution saved on the event as Belimbing
+  # did. A refusal here fails the enclosing transaction.
+  def complete_human(scope, ref, run_id, item_id, request, handler, context) do
+    with_run(scope, run_id, :complete, fn run, items, dependencies, _definition ->
+      time = now()
+      item = find_item(items, item_id)
+
+      with :ok <- same_subject(run, ref),
+           :ok <- available(run, item, request, time),
+           {:ok, outcome} <- handler.(),
+           {:ok, completed} <-
+             complete_item(scope, run, items, dependencies, item, outcome, time, context) do
+        {:ok, Map.put(completed, :outcome, outcome)}
+      end
+    end)
+  end
+
+  defp same_subject(run, ref) do
+    case Definitions.subject(%{type: run.subject_type, id: run.subject_id}) do
+      {:ok, %{type: type, id: id}} when type == ref.type and id == ref.id -> :ok
+      _ -> {:error, :process_subject_mismatch}
     end
   end
 
@@ -453,18 +481,24 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     end)
   end
 
-  defp complete_item(scope, run, items, dependencies, item, request, time) do
+  defp complete_item(scope, run, items, dependencies, item, request, time, context \\ %{}) do
     {:ok, item} =
       finish(item, "completed", request.outcome, request.output, nil, time, %{
         result_ref: request.result_ref || item.result_ref
       })
 
     :ok =
-      append_event(scope, run, item, "work.completed", %{
-        "outcome" => item.outcome,
-        "output" => item.output,
-        "result_ref" => item.result_ref
-      })
+      append_event(
+        scope,
+        run,
+        item,
+        "work.completed",
+        Map.merge(context, %{
+          "outcome" => item.outcome,
+          "output" => item.output,
+          "result_ref" => item.result_ref
+        })
+      )
 
     {:ok, run} = settle(scope, run, replace(items, item), dependencies, time)
     {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
@@ -1376,26 +1410,8 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   defp write(scope, fun) do
     actor = Scope.actor(scope)
 
-    if actor.type == :user or is_binary(actor.system_principal) do
-      previous = AuditContext.get()
-
-      AuditContext.put(%{
-        previous
-        | tenant_id: Scope.tenant_id(scope),
-          company_id: actor.company_id,
-          actor_type: Atom.to_string(actor.type),
-          actor_id: actor.user_id || 0,
-          impersonator_id: actor.impersonator_id,
-          system_principal: actor.system_principal
-      })
-
-      try do
-        Repo.transact(fun)
-      after
-        AuditContext.put(previous)
-      end
-    else
-      {:error, :no_authenticated_actor}
-    end
+    if actor.type == :user or is_binary(actor.system_principal),
+      do: Attribution.transact(scope, fun),
+      else: {:error, :no_authenticated_actor}
   end
 end

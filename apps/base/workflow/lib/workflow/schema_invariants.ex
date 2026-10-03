@@ -12,7 +12,8 @@ defmodule Bilimbi.Base.Workflow.SchemaInvariants do
     errors =
       errors ++
         binding_errors(repo, prefix, opts) ++
-        Bilimbi.Base.Workflow.CoordinationInvariants.errors(repo, quoted)
+        Bilimbi.Base.Workflow.CoordinationInvariants.errors(repo, quoted) ++
+        Bilimbi.Base.Workflow.HumanActionInvariants.errors(repo, quoted)
 
     if errors == [], do: :ok, else: {:error, errors}
   end

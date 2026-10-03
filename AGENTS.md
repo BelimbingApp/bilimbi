@@ -127,9 +127,9 @@ allows design freedom, not shortcuts.
   scopes, mappings, codes, visibility, and approvers) are settings with an
   operator UI, not code constants, config files, or environment-only values.
   Secrets are stored encrypted and never displayed back or logged. Only
-  bootstrap values needed before the settings store is reachable (database
-  URL, secret key base, pool size, host, and port) stay in the runtime
-  environment.
+  bootstrap values needed before the settings store is reachable stay in the
+  runtime environment; see the environment-file guidance in
+  `docs/deploy/ubuntu-24.04.md` for the deployment contract and current exceptions.
 
 ## 4. Application ownership and dependency direction
 
