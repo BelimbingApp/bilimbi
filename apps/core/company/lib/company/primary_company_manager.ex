@@ -32,7 +32,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
   defp find_for_resolved_tenant(tenant) do
     query =
-      from company in Tenancy.scope_query(Schema, Scope.for_tenant(tenant)),
+      from(company in Tenancy.scope_query(Schema, Scope.for_tenant(tenant)),
         join: assignment in TenantPrimaryCompany,
         on:
           assignment.company_id == company.id and
@@ -46,6 +46,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
              status: company.status,
              legal_name: company.legal_name
            }, company.deleted_at}
+      )
 
     case Repo.one(query) do
       nil ->
@@ -74,14 +75,6 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
     find_for_resolved_tenant(tenant) ||
       raise PrimaryCompanyNotProvisionedError, tenant_id: tenant.id
-  end
-
-  @spec primary?(Summary.t()) :: boolean()
-  def primary?(%Summary{id: company_id, tenant_id: tenant_id}) do
-    Repo.exists?(
-      from assignment in TenantPrimaryCompany,
-        where: assignment.tenant_id == ^tenant_id and assignment.company_id == ^company_id
-    )
   end
 
   @type assignment_status :: :assigned | :unchanged | :transferred
@@ -212,7 +205,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
   end
 
   defp lock_company!(company_id) do
-    query = from company in Schema, where: company.id == ^company_id, lock: "FOR UPDATE"
+    query = from(company in Schema, where: company.id == ^company_id, lock: "FOR UPDATE")
 
     case Repo.one(query) do
       nil -> Repo.rollback(:company_not_found)
@@ -223,9 +216,11 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
   defp locked_assignment(tenant_id) do
     Repo.one(
-      from assignment in TenantPrimaryCompany,
+      from(assignment in TenantPrimaryCompany,
+        # Row lock checks intentionally include tenant_id to prove ownership.
         where: assignment.tenant_id == ^tenant_id,
         lock: "FOR UPDATE"
+      )
     )
   end
 
@@ -237,10 +232,11 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
   defp validate_company_available!(tenant_id, company_id) do
     query =
-      from assignment in TenantPrimaryCompany,
+      from(assignment in TenantPrimaryCompany,
         where: assignment.company_id == ^company_id and assignment.tenant_id != ^tenant_id,
         select: assignment.tenant_id,
         lock: "FOR UPDATE"
+      )
 
     case Repo.one(query) do
       nil -> :ok
@@ -275,8 +271,10 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
   defp assignment_exists?(tenant_id) do
     Repo.exists?(
-      from assignment in TenantPrimaryCompany,
+      from(assignment in TenantPrimaryCompany,
+        # This invariant check bounds the lookup to the tenant being reconciled.
         where: assignment.tenant_id == ^tenant_id
+      )
     )
   end
 end
