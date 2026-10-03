@@ -54,3 +54,10 @@ Settings calls the host seam `Bilimbi.Base.Settings.SecretRevealService`
 `BilimbiWeb.SecretReveal` to check the grant and password, throttle failures,
 and audit every attempt without the value. The value stays visible for the
 definition's `reveal_duration_ms` (default 10 000, bounded 1 000–60 000).
+
+Settings row reads use a node-local ETS read-through cache with a 30-second
+TTL. `Settings.put/3` and `Settings.delete/2` invalidate the matching scope
+immediately; direct writes may remain stale until expiry. A multi-node
+deployment needs PubSub invalidation before enabling this cache across nodes.
+Settings forms fetch all rows for their requested keys and scope chain in one
+query, then derive values and override metadata from that snapshot.

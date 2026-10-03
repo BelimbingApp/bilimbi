@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Settings do
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Encryption
   alias Bilimbi.Base.Settings.Schema
@@ -64,7 +65,48 @@ defmodule Bilimbi.Base.Settings do
 
   @spec get_many([String.t()], Scope.t() | nil) :: %{required(String.t()) => term()}
   def get_many(keys, scope \\ nil) when is_list(keys) do
-    Map.new(Enum.uniq(keys), &{&1, get(&1, scope)})
+    keys = Enum.uniq(keys)
+
+    definitions = Map.new(keys, &{&1, definition(&1)})
+
+    keys
+    |> Enum.flat_map(fn key ->
+      definition = Map.fetch!(definitions, key)
+
+      if definition do
+        scope
+        |> Scope.chain()
+        |> Enum.filter(&Definition.allows_scope?(definition, &1))
+        |> Enum.map(&{key, &1})
+      else
+        assert_runtime_claimed!(key)
+        Enum.map(Scope.chain(scope), &{key, &1})
+      end
+    end)
+    |> Enum.uniq()
+    |> then(fn pairs ->
+      rows = fetch_rows(pairs)
+
+      Map.new(keys, fn key ->
+        definition = Map.fetch!(definitions, key)
+
+        value =
+          pairs
+          |> Enum.filter(fn {candidate_key, _scope} -> candidate_key == key end)
+          |> Enum.reduce_while(nil, fn {_candidate_key, candidate_scope}, _acc ->
+            case Map.fetch(rows, row_cache_key(key, candidate_scope)) do
+              {:ok, %Schema{} = row} -> {:halt, {:found, decode(row)}}
+              _ -> {:cont, nil}
+            end
+          end)
+          |> case do
+            {:found, value} -> value
+            nil -> if(definition, do: definition.default, else: nil)
+          end
+
+        {key, value}
+      end)
+    end)
   end
 
   @spec put(String.t(), term(), Scope.t() | nil) :: {:ok, term()} | {:error, Ecto.Changeset.t()}
@@ -132,8 +174,12 @@ defmodule Bilimbi.Base.Settings do
           conflict_target: conflict_target(scope)
         )
         |> case do
-          {:ok, _setting} -> {:ok, value}
-          {:error, changeset} -> {:error, changeset}
+          {:ok, _setting} ->
+            Cache.invalidate(key, scope_type, scope_id)
+            {:ok, value}
+
+          {:error, changeset} ->
+            {:error, changeset}
         end
     end
   end
@@ -146,6 +192,8 @@ defmodule Bilimbi.Base.Settings do
     key
     |> setting_scope_query(scope_type, scope_id)
     |> Repo.delete_all()
+
+    Cache.invalidate(key, scope_type, scope_id)
 
     :ok
   end
@@ -166,13 +214,59 @@ defmodule Bilimbi.Base.Settings do
   end
 
   defp fetch_row(key, scope) do
-    {scope_type, scope_id} = Scope.database_identity(scope)
+    Cache.fetch(row_cache_key(key, scope), fn ->
+      {scope_type, scope_id} = Scope.database_identity(scope)
 
-    key
-    |> setting_scope_query(scope_type, scope_id)
-    |> limit(1)
-    |> Repo.one()
+      key
+      |> setting_scope_query(scope_type, scope_id)
+      |> limit(1)
+      |> Repo.one()
+    end)
   end
+
+  defp fetch_rows(pairs) do
+    cache_keys =
+      Enum.map(pairs, fn {key, scope} ->
+        {scope_type, scope_id} = Scope.database_identity(scope)
+        {key, scope_type, scope_id}
+      end)
+      |> Enum.uniq()
+
+    Cache.fetch_many(cache_keys, fn missing_keys ->
+      filters =
+        Enum.reduce(missing_keys, dynamic(false), fn {key, scope_type, scope_id}, filters ->
+          scope_filter =
+            if is_nil(scope_type) do
+              dynamic([setting], is_nil(setting.scope_type) and is_nil(setting.scope_id))
+            else
+              dynamic(
+                [setting],
+                setting.scope_type == ^scope_type and setting.scope_id == ^scope_id
+              )
+            end
+
+          dynamic([setting], ^filters or (setting.key == ^key and ^scope_filter))
+        end)
+
+      rows = from(setting in Schema, where: ^filters) |> Repo.all()
+
+      by_identity =
+        Map.new(rows, fn row ->
+          {{row.key, row.scope_type, row.scope_id}, row}
+        end)
+
+      Map.new(missing_keys, fn cache_key ->
+        {cache_key, Map.get(by_identity, cache_key)}
+      end)
+    end)
+  end
+
+  defp row_cache_key(key, %Scope{} = scope) do
+    {scope_type, scope_id} = Scope.database_identity(scope)
+    {key, scope_type, scope_id}
+  end
+
+  defp row_cache_key(key, nil), do: {key, nil, nil}
 
   defp setting_scope_query(key, nil, nil) do
     from(setting in Schema,

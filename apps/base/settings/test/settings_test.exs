@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.SettingsTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.ContributionValidator
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Scope
@@ -12,6 +13,7 @@ defmodule Bilimbi.Base.SettingsTest do
 
   setup do
     create_settings_table!()
+    Cache.clear()
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
@@ -29,6 +31,68 @@ defmodule Bilimbi.Base.SettingsTest do
     assert Settings.get("tests.inherited", Scope.user(11, 20, 30)) == "company"
     assert Settings.get("tests.inherited", Scope.company(21, 30)) == "tenant"
     assert Settings.get("tests.inherited", Scope.tenant(31)) == "global"
+  end
+
+  test "caches found rows and misses, then invalidates both after writes and deletes" do
+    scope = Scope.user(10, 20, 30)
+
+    assert collect_queries(fn -> Settings.get("tests.inherited", scope) end) == 4
+    assert collect_queries(fn -> Settings.get("tests.inherited", scope) end) == 0
+    assert {:ok, "new"} = Settings.put("tests.inherited", "new", Scope.tenant(30))
+    assert Settings.get("tests.inherited", scope) == "new"
+
+    assert :ok = Settings.delete("tests.inherited", Scope.tenant(30))
+    assert Settings.get("tests.inherited", scope) == "default"
+
+    assert {:ok, "global"} = Settings.put("tests.inherited", "global")
+    assert Settings.get("tests.inherited", scope) == "global"
+  end
+
+  test "get_many resolves a set of keys in one query across the scope chain" do
+    scope = Scope.user(10, 20, 30)
+    assert {:ok, "tenant"} = Settings.put("tests.inherited", "tenant", Scope.tenant(30))
+
+    queries =
+      collect_queries(fn -> Settings.get_many(["tests.inherited", "tests.personal"], scope) end)
+
+    assert queries == 1
+
+    assert Settings.get_many(["tests.inherited", "tests.personal"], scope) == %{
+             "tests.inherited" => "tenant",
+             "tests.personal" => "system"
+           }
+  end
+
+  defp collect_queries(fun) do
+    ref = make_ref()
+    handler = "settings-query-count-#{inspect(ref)}"
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        [:bilimbi, :base, :repo, :query],
+        fn _event, _measurements, _metadata, pid ->
+          send(pid, {:query, ref})
+        end,
+        self()
+      )
+
+    flush_queries(ref)
+
+    fun.()
+
+    count = flush_queries(ref)
+
+    :telemetry.detach(handler)
+    count
+  end
+
+  defp flush_queries(ref) do
+    receive do
+      {:query, ^ref} -> 1 + flush_queries(ref)
+    after
+      0 -> 0
+    end
   end
 
   test "rejects a definition key the settings column cannot store" do

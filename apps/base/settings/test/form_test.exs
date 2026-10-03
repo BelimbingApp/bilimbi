@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.ContributionValidator
   alias Bilimbi.Base.Settings.Form
   alias Bilimbi.Base.Settings.Scope
@@ -19,6 +20,7 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   setup do
     create_settings_table!()
+    Cache.clear()
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
@@ -32,6 +34,20 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
       assert Enum.map(fields, & &1.key) == ["tests.landing", "tests.theme"]
       assert field(fields, "tests.theme").definition.label == "Theme"
+    end
+
+    test "loads all field overrides together and preserves inherited metadata" do
+      assert {:ok, "tenant"} = Settings.put("tests.theme", "tenant", Scope.tenant(30))
+      assert {:ok, "/mine"} = Settings.put("tests.landing", "/mine", @user)
+
+      fields = Form.fields(["profile"], @user)
+
+      assert field(fields, "tests.theme").value == "tenant"
+      assert field(fields, "tests.theme").source_scope == :tenant
+      refute field(fields, "tests.theme").overridden?
+      assert field(fields, "tests.landing").value == "/mine"
+      assert field(fields, "tests.landing").source_scope == :user
+      assert field(fields, "tests.landing").overridden?
     end
 
     test "keeps the caller's group order and sorts by key inside a group" do

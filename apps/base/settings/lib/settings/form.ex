@@ -73,19 +73,24 @@ defmodule Bilimbi.Base.Settings.Form do
   def fields(groups, scope) when is_list(groups) do
     definitions = Settings.definitions()
 
-    groups
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {group, position} ->
-      definitions
-      |> Enum.filter(fn {_key, definition} ->
-        definition.editable == group and
-          Enum.any?(Scope.chain(scope), &Definition.allows_scope?(definition, &1))
+    selected =
+      groups
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {group, position} ->
+        definitions
+        |> Enum.filter(fn {_key, definition} ->
+          definition.editable == group and
+            Enum.any?(Scope.chain(scope), &Definition.allows_scope?(definition, &1))
+        end)
+        |> Enum.map(fn {key, definition} -> {position, key, definition} end)
       end)
-      |> Enum.sort_by(fn {key, _definition} -> key end)
-      |> Enum.map(fn {key, definition} -> {position, build_field(key, definition, scope)} end)
+      |> Enum.sort_by(fn {position, key, _definition} -> {position, key} end)
+
+    values = Settings.get_many(Enum.map(selected, &elem(&1, 1)), scope)
+
+    Enum.map(selected, fn {_position, key, definition} ->
+      build_field(key, definition, scope, values)
     end)
-    |> Enum.sort_by(fn {position, field} -> {position, field.key} end)
-    |> Enum.map(fn {_position, field} -> field end)
   end
 
   @doc """
@@ -247,16 +252,18 @@ defmodule Bilimbi.Base.Settings.Form do
     {:ok, cleared}
   end
 
-  defp build_field(key, definition, scope) do
+  defp build_field(key, definition, scope, values) do
     scope = narrow_to_allowed(scope, definition)
-    stored = Settings.get(key, scope)
+    stored = Map.fetch!(values, key)
+    overridden? = Settings.overridden?(key, scope)
+    source_scope = source_scope(key, scope, definition)
 
     %{
       key: key,
       definition: definition,
-      value: display_value(stored, definition, key, scope),
-      overridden?: Settings.overridden?(key, scope),
-      source_scope: source_scope(key, scope, definition),
+      value: display_value(stored, definition, overridden?),
+      overridden?: overridden?,
+      source_scope: source_scope,
       encrypted?: definition.encrypted
     }
   end
@@ -276,11 +283,11 @@ defmodule Bilimbi.Base.Settings.Form do
 
   # Never hand a stored secret to the caller: a screen that receives it will
   # eventually render it.
-  defp display_value(stored, %Definition{encrypted: true}, key, scope) do
-    if Settings.overridden?(key, scope) or present?(stored), do: secret_mask(), else: ""
+  defp display_value(stored, %Definition{encrypted: true}, overridden?) do
+    if overridden? or present?(stored), do: secret_mask(), else: ""
   end
 
-  defp display_value(stored, _definition, _key, _scope), do: stored
+  defp display_value(stored, _definition, _overridden?), do: stored
 
   # Which scope the visible value actually came from -- the first in the
   # cascade that holds an override, or the definition's default at the end.
@@ -289,7 +296,10 @@ defmodule Bilimbi.Base.Settings.Form do
     |> Scope.chain()
     |> Enum.filter(&(scope_type(&1) in definition.scopes))
     |> Enum.find(fn candidate -> Settings.overridden?(key, candidate) end)
-    |> scope_type()
+    |> case do
+      nil -> scope_type(nil)
+      candidate -> scope_type(candidate)
+    end
   end
 
   @doc """
