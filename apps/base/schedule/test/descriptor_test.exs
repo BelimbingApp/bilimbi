@@ -24,7 +24,8 @@ defmodule Bilimbi.Base.Schedule.DescriptorTest do
 
     assert descriptor[:migration_dispositions] == %{
              20_260_813_114_301 => :compatible_baseline,
-             20_260_821_100_001 => :bilimbi_only
+             20_260_821_100_001 => :bilimbi_only,
+             20_261_003_120_002 => :bilimbi_only
            }
 
     assert descriptor[:schema_contract] == Bilimbi.Base.Schedule.SchemaContract
