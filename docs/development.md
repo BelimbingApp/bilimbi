@@ -133,7 +133,8 @@ apps/
 │   ├── system/                   # Read-only instance facts (System Info)
 │   ├── tenancy/                  # Tenant scope and operator resolution
 │   ├── tiling/                   # Tiled workspace and saved layouts
-│   └── ui/                       # Shared components, layouts, Design Library
+│   ├── ui/                       # Shared components, layouts, Design Library
+│   └── workflow/                 # Status configuration, transitions, history
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── address/                  # Addresses with Geonames normalization

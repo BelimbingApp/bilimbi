@@ -19,6 +19,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     dashboard: Bilimbi.Base.Dashboard.ContributionValidator,
     principal_directory: Bilimbi.Base.PrincipalDirectory.ContributionValidator,
     schedule: Bilimbi.Base.Schedule.ContributionValidator,
+    workflow: Bilimbi.Base.Workflow.ContributionValidator,
     actor_verifier: Bilimbi.Base.Tenancy.ActorVerifier.ContributionValidator,
     system_principals: Bilimbi.Base.Tenancy.SystemPrincipals.ContributionValidator
   }
