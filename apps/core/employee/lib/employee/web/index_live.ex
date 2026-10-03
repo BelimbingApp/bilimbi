@@ -7,9 +7,12 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.AdministrationPage
+
+  @delete_capability "admin.employee.delete"
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
@@ -96,18 +99,21 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   # employee rather than on a client-supplied id, so what was confirmed is what
   # runs.
   def handle_event("request_delete", %{"id" => id}, socket) do
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.employee.delete") ->
-        delete_forbidden(socket)
+    case authorize_delete(socket) do
+      {:denied, socket} ->
+        {:noreply, assign(socket, :pending_delete, nil)}
 
-      employee = find_listed(socket, id) ->
-        {:noreply, socket |> clear_flash() |> assign(:pending_delete, employee)}
+      {:ok, socket} ->
+        cond do
+          employee = find_listed(socket, id) ->
+            {:noreply, socket |> clear_flash() |> assign(:pending_delete, employee)}
 
-      true ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "That employee no longer exists.")
-         |> load_page(socket.assigns.index_state)}
+          true ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "That employee no longer exists.")
+             |> load_page(socket.assigns.index_state)}
+        end
     end
   end
 
@@ -116,53 +122,53 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   end
 
   def handle_event("delete", _params, socket) do
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.employee.delete") ->
-        delete_forbidden(socket)
+    case authorize_delete(socket) do
+      {:denied, socket} ->
+        {:noreply, assign(socket, :pending_delete, nil)}
 
-      is_nil(socket.assigns.pending_delete) ->
-        {:noreply, socket}
+      {:ok, socket} ->
+        if is_nil(socket.assigns.pending_delete) do
+          {:noreply, socket}
+        else
+          employee = socket.assigns.pending_delete
+          socket = assign(socket, :pending_delete, nil)
+          scope = resolve_scope(socket)
+          company_id = resolve_company_id(socket)
 
-      true ->
-        employee = socket.assigns.pending_delete
-        socket = assign(socket, :pending_delete, nil)
-        scope = resolve_scope(socket)
-        company_id = resolve_company_id(socket)
+          case Employee.delete_employee(scope, company_id, employee.id) do
+            :ok ->
+              {:noreply,
+               socket
+               |> put_flash(:success, "#{employee.full_name} was deleted.")
+               |> load_page(socket.assigns.index_state)}
 
-        case Employee.delete_employee(scope, company_id, employee.id) do
-          :ok ->
-            {:noreply,
-             socket
-             |> put_flash(:success, "#{employee.full_name} was deleted.")
-             |> load_page(socket.assigns.index_state)}
+            {:error, :employee_not_found} ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "That employee no longer exists.")
+               |> load_page(socket.assigns.index_state)}
 
-          {:error, :employee_not_found} ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "That employee no longer exists.")
-             |> load_page(socket.assigns.index_state)}
+            {:error, :invariant_violation} ->
+              {:noreply,
+               put_flash(
+                 socket,
+                 :error,
+                 "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
+               )}
 
-          {:error, :invariant_violation} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
-             )}
+            {:error, :forbidden} ->
+              {:noreply, put_flash(socket, :error, LiveAuthorization.denied_message())}
 
-          {:error, _reason} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "#{employee.full_name} was not deleted. Reload the page and try again."
-             )}
+            {:error, _reason} ->
+              {:noreply,
+               put_flash(
+                 socket,
+                 :error,
+                 "#{employee.full_name} was not deleted. Reload the page and try again."
+               )}
+          end
         end
     end
-  end
-
-  defp delete_forbidden(socket) do
-    {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
   end
 
   defp find_listed(socket, id) do
@@ -240,6 +246,11 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
       _ ->
         %{}
     end
+  end
+
+  # `allowed?/2` on the row only decides whether the control is shown.
+  defp authorize_delete(socket) do
+    LiveAuthorization.authorize_event(socket, @delete_capability)
   end
 
   defp resolve_scope(socket) do

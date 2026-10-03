@@ -3,7 +3,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -466,9 +469,86 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "#employee-#{employee.id}-delete")
 
     assert render_click(view, "delete", %{"id" => to_string(employee.id)}) =~
-             "You do not have permission to delete employees."
+             LiveAuthorization.denied_message()
 
     assert {:ok, _found} = Employee.get_employee(scope, 73, employee.id)
+  end
+
+  test "the API refuses employee deletion without its capability and allows the holder and the system actor",
+       %{scope: scope} do
+    user = Authentication.sign_in(scope, 91, 73)
+
+    {:ok, protected} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-PROT",
+        full_name: "Protected"
+      })
+
+    assert {:error, :forbidden} = Employee.delete_employee(user, 73, protected.id)
+    assert {:ok, _} = Employee.get_employee(scope, 73, protected.id)
+
+    grant_capabilities!("admin.employee.delete")
+    assert :ok = Employee.delete_employee(user, 73, protected.id)
+    assert {:error, :employee_not_found} = Employee.get_employee(scope, 73, protected.id)
+
+    {:ok, system_owned} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-SYS",
+        full_name: "System Owned"
+      })
+
+    assert :ok = Employee.delete_employee(scope, 73, system_owned.id)
+    assert {:error, :employee_not_found} = Employee.get_employee(scope, 73, system_owned.id)
+  end
+
+  test "refuses a deletion request when permission is revoked after mount", %{
+    conn: conn,
+    scope: scope,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.list", "admin.employee.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+    assert has_element?(view, "#employee-#{employee.id}-delete")
+
+    revoke_capability!(scope, "admin.employee.delete")
+
+    view |> element("#employee-#{employee.id}-delete") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#delete-employee-confirm")
+    assert has_element?(view, "#employees td", "John Doe")
+    assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
+  end
+
+  test "refuses deletion when permission is revoked after opening confirmation", %{
+    conn: conn,
+    scope: scope,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.list", "admin.employee.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+    view |> element("#employee-#{employee.id}-delete") |> render_click()
+    assert has_element?(view, "#delete-employee-confirm-confirm")
+
+    revoke_capability!(scope, "admin.employee.delete")
+
+    view |> element("#delete-employee-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#flash-success")
+    assert has_element?(view, "#employees td", "John Doe")
+    assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
+  end
+
+  defp revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "the list's Edit action opens the employee's read-first record page", %{

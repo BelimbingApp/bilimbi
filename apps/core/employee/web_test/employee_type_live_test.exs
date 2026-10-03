@@ -3,7 +3,10 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -216,6 +219,81 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert has_element?(view, "#flash-success", "Employee type deleted.")
 
     assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
+  test "the API refuses type deletion without its capability and allows the holder and the system actor" do
+    {:ok, scope} = Tenancy.scope(41)
+    user = Authentication.sign_in(scope, 91, 73)
+
+    {:ok, protected} =
+      Employee.create_employee_type(scope, 73, %{code: "shielded", label: "Shielded"})
+
+    assert {:error, :forbidden} = Employee.delete_employee_type(user, 73, protected.id)
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, protected.id)
+
+    grant_capabilities!("admin.employee-type.delete")
+    assert :ok = Employee.delete_employee_type(user, 73, protected.id)
+    assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, protected.id)
+
+    {:ok, system_owned} =
+      Employee.create_employee_type(scope, 73, %{code: "seeded", label: "Seeded"})
+
+    assert :ok = Employee.delete_employee_type(scope, 73, system_owned.id)
+    assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, system_owned.id)
+  end
+
+  test "refuses a type deletion request when permission is revoked after mount", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{code: "guarded", label: "Guarded"})
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+    assert has_element?(view, "#employee-type-delete-#{type.id}")
+
+    revoke_capability!(scope, "admin.employee-type.delete")
+
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#delete-employee-type-confirm")
+    assert has_element?(view, "#employee-types td", "Guarded")
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
+  test "refuses type deletion when permission is revoked after opening confirmation", %{
+    conn: conn
+  } do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{code: "latched", label: "Latched"})
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+    assert has_element?(view, "#delete-employee-type-confirm-confirm")
+
+    revoke_capability!(scope, "admin.employee-type.delete")
+
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#flash-success")
+    assert has_element?(view, "#employee-types td", "Latched")
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
+  defp revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "rejects deleting an in-use custom type", %{conn: conn} do
