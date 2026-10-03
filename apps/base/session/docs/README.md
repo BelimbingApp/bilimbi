@@ -30,3 +30,10 @@ The [Session API documentation](../lib/session.ex) owns the bulk termination
 contract and the `subscribe_terminations/0` notification contract. The host's
 [Live navigation documentation](../../../web/docs/navigation.md) describes
 how session termination affects open pages.
+
+The Web authentication edge calls `touch_session/2` only after validating the
+session identity. It writes at most once per configured interval and bypasses
+audit capture because this is machine housekeeping. `session.retention_days`
+and `session.last_activity_touch_minutes` are operator settings; the daily
+session worker prunes rows outside that retention window. Session keeps this
+lifecycle independent of Web and Core User.

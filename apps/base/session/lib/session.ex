@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.Session do
   @maximum_limit 500
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
+  @touch_interval_key "session.last_activity_touch_minutes"
+  @retention_key "session.retention_days"
   @sortable_fields [:user_id, :ip_address, :user_agent, :last_activity]
 
   @spec put_session(String.t(), String.t(), map() | keyword()) ::
@@ -53,21 +55,31 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
-  @doc "Refreshes activity when the stored timestamp is at least one minute old."
-  @spec refresh_activity(String.t(), non_neg_integer()) :: :ok
-  def refresh_activity(id, now) when is_binary(id) and is_integer(now) and now >= 0 do
-    # Clock update, not a user decision: would write one audit row per
-    # active session per minute otherwise.
-    WriteCapture.without_capture(fn ->
-      Repo.update_all(
-        from(session in Schema,
-          where: session.id == ^id and session.last_activity <= ^(now - 60)
-        ),
-        set: [last_activity: now]
-      )
-    end)
+@doc "Advances session activity when the configured throttle interval elapsed."
+  @spec touch_session(String.t(), non_neg_integer()) :: :ok | {:error, :not_found}
+  def touch_session(id, now \\ System.system_time(:second))
+      when is_binary(id) and is_integer(now) and now >= 0 do
+    interval = Bilimbi.Base.Settings.get(@touch_interval_key) * 60
+    cutoff = now - interval
 
-    :ok
+    {count, _rows} =
+      WriteCapture.without_capture(fn ->
+        Repo.update_all(
+          from(session in Schema,
+            where: session.id == ^id and session.last_activity < ^cutoff
+          ),
+          set: [last_activity: now]
+        )
+      end)
+
+    if count == 0 and is_nil(Repo.get(Schema, id)), do: {:error, :not_found}, else: :ok
+  end
+
+  @doc "Deletes sessions older than the configured operator retention period."
+  @spec prune_by_retention() :: non_neg_integer()
+  def prune_by_retention do
+    days = Bilimbi.Base.Settings.get(@retention_key)
+    prune_expired(System.system_time(:second) - days * 86_400)
   end
 
   @spec list_sessions(keyword()) :: [Summary.t()]

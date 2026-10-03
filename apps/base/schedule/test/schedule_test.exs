@@ -553,6 +553,48 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert Repo.exists?(from(run in Run, where: run.key == "test.recent"))
   end
 
+  test "prunes only finished occurrences older than schedule retention", %{definition: definition} do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    old = DateTime.add(now, -100 * 86_400, :second)
+
+    old_finished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: old,
+        trigger: "manual",
+        state: "succeeded",
+        claimed_at: old,
+        finished_at: old
+      })
+
+    recent_finished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: now,
+        trigger: "manual",
+        state: "succeeded",
+        claimed_at: now,
+        finished_at: now
+      })
+
+    unfinished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: DateTime.add(old, -1, :second),
+        trigger: "manual",
+        state: "queued",
+        claimed_at: old
+      })
+
+    assert Schedule.prune_occurrences() == 1
+    assert Repo.get(Occurrence, old_finished.id) == nil
+    assert Repo.get(Occurrence, recent_finished.id)
+    assert Repo.get(Occurrence, unfinished.id)
+  end
+
   test "coalescing selects only the latest missed local occurrence across DST", %{
     definition: definition
   } do

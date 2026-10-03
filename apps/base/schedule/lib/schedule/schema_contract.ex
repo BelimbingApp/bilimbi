@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   def migration_version, do: @migration_version
 
   @impl true
-  def tables, do: [runs(), suppressions()]
+  def tables, do: [runs(), suppressions(), occurrences()]
 
   @impl true
   def verify_invariants(repo, opts) do
@@ -85,8 +85,44 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
     }
   end
 
+  defp occurrences do
+    %{
+      name: "base_schedule_occurrences",
+      columns: %{
+        "id" => column(:bigint, false, {:sequence, "base_schedule_occurrences_id_seq"}),
+        "source" => column({:varchar, 40}, false),
+        "key" => column({:varchar, 255}, false),
+        "intended_at" => column({:timestamp, 6}, false),
+        "trigger" => column({:varchar, 20}, false),
+        "overlap_key" => column({:varchar, 296}),
+        "state" => column({:varchar, 20}, false),
+        "job_id" => column(:bigint),
+        "claimed_at" => column({:timestamp, 6}, false),
+        "started_at" => column({:timestamp, 6}),
+        "finished_at" => column({:timestamp, 6})
+      },
+      indexes: %{
+        "base_schedule_occurrences_pkey" => index(["id"], true),
+        "base_schedule_occurrences_intended_unique" =>
+          index(["source", "key", "intended_at", "trigger"], true),
+        "base_schedule_occurrences_active_overlap_unique" =>
+          index(["overlap_key"], true, "overlap_keyisnotnullANDfinished_atisnull"),
+        "base_schedule_occurrences_state_claimed_index" => index(["state", "claimed_at"]),
+        "base_schedule_occurrences_unfinished_claimed_index" =>
+          index(
+            ["claimed_at", "id"],
+            false,
+            "finished_atisnullANDjob_idisnotnull",
+            [false, false]
+          )
+      },
+      foreign_keys: %{}
+    }
+  end
+
   defp column(type, nullable \\ true, default \\ nil),
     do: %{type: type, nullable: nullable, default: default}
 
-  defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
+  defp index(columns, unique \\ false, where \\ nil, order \\ nil),
+    do: %{columns: columns, unique: unique, where: where, order: order}
 end

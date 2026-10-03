@@ -492,6 +492,16 @@ defmodule BilimbiWeb.UserAuth do
             guard_session(socket, true)
         end)
 
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :component_session_activity, :handle_info, fn
+          {Bilimbi.Base.UI.ComponentActivity, :activity}, socket ->
+            _ = Session.touch_session(socket.assigns.current_scope.session_identity["session_id"])
+            {:halt, socket}
+
+          _message, socket ->
+            {:cont, socket}
+        end)
+
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, redirect_if_ended(socket, session)}
@@ -603,10 +613,6 @@ defmodule BilimbiWeb.UserAuth do
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
-      if activity? do
-        :ok = Session.refresh_activity(session_id, System.system_time(:second))
-      end
-
       impersonator = Impersonation.extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
@@ -619,6 +625,11 @@ defmodule BilimbiWeb.UserAuth do
           company_id,
           Impersonation.impersonation_opts(impersonator, session_id)
         )
+
+      # Session metadata is housekeeping, not a user action. Touch only after
+      # this edge has proved the durable session and identity, throttled by the
+      # Session setting so ordinary requests do not amplify writes.
+      _ = Session.touch_session(session_id)
 
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)
@@ -705,7 +716,7 @@ defmodule BilimbiWeb.UserAuth do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(identity["session_id"]),
          true <- entry.user_id == identity["user_id"],
          true <- session_active?(entry) do
-      if activity?, do: Session.refresh_activity(entry.id, System.system_time(:second))
+      if activity?, do: Session.touch_session(entry.id)
       true
     else
       _ -> false

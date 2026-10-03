@@ -146,6 +146,8 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
       indexes: %{
         "base_authz_decision_logs_pkey" => index(["id"], true),
         "base_authz_decision_logs_company_id_index" => index(["company_id"]),
+        "base_authz_decision_logs_company_timeline_index" =>
+          index(["company_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_authz_decision_logs_actor_type_index" => index(["actor_type"]),
         "base_authz_decision_logs_actor_id_index" => index(["actor_id"]),
         "base_authz_decision_logs_acting_for_user_id_index" => index(["acting_for_user_id"]),
@@ -168,7 +170,8 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
     %{type: type, nullable: nullable, default: default}
   end
 
-  defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
+  defp index(columns, unique \\ false, where \\ nil, order \\ nil),
+    do: %{columns: columns, unique: unique, where: where, order: order}
 
   defp foreign_key(column, table, on_delete \\ :cascade) do
     %{

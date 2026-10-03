@@ -98,6 +98,15 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     assert "widgets: incompatible foreign key widgets_parent_foreign" in errors
   end
 
+  test "verifies index ordering as part of the schema contract", %{schema: schema} do
+    spec =
+      widget_spec()
+      |> put_in([:indexes, "widgets_name_unique", :order], [true])
+
+    assert {:error, ["widgets: incompatible index widgets_name_unique"]} =
+             SchemaVerifier.verify(Repo, [spec], prefix: schema)
+  end
+
   test "accepts uuid, char, jsonb, and inet columns", %{schema: schema} do
     assert :ok = SchemaVerifier.verify(Repo, [gadget_spec()], prefix: schema)
   end
