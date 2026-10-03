@@ -469,14 +469,34 @@ defmodule Bilimbi.Base.AuditTest do
     assert retained_page.total_entries == 1
     assert hd(retained_page.entries).id == failed_http.id
 
-    # Toggle retention
-    assert {:ok, updated} = Audit.toggle_retained(scope, http_action.id)
-    assert updated.is_retained == true
-    assert {:ok, toggled_back} = Audit.toggle_retained(scope, http_action.id)
-    assert toggled_back.is_retained == false
+    # Base Authz is not loaded in this package, so the wired authorizer is
+    # absent and the change is refused, including for an id that does not exist.
+    assert {:error, :forbidden} = Audit.toggle_retained(scope, http_action.id)
+    assert {:error, :forbidden} = Audit.toggle_retained(scope, 999_999)
+    refute reload_retained?(scope, http_action.id)
+  end
 
-    # Toggle retention on unknown id
+  test "toggles retention when the configured authorizer allows the manage capability" do
+    insert_tenant!(%{id: 41})
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, action} =
+      Audit.record_action(scope, action_attrs(%{event: "employee.updated", is_retained: false}))
+
+    previous = Application.get_env(:bilimbi_base_audit, :authorization)
+    Application.put_env(:bilimbi_base_audit, :authorization, Bilimbi.Base.Audit.TestAuthorization)
+    on_exit(fn -> Application.put_env(:bilimbi_base_audit, :authorization, previous) end)
+
+    assert {:ok, updated} = Audit.toggle_retained(scope, action.id)
+    assert updated.is_retained == true
+    assert {:ok, toggled_back} = Audit.toggle_retained(scope, action.id)
+    assert toggled_back.is_retained == false
     assert {:error, :not_found} = Audit.toggle_retained(scope, 999_999)
+  end
+
+  defp reload_retained?(scope, action_id) do
+    {:ok, actions} = Audit.list_actions(scope)
+    Enum.find(actions, &(&1.id == action_id)).is_retained
   end
 
   test "safely escapes wildcard characters in search" do

@@ -172,13 +172,28 @@ defmodule Bilimbi.Core.Company do
   @doc """
   Lists the live companies an actor may target for an authorized operation.
 
+  Pass the sealed `%Bilimbi.Base.Tenancy.Scope{}` for the person performing
+  the work. That clause reads the actor the authentication edge sealed onto
+  the scope through `Bilimbi.Base.Authz.scope_actor/1`. A system scope names
+  nobody and returns `{:error, :unauthorized}`. The
+  `%Bilimbi.Base.Authz.Actor{}` clause remains for a caller that already holds
+  that actor; both forms return the same result for the same sealed user.
+
   The operation capability and company reach are independent: the tenant-wide
   capability expands the actor's reach but never authorizes an operation by
   itself. Every returned company remains inside the actor's validated tenant
   scope.
   """
-  @spec list_selectable_companies(Actor.t(), String.t()) ::
+  @spec list_selectable_companies(Actor.t() | Scope.t(), String.t()) ::
           {:ok, [Summary.t()]} | {:error, :unauthorized}
+  def list_selectable_companies(%Scope{} = scope, operation_capability)
+      when is_binary(operation_capability) do
+    case Authz.scope_actor(scope) do
+      {:ok, actor} -> list_selectable_companies(actor, operation_capability)
+      {:error, :no_authenticated_actor} -> {:error, :unauthorized}
+    end
+  end
+
   def list_selectable_companies(%Actor{} = actor, operation_capability)
       when is_binary(operation_capability) do
     if capability_allowed?(actor, operation_capability) do
@@ -197,12 +212,27 @@ defmodule Bilimbi.Core.Company do
   @doc """
   Authorizes one live company as the target of an actor's operation.
 
+  Pass the sealed `%Bilimbi.Base.Tenancy.Scope{}` for the person performing
+  the work. That clause reads the actor the authentication edge sealed onto
+  the scope through `Bilimbi.Base.Authz.scope_actor/1`, then uses the same
+  rules as the `%Bilimbi.Base.Authz.Actor{}` clause. A system scope names
+  nobody: a positive company id is `{:error, :unauthorized}`, and a malformed
+  id is `{:error, :not_found}`.
+
   Missing, deleted, and cross-tenant companies are indistinguishable. A
   sibling company additionally requires the explicit tenant-wide reach
   capability.
   """
-  @spec authorize_company_target(Actor.t(), term(), String.t()) ::
+  @spec authorize_company_target(Actor.t() | Scope.t(), term(), String.t()) ::
           {:ok, Summary.t()} | {:error, :not_found | :unauthorized}
+  def authorize_company_target(%Scope{} = scope, company_id, operation_capability)
+      when is_binary(operation_capability) do
+    case Authz.scope_actor(scope) do
+      {:ok, actor} -> authorize_company_target(actor, company_id, operation_capability)
+      {:error, :no_authenticated_actor} -> unauthorized_without_actor(company_id)
+    end
+  end
+
   def authorize_company_target(%Actor{} = actor, company_id, operation_capability)
       when is_integer(company_id) and company_id > 0 and is_binary(operation_capability) do
     with true <- capability_allowed?(actor, operation_capability),
@@ -220,6 +250,11 @@ defmodule Bilimbi.Core.Company do
   def authorize_company_target(%Actor{}, _company_id, operation_capability)
       when is_binary(operation_capability),
       do: {:error, :not_found}
+
+  defp unauthorized_without_actor(company_id) when is_integer(company_id) and company_id > 0,
+    do: {:error, :unauthorized}
+
+  defp unauthorized_without_actor(_company_id), do: {:error, :not_found}
 
   defp capability_allowed?(actor, capability) do
     Authz.can(actor, capability).allowed
@@ -244,6 +279,46 @@ defmodule Bilimbi.Core.Company do
       |> Repo.all()
 
     {:ok, ids}
+  end
+
+  @doc """
+  Live company ids in this tenant, as a query a sibling may compose.
+
+  This is the only company query another module may embed, and only as
+  `where: other.company_id in subquery(live_company_ids_query(scope))`.
+  It replaces loading every company row to throw the rows away. The query
+  selects ids of companies that are not soft-deleted, the same set as
+  `list_companies/1`.
+  """
+  @spec live_company_ids_query(Scope.t()) :: Ecto.Query.t()
+  def live_company_ids_query(%Scope{} = scope) do
+    from(company in Tenancy.scope_query(Schema, scope),
+      where: is_nil(company.deleted_at),
+      select: company.id
+    )
+  end
+
+  @doc """
+  Names of the given live companies in this tenant.
+
+  Missing, soft-deleted, and other-tenant ids are omitted. The value is
+  `companies.name`, the same field `get_company/2` exposes as `Summary.name`.
+  An empty id list does not touch the database.
+  """
+  @spec live_company_names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
+  def live_company_names(%Scope{} = scope, company_ids) when is_list(company_ids) do
+    company_ids = for id <- company_ids, is_integer(id) and id > 0, uniq: true, do: id
+
+    if company_ids == [] do
+      %{}
+    else
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id in ^company_ids and is_nil(company.deleted_at),
+        select: {company.id, company.name}
+      )
+      |> Repo.all()
+      |> Map.new()
+    end
   end
 
   @spec platform_operator_company() :: {:ok, Summary.t()} | {:error, lookup_error()}

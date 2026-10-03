@@ -125,6 +125,16 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Geonames.list_admin1("M") == []
   end
 
+  test "reads one administrative division by its code" do
+    assert %{code: "MY.14", name: "Kuala Lumpur", country_iso: "MY"} =
+             Geonames.get_admin1("MY.14")
+
+    assert %{code: "MY.05", name: "Negeri Sembilan"} = Geonames.get_admin1("  MY.05  ")
+    assert Geonames.get_admin1("NO.SUCH") == nil
+    assert Geonames.get_admin1("") == nil
+    assert Geonames.get_admin1(nil) == nil
+  end
+
   test "returns global Admin1 pages with country-name search and a bounded country filter" do
     assert %{page_size: 25} = Geonames.page_admin1()
 

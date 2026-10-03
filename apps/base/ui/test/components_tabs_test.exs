@@ -42,6 +42,15 @@ defmodule Bilimbi.Base.UI.ComponentsTabsTest do
     html = render_component(&link_tabs/1, %{})
 
     assert html =~ ~s(id="example-tabs")
+    assert html =~ ~s(phx-hook="TabStrip")
+    assert html =~ ~s(data-tab-scroller)
+    assert html =~ "flex-nowrap"
+    assert html =~ "overflow-x-auto"
+    assert html =~ "contain-inline-size"
+    assert html =~ "whitespace-nowrap"
+    assert html =~ ~s(id="example-tabs-scroll-end")
+    assert html =~ ~s(hidden)
+    assert html =~ ~s(tabindex="-1")
     assert html =~ ~s(aria-label="Example views")
     assert html =~ "border-b border-line"
     assert html =~ "Overview"

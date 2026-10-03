@@ -192,6 +192,69 @@ defmodule Bilimbi.Base.AuthzTest do
     assert Repo.aggregate(PrincipalCapability, :count) == 1
   end
 
+  test "loads grantability for many roles in one scoped query" do
+    tenant_scope = scope()
+
+    roles =
+      for i <- 1..12 do
+        assert {:ok, role} =
+                 Authz.create_role(tenant_scope, 10, %{name: "Role #{i}", code: "role_#{i}"})
+
+        if rem(i, 2) == 0 do
+          assert {:ok, 1} =
+                   Authz.replace_role_capabilities(tenant_scope, role.id, [
+                     "admin.test.record.view"
+                   ])
+        end
+
+        role
+      end
+
+    [first | _] = roles
+
+    queries =
+      capture_queries(fn ->
+        grants = Authz.role_grants(tenant_scope, Enum.map(roles, & &1.id) ++ [0, first.id])
+        send(self(), {:role_grants, grants})
+      end)
+
+    assert_receive {:role_grants, grants}
+    assert length(queries) == 1
+    assert map_size(grants) == 12
+    assert grants[first.id] == %{grant_all: false, capabilities: []}
+
+    even = Enum.at(roles, 1)
+    assert grants[even.id].capabilities == ["admin.test.record.view"]
+    assert grants[even.id].grant_all == false
+    assert Authz.role_grants(scope(2), Enum.map(roles, & &1.id)) == %{}
+    assert Authz.role_grants(tenant_scope, []) == %{}
+  end
+
+  defp capture_queries(fun) do
+    handler = "authz-queries-#{System.unique_integer([:positive])}"
+    parent = self()
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _, _, metadata, _ -> send(parent, {:authz_query, metadata.query}) end,
+      nil
+    )
+
+    fun.()
+    :telemetry.detach(handler)
+
+    receive_queries([])
+  end
+
+  defp receive_queries(queries) do
+    receive do
+      {:authz_query, query} -> receive_queries([query | queries])
+    after
+      20 -> Enum.reverse(queries)
+    end
+  end
+
   defp system_role(code) do
     Repo.one!(from(role in Role, where: role.code == ^code and is_nil(role.company_id)))
   end

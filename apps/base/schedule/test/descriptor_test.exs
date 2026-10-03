@@ -18,6 +18,7 @@ defmodule Bilimbi.Base.Schedule.DescriptorTest do
              "base/module_registry",
              "base/queue",
              "base/settings",
+             "base/tenancy",
              "base/ui"
            ]
 

@@ -31,6 +31,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Crontab.CronExpression.Parser
@@ -99,15 +100,15 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     refute has_element?(view, "#schedule-task-test-schedule button")
 
     assert render_click(view, "run_now", %{"key" => definition.key}) =~
-             "You do not have permission to perform that action."
+             "You do not have permission for that action."
 
     assert render_click(view, "request_pause", %{"key" => definition.key}) =~
-             "You do not have permission to perform that action."
+             "You do not have permission for that action."
 
     refute has_element?(view, "#schedule-command-confirm")
 
     assert render_click(view, "pause", %{"key" => definition.key}) =~
-             "You do not have permission to perform that action."
+             "You do not have permission for that action."
 
     refute Repo.exists?(Occurrence)
     refute Repo.exists?(Suppression)
@@ -340,9 +341,69 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
 
     assert render_click(view, "enable", %{"key" => definition.key}) =~
-             "You do not have permission to perform that action."
+             "You do not have permission for that action."
 
     assert {:error, :unreviewed} = Schedule.run_now(definition.key)
+  end
+
+  test "the API refuses operator writes without the capability and for the system actor", %{
+    definition: definition
+  } do
+    {:ok, system} = Tenancy.scope(41)
+    refused = Authentication.sign_in(system, 91, 73)
+
+    assert :ok = Schedule.review_definition(definition.key, true)
+
+    for scope <- [system, refused] do
+      assert {:error, :forbidden} = Schedule.run_now(scope, definition.key)
+      assert {:error, :forbidden} = Schedule.set_history_retention(scope, 12)
+      assert {:error, :forbidden} = Schedule.suppress(scope, definition.key)
+    end
+
+    refute Repo.exists?(Occurrence)
+    refute Repo.exists?(Suppression)
+
+    grant_capabilities!(@execute)
+    allowed = Authentication.sign_in(system, 91, 73)
+    assert {:ok, %{id: id}} = Schedule.run_now(allowed, definition.key)
+    assert is_integer(id)
+
+    grant_capabilities!(@manage)
+    assert {:ok, 12} = Schedule.set_history_retention(allowed, 12)
+    assert Settings.get("schedule.history.keep_days") == 12
+  end
+
+  test "an open page refuses run now after execute is revoked", %{
+    conn: conn,
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    grant_capabilities!([@view, @execute])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule")
+    assert has_element?(view, "#schedule-task-test-schedule-run")
+
+    {:ok, scope} = Tenancy.scope(41)
+    remove_capability!(scope, @execute)
+
+    assert render_click(view, "run_now", %{"key" => definition.key}) =~
+             "You do not have permission for that action."
+
+    refute Repo.exists?(Occurrence)
+  end
+
+  test "an open page refuses a retention change after manage is revoked", %{conn: conn} do
+    grant_capabilities!([@view, @manage])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=settings")
+    assert has_element?(view, "#schedule-retention-form")
+
+    {:ok, scope} = Tenancy.scope(41)
+    remove_capability!(scope, @manage)
+
+    assert view
+           |> form("#schedule-retention-form", retention: %{days: "12"})
+           |> render_submit() =~ "You do not have permission for that action."
+
+    assert Settings.get("schedule.history.keep_days") == 90
   end
 
   test "history date filters bound the day the Started column shows, in every clock mode", %{
@@ -565,6 +626,20 @@ defmodule BilimbiWeb.ScheduleLiveTest do
              view,
              "#schedule-history-pagination-page-size option[value='25'][selected]"
            )
+  end
+
+  defp remove_capability!(scope, capability) do
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(
+        principal_type: :user,
+        principal_id: 91,
+        page_size: 100
+      )
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   # The company clock is what the product shows by default; the settings table
