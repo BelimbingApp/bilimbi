@@ -12,6 +12,8 @@ An instant inside a diff includes seconds. `MutationDiff.diff_value/1` passes `p
 
 Silencing capture is not done from this folder. `Bilimbi.Base.Database.WriteCapture.without_capture/1` needs a written, table-level reason. See `apps/base/database/AGENTS.md`.
 
+A retention change goes through `toggle_retained/2`, which asks `Bilimbi.Base.Audit.Authorization`. The workspace wires that to Base Authz in `config/config.exs`. Do not add a `base/authz` dependency: Authz already depends on Audit, and discovery rejects the cycle. The actions screen's `can_manage` assign only shows the control.
+
 ## Maintaining this file
 
 Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.

@@ -77,21 +77,24 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
     {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
   end
 
+  # `can_manage` only shows the control. The write re-asks the manage
+  # capability, so a grant removed after the page opened still refuses.
   @impl true
   def handle_event("toggle_retain", %{"id" => id_str}, socket) do
-    if allowed?(socket.assigns.current_scope, @manage_cap) do
-      id = to_int(id_str, 0)
-      scope = socket.assigns.current_scope.scope
+    id = to_int(id_str, 0)
 
-      case Audit.toggle_retained(scope, id) do
-        {:ok, _updated_action} ->
-          {:noreply, load(socket, socket.assigns.state)}
+    case Audit.toggle_retained(socket.assigns.current_scope.scope, id) do
+      {:ok, _updated_action} ->
+        {:noreply, load(socket, socket.assigns.state)}
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "Could not update retention status.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage audit logs.")}
+      {:error, :forbidden} ->
+        {:noreply,
+         socket
+         |> assign(:can_manage, allowed?(socket.assigns.current_scope, @manage_cap))
+         |> put_flash(:error, "You do not have permission to manage audit logs.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not update retention status.")}
     end
   end
 

@@ -960,10 +960,15 @@
                 </p>
               </.card>
               <.card id="component-tabs" title="Tabs" inner_class="p-3">
+                <p id="design-library-tabs-overflow" class="mb-2 text-xs text-ink-muted">
+                  Labels stay on one line. What does not fit scrolls, and an edge control appears only while a tab is out of view.
+                </p>
                 <.tabs id="example-tabs" aria-label="Example views">
                   <:tab href="#component-tabs" current={true}>Overview</:tab>
                   <:tab href="#component-tabs">History</:tab>
                   <:tab href="#component-tabs">Settings</:tab>
+                  <:tab href="#component-tabs">Recent activity</:tab>
+                  <:tab href="#component-tabs">Access history</:tab>
                 </.tabs>
                 <div id="design-library-tabs-single" class="border-t border-line pt-3">
                   <p class="mb-2 text-xs text-ink-muted">One section needs no switching</p>
