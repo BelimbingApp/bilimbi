@@ -1,12 +1,12 @@
 defmodule Bilimbi.Core.AddressTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
-  alias Bilimbi.Base.Authz.ContributionValidator
-  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Address.Page
