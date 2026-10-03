@@ -8,9 +8,10 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SharedLayouts
 
-  # This route mounts under ui.workspace.publish, and both write handlers
-  # check that capability again before changing company settings.
-  # delete-layout only opens the confirmation dialog; it writes nothing.
+  # The route mounts under ui.workspace.publish. Publishing and deleting are
+  # SharedLayouts writes: they take the sealed scope and check that same
+  # capability. These handlers only present the outcome. delete-layout opens
+  # the confirmation and writes nothing.
   @write_guard_opt_out ~w(publish-layout delete-layout confirm-delete-layout)
 
   @impl true
@@ -61,17 +62,13 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
 
   @impl true
   def handle_event("publish-layout", %{"layout" => params}, socket) do
-    if allowed?(socket.assigns.current_scope, "ui.workspace.publish") do
-      roles = params |> Map.get("roles", []) |> List.wrap() |> Enum.reject(&(&1 == ""))
-      known = MapSet.new(socket.assigns.role_options, &elem(&1, 1))
+    roles = params |> Map.get("roles", []) |> List.wrap() |> Enum.reject(&(&1 == ""))
+    known = MapSet.new(socket.assigns.role_options, &elem(&1, 1))
 
-      if Enum.all?(roles, &MapSet.member?(known, &1)) do
-        publish(socket, params, roles)
-      else
-        {:noreply, put_flash(socket, :error, gettext("Choose role codes from this company."))}
-      end
+    if Enum.all?(roles, &MapSet.member?(known, &1)) do
+      publish(socket, params, roles)
     else
-      {:noreply, put_flash(socket, :error, gettext("You cannot share workspaces."))}
+      {:noreply, put_flash(socket, :error, gettext("Choose role codes from this company."))}
     end
   end
 
@@ -87,31 +84,37 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
     do: {:noreply, assign(socket, :pending_delete, nil)}
 
   def handle_event("confirm-delete-layout", _params, socket) do
-    slug = socket.assigns.pending_delete
+    case socket.assigns.pending_delete do
+      slug when is_binary(slug) ->
+        case SharedLayouts.delete(socket.assigns.current_scope.scope, slug) do
+          :ok ->
+            {:noreply,
+             assign(socket,
+               entries: SharedLayouts.list(socket.assigns.company_scope),
+               pending_delete: nil
+             )}
 
-    if is_binary(slug) and allowed?(socket.assigns.current_scope, "ui.workspace.publish") do
-      case SharedLayouts.delete(socket.assigns.company_scope, slug) do
-        :ok ->
-          {:noreply,
-           assign(socket,
-             entries: SharedLayouts.list(socket.assigns.company_scope),
-             pending_delete: nil
-           )}
+          {:error, :forbidden} ->
+            {:noreply,
+             socket
+             |> assign(:pending_delete, nil)
+             |> put_flash(:error, gettext("You cannot manage shared workspaces."))}
 
-        {:error, _changeset} ->
-          {:noreply,
-           socket
-           |> assign(:pending_delete, nil)
-           |> put_flash(:error, gettext("The shared workspace could not be deleted."))}
-      end
-    else
-      {:noreply, put_flash(socket, :error, gettext("You cannot manage shared workspaces."))}
+          {:error, _changeset} ->
+            {:noreply,
+             socket
+             |> assign(:pending_delete, nil)
+             |> put_flash(:error, gettext("The shared workspace could not be deleted."))}
+        end
+
+      _missing ->
+        {:noreply, put_flash(socket, :error, gettext("You cannot manage shared workspaces."))}
     end
   end
 
   defp publish(socket, params, roles) do
     case SharedLayouts.publish(
-           socket.assigns.company_scope,
+           socket.assigns.current_scope.scope,
            Map.get(params, "label", ""),
            Map.get(params, "tree", ""),
            roles
@@ -121,6 +124,9 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
          socket
          |> assign(:entries, SharedLayouts.list(socket.assigns.company_scope))
          |> put_flash(:success, gettext("Shared the workspace."))}
+
+      {:error, :forbidden} ->
+        {:noreply, put_flash(socket, :error, gettext("You cannot share workspaces."))}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, gettext("The workspace could not be shared."))}

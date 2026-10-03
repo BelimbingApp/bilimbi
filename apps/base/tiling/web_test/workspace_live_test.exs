@@ -13,6 +13,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.Tiling.SharedLayouts
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -748,13 +749,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "shared workspace opens for company viewer while a forbidden tile stays closed", %{
     conn: conn
   } do
-    {:ok, entry} =
-      SharedLayouts.publish(
-        Settings.Scope.company(73),
-        "Team desk",
-        "h.5(/companies,/users)",
-        []
-      )
+    {:ok, entry} = publish_shared("Team desk", "h.5(/companies,/users)", [])
 
     {:ok, view, _html} = open(conn, "/workspace/shared/#{entry["slug"]}")
     assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
@@ -784,7 +779,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   end
 
   test "copying the open shared workspace keeps the viewer's arrangement", %{conn: conn} do
-    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+    {:ok, _} = publish_shared("Team desk", "/companies")
 
     {:ok, view, _html} =
       open(conn, "/workspace/shared/team-desk?t=h.5(%2Fcompanies,%2Fcompanies)")
@@ -807,7 +802,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     })
 
     grant_capabilities!("ui.workspace.publish", user_id: 96)
-    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+    {:ok, _} = publish_shared("Team desk", "/companies")
     conn = log_in_as(conn, session_user(%{"user_id" => 96, "company_id" => nil}))
 
     for path <- ["/workspace", "/workspace/shared/team-desk", "/workspace/shared-layouts"] do
@@ -816,7 +811,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   end
 
   test "a shared workspace does not replace the empty workspace", %{conn: conn} do
-    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+    {:ok, _} = publish_shared("Team desk", "/companies")
 
     {:ok, view, _html} = open(conn)
     assert has_element?(view, "#workspace-empty-state", "No pages open")
@@ -830,8 +825,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     {:ok, role} = Authz.create_role(scope, 73, %{name: "Reviewer", code: "reviewer"})
     {:ok, :assigned} = Authz.assign_role(scope, 73, :user, 91, role.id)
 
-    {:ok, _} =
-      SharedLayouts.publish(Settings.Scope.company(73), "Review", "/companies", ["reviewer"])
+    {:ok, _} = publish_shared("Review", "/companies", ["reviewer"])
 
     {:ok, owner, _html} = conn |> log_in_as() |> live("/workspace?t=/companies")
     owner |> element("#workspace-open-layouts") |> render_click()
@@ -873,5 +867,55 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert_modal_dialog(view, "shared-workspace-delete-confirmation", "will be deleted")
     view |> element("#shared-workspace-delete-confirmation-cancel") |> render_click()
     assert [%{"slug" => "control-desk"}] = SharedLayouts.list(Settings.Scope.company(73))
+  end
+
+  test "the API refuses a system actor and a user without publish, and allows a user who holds it" do
+    {:ok, system} = Tenancy.scope(41)
+    company = Settings.Scope.company(73)
+
+    assert {:error, :forbidden} = SharedLayouts.publish(system, "Desk", "/companies", [])
+    assert {:error, :forbidden} = SharedLayouts.delete(system, "desk")
+    assert SharedLayouts.list(company) == []
+
+    refused = Authentication.sign_in(system, 91, 73)
+    assert {:error, :forbidden} = SharedLayouts.publish(refused, "Desk", "/companies", [])
+    assert {:error, :forbidden} = SharedLayouts.delete(refused, "desk")
+    assert SharedLayouts.list(company) == []
+
+    grant_capabilities!("ui.workspace.publish")
+    allowed = Authentication.sign_in(system, 91, 73)
+    assert {:ok, %{"slug" => "desk"}} = SharedLayouts.publish(allowed, "Desk", "/companies", [])
+    assert [%{"slug" => "desk"}] = SharedLayouts.list(company)
+    assert :ok = SharedLayouts.delete(allowed, "desk")
+    assert SharedLayouts.list(company) == []
+  end
+
+  test "revoking publish after mount closes the page and leaves the shared workspace", %{
+    conn: conn
+  } do
+    {:ok, _} = publish_shared("Control desk", "/companies")
+    grant_capabilities!("ui.workspace.publish")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live("/workspace/shared-layouts")
+    assert has_element?(view, "#shared-workspace-control-desk")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(scope, 73, :user, 91, "ui.workspace.publish", false)
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             view |> element("#shared-workspace-delete-control-desk") |> render_click()
+
+    assert assert_redirect(view, "/dashboard")["error"] ==
+             BilimbiWeb.RouteAccess.revoked_message()
+
+    assert [%{"slug" => "control-desk"}] = SharedLayouts.list(Settings.Scope.company(73))
+  end
+
+  defp publish_shared(label, tree, roles \\ []) do
+    grant_capabilities!("ui.workspace.publish")
+    {:ok, system} = Tenancy.scope(41)
+    SharedLayouts.publish(Authentication.sign_in(system, 91, 73), label, tree, roles)
   end
 end

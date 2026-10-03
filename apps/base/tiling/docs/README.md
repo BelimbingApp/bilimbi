@@ -38,10 +38,13 @@ default in the `ui.workspace.layouts` and `ui.workspace.default` settings at
 user scope, through the shared Settings API, so every write is audited.
 `Bilimbi.Base.Tiling.SharedLayouts` keeps published layouts in the
 `ui.workspace.shared_layouts` setting at company scope. An empty role list
-shares with the company; role codes limit who sees a layout. Publishing and
-administration require `ui.workspace.publish`. A viewer may open or copy a
-shared layout, while every tile still applies that viewer's route access. An
-account without a company sees no shared layouts and keeps its own.
+shares with the company; role codes limit who sees a layout. `publish/4` and
+`delete/2` take the sealed tenancy scope and check `ui.workspace.publish`,
+the capability the shared-workspaces screen already requires; the company is
+the actor's company, and a system actor is refused. The screen only presents
+that result. A viewer may open or copy a shared layout, while every tile
+still applies that viewer's route access. An account without a company sees
+no shared layouts and keeps its own.
 `Bilimbi.Base.Tiling.Web.WorkspaceLive` is the host page; it holds only the
 tree, the focused tile, monocle, and the titles the tiles report. The
 sidebar control is `nav_tile/1` in Base UI's `Layouts`, and `AppShell`
