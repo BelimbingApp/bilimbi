@@ -5,8 +5,8 @@ defmodule BilimbiWeb.SessionDisconnect do
   Every LiveView socket of a signed-in browser carries its session's
   `live_socket_id` (`BilimbiWeb.UserAuth.live_socket_id/1`) from the cookie
   session, and Phoenix closes a transport when `"disconnect"` is broadcast on
-  that id. Base Session publishes every termination it performs, whoever
-  asked for it: logout, an operator ending a listed session, Core User ending
+  that id. Base Session reports explicit deletions and terminations: logout,
+  an operator ending a listed session, Core User ending
   a user's sessions after a password reset or a change of affiliation. This
   process is the host's one subscriber and turns each termination into that
   broadcast, so every open tab of the session reconnects and is refused at

@@ -29,12 +29,8 @@ defmodule BilimbiWeb.UserAuth do
   with an opaque payload; logout calls `Session.delete_session/1` before
   dropping the cookie.
 
-  A connected LiveView rehydrates the same four facts again before every
-  event and live navigation (`BilimbiWeb.RouteAccess` calls `refresh_scope/1`),
-  so a terminated session or a removed login ends an open page at its next
-  action. The cookie also carries `live_socket_id/1`, the transport topic on
-  which `BilimbiWeb.SessionDisconnect` ends every socket of a session that
-  Base Session reports terminated.
+  For connected-page reauthorization, see `BilimbiWeb.RouteAccess`. Session
+  termination transport handling belongs to `BilimbiWeb.SessionDisconnect`.
 
   Once identity is rehydrated, this edge also resolves Base Locale from the
   authenticated user's explicit Settings scope and applies its language to the

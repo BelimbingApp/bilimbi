@@ -40,18 +40,10 @@ revocation commits with a retained `authz.system_principal.granted` or
 
 ## Re-authorizing inside a LiveView
 
-`Bilimbi.Base.Authz.LiveAuthorization` is the one way a module LiveView
-re-asks Authz after mount. `allowed_now?/2` evaluates a string or
-`{:any_of, keys}` requirement with one `can/2` decision per key against the
-actor the authentication edge sealed onto `current_scope`; the host's
-`BilimbiWeb.RouteAccess` uses it before every event and navigation of an
-open page, including component events through the Base UI host callback.
-`authorize_event/2` checks the additional operation requirement for an event handler: `{:ok, socket}`
-proceeds, `{:denied, socket}` carries the refusal flash and drops the denied
-keys from `current_scope.capabilities` so controls hidden through
-`allowed?/2` disappear on the next render. A `nil` requirement raises; an
-operation always names what it needs. Base Menu's `Capability` owns the
-requirement shape.
+Use `Bilimbi.Base.Authz.LiveAuthorization` for additional operation checks in
+LiveView event handlers. Its [module documentation](../lib/authz/live_authorization.ex)
+owns requirement shapes, live decisions, and refusal handling. The host's
+page and session boundary is documented in [Live navigation](../../../web/docs/navigation.md).
 
 ## Administration facade
 

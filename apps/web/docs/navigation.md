@@ -6,31 +6,24 @@ these routes as one block so navigation can use the live connection instead
 of reloading the document. Authentication is rehydrated on each destination
 mount. Anonymous and operator-only routes keep separate session boundaries.
 
-`BilimbiWeb.RouteAccess` checks each route's declared capability before the
-module's mount runs, then re-proves the page before every event it handles
-and before every URL patch, whether the patch stays on the same route or
-enters a different one. The re-proof first rehydrates the scope exactly as
-an HTTP request does (`UserAuth.refresh_scope/1`: durable session row,
-company, tenant, user and effective capabilities), sending a page whose
-session was terminated or whose login was removed to the login screen with
-the expired-session flash, and assigns the refreshed `current_scope`. It
-then re-checks the route capability against that actor, one `Authz.can/2`
-decision per key, logged like any other, and a grant revoked while the page
-is open sends it to the dashboard with a flash saying so instead of letting
-it keep acting until remount. The first `handle_params` of a mount is not
-checked a second time. Separately, the cookie session carries
-`UserAuth.live_socket_id/1`; Base Session publishes every termination and
-`BilimbiWeb.SessionDisconnect` broadcasts `"disconnect"` on that id, so the
-idle tabs of a session that ended reconnect and are refused at mount. The router supplies a compile-time action key for the
-policy lookup; the hook clears that host-only key before the adapter runs,
-preserving the existing nil-action adapter contract. A missing policy fails
-closed. Modules sharing a LiveView (for example User create/edit) still have
-distinct policies. An operation that needs a capability other than the
-route's re-asks through `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
-Every Base UI LiveComponent event first runs the same host identity and page
-check through `Bilimbi.Base.UI.EventAuthorization`. The host installs the
-callback in the owning LiveView process and replaces it on live navigation;
-components cannot substitute their own page policy or stale identity.
+An open page rechecks its session and page permission before each client
+event or URL patch, including events handled by Base UI LiveComponents.
+A terminated session or removed login sends the page to sign-in with the
+expired-session message. Revoking its page permission sends it to the
+dashboard with a refusal message before the action runs. Server-triggered
+callbacks are outside this boundary. The host refreshes `current_scope` for
+the handler; cached presentation flags are not authorization.
+
+[RouteAccess](../lib/bilimbi_web/route_access.ex) owns the hook, route-policy,
+and component callback contract. Additional operation permissions use
+[LiveAuthorization](../../base/authz/lib/authz/live_authorization.ex).
+
+Session termination also disconnects idle tabs through
+[SessionDisconnect](../lib/bilimbi_web/session_disconnect.ex). Sockets carrying
+`UserAuth.live_socket_id/1` reconnect and are refused at mount. The next-action
+check does not depend on receiving that notification. The
+[Session API](../../base/session/lib/session.ex) owns which deletion operations
+publish and the notification timing.
 
 The menu and content render together through Base UI. Sharing the session does
 not cache the actor's permissions or introduce a separate menu request. The

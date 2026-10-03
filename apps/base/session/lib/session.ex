@@ -147,14 +147,17 @@ defmodule Bilimbi.Base.Session do
   @doc """
   Terminates a user's durable sessions except the caller's current session.
 
-  Returns the number of rows terminated as `{:ok, count}`. The caller must
-  supply a positive durable user ID and a non-empty current session ID; invalid
-  input has no fallback that could widen the deletion.
+  The caller must already have authorized the operation. Returns the number
+  of rows terminated as `{:ok, count}`. The caller must supply a positive
+  durable user ID and a non-empty current session ID; invalid input has no
+  fallback that could widen the deletion.
 
   The delete participates in an existing shared Repo transaction when one is
-  open. It affects rows matched by this statement, not a credential epoch or a
-  permanent login lockout: a session established after the statement outside
-  that serialization can remain or appear later.
+  open. It first selects matching session IDs, then deletes those IDs and
+  publishes their termination notifications. The returned count is the number
+  actually deleted; notifications cover the selected IDs even if another
+  caller deleted one meanwhile. This is not a credential epoch or permanent
+  login lockout: sessions created after the selection can survive.
 
   Session payloads are opaque: this lifecycle operation does not return them,
   and the audit trail records only that a payload was there, redacted.
@@ -178,13 +181,18 @@ defmodule Bilimbi.Base.Session do
   end
 
   @doc """
-  Subscribes the calling process to every session that ends through this
-  module: `{:session_terminated, id}` for each deleted row, whoever ended it.
+  Subscribes the calling process to `{:session_terminated, id}` notifications.
 
-  The transport is the configured `:pubsub_server`; without one the lifecycle
-  still completes and nothing is published. A subscriber that holds live
-  connections for a session ends them on this message; the host's
-  `BilimbiWeb.SessionDisconnect` is that subscriber.
+  `delete_session/1` and `terminate_session/2` publish after deleting a row;
+  `terminate_user_sessions/2` publishes for its selected IDs as documented
+  above. `prune_expired/1` does not publish. Notifications precede the commit
+  of any enclosing transaction; see the rollback rationale at `publish_terminated/1`.
+
+  The transport is `:bilimbi_base_session`'s configured `:pubsub_server`.
+  Without a running transport the lifecycle still completes and nothing is
+  published. With no configured server subscription returns `:ok`; an
+  unavailable configured server returns `{:error, :pubsub_unavailable}`.
+  The host consumes these notifications through `BilimbiWeb.SessionDisconnect`.
   """
   @spec subscribe_terminations() :: :ok | {:error, :pubsub_unavailable}
   def subscribe_terminations do

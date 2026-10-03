@@ -6,7 +6,8 @@ defmodule BilimbiWeb.RouteAccess do
   Route actions carry a compile-time policy key, never a client-supplied grant.
   Clear that host-only key before calling module adapters, which historically
   receive a nil action. Authentication and operator boundaries remain UserAuth
-  session hooks.
+  session hooks. A missing policy fails closed; routes sharing a LiveView
+  still carry distinct policies.
 
   ## After mount
 
