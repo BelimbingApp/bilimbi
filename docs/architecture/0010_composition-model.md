@@ -340,7 +340,8 @@ The chosen mechanisms, each owned where it is enforced:
   sources, `precommit.test`, and `compile.strict` derive their paths from
   discovery rather than fixed-depth globs. The strict task compiles each path
   package in its own project context because root compilation does not pass
-  `--warnings-as-errors` into path dependencies.
+  `--warnings-as-errors` into path dependencies. `compile.strict` also compiles
+  the Web host, which discovery does not list.
 - **Repository CI.** A mounted repository's CI checks out the Platform at a
   pinned revision, mounts itself, resolves the composition lock, and runs the
   Platform's precommit, once mounted and once absent; the Factory workflow is

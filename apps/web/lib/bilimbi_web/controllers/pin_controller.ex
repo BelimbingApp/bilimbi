@@ -5,25 +5,24 @@ defmodule BilimbiWeb.PinController do
 
   use BilimbiWeb, :controller
 
+  alias Bilimbi.Base.UI
   alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Core.User
 
   def index(conn, _params) do
     scope = conn.assigns[:current_scope]
 
-    if scope && scope[:user] do
-      user_id = extract_user_id(scope)
+    case authenticated_user_id(scope) do
+      {:ok, user_id} ->
+        pins =
+          user_id
+          |> User.list_user_pins()
+          |> Enum.filter(&served_pin?/1)
 
-      pins =
-        user_id
-        |> User.list_user_pins()
-        |> Enum.filter(&served_pin?/1)
+        json(conn, %{pins: format_pins(pins)})
 
-      json(conn, %{pins: format_pins(pins)})
-    else
-      conn
-      |> put_status(:unauthorized)
-      |> json(%{error: "unauthorized"})
+      {:error, reason} ->
+        respond_to_actor_error(conn, reason)
     end
   end
 
@@ -31,31 +30,23 @@ defmodule BilimbiWeb.PinController do
       when is_binary(label) and is_binary(url) do
     scope = conn.assigns[:current_scope]
 
-    if scope && scope[:user] && is_nil(scope[:impersonator]) do
-      user_id = extract_user_id(scope)
+    case self_service_user_id(scope) do
+      {:ok, user_id} ->
+        case User.toggle_user_pin(user_id, params) do
+          {:ok, action, pins} ->
+            json(conn, %{
+              pinned: action == :pinned,
+              pins: format_pins(pins)
+            })
 
-      case User.toggle_user_pin(user_id, params) do
-        {:ok, action, pins} ->
-          json(conn, %{
-            pinned: action == :pinned,
-            pins: format_pins(pins)
-          })
+          {:error, _changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "invalid_pin"})
+        end
 
-        {:error, _changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "invalid_pin"})
-      end
-    else
-      if scope && scope[:impersonator] do
-        conn
-        |> put_status(:forbidden)
-        |> json(%{error: "impersonating"})
-      else
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "unauthorized"})
-      end
+      {:error, reason} ->
+        respond_to_actor_error(conn, reason)
     end
   end
 
@@ -68,29 +59,21 @@ defmodule BilimbiWeb.PinController do
   def reorder(conn, %{"pins" => pin_list}) when is_list(pin_list) do
     scope = conn.assigns[:current_scope]
 
-    if scope && scope[:user] && is_nil(scope[:impersonator]) do
-      user_id = extract_user_id(scope)
+    case self_service_user_id(scope) do
+      {:ok, user_id} ->
+        case pin_ids(pin_list) do
+          {:ok, pin_ids} ->
+            {:ok, pins} = User.reorder_user_pins(user_id, pin_ids)
+            json(conn, %{pins: format_pins(pins)})
 
-      case pin_ids(pin_list) do
-        {:ok, pin_ids} ->
-          {:ok, pins} = User.reorder_user_pins(user_id, pin_ids)
-          json(conn, %{pins: format_pins(pins)})
+          :error ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "invalid_parameters"})
+        end
 
-        :error ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "invalid_parameters"})
-      end
-    else
-      if scope && scope[:impersonator] do
-        conn
-        |> put_status(:forbidden)
-        |> json(%{error: "impersonating"})
-      else
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "unauthorized"})
-      end
+      {:error, reason} ->
+        respond_to_actor_error(conn, reason)
     end
   end
 
@@ -98,6 +81,28 @@ defmodule BilimbiWeb.PinController do
     conn
     |> put_status(:unprocessable_entity)
     |> json(%{error: "invalid_parameters"})
+  end
+
+  defp self_service_user_id(%{impersonator: impersonator}) when not is_nil(impersonator),
+    do: {:error, :impersonating}
+
+  defp self_service_user_id(scope), do: authenticated_user_id(scope)
+
+  defp authenticated_user_id(%{user: user} = scope) when not is_nil(user),
+    do: {:ok, UI.current_user_id(scope)}
+
+  defp authenticated_user_id(_scope), do: {:error, :unauthorized}
+
+  defp respond_to_actor_error(conn, :impersonating) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{error: "impersonating"})
+  end
+
+  defp respond_to_actor_error(conn, :unauthorized) do
+    conn
+    |> put_status(:unauthorized)
+    |> json(%{error: "unauthorized"})
   end
 
   # Keep stale durable pins out of the shell when a module route is removed.
@@ -155,9 +160,4 @@ defmodule BilimbiWeb.PinController do
       }
     end)
   end
-
-  defp extract_user_id(%{user: %{"user_id" => id}}), do: id
-  defp extract_user_id(%{user: %{user_id: id}}), do: id
-  defp extract_user_id(%{user: %{id: id}}), do: id
-  defp extract_user_id(%{actor: %{id: id}}), do: id
 end

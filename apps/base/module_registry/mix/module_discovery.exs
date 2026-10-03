@@ -344,7 +344,9 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   Writes the compile-time route manifest from installed descriptors and the
   optional host route file.
 
-  Reads descriptors from disk. Does not call the runtime registry.
+  Reads descriptors from disk. Does not call the runtime registry. Two browser
+  entries that share a path and HTTP verb are rejected. A missing verb is
+  `:get`, so distinct verbs on one path stay valid.
   """
   @spec write_route_manifest!(String.t()) :: :ok
   def write_route_manifest!(workspace_root) do
@@ -378,6 +380,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     entries = module_routes ++ host_routes
     validate_unique_embed_keys!(entries)
+    paths = Enum.filter(entries, &Map.has_key?(&1, :path))
+
+    if length(Enum.uniq_by(paths, &{&1.path, Map.get(&1, :verb, :get)})) != length(paths) do
+      raise ArgumentError, "duplicate route path"
+    end
+
     webhooks = Enum.filter(entries, &Map.has_key?(&1, :webhook))
 
     if length(Enum.uniq_by(webhooks, & &1.webhook)) != length(webhooks) do

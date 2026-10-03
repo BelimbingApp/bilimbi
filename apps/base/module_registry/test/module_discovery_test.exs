@@ -637,6 +637,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       File.write!(route_file, inspect(bad))
       assert_raise ArgumentError, fn -> MixDiscovery.write_route_manifest!(root) end
     end
+
+    File.write!(route_file, inspect([%{path: "/same"}, %{path: "/same"}]))
+
+    assert_raise ArgumentError, ~r/duplicate route path/, fn ->
+      MixDiscovery.write_route_manifest!(root)
+    end
   end
 
   test "mounted browser routes cannot occupy the raw webhook namespace", %{root: root} do
