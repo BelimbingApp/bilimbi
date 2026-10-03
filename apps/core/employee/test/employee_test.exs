@@ -329,6 +329,38 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.get_employee(owner, employee.id)
   end
 
+  test "scope-wide lookup is one statement however many sibling companies exist", %{owner: owner} do
+    for id <- 80..99 do
+      CompanyFixtures.insert_company!(%{
+        id: id,
+        tenant_id: 41,
+        name: "Sibling #{id}",
+        code: "sibling_#{id}"
+      })
+    end
+
+    assert {:ok, employee} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ONE",
+               full_name: "Single Read"
+             })
+
+    queries =
+      capture_queries(fn ->
+        assert {:ok, %{full_name: "Single Read"}} = Employee.get_employee(owner, employee.id)
+      end)
+
+    assert length(queries) == 1
+    query = hd(queries)
+    assert query =~ "employees"
+    assert query =~ "IN (SELECT"
+
+    assert Employee.live_full_names(owner, [employee.id, employee.id + 1]) ==
+             %{employee.id => "Single Read"}
+
+    assert Employee.live_full_names(owner, []) == %{}
+  end
+
   test "rejects cross-company departments, supervisors, and employee types", %{
     owner: owner,
     other: other
@@ -612,4 +644,29 @@ defmodule Bilimbi.Core.EmployeeTest do
   end
 
   defp opaque(value), do: :erlang.element(1, {value})
+
+  defp capture_queries(fun) do
+    handler = "employee-queries-#{System.unique_integer([:positive])}"
+    parent = self()
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _, _, metadata, _ -> send(parent, {:employee_query, metadata.query}) end,
+      nil
+    )
+
+    fun.()
+    :telemetry.detach(handler)
+
+    receive_queries([])
+  end
+
+  defp receive_queries(queries) do
+    receive do
+      {:employee_query, query} -> receive_queries([query | queries])
+    after
+      20 -> Enum.reverse(queries)
+    end
+  end
 end

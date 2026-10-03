@@ -737,6 +737,69 @@ defmodule Bilimbi.Core.AddressTest do
     assert {:valid_to, {_message, []}} = List.keyfind(changeset.errors, :valid_to, 0)
   end
 
+  test "linked owner names stay a fixed read as owners grow", context do
+    counts =
+      for n <- [1, 20] do
+        assert {:ok, address} =
+                 Address.create_address(context.operator, %{
+                   label: "Owners #{n}",
+                   country_iso: "MY",
+                   admin1_code: "MY.14"
+                 })
+
+        for i <- 1..n do
+          company_id = 400 + n * 50 + i
+
+          insert_company!(%{
+            id: company_id,
+            tenant_id: 41,
+            name: "Linked #{n}-#{i}",
+            code: "lnk#{n}x#{i}"
+          })
+
+          assert {:ok, :attached} =
+                   Address.attach_to_company(context.operator, address.id, company_id)
+        end
+
+        queries =
+          capture_queries(fn ->
+            assert {:ok, detail} = Address.get_address_detail(context.operator, address.id)
+            assert length(detail.linked_owners) == n
+            assert detail.admin1_name == "Kuala Lumpur"
+            assert hd(detail.linked_owners).name == "Linked #{n}-1"
+          end)
+
+        length(queries)
+      end
+
+    assert counts == [5, 5]
+  end
+
+  defp capture_queries(fun) do
+    handler = "address-queries-#{System.unique_integer([:positive])}"
+    parent = self()
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _, _, metadata, _ -> send(parent, {:address_query, metadata.query}) end,
+      nil
+    )
+
+    fun.()
+    :telemetry.detach(handler)
+
+    receive_queries([])
+  end
+
+  defp receive_queries(queries) do
+    receive do
+      {:address_query, query} -> receive_queries([query | queries])
+    after
+      20 -> Enum.reverse(queries)
+    end
+  end
+
   defp assert_owner_order(scope, address_id, sort_by, sort_dir, expected) do
     assert {:ok, detail} =
              Address.get_address_detail(scope, address_id,
