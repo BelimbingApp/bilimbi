@@ -5,6 +5,7 @@ defmodule BilimbiWeb.AddressLiveTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -58,6 +59,57 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     grant_capabilities!("admin.address.delete")
     assert :ok = Address.delete_address(user_scope, address.id)
+  end
+
+  test "refuses a deletion request when permission is revoked after mount", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} = Address.create_address(scope, %{label: "Protected"})
+    grant_capabilities!(["admin.address.list", "admin.address.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+    assert has_element?(view, "#address-delete-#{address.id}")
+
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.address.delete"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    view |> element("#address-delete-#{address.id}") |> render_click()
+
+    assert has_element?(view, "#flash-error", "You do not have permission to delete addresses.")
+    refute has_element?(view, "#delete-address-confirm")
+    assert has_element?(view, "#address-#{address.id}")
+    assert {:ok, ^address} = Address.get_address(scope, address.id)
+  end
+
+  test "refuses deletion when permission is revoked after opening confirmation", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} = Address.create_address(scope, %{label: "Protected"})
+    grant_capabilities!(["admin.address.list", "admin.address.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+    view |> element("#address-delete-#{address.id}") |> render_click()
+    assert has_element?(view, "#delete-address-confirm-confirm")
+
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.address.delete"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    view |> element("#delete-address-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", "You do not have permission to delete addresses.")
+    refute has_element?(view, "#flash-success")
+    assert has_element?(view, "#address-#{address.id}")
+    assert {:ok, ^address} = Address.get_address(scope, address.id)
   end
 
   test "lists, filters, sorts, and safely deletes tenant addresses", %{
