@@ -25,6 +25,17 @@ defmodule Bilimbi.Base.Authz.CompanyDirectory do
   @callback company_in_scope?(Scope.t(), pos_integer()) :: boolean()
 
   @doc """
+  Live company ids for this scope, as a query the caller embeds.
+
+  Optional. When present, permission checks use it inside their own statement
+  instead of loading `company_ids/1` into a list. The rows are the same set
+  `company_ids/1` returns.
+  """
+  @callback live_company_ids_query(Scope.t()) :: Ecto.Query.t()
+
+  @optional_callbacks live_company_ids_query: 1
+
+  @doc """
   The same companies `company_ids/1` reports, carrying display names.
 
   Two properties callers depend on, both asserted in

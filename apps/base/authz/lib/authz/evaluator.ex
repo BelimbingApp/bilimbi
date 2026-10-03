@@ -14,8 +14,15 @@ defmodule Bilimbi.Base.Authz.Evaluator do
     directory = registry.company_directory
     policies = ["actor_context"]
 
+    proved =
+      if is_nil(directory) do
+        :out_of_scope
+      else
+        EffectivePermissions.live_company_roles(actor, directory)
+      end
+
     cond do
-      is_nil(directory) or not directory.company_in_scope?(actor.scope, actor.company_id) ->
+      proved == :out_of_scope ->
         Decision.deny(:denied_invalid_actor_context, policies)
 
       capability not in registry.capabilities ->
@@ -41,8 +48,10 @@ defmodule Bilimbi.Base.Authz.Evaluator do
         )
 
       true ->
+        {:ok, company_id, roles} = proved
+
         actor
-        |> EffectivePermissions.load(directory)
+        |> EffectivePermissions.load(directory, company_id, roles)
         |> EffectivePermissions.evaluate(capability, [
           "actor_context",
           "capability_registry",
