@@ -42,7 +42,8 @@ defmodule Bilimbi.Core.CompanyTest do
               legal_name: "Bilimbi Industries Sdn. Bhd."
             }} = Company.platform_operator_company()
 
-    assert PrimaryCompanyManager.primary?(PrimaryCompanyManager.platform_operator_company!())
+    {:ok, operator_scope} = Tenancy.scope(41)
+    assert Company.primary_company?(operator_scope, 73)
   end
 
   test "dashboard counts only live tenant companies and preserves current-company selection" do
@@ -159,7 +160,8 @@ defmodule Bilimbi.Core.CompanyTest do
 
     assert company.tenant_id == tenant.id
     assert PrimaryCompanyManager.find_for_tenant(tenant).id == company.id
-    assert PrimaryCompanyManager.primary?(company)
+    {:ok, scope} = Tenancy.scope(tenant.id)
+    assert Company.primary_company?(scope, company.id)
   end
 
   test "requires an explicit transfer when changing a primary company" do
