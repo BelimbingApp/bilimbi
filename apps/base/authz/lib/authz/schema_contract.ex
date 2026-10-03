@@ -146,8 +146,6 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
       indexes: %{
         "base_authz_decision_logs_pkey" => index(["id"], true),
         "base_authz_decision_logs_company_id_index" => index(["company_id"]),
-        "base_authz_decision_logs_company_timeline_index" =>
-          index(["company_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_authz_decision_logs_actor_type_index" => index(["actor_type"]),
         "base_authz_decision_logs_actor_id_index" => index(["actor_id"]),
         "base_authz_decision_logs_acting_for_user_id_index" => index(["acting_for_user_id"]),
@@ -161,6 +159,10 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
         "base_authz_decision_logs_actor_type_actor_id_occurred_at_index" =>
           index(["actor_type", "actor_id", "occurred_at"]),
         "base_authz_decision_logs_capability_allowed_index" => index(["capability", "allowed"])
+      },
+      optional_indexes: %{
+        "base_authz_decision_logs_company_timeline_index" =>
+          index(["company_id", "occurred_at", "id"], false, nil, [false, true, true])
       },
       foreign_keys: %{}
     }
@@ -183,3 +185,4 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
 
   defp check(expression), do: %{expression: expression, validated: true}
 end
+

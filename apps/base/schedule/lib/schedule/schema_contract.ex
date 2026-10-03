@@ -12,7 +12,12 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   def migration_version, do: @migration_version
 
   @impl true
-  def tables, do: [runs(), suppressions(), occurrences()]
+  def tables, do: [runs(), suppressions()]
+
+  @doc "Verifies Bilimbi-only occurrence state after runtime migrations have run."
+  def verify_runtime(repo, opts \\ []) do
+    SchemaVerifier.verify(repo, [occurrences()], opts)
+  end
 
   @impl true
   def verify_invariants(repo, opts) do
@@ -107,7 +112,9 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
           index(["source", "key", "intended_at", "trigger"], true),
         "base_schedule_occurrences_active_overlap_unique" =>
           index(["overlap_key"], true, "overlap_keyisnotnullANDfinished_atisnull"),
-        "base_schedule_occurrences_state_claimed_index" => index(["state", "claimed_at"]),
+        "base_schedule_occurrences_state_claimed_index" => index(["state", "claimed_at"])
+      },
+      optional_indexes: %{
         "base_schedule_occurrences_unfinished_claimed_index" =>
           index(
             ["claimed_at", "id"],
@@ -126,3 +133,4 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   defp index(columns, unique \\ false, where \\ nil, order \\ nil),
     do: %{columns: columns, unique: unique, where: where, order: order}
 end
+

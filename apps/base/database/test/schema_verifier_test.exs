@@ -18,6 +18,45 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     assert :ok = SchemaVerifier.verify(Repo, [widget_spec()], prefix: schema)
   end
 
+  test "accepts nil and explicit ascending index ordering", %{schema: schema} do
+    for order <- [nil, [false]] do
+      spec = put_in(widget_spec(), [:indexes, "widgets_name_unique", :order], order)
+      assert :ok = SchemaVerifier.verify(Repo, [spec], prefix: schema)
+    end
+  end
+
+  test "checks optional and contributed index ordering when present", %{schema: schema} do
+    spec =
+      widget_spec()
+      |> Map.put(:optional_indexes, %{
+        "widgets_parent_id_index" => %{columns: ["parent_id"], unique: false, order: nil}
+      })
+
+    assert :ok = SchemaVerifier.verify(Repo, [spec], prefix: schema)
+
+    SQL.query!(
+      Repo,
+      ~s|CREATE INDEX widgets_parent_id_index ON "#{schema}".widgets (parent_id)|,
+      []
+    )
+
+    assert :ok = SchemaVerifier.verify(Repo, [spec], prefix: schema)
+
+    contribution = %{name: "widgets", indexes: spec.optional_indexes}
+    assert :ok = SchemaVerifier.verify_contributions(Repo, [contribution], prefix: schema)
+
+    SQL.query!(Repo, ~s|DROP INDEX "#{schema}".widgets_parent_id_index|, [])
+
+    SQL.query!(
+      Repo,
+      ~s|CREATE INDEX widgets_parent_id_index ON "#{schema}".widgets (parent_id DESC)|,
+      []
+    )
+
+    assert {:error, ["widgets: incompatible index widgets_parent_id_index"]} =
+             SchemaVerifier.verify(Repo, [spec], prefix: schema)
+  end
+
   test "reports missing tables and structural drift", %{schema: schema} do
     assert {:error, [missing]} =
              SchemaVerifier.verify(Repo, [%{widget_spec() | name: "missing_widgets"}],
@@ -245,3 +284,4 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
 
   defp check(expression), do: %{expression: expression, validated: true}
 end
+

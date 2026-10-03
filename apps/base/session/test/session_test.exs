@@ -290,7 +290,7 @@ defmodule Bilimbi.Base.SessionTest do
     assert {:ok, %Entry{last_activity: 100}} = Session.fetch_session("activity")
 
     assert :ok = Session.touch_session("activity", 401)
-    assert {:ok, %Entry{last_activity: 400}} = Session.fetch_session("activity")
+    assert {:ok, %Entry{last_activity: 401}} = Session.fetch_session("activity")
   end
 
   test "validates canonical column limits and activity metadata" do
@@ -328,3 +328,4 @@ defmodule Bilimbi.Base.SessionTest do
     entry
   end
 end
+

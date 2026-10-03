@@ -378,17 +378,31 @@ defmodule Bilimbi.Base.Schedule do
   @doc "Prunes completed occurrence history older than the configured retention period."
   @spec prune_occurrences() :: non_neg_integer()
   def prune_occurrences do
-    days = Settings.get(@retention_key)
-    cutoff = DateTime.utc_now() |> DateTime.add(-days * 86_400, :second)
+    case Settings.get(@retention_key) do
+      0 ->
+        0
 
-    {count, _rows} =
-      Repo.delete_all(
-        from(item in Occurrence,
-          where: not is_nil(item.finished_at) and item.finished_at < ^cutoff
-        )
-      )
+      days ->
+        cutoff = DateTime.utc_now() |> DateTime.add(-days * 86_400, :second)
 
-    count
+        latest =
+          from(item in Occurrence,
+            where: item.trigger == "scheduled",
+            distinct: [item.source, item.key],
+            order_by: [asc: item.source, asc: item.key, desc: item.intended_at],
+            select: item.id
+          )
+
+        {count, _rows} =
+          Repo.delete_all(
+            from(item in Occurrence,
+              where: not is_nil(item.finished_at) and item.finished_at < ^cutoff,
+              where: item.id not in subquery(latest)
+            )
+          )
+
+        count
+    end
   end
 
   @doc false
@@ -1128,3 +1142,4 @@ defmodule Bilimbi.Base.Schedule do
     :ok
   end
 end
+
