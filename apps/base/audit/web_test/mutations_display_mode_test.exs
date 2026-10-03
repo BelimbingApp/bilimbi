@@ -137,6 +137,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     mutation_id: mutation_id
   } do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+    view |> element("#mutation-#{mutation_id}-details-toggle") |> render_click()
 
     # The stored value is the UTC string capture wrote; the reader sees it in
     # company time with the zone named, not the raw column.

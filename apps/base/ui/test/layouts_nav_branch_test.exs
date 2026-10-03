@@ -64,6 +64,12 @@ defmodule Bilimbi.Base.UI.LayoutsNavBranchTest do
     assert html =~ ~s(data-nav-tile="/system/design-library/components")
     assert html =~ ~s(aria-label="Open Companies in a tile")
     refute html =~ ~s(aria-current="page")
+
+    # The pin and tile controls share one utility. The utility list they used
+    # to repeat is 342 bytes, and a sidebar of them was most of the page.
+    assert html =~ ~s(class="nav-icon-button app-nav-pin")
+    assert html =~ ~s(class="nav-icon-button app-nav-tile")
+    refute html =~ "focus-visible:ring-brand-strong/40"
   end
 
   test "a branch with a route carries the tile control beside its pin" do

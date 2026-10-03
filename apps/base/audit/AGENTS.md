@@ -10,6 +10,8 @@ Secrets and opaque blobs, including a session `payload`, are redacted in `@redac
 
 An instant inside a diff includes seconds. `MutationDiff.diff_value/1` passes `precision={:second}` so two edits in one minute stay distinct. The history entry's own clock can stay at minute precision.
 
+The mutations table shows `MutationDiff.summary/1` on each row. Field values render only while `Bilimbi.Base.Audit.Web.MutationDetails` is open. Do not call `MutationDiff.rows/1` for every row of that table.
+
 Silencing capture is not done from this folder. `Bilimbi.Base.Database.WriteCapture.without_capture/1` needs a written, table-level reason. See `apps/base/database/AGENTS.md`.
 
 A retention change goes through `toggle_retained/2`, which asks `Bilimbi.Base.Audit.Authorization`. The workspace wires that to Base Authz in `config/config.exs`. Do not add a `base/authz` dependency: Authz already depends on Audit, and discovery rejects the cycle. The actions screen's `can_manage` assign only shows the control.

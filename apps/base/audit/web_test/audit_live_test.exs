@@ -34,7 +34,7 @@ defmodule BilimbiWeb.AuditLiveTest do
     test "renders data mutations and marks nav active", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.audit.log.list")
 
-      {:ok, _mutation} =
+      {:ok, mutation} =
         Audit.record_mutation(
           scope,
           %{
@@ -60,8 +60,39 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#mutations-table", "User #91")
       assert has_element?(view, "#mutations-table", "Acme Corp")
       assert has_element?(view, "#mutations-table", "Company #73")
-      assert has_element?(view, "#mutations-table", "Acme Inc")
       assert has_element?(view, "#mutations-table", "trc123456")
+      refute has_element?(view, "#mutations-table", "Acme Inc")
+
+      view |> element("#mutation-#{mutation.id}-details-toggle") |> render_click()
+
+      assert has_element?(view, "#mutations-table", "Acme Inc")
+    end
+
+    test "a collapsed row does not send the field values", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.audit.log.list")
+      blob = String.duplicate("payload-byte-", 400)
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Bilimbi.Core.Company",
+          auditable_id: "73",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:02:00],
+          old_values: %{"notes" => "short"},
+          new_values: %{"notes" => blob}
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+
+      details = view |> element("#mutation-#{mutation.id}-details") |> render()
+      assert byte_size(details) < 1_024
+      refute details =~ blob
+
+      view |> element("#mutation-#{mutation.id}-details-toggle") |> render_click()
+      assert render(view) =~ blob
     end
 
     test "shows impersonation attribution only on impersonated mutations", %{

@@ -560,6 +560,15 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:kind, :atom, values: [:neutral, :danger], default: :neutral)
   attr(:class, :any, default: nil)
 
+  attr(:chrome, :atom,
+    values: [:utilities, :nav],
+    default: :utilities,
+    doc:
+      "`:nav` is the sidebar pin and tile control. It renders `nav-icon-button` " <>
+        "from `apps/web/assets/css/app.css` instead of repeating that utility list " <>
+        "on every button. Other icon buttons keep `:utilities`."
+  )
+
   attr(:busy, :boolean,
     default: false,
     doc:
@@ -580,18 +589,7 @@ defmodule Bilimbi.Base.UI.Components do
 
     assigns =
       assigns
-      |> assign(:control_class, [
-        "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
-        assigns.context == :inline && "size-6 rounded-sm",
-        assigns.context == :table && "size-7 rounded-md",
-        assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
-        assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
-        if(assigns.busy,
-          do: "cursor-progress bg-surface-sunken ring-1 ring-line",
-          else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
-        ),
-        assigns.class
-      ])
+      |> assign(:control_class, icon_button_class(assigns))
       |> assign(:icon_name, if(assigns.busy, do: "hero-arrow-path", else: assigns.icon))
       |> assign(:icon_class, [
         if(assigns.context == :inline, do: "size-3.5", else: "size-4"),
@@ -624,6 +622,29 @@ defmodule Bilimbi.Base.UI.Components do
       </button>
       """
     end
+  end
+
+  # The sidebar repeats this control on every destination. The long utility
+  # list used to be written out on each one (`nav-icon-button` in app.css is
+  # that list, once). Busy and danger keep the explicit utilities: the nav
+  # treatment has neither.
+  defp icon_button_class(%{chrome: :nav, busy: false, kind: :neutral} = assigns) do
+    ["nav-icon-button", assigns.class]
+  end
+
+  defp icon_button_class(assigns) do
+    [
+      "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+      assigns.context == :inline && "size-6 rounded-sm",
+      assigns.context == :table && "size-7 rounded-md",
+      assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+      assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+      if(assigns.busy,
+        do: "cursor-progress bg-surface-sunken ring-1 ring-line",
+        else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
+      ),
+      assigns.class
+    ]
   end
 
   @doc """

@@ -10,11 +10,8 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.Web.MutationDiff
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
-
-  import MutationDiff, only: [diff_value: 1]
 
   # `occurred_at` opens descending. The URL keeps this screen's `page_size`
   # key; `<.pagination>` still posts `perPage`.

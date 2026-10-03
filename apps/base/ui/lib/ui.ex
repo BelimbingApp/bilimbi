@@ -56,6 +56,11 @@ defmodule Bilimbi.Base.UI do
       use Phoenix.LiveView
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
 
+      # After the live_session hooks, so the scope they built is already
+      # assigned. The tree is reused until capabilities or pins change;
+      # `Nav.rendered_tree/1` is what the shell reads.
+      Phoenix.LiveView.on_mount({Bilimbi.Base.UI.Nav, :prepare})
+
       Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
 
       unquote(html_helpers())

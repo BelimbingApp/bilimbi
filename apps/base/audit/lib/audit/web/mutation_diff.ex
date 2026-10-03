@@ -68,6 +68,48 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
 
   def rows(_mutation), do: []
 
+  @doc """
+  The names of the fields `rows/1` would render, without their values.
+
+  The mutations table uses this for the collapsed row. Building the rows
+  walks every value, including large JSON, which the closed row does not show.
+  """
+  @spec changed_fields(map()) :: [String.t()]
+  def changed_fields(%{event: "created", new_values: new_values}) when is_map(new_values) do
+    names(Map.keys(new_values))
+  end
+
+  def changed_fields(%{event: "deleted", old_values: old_values}) when is_map(old_values) do
+    names(Map.keys(old_values))
+  end
+
+  def changed_fields(%{old_values: old_values, new_values: new_values}) do
+    old_map = if is_map(old_values), do: old_values, else: %{}
+    new_map = if is_map(new_values), do: new_values, else: %{}
+
+    (Map.keys(old_map) ++ Map.keys(new_map))
+    |> Enum.uniq()
+    |> Enum.filter(&(Map.get(old_map, &1) != Map.get(new_map, &1)))
+    |> names()
+  end
+
+  def changed_fields(_mutation), do: []
+
+  @doc """
+  One line naming the changed fields, without their values.
+
+  At most four names are written out. A longer change says how many more
+  there are, so a row with a large payload stays one short line.
+  """
+  @spec summary(map()) :: String.t()
+  def summary(mutation) do
+    case changed_fields(mutation) do
+      [] -> "No field changes recorded."
+      [field] -> field
+      fields -> field_summary(fields)
+    end
+  end
+
   @doc "Classifies one stored value for rendering."
   @spec value(term()) :: value()
   def value(nil), do: :absent
@@ -116,6 +158,21 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
 
   defp row(key, old, new) do
     %{field: to_string(key), old: old, new: new, sensitive: sensitive_key?(key)}
+  end
+
+  defp names(keys) do
+    keys |> Enum.map(&to_string/1) |> Enum.sort()
+  end
+
+  defp field_summary(fields) do
+    {shown, rest} = Enum.split(fields, 4)
+    label = Enum.join(shown, ", ")
+
+    if rest == [] do
+      "#{length(fields)} fields: #{label}"
+    else
+      "#{length(fields)} fields: #{label}, +#{length(rest)}"
+    end
   end
 
   # A string with an offset is an instant outright; one without is the
