@@ -181,6 +181,61 @@ defmodule Bilimbi.Base.Workflow.CoordinationConcurrencyTest do
              ).rows
   end
 
+  test "reads prove owner and graph without waiting on subject, run or work locks", c do
+    assert {:ok, run} =
+             Workflow.start_run(c.scope, "example.parallel", c.subject, idempotency_key: "read")
+
+    supervisor = start_supervised!(Task.Supervisor)
+    parent = self()
+
+    holder =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        Repo.put_dynamic_repo(c.name)
+
+        Repo.transact(fn ->
+          Repo.query!("SELECT id FROM workflow_test_subjects WHERE id = $1 FOR UPDATE", [
+            c.subject.id
+          ])
+
+          Repo.query!("SELECT id FROM base_workflow_process_runs WHERE id = $1 FOR UPDATE", [
+            run.id
+          ])
+
+          Repo.query!(
+            "SELECT id FROM base_workflow_process_work_items WHERE process_run_id = $1 FOR UPDATE",
+            [run.id]
+          )
+
+          Repo.query!("SELECT id FROM base_workflow_process_dependencies FOR UPDATE", [])
+          send(parent, {:locked, self()})
+
+          receive do
+            :release -> {:ok, :released}
+          after
+            10_000 -> raise "read barrier timed out"
+          end
+        end)
+      end)
+
+    assert_receive {:locked, locker}, 5_000
+
+    reader =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        Repo.put_dynamic_repo(c.name)
+
+        {Workflow.get_run(c.scope, run.id), Workflow.pending_work(c.scope),
+         Workflow.run_events(c.scope, run.id)}
+      end)
+
+    assert {:ok,
+            {{:ok, %{work_items: items}}, {:ok, %{entries: pending}}, {:ok, %{entries: [_ | _]}}}} =
+             Task.yield(reader, 5_000)
+
+    assert length(items) == 3 and length(pending) == 3
+    send(locker, :release)
+    assert {:ok, :released} = Task.await(holder, 5_000)
+  end
+
   defp request(key),
     do: %{
       expected_version: 1,

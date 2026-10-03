@@ -120,7 +120,8 @@ start preserves the run and work IDs; changed input, subject or definition
 conflicts. Legacy subject aliases and saved payloads remain intact.
 
 `get_run/2` returns `%{run: facts, work_items: facts}` after owner proof and exact
-saved graph/fingerprint checks. Its size is bounded by the installed definition,
+saved graph/fingerprint checks. Reads (`get_run/2`, `run_events/3` and
+`pending_work/2`) take no row locks. Its size is bounded by the installed definition,
 not a growing run list. Complete an available, due item by ID or `%{step_key: key}`:
 
 ```elixir
@@ -143,7 +144,10 @@ once dependencies and any signal are satisfied.
 `reconcile_run/2` repairs expired leases, fences stale completions by incrementing
 the saved version, and releases satisfied dependencies/timers. It operates on the
 same saved graph after process/Repo restart. Final-attempt expiry fails work;
-remaining attempts return it to pending. Live leases remain untouched.
+remaining attempts return it to pending. Live leases remain untouched. A retained
+run marked by Belimbing as `Process definition cannot be reconciled: ...` has
+the mark cleared, with `process.definition_restored`, once its installed
+definition is proved again.
 `supersede_run/3` requires a reason and refuses live leases. It preserves completed
 facts, blocks unfinished work, aggregates the terminal run state, and appends
 `process.superseded`. Supersede's durable state is `"blocked"`; there is no new
@@ -157,7 +161,10 @@ saved graph, so an adopted paused run continues with its original items.
 
 Workers lease due work with `claim_work(scope, "worker-1", lease_seconds: 300)`,
 optionally filtered by `:definition_key`, `:executor_keys` or `:run_ids`. Due
-pending work and expired leases are reconciled before the lease is taken. The
+pending work and expired leases are reconciled before the lease is taken. Only
+runs of an installed definition version and fingerprint are candidates, and a
+run refused under its lock is skipped, so retained unsupported runs never starve
+supported work. The
 result's `claim: %{run_id, work_item_id, lease_token}` is required by
 `heartbeat_work/3`, `complete_claimed_work/3`, `fail_work/4` and
 `block_claimed_work/4`; a mismatched or expired token is refused, and a repeated

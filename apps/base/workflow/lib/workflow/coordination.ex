@@ -19,6 +19,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   @terminal_work ~w(completed failed waived blocked)
   @terminal_run ~w(completed failed blocked)
   @claim_attempts 8
+  @definition_unavailable "Process definition cannot be reconciled: "
 
   def start(scope, definition_key, subject_ref, opts) do
     Scope.actor(scope)
@@ -65,9 +66,29 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     end)
   end
 
+  # Belimbing marks a run whose definition could not be resolved with this
+  # prefix; once the installed definition is proved again the mark is cleared.
   def reconcile(scope, run_id) do
     with_run(scope, run_id, :reconcile, fn run, items, dependencies, _definition ->
-      {:ok, run} = settle(scope, run, items, dependencies, now())
+      time = now()
+
+      run =
+        if run.status not in @terminal_run and is_binary(run.last_error) and
+             String.starts_with?(run.last_error, @definition_unavailable) do
+          run = update!(run, %{last_error: nil, updated_at: time})
+
+          :ok =
+            append_event(scope, run, nil, "process.definition_restored", %{
+              "definition_key" => run.definition_key,
+              "definition_version" => run.definition_version
+            })
+
+          run
+        else
+          run
+        end
+
+      {:ok, run} = settle(scope, run, items, dependencies, time)
       {:ok, run_fact(run)}
     end)
   end
@@ -173,7 +194,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         {:ok, nil}
 
       true ->
-        claim_next(scope, worker, opts, [], @claim_attempts)
+        claim_next(scope, worker, opts, {[], []}, @claim_attempts)
     end
   end
 
@@ -477,7 +498,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
 
   defp claim_next(_scope, _worker, _opts, _excluded, 0), do: {:ok, nil}
 
-  defp claim_next(scope, worker, opts, excluded, attempts) do
+  defp claim_next(scope, worker, opts, {items, runs} = excluded, attempts) do
     case Repo.one(claim_candidate(scope, opts, excluded, now())) do
       nil ->
         {:ok, nil}
@@ -488,15 +509,35 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         end
 
         case with_run(scope, candidate.run_id, :claim, claim) do
-          {:ok, %{claim: _} = claimed} -> {:ok, claimed}
-          _ -> claim_next(scope, worker, opts, [candidate.id | excluded], attempts - 1)
+          {:ok, %{claim: _} = claimed} ->
+            {:ok, claimed}
+
+          {:ok, nil} ->
+            claim_next(scope, worker, opts, {[candidate.id | items], runs}, attempts - 1)
+
+          {:error, _} ->
+            claim_next(scope, worker, opts, {items, [candidate.run_id | runs]}, attempts - 1)
         end
     end
   end
 
   # Due pending work and expired leases become available when the locked run
   # is reconciled, so they are candidates as well as already available work.
-  defp claim_candidate(scope, opts, excluded, time) do
+  # Only runs bound to an installed definition fingerprint are candidates;
+  # retained runs of uninstalled definitions stay saved without consuming
+  # attempts. A run refused under its lock is skipped for this claim.
+  defp claim_candidate(scope, opts, {excluded, excluded_runs}, time) do
+    installed =
+      Enum.reduce(Definitions.registry!().processes, dynamic(false), fn
+        {{key, version}, definition}, acc ->
+          dynamic(
+            [_w, r],
+            ^acc or
+              (r.definition_key == ^key and r.definition_version == ^version and
+                 r.definition_fingerprint == ^definition.fingerprint)
+          )
+      end)
+
     query =
       from(w in Tenancy.scope_query(WorkSchema, scope),
         join: r in subquery(Tenancy.scope_query(RunSchema, scope)),
@@ -504,12 +545,15 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         where:
           r.scope_type == "tenant" and r.status == "running" and is_nil(r.last_error) and
             r.available_at <= ^time and w.id not in ^excluded and
+            r.id not in ^excluded_runs and
             ((w.status in ["available", "pending"] and w.available_at <= ^time) or
                (w.status == "leased" and w.lease_expires_at <= ^time)),
         order_by: [desc: r.priority, desc: w.priority, asc: w.available_at, asc: w.id],
         limit: 1,
         select: %{id: w.id, run_id: r.id}
       )
+
+    query = from([_w, _r] in query, where: ^installed)
 
     query =
       if opts[:definition_key],
@@ -609,20 +653,22 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   # Lock order is subject -> run -> items. The first scoped run read resolves
   # identity only; all authority, graph and state are reread under the lock.
   # The owner adapter receives run facts to check its current round/attempt.
+  # :read repeats the same owner and graph proof without taking row locks.
   defp with_run(scope, run_id, operation, fun) do
     Scope.actor(scope)
+    lock? = operation != :read
 
     write(scope, fn ->
       with {:ok, candidate} <- scoped_run(scope, run_id, false),
            {:ok, ref} <-
              Definitions.subject(%{type: candidate.subject_type, id: candidate.subject_id}),
-           {:ok, subject} <- load(scope, ref, :lock),
-           {:ok, run} <- scoped_run(scope, run_id, true),
+           {:ok, subject} <- load(scope, ref, if(lock?, do: :lock, else: :read)),
+           {:ok, run} <- if(lock?, do: scoped_run(scope, run_id, true), else: {:ok, candidate}),
            true <-
              run.subject_type == candidate.subject_type and run.subject_id == candidate.subject_id,
-           {:ok, definition} <- supported(run, ref),
+           {:ok, definition} <- supported(run, ref, lock?),
            :ok <- authorize(scope, ref, subject, definition, run, operation),
-           {:ok, items, dependencies} <- graph(scope, run, definition) do
+           {:ok, items, dependencies} <- graph(scope, run, definition, lock?) do
         fun.(run, items, dependencies, definition)
       else
         false -> {:error, :run_identity_changed}
@@ -679,11 +725,11 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     end
   end
 
-  defp supported(run, ref) do
+  defp supported(run, ref, lock?) do
     with {:ok, definition} <- definition(run.definition_key, run.definition_version),
          true <- definition.subject == ref.type and definition.owner == ref.owner,
          true <- definition.fingerprint == run.definition_fingerprint,
-         %{definition_fingerprint: fingerprint} <- Repo.one(version_query(definition)),
+         %{definition_fingerprint: fingerprint} <- Repo.one(version_query(definition, lock?)),
          true <- fingerprint == definition.fingerprint do
       {:ok, definition}
     else
@@ -691,11 +737,13 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     end
   end
 
-  defp version_query(definition) do
-    from(v in ProcessVersionSchema,
-      where: v.definition_key == ^definition.key and v.definition_version == ^definition.version,
-      lock: "FOR SHARE"
-    )
+  defp version_query(definition, lock?) do
+    query =
+      from(v in ProcessVersionSchema,
+        where: v.definition_key == ^definition.key and v.definition_version == ^definition.version
+      )
+
+    if lock?, do: from(v in query, lock: "FOR SHARE"), else: query
   end
 
   defp register_version(definition) do
@@ -716,7 +764,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
       conflict_target: [:definition_key, :definition_version]
     )
 
-    if Repo.one(version_query(definition)).definition_fingerprint == definition.fingerprint,
+    if Repo.one(version_query(definition, true)).definition_fingerprint == definition.fingerprint,
       do: :ok,
       else: {:error, :definition_version_changed}
   end
@@ -855,7 +903,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
           tenant_id: run.tenant_id,
           work_item_id: by_key[step.key].id,
           depends_on_work_item_id: by_key[dependency.step_key].id,
-          acceptable_outcomes: dependency.acceptable_outcomes,
+          acceptable_outcomes: Enum.uniq(dependency.acceptable_outcomes),
           created_at: now(),
           updated_at: now()
         }
@@ -867,11 +915,11 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   end
 
   defp initialize(scope, run, definition, false) do
-    with {:ok, items, dependencies} <- graph(scope, run, definition),
+    with {:ok, items, dependencies} <- graph(scope, run, definition, true),
          do: settle(scope, run, items, dependencies, now())
   end
 
-  defp graph(scope, run, definition) do
+  defp graph(scope, run, definition, lock?) do
     # This owner-local invariant proof checks run children, including any
     # contradictory tenant row a scoped read would hide. Read at most the
     # installed graph size plus one: surplus rows invalidate the graph without
@@ -885,9 +933,9 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         from(w in WorkSchema,
           where: w.process_run_id == ^run.id,
           order_by: [asc: w.id],
-          limit: ^item_limit,
-          lock: "FOR UPDATE"
+          limit: ^item_limit
         )
+        |> lock_rows(lock?)
       )
 
     ids = Enum.map(items, & &1.id)
@@ -897,9 +945,9 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         from(d in DependencySchema,
           where: d.work_item_id in ^ids or d.depends_on_work_item_id in ^ids,
           order_by: [asc: d.id],
-          limit: ^dependency_limit,
-          lock: "FOR UPDATE"
+          limit: ^dependency_limit
         )
+        |> lock_rows(lock?)
       )
 
     steps = Map.new(definition.steps, &{&1.key, &1})
@@ -909,7 +957,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     expected_dependencies =
       for step <- definition.steps,
           dependency <- step.dependencies,
-          do: {step.key, dependency.step_key, Enum.sort(dependency.acceptable_outcomes)}
+          do: {step.key, dependency.step_key, outcome_set(dependency.acceptable_outcomes)}
 
     actual_dependencies =
       Enum.map(dependencies, fn dep ->
@@ -918,7 +966,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
 
         if dependent && prerequisite && dep.tenant_id == tenant &&
              is_list(dep.acceptable_outcomes) do
-          {dependent.step_key, prerequisite.step_key, Enum.sort(dep.acceptable_outcomes)}
+          {dependent.step_key, prerequisite.step_key, outcome_set(dep.acceptable_outcomes)}
         else
           :invalid
         end
@@ -1289,6 +1337,12 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     do:
       item.status == "leased" and not is_nil(item.lease_expires_at) and
         not due?(item.lease_expires_at, time)
+
+  defp lock_rows(query, true), do: from(row in query, lock: "FOR UPDATE")
+  defp lock_rows(query, false), do: query
+
+  # Belimbing fingerprints raw outcomes but saves each edge's unique outcomes.
+  defp outcome_set(outcomes), do: outcomes |> Enum.uniq() |> Enum.sort()
 
   defp due?(nil, _time), do: false
   defp due?(at, time), do: NaiveDateTime.compare(at, time) != :gt

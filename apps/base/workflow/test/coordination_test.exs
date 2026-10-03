@@ -3,7 +3,15 @@ defmodule Bilimbi.Base.Workflow.CoordinationTest do
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.{Authentication, ForgedActorError}
-  alias Bilimbi.Base.Workflow.{EventSchema, RunSchema, TestProcessContributions, WorkSchema}
+
+  alias Bilimbi.Base.Workflow.{
+    DependencySchema,
+    EventSchema,
+    RunSchema,
+    TestProcessContributions,
+    WorkSchema
+  }
+
   import Bilimbi.Base.Workflow.TestFixtures
 
   setup do
@@ -749,6 +757,167 @@ defmodule Bilimbi.Base.Workflow.CoordinationTest do
     assert Enum.all?(~w(work.waived work.blocked work.claimed process.blocked), &(&1 in types))
     assert {:error, :run_not_paused} = Workflow.resume_run(c.scope, run.id)
     assert {:error, :run_not_running} = Workflow.pause_run(c.scope, run.id, "Hold")
+  end
+
+  test "reconcile clears a retained definition-unavailable mark once the definition is proved",
+       c do
+    subject = subject!(%{id: 41})
+
+    saved =
+      Bilimbi.Base.Workflow.LegacyCoordinationFixture.insert_in_flight!(
+        Repo,
+        Bilimbi.Base.Database.DataCase.temporary_schema!()
+      )
+
+    Repo.update_all(from(r in RunSchema, where: r.id == ^saved.run_id),
+      set: [last_error: "Process definition cannot be reconciled: definition missing"]
+    )
+
+    assert {:ok, %{entries: []}} = Workflow.pending_work(c.scope)
+
+    assert {:error, :run_unavailable} =
+             Workflow.complete_work(
+               c.scope,
+               saved.run_id,
+               saved.items["second"],
+               request("example.second")
+             )
+
+    assert {:ok, %{status: "running", last_error: nil}} =
+             Workflow.reconcile_run(c.scope, saved.run_id)
+
+    assert %{"definition_key" => "example.parallel", "definition_version" => 1} =
+             Enum.find(
+               events!(c.scope, saved.run_id),
+               &(&1.type == "process.definition_restored")
+             ).payload
+
+    assert {:ok, %{entries: entries}} = Workflow.pending_work(c.scope, subject: subject)
+    assert Enum.map(entries, & &1.id) == [saved.items["second"], saved.items["third"]]
+
+    Repo.update_all(from(r in RunSchema, where: r.id == ^saved.run_id),
+      set: [last_error: "Owner diagnostic"]
+    )
+
+    assert {:ok, %{last_error: "Owner diagnostic"}} =
+             Workflow.reconcile_run(c.scope, saved.run_id)
+  end
+
+  test "duplicate acceptable outcomes fingerprint raw but save and compare unique edges", c do
+    duplicate = %{
+      key: "example.duplicate",
+      version: 1,
+      subject: "example.record",
+      adapter: Bilimbi.Base.Workflow.TestProcessAdapter,
+      steps: [
+        %{key: "first", label: "First", executor_key: "example.first"},
+        %{
+          key: "second",
+          label: "Second",
+          dependencies: [%{step_key: "first", acceptable_outcomes: ["completed", "completed"]}]
+        }
+      ]
+    }
+
+    install_registry!([duplicate])
+    installed = Bilimbi.Base.Workflow.Definitions.registry!().processes[{"example.duplicate", 1}]
+
+    unique =
+      update_in(installed, [:steps, Access.at(1), :dependencies, Access.at(0)], fn dependency ->
+        %{dependency | acceptable_outcomes: ["completed"]}
+      end)
+
+    refute installed.fingerprint == Bilimbi.Base.Workflow.ProcessFingerprint.digest(unique)
+
+    assert {:ok, run} =
+             Workflow.start_run(c.scope, "example.duplicate", c.subject, idempotency_key: "dup")
+
+    assert run.definition_fingerprint == installed.fingerprint
+    assert [["completed"]] = Repo.all(from(d in DependencySchema, select: d.acceptable_outcomes))
+    assert {:ok, %{work_items: [_, _]}} = Workflow.get_run(c.scope, run.id)
+
+    assert {:ok, %{run: %{status: "running"}}} =
+             Workflow.complete_work(
+               c.scope,
+               run.id,
+               %{step_key: "first"},
+               request("example.first")
+             )
+
+    assert {:ok, %{work_items: [_, %{status: "available"}]}} = Workflow.get_run(c.scope, run.id)
+  end
+
+  test "uninstalled and owner-refused runs do not starve supported claims", c do
+    time = ~N[2026-01-01 00:00:00]
+
+    [retired] =
+      Repo.insert_all(
+        RunSchema,
+        [
+          %{
+            definition_key: "example.retired",
+            definition_version: 3,
+            definition_fingerprint: String.duplicate("a", 64),
+            status: "running",
+            subject_type: "example.record",
+            subject_id: to_string(c.subject.id),
+            input: [],
+            started_at: time,
+            available_at: time,
+            scope_type: "tenant",
+            tenant_id: 1
+          }
+        ],
+        returning: [:id]
+      )
+      |> elem(1)
+
+    Repo.insert_all(
+      WorkSchema,
+      for index <- 1..9 do
+        %{
+          process_run_id: retired.id,
+          step_key: "retained-#{index}",
+          label: "Retained",
+          executor_key: "example.retained",
+          status: "available",
+          available_at: time,
+          input: [],
+          metadata: [],
+          tenant_id: 1,
+          version: 1
+        }
+      end
+    )
+
+    refused =
+      for index <- 1..3 do
+        private = subject!()
+
+        assert {:ok, _} =
+                 Workflow.start_run(c.scope, "example.parallel", private,
+                   idempotency_key: "refused:#{index}"
+                 )
+
+        private.id
+      end
+
+    Repo.update_all(from(s in Bilimbi.Base.Workflow.TestSubjectSchema, where: s.id in ^refused),
+      set: [marker: "process_private"]
+    )
+
+    assert {:ok, run} =
+             Workflow.start_run(c.scope, "example.parallel", c.subject, idempotency_key: "served")
+
+    assert {:ok, %{claim: %{run_id: run_id}, work_item: %{step_key: "first"}}} =
+             Workflow.claim_work(c.scope, "worker-1")
+
+    assert run_id == run.id
+
+    assert Repo.aggregate(from(w in WorkSchema, where: w.process_run_id == ^retired.id), :count) ==
+             9
+
+    assert Repo.get!(RunSchema, retired.id).status == "running"
   end
 
   defp start!(c, opts \\ []) do
