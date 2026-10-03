@@ -30,6 +30,10 @@ A record's page reads first and edits in place. There is no separate Edit button
 
 Take the person who performed an operation (an approver, an overrider, a requester) from `Bilimbi.Base.Tenancy.Scope.actor/1`, and ask whether they may do it with `Bilimbi.Base.Authz.can(scope, capability)`. Do not accept an actor or approver ID as an argument, and do not build one with `Authz.actor/5`, which checks whoever the caller names. A system actor names nobody, so refuse it. Under impersonation the actor carries `impersonator_id`; record it or refuse. Never call `Bilimbi.Base.Tenancy.Authentication` from module code: it is the authentication edge, and an actor it did not seal fails `Scope.actor/1`. A job that acts for a user is enqueued with `Queue.enqueue_for/3` and reads `execution.scope`; it runs only while Core User still proves the user (and any impersonation it was queued under).
 
+## Permission checks after mount
+
+Do not duplicate host session or route checks in page handlers; `BilimbiWeb.RouteAccess` owns that boundary, including Base UI component events. For additional operation capabilities, use `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`; its moduledoc owns the contract and refusal handling. Cached `can_*?` assigns are presentation state, not authority. See [Live navigation](web/docs/navigation.md) for host behavior.
+
 ## Tests
 
 Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary is proved by making PostgreSQL refuse; `apps/base/database/AGENTS.md` names the control.
