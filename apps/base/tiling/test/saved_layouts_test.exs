@@ -1,35 +1,35 @@
 defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Scope
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
+  alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.Tiling.SharedLayouts
 
+  @publish "ui.workspace.publish"
   @scope Scope.user(91, 73, 41)
   @other Scope.user(92, 73, 41)
 
   setup do
     SettingsFixtures.create_settings_table!()
-    # The package VM loads only this module's closure, so the deployment
-    # snapshot cannot be built here. Install the two definitions this module
-    # declares, taken from its own provider so the test cannot drift from it.
-    %{settings: %{definitions: declared}} = Bilimbi.Base.Tiling.Contributions.contributions()
+    AuthzFixtures.create_authz_tables!()
+    install_tiling_registry!()
 
-    definitions =
-      Map.new(declared, fn {key, attributes} ->
-        {key, Definition.new!(key, "base/tiling", attributes)}
-      end)
+    system = system_scope()
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "tiling-test",
-      consumers: %{settings: %{definitions: definitions, runtime_claims: []}}
-    })
+    {:ok, :stored} =
+      Authz.put_principal_capability(system, 73, :user, 91, @publish, true)
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
-    :ok
+    %{publisher: Authentication.sign_in(system, 91, 73), system: system}
   end
 
   test "an account starts with no layout and no default" do
@@ -93,31 +93,45 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     assert SavedLayouts.default_slug(@scope) == nil
   end
 
-  test "shared workspaces stay in their company and filter by role code" do
+  test "shared workspaces stay in their company and filter by role code", %{publisher: publisher} do
     company = Scope.company(73)
     other_company = Scope.company(74)
 
     assert {:ok, %{"slug" => "company-desk"}} =
-             SharedLayouts.publish(company, "Company desk", "/companies", [])
+             SharedLayouts.publish(publisher, "Company desk", "/companies", [])
 
     assert {:ok, %{"slug" => "review-desk"}} =
-             SharedLayouts.publish(company, "Review desk", "/users", ["reviewer"])
+             SharedLayouts.publish(publisher, "Review desk", "/users", ["reviewer"])
 
     assert Enum.map(SharedLayouts.visible(company, []), & &1["slug"]) == ["company-desk"]
     assert length(SharedLayouts.visible(company, ["reviewer"])) == 2
     assert SharedLayouts.fetch_visible(company, "review-desk", []) == :error
     assert SharedLayouts.list(other_company) == []
 
-    assert SharedLayouts.publish(company, "Bad roles", "/users", ["Not A Code"]) ==
+    assert SharedLayouts.publish(publisher, "Bad roles", "/users", ["Not A Code"]) ==
              {:error, :roles}
 
-    assert SharedLayouts.publish(company, " ", "/users", []) == {:error, :label}
+    assert SharedLayouts.publish(publisher, " ", "/users", []) == {:error, :label}
   end
 
-  test "an account without a company sees no shared workspaces" do
-    assert {:ok, _} = SharedLayouts.publish(Scope.company(73), "Company desk", "/companies", [])
+  test "an account without a company sees no shared workspaces", %{publisher: publisher} do
+    assert {:ok, _} = SharedLayouts.publish(publisher, "Company desk", "/companies", [])
     assert SharedLayouts.visible(nil, ["reviewer"]) == []
     assert SharedLayouts.fetch_visible(nil, "company-desk", []) == :error
+  end
+
+  test "publish and delete refuse a system actor and a user without the capability", %{
+    system: system
+  } do
+    company = Scope.company(73)
+    refused = Authentication.sign_in(system, 92, 73)
+
+    for scope <- [system, refused] do
+      assert {:error, :forbidden} = SharedLayouts.publish(scope, "Desk", "/companies", [])
+      assert {:error, :forbidden} = SharedLayouts.delete(scope, "desk")
+    end
+
+    assert SharedLayouts.list(company) == []
   end
 
   test "a saved layout never takes the slug of a workspace route" do
@@ -140,5 +154,41 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
 
     assert SavedLayouts.set_layout(@scope, "missing", "master", "/a") ==
              {:error, :not_found}
+  end
+
+  defp system_scope do
+    TenancyScope.for_tenant(%Identity{
+      id: 41,
+      name: "Operator tenant",
+      status: "active",
+      is_platform_operator: true
+    })
+  end
+
+  defp install_tiling_registry! do
+    %{settings: %{definitions: declared}, authz: authz} =
+      Bilimbi.Base.Tiling.Contributions.contributions()
+
+    definitions =
+      Map.new(declared, fn {key, attributes} ->
+        {key, Definition.new!(key, "base/tiling", attributes)}
+      end)
+
+    validated =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "base/tiling", otp_app: :bilimbi_base_tiling},
+          payload: Map.put(authz, :company_directory, Bilimbi.Base.Tiling.TestCompanyDirectory)
+        }
+      ])
+
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: "tiling-test",
+      consumers:
+        Map.merge(ContributionRegistry.build!([]).consumers, %{
+          settings: %{definitions: definitions, runtime_claims: []},
+          authz: validated
+        })
+    })
   end
 end
