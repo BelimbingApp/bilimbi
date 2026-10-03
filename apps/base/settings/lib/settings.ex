@@ -68,7 +68,17 @@ defmodule Bilimbi.Base.Settings do
     Map.new(resolve_many(keys, scope), fn {key, resolved} -> {key, resolved.value} end)
   end
 
-  @doc "Resolves values and override metadata from one uncached query snapshot."
+  @doc """
+  Resolves values and override metadata from one uncached query snapshot.
+
+  Returns a map keyed by setting key. Each entry contains the decoded `:value`,
+  `:overridden?` (whether the first allowed scope in the chain supplied a row),
+  and `:source_scope` (the supplying scope type). A default or missing runtime
+  value uses `:global` as its source and is not overridden. Encrypted values
+  are decoded here; presentation callers must mask them through `Settings.Form`.
+
+  An empty key list returns an empty map without querying storage.
+  """
   @spec resolve_many([String.t()], Scope.t() | nil) :: map()
   def resolve_many(keys, scope \\ nil) when is_list(keys) do
     plans =

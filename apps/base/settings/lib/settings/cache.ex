@@ -2,8 +2,7 @@ defmodule Bilimbi.Base.Settings.Cache do
   @moduledoc """
   Node-local read-through cache for setting rows and misses.
 
-  Entries expire after 30 seconds and are periodically reclaimed. Multi-node
-  deployments require PubSub invalidation in addition to this cache.
+  See `apps/base/settings/docs/README.md` for expiry and multi-node consistency.
   """
 
   use GenServer

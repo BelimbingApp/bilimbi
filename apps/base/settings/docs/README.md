@@ -55,11 +55,12 @@ Settings calls the host seam `Bilimbi.Base.Settings.SecretRevealService`
 and audit every attempt without the value. The value stays visible for the
 definition's `reveal_duration_ms` (default 10 000, bounded 1 000–60 000).
 
-Settings row reads use a node-local ETS read-through cache with a 30-second
+Single-row settings reads cache both hits and misses by key and scope in a
+node-local ETS cache, started with the Settings application, with a 30-second
 TTL and periodic expiry reclamation. `Settings.put/3` and `Settings.delete/2`
 invalidate the matching scope after a successful commit; transaction reads
 bypass the cache, and publication cannot undo a concurrent invalidation.
-Direct writes may remain stale until expiry. A multi-node
-deployment needs PubSub invalidation before enabling this cache across nodes.
+Direct writes and writes on other nodes may remain stale until expiry.
+PubSub invalidation is a multi-node follow-up; it is not implemented yet.
 Settings forms fetch all rows for their requested keys and scope chain in one
 query, then derive values and override metadata from that snapshot.

@@ -9,8 +9,8 @@ defmodule Bilimbi.Base.Settings.Form do
   concern. A module that declares a new editable setting gets it on screen with
   no UI change, which is the whole point of generating the form.
 
-  Everything here is pure except `load/2` and `save/3`, which read and write
-  through `Bilimbi.Base.Settings`. There is no Phoenix dependency: rendering
+  Storage reads and writes go through `Bilimbi.Base.Settings`.
+  There is no Phoenix dependency: rendering
   belongs to the screen, and the rules below belong to every screen equally.
 
   ## The three rules that are easy to get wrong
@@ -22,9 +22,9 @@ defmodule Bilimbi.Base.Settings.Form do
   cleared while permanently shadowing the value it should have inherited.
 
   **Inherited is not the same as set here.** The override metadata returned
-  by `Settings.resolve_many/2` distinguishes them, and a screen that does not show the
-  difference makes clearing a field look like it did nothing — the value comes
-  straight back, because it was always inherited.
+  by `Settings.resolve_many/2` distinguishes them, and a screen that does not
+  show the difference makes clearing a field look like it did nothing — the
+  value comes straight back, because it was always inherited.
 
   **An encrypted value never reaches the browser.** A stored secret renders as
   a mask, and a submission still equal to that mask means "unchanged", not
