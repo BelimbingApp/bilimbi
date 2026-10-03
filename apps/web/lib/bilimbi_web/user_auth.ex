@@ -275,11 +275,6 @@ defmodule BilimbiWeb.UserAuth do
     |> redirect(to: ~p"/")
   end
 
-  defdelegate impersonate_user(conn, original_user, target_user),
-    to: BilimbiWeb.Impersonation
-
-  defdelegate leave_impersonation(conn), to: BilimbiWeb.Impersonation
-
   # ------------------------------------------------------------------
   # Plugs
   # ------------------------------------------------------------------

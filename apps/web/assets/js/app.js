@@ -42,16 +42,21 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 // The loading bar uses the orientation colour from the theme. Canvas cannot
 // paint a `var(--color-brand-strong)` token, so a probe resolves the used
-// colour. Read once at startup; the stylesheet is already applied because
-// this script is deferred.
-const brandProbe = document.createElement("span")
-brandProbe.style.color = "var(--color-brand-strong)"
-document.documentElement.appendChild(brandProbe)
-const brandStrong = getComputedStyle(brandProbe).color
-brandProbe.remove()
+// colour when loading starts.
+function brandStrong() {
+  const brandProbe = document.createElement("span")
+  brandProbe.style.color = "var(--color-brand-strong)"
+  document.documentElement.appendChild(brandProbe)
+  const color = getComputedStyle(brandProbe).color
+  brandProbe.remove()
+  return color
+}
 
-topbar.config({barColors: {0: brandStrong}, shadowColor: "rgba(0, 0, 0, .3)"})
-window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
+topbar.config({shadowColor: "rgba(0, 0, 0, .3)"})
+window.addEventListener("phx:page-loading-start", _info => {
+  topbar.config({barColors: {0: brandStrong()}})
+  topbar.show(300)
+})
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 // A pressed `phx-disable-with` control is disabled and relabelled while the

@@ -2330,8 +2330,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   # The guard is the users list's: the capability, never the signed-in
   # account, never while already impersonating, and never an archived-company
-  # account, whose session the host cannot open (`UserAuth.impersonate_user/3`
-  # resolves the tenant through the live company and refuses it).
+  # account, whose session the host cannot open
+  # (`BilimbiWeb.Impersonation.impersonate_user/3` resolves the tenant through
+  # the live company and refuses it).
   defp can_impersonate?(current_scope, user, company_archived?) do
     allowed?(current_scope, "admin.user.impersonate") and
       user.id != current_scope.user["user_id"] and
