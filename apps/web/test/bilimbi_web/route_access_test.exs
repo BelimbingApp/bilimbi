@@ -18,8 +18,8 @@ defmodule BilimbiWeb.RouteAccessTest do
     import Phoenix.LiveView.Router
 
     live_session :guard_test do
-      live "/combined", BilimbiWeb.DashboardLive, :"bilimbi:/combined"
-      live "/restricted", BilimbiWeb.DashboardLive, :"bilimbi:/restricted"
+      live("/combined", BilimbiWeb.DashboardLive, :"bilimbi:/combined")
+      live("/restricted", BilimbiWeb.DashboardLive, :"bilimbi:/restricted")
     end
   end
 
@@ -85,6 +85,29 @@ defmodule BilimbiWeb.RouteAccessTest do
              RouteAccess.on_mount(%{@action => "admin.user.list"}, %{}, %{}, socket(conn))
 
     refute UserAuth.require_capability(conn, "admin.user.list").halted
+  end
+
+  test "component events follow the destination policy after live navigation", %{conn: conn} do
+    grant_capabilities!("admin.company.list")
+    policies = %{@action => @policy, :"bilimbi:/restricted" => nil}
+    initial = %{socket(conn) | router: GuardRouter}
+    initial = Phoenix.Component.assign(initial, :live_action, :"bilimbi:/restricted")
+    assert {:cont, mounted} = RouteAccess.on_mount(policies, %{}, %{}, initial)
+
+    assert {:cont, _} =
+             Lifecycle.handle_params(%{}, "http://localhost/combined", mounted)
+
+    component = Phoenix.Component.assign(socket(conn), :current_scope, nil)
+    assert {:cont, refreshed} = Bilimbi.Base.UI.EventAuthorization.authorize(component)
+    assert refreshed.assigns.current_scope.actor
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(scope, 73, :user, 91, "admin.company.list", false)
+
+    assert {:halt, denied} = Bilimbi.Base.UI.EventAuthorization.authorize(component)
+    assert {:redirect, %{to: "/dashboard"}} = denied.redirected
   end
 
   test "patching to an any-of route checks the destination policy", %{conn: conn} do

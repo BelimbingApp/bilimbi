@@ -9,9 +9,9 @@ defmodule Bilimbi.Base.Authz.LiveAuthorization do
   `can_*?` assign is presentation state, not authority. The host re-checks
   the route's declared capability before every event and navigation
   (`BilimbiWeb.RouteAccess`). An operation that needs a different capability
-  than the route, and every event a LiveComponent handles (the host hook does
-  not see component events), re-asks here before writing or reading private
-  facts.
+  than the route re-asks here before writing or reading private facts.
+  Component events first pass the same host identity and page check through
+  the Base UI event wrapper; this helper checks the operation capability.
 
   One `Bilimbi.Base.Authz.can/2` decision per key, judged on the actor the
   authentication edge sealed; an `{:any_of, keys}` requirement stops at the

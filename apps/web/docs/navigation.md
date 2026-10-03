@@ -26,9 +26,11 @@ policy lookup; the hook clears that host-only key before the adapter runs,
 preserving the existing nil-action adapter contract. A missing policy fails
 closed. Modules sharing a LiveView (for example User create/edit) still have
 distinct policies. An operation that needs a capability other than the
-route's, and every LiveComponent event (component events never pass through
-the parent view's hooks), re-asks through
-`Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
+route's re-asks through `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
+Every Base UI LiveComponent event first runs the same host identity and page
+check through `Bilimbi.Base.UI.EventAuthorization`. The host installs the
+callback in the owning LiveView process and replaces it on live navigation;
+components cannot substitute their own page policy or stale identity.
 
 The menu and content render together through Base UI. Sharing the session does
 not cache the actor's permissions or introduce a separate menu request. The

@@ -33,10 +33,11 @@ defmodule BilimbiWeb.RouteAccess do
   current capability list rather than the mount's.
 
   Server-triggered callbacks (`handle_info`, `handle_async`) are not checked
-  here, and a LiveComponent's `handle_event/3` never passes through the parent
-  view's hooks. An operation that needs a capability other than the route's,
-  and every component event, re-asks through
-  `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
+  here. A LiveComponent's `handle_event/3` reaches the same authorization
+  through the Base UI event wrapper and its process-local host callback.
+  The callback is replaced on live navigation and refreshes the owning page's
+  identity before checking its requirement. An operation needing another
+  capability also uses `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
   """
 
   use BilimbiWeb, :verified_routes
@@ -62,6 +63,8 @@ defmodule BilimbiWeb.RouteAccess do
         {:halt, socket}
 
       {:cont, socket} ->
+        install_event_authorization(capability, socket)
+
         socket =
           socket
           |> put_route(action, true)
@@ -99,6 +102,7 @@ defmodule BilimbiWeb.RouteAccess do
 
     case result do
       {:cont, socket} ->
+        install_event_authorization(capability, socket)
         {:cont, socket |> put_route(action, false) |> assign(:live_action, nil)}
 
       {:halt, socket} ->
@@ -107,8 +111,19 @@ defmodule BilimbiWeb.RouteAccess do
   end
 
   defp handle_event(policies, _event, _params, socket) do
-    with {:cont, socket} <- refresh(socket),
-         do: reauthorize(Map.fetch!(policies, socket.private.bilimbi_route_action), socket)
+    authorize_event(Map.fetch!(policies, socket.private.bilimbi_route_action), socket)
+  end
+
+  defp authorize_event(capability, socket) do
+    with {:cont, socket} <- refresh(socket), do: reauthorize(capability, socket)
+  end
+
+  defp install_event_authorization(capability, socket) do
+    scope = socket.assigns[:current_scope]
+
+    Bilimbi.Base.UI.EventAuthorization.install(fn component_socket ->
+      authorize_event(capability, assign(component_socket, :current_scope, scope))
+    end)
   end
 
   # The same four reads the HTTP plug pays per request. The frame flag is the
