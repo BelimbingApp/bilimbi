@@ -72,10 +72,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
     {:noreply, push_patch(socket, to: employee_types_path(state))}
   end
 
-  def handle_event("filters", params, socket) when is_map(params) do
-    handle_event("filters", %{"filters" => params}, socket)
-  end
-
   @impl true
   def handle_event("sort", %{"sort" => sort_key}, socket) do
     state = socket.assigns.index_state
@@ -85,8 +81,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
       next -> {:noreply, push_patch(socket, to: employee_types_path(next))}
     end
   end
-
-  def handle_event("sort", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do

@@ -38,7 +38,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           page_sizes: @page_sizes,
           default_page_size: @default_page_size,
           page_size_param: "per_page",
-          page_size_aliases: ["perPage"],
           invalid_page_size: :default,
           filters: [type_filter: {:one_of, ["all", "human", "agent"], "all"}],
           omit_blank: [:search]
@@ -73,10 +72,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     {:noreply, push_patch(socket, to: employees_path(state))}
   end
 
-  def handle_event("filters", params, socket) when is_map(params) do
-    handle_event("filters", %{"filters" => params}, socket)
-  end
-
   @impl true
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     state = socket.assigns.index_state
@@ -86,8 +81,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
       next -> {:noreply, push_patch(socket, to: employees_path(next))}
     end
   end
-
-  def handle_event("sort", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
