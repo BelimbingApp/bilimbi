@@ -9,7 +9,6 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.ContributionValidator
   alias Bilimbi.Base.Settings.Form
   alias Bilimbi.Base.Settings.Scope
@@ -20,7 +19,6 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   setup do
     create_settings_table!()
-    Cache.clear()
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok

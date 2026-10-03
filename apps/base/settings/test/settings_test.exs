@@ -13,7 +13,6 @@ defmodule Bilimbi.Base.SettingsTest do
 
   setup do
     create_settings_table!()
-    Cache.clear()
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
@@ -46,6 +45,16 @@ defmodule Bilimbi.Base.SettingsTest do
 
     assert {:ok, "global"} = Settings.put("tests.inherited", "global")
     assert Settings.get("tests.inherited", scope) == "global"
+  end
+
+  test "a stored-value fixture replaces a cached miss" do
+    scope = Scope.user(10, 20, 30)
+    assert Settings.get("tests.inherited", scope) == "default"
+
+    put_stored_value!("tests.inherited", "legacy", scope)
+
+    assert Settings.get("tests.inherited", scope) == "legacy"
+    assert Settings.overridden?("tests.inherited", scope)
   end
 
   test "get_many resolves a set of keys in one query across the scope chain" do

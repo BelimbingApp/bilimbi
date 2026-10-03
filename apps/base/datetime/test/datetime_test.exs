@@ -75,7 +75,8 @@ defmodule Bilimbi.Base.DateTimeTest do
     scope = user_scope()
     assert {:ok, _} = Settings.put("ui.timezone.mode", "company", scope)
 
-    Repo.query!("UPDATE base_settings SET value = to_json('galactic'::text)")
+    Settings.delete("ui.timezone.mode", scope)
+    TestFixtures.put_stored_value!("ui.timezone.mode", "galactic", scope)
     assert Policy.mode(scope) == :company
   end
 
@@ -107,7 +108,8 @@ defmodule Bilimbi.Base.DateTimeTest do
     assert {:ok, _} = Settings.put("localization.timezone", "Asia/Kuala_Lumpur", company_scope())
     assert Policy.company_timezone(company_scope()) == "Asia/Kuala_Lumpur"
 
-    Repo.query!("UPDATE base_settings SET value = to_json('Atlantis/Sunken'::text)")
+    Settings.delete("localization.timezone", company_scope())
+    TestFixtures.put_stored_value!("localization.timezone", "Atlantis/Sunken", company_scope())
     assert Policy.company_timezone(company_scope()) == "UTC"
   end
 
