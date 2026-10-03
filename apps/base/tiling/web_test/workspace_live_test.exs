@@ -65,6 +65,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "the picker lists only pages this account may open", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/workspace")
 
+    view |> element("#workspace-empty-add") |> render_click()
     refute has_element?(view, "#workspace-pick-admin-company")
     assert has_element?(view, "#workspace-picker-empty", "No pages to add")
   end
@@ -72,6 +73,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "adding pages splits the focused tile and writes the tree into the URL", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
+    view |> element("#workspace-empty-add") |> render_click()
     view |> element("#workspace-pick-admin-company") |> render_click()
     assert_patch(view, "/workspace?t=%2Fcompanies")
 
