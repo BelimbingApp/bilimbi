@@ -394,6 +394,27 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert Geonames.get_country("MY").country == "Malaysia"
   end
 
+  test "refuses a country catalog update after the capability is revoked", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+    assert has_element?(countries, "#countries-update")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.geonames.update"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    countries |> element("#countries-update") |> render_click()
+
+    assert render(countries) =~ "You do not have permission to update countries."
+    assert Geonames.get_country("MY").country == "Malaysia"
+  end
+
   test "refuses an admin1 rename after the capability is revoked", %{conn: conn} do
     grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
