@@ -122,13 +122,13 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         {:noreply, assign(socket, :pending_delete, nil)}
 
       {:ok, socket} ->
-        cond do
-          type = find_listed(socket, id_str) ->
-            request_delete(socket, type)
+        type = find_listed(socket, id_str)
 
-          true ->
-            {:noreply,
-             put_flash(socket, :error, "That employee type does not exist in this company.")}
+        if type do
+          request_delete(socket, type)
+        else
+          {:noreply,
+           put_flash(socket, :error, "That employee type does not exist in this company.")}
         end
     end
   end

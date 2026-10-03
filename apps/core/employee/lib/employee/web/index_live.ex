@@ -104,15 +104,15 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         {:noreply, assign(socket, :pending_delete, nil)}
 
       {:ok, socket} ->
-        cond do
-          employee = find_listed(socket, id) ->
-            {:noreply, socket |> clear_flash() |> assign(:pending_delete, employee)}
+        employee = find_listed(socket, id)
 
-          true ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "That employee no longer exists.")
-             |> load_page(socket.assigns.index_state)}
+        if employee do
+          {:noreply, socket |> clear_flash() |> assign(:pending_delete, employee)}
+        else
+          {:noreply,
+           socket
+           |> put_flash(:error, "That employee no longer exists.")
+           |> load_page(socket.assigns.index_state)}
         end
     end
   end
