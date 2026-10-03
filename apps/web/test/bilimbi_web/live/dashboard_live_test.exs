@@ -40,6 +40,55 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
   end
 
+  test "authentication honors changes to the idle lifetime", %{conn: conn} do
+    conn = log_in_as(conn)
+    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+    old_activity = System.system_time(:second) - 5 * 60
+
+    assert {:ok, 10} = Settings.put("session.lifetime_minutes", 10)
+
+    assert {:ok, _} =
+             Session.put_session(session_id, "{}", user_id: 91, last_activity: old_activity)
+
+    assert conn |> get(~p"/dashboard") |> html_response(200)
+
+    # Restore the same inactivity after the accepted request refreshed it.
+    assert {:ok, _} =
+             Session.put_session(session_id, "{}", user_id: 91, last_activity: old_activity)
+
+    assert {:ok, 1} = Settings.put("session.lifetime_minutes", 1)
+    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
+
+    assert {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+    assert has_element?(view, "#dashboard-current-company")
+  end
+
+  test "scheduled expiry rereads the lifetime and preserves active sessions" do
+    now = System.system_time(:second)
+    execution = %Bilimbi.Base.Queue.Execution{
+      job_id: 1,
+      attempt: 1,
+      max_attempts: 5,
+      queue: "default"
+    }
+
+    for {id, activity} <- [{"old", now - 900}, {"recent", now - 300}, {"active", now}] do
+      assert {:ok, _} = Session.put_session(id, "opaque", last_activity: activity)
+    end
+
+    assert {:ok, 10} = Settings.put("session.lifetime_minutes", 10)
+    assert :ok = Session.ExpiryWorker.handle_scheduled_job(%{}, execution)
+    assert {:error, :not_found} = Session.fetch_session("old")
+    assert {:ok, %{last_activity: activity}} = Session.fetch_session("recent")
+    assert activity == now - 300
+    assert {:ok, %{last_activity: ^now}} = Session.fetch_session("active")
+
+    assert {:ok, 1} = Settings.put("session.lifetime_minutes", 1)
+    assert :ok = Session.ExpiryWorker.handle_scheduled_job(%{}, execution)
+    assert {:error, :not_found} = Session.fetch_session("recent")
+    assert {:ok, %{last_activity: ^now}} = Session.fetch_session("active")
+  end
+
   test "initial HTTP render resolves the durable session only once", %{conn: conn} do
     conn = log_in_as(conn)
     session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
