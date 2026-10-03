@@ -28,6 +28,12 @@ defmodule BilimbiWeb.Webhooks do
   {entries, _} = Code.eval_file(@manifest_path)
   @registrations Map.new(Enum.filter(entries, &Map.has_key?(&1, :webhook)), &{&1.webhook, &1})
 
+  defp registration(identifier) do
+    Enum.find_value(@registrations, fn {registered_identifier, entry} ->
+      if registered_identifier == identifier, do: entry
+    end)
+  end
+
   def registrations, do: @registrations
 
   def validate! do
@@ -47,7 +53,7 @@ defmodule BilimbiWeb.Webhooks do
 
   def deliver(conn, identifier) do
     handler = if Map.has_key?(@registrations, identifier), do: identifier, else: "unknown"
-    {conn, result, record} = attempt(conn, Map.get(@registrations, identifier))
+    {conn, result, record} = attempt(conn, registration(identifier))
 
     if record == :aggregated or match?({:ok, _}, audit(conn, handler, result)),
       do: respond(conn, result),

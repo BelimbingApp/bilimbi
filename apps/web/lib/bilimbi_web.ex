@@ -30,12 +30,6 @@ defmodule BilimbiWeb do
     end
   end
 
-  def channel do
-    quote do
-      use Phoenix.Channel
-    end
-  end
-
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
@@ -58,19 +52,6 @@ defmodule BilimbiWeb do
       # compiled module ever reads it and Elixir warns "set but never used" --
       # which fails CI's `mix compile --warnings-as-errors`. Registering it
       # marks it as used and makes the documented opt-out usable at all (#437).
-      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
-
-      unquote(html_helpers())
-    end
-  end
-
-  def live_component do
-    quote do
-      use Phoenix.LiveComponent
-      use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
-
-      # Same registration as `:live_view` — opt-out is documented for both
-      # adapter shapes (#437).
       Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
 
       unquote(html_helpers())

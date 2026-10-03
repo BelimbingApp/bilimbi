@@ -65,6 +65,7 @@ defmodule Bilimbi.Umbrella.MixProject do
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
       precommit: [
         "compile --warnings-as-errors",
+        "compile.strict",
         "deps.unlock --unused",
         "format",
         "assets.test",
@@ -124,7 +125,7 @@ defmodule Bilimbi.Umbrella.MixProject do
   defp compile_strict(_args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
 
-    for module <- module_paths([:base, :core, :domain, :extension]) do
+    for module <- module_paths([:base, :core, :domain, :extension]) ++ ["apps/web"] do
       Mix.shell().info("==> #{module}")
 
       case System.cmd(mix, ["compile", "--warnings-as-errors"],
