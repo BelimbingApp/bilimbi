@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.Address do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Locale.Bootstrap
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
@@ -151,25 +152,34 @@ defmodule Bilimbi.Core.Address do
   end
 
   @spec delete_address(Scope.t(), pos_integer()) ::
-          :ok | {:error, :address_in_use | :address_not_found | Ecto.Changeset.t()}
+          :ok | {:error, :address_in_use | :address_not_found | :forbidden | Ecto.Changeset.t()}
   def delete_address(%Scope{} = scope, address_id) do
-    Repo.transaction(fn ->
-      address = lock_address!(scope, address_id)
+    with :ok <- authorize(scope, "admin.address.delete") do
+      Repo.transaction(fn ->
+        address = lock_address!(scope, address_id)
 
-      if attachment_exists?(address.id) do
-        Repo.rollback(:address_in_use)
-      end
+        if attachment_exists?(address.id) do
+          Repo.rollback(:address_in_use)
+        end
 
-      case address
-           |> Ecto.Changeset.change(deleted_at: now())
-           |> Repo.update() do
-        {:ok, _address} -> :ok
-        {:error, changeset} -> Repo.rollback(changeset)
+        case address
+             |> Ecto.Changeset.change(deleted_at: now())
+             |> Repo.update() do
+          {:ok, _address} -> :ok
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+      |> case do
+        {:ok, :ok} -> :ok
+        {:error, reason} -> {:error, reason}
       end
-    end)
-    |> case do
-      {:ok, :ok} -> :ok
-      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp authorize(scope, capability) do
+    case Authz.can(scope, capability) do
+      %{allowed: true} -> :ok
+      %{allowed: false} -> {:error, :forbidden}
     end
   end
 

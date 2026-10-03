@@ -50,6 +50,16 @@ defmodule BilimbiWeb.AddressLiveTest do
              conn |> log_in_as() |> live(~p"/addresses/create")
   end
 
+  test "the API refuses address deletion without its capability", %{scope: scope} do
+    user_scope = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73)
+    {:ok, address} = Address.create_address(scope, %{label: "Protected"})
+
+    assert {:error, :forbidden} = Address.delete_address(user_scope, address.id)
+
+    grant_capabilities!("admin.address.delete")
+    assert :ok = Address.delete_address(user_scope, address.id)
+  end
+
   test "lists, filters, sorts, and safely deletes tenant addresses", %{
     conn: conn,
     scope: scope,

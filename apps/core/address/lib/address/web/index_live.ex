@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Address
 
   @page_sizes [25, 50, 100]
@@ -55,7 +56,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   # runs.
   def handle_event("request_delete", %{"id" => id}, socket) do
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.address.delete") ->
+      not Authz.can(socket.assigns.current_scope, "admin.address.delete").allowed ->
         delete_forbidden(socket)
 
       address = find_listed(socket, id) ->
@@ -75,7 +76,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   def handle_event("delete", _params, socket) do
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.address.delete") ->
+      not Authz.can(socket.assigns.current_scope, "admin.address.delete").allowed ->
         delete_forbidden(socket)
 
       is_nil(socket.assigns.pending_delete) ->
