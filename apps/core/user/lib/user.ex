@@ -41,6 +41,7 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
@@ -903,15 +904,38 @@ defmodule Bilimbi.Core.User do
     |> transaction_result()
   end
 
-  @spec delete_user(Scope.t(), pos_integer(), pos_integer()) :: :ok | {:error, lookup_error()}
+  @doc """
+  Deletes one user in the scope's company.
+
+  Requires `admin.user.delete` now. The user screen's delete control only
+  shows the action. An anonymous system actor (tests and `Tenancy.scope/1`)
+  is allowed; a person and a named system principal are decided by Authz.
+  """
+  @spec delete_user(Scope.t(), pos_integer(), pos_integer()) ::
+          :ok | {:error, lookup_error() | :forbidden}
   def delete_user(%Scope{} = scope, company_id, user_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with :ok <- authorize_delete(scope),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, _} = Repo.delete(user)
       :ok
     else
+      {:error, :forbidden} = error -> error
       {:error, :company_not_found} = error -> error
       nil -> {:error, :user_not_found}
+    end
+  end
+
+  defp authorize_delete(%Scope{} = scope) do
+    actor = Scope.actor(scope)
+
+    if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
+      :ok
+    else
+      case Authz.can(scope, "admin.user.delete") do
+        %{allowed: true} -> :ok
+        %{allowed: false} -> {:error, :forbidden}
+      end
     end
   end
 

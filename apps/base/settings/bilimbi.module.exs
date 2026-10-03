@@ -5,7 +5,7 @@
   required: true,
   otp_app: :bilimbi_base_settings,
   namespace: Bilimbi.Base.Settings,
-  dependencies: ["base/database", "base/module_registry", "base/ui"],
+  dependencies: ["base/database", "base/module_registry", "base/tenancy", "base/ui"],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{20_260_811_093_952 => :compatible_baseline},
   web: "priv/web_routes.exs",

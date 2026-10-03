@@ -15,7 +15,7 @@ alias Bilimbi.Core.Company
 ensure_type = fn code, name ->
   case Enum.find(existing_types, &(&1.code == code)) do
     nil ->
-      {:ok, type} = Company.create_department_type(%{code: code, name: name})
+      {:ok, type} = Company.create_department_type(scope, %{code: code, name: name})
       type
 
     type ->

@@ -247,7 +247,12 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp save(params, socket) do
     submitted = Map.get(params, "settings", %{})
 
-    case Form.save(submitted, socket.assigns.fields, scope(socket)) do
+    case Form.save(
+           submitted,
+           socket.assigns.fields,
+           scope(socket),
+           socket.assigns.current_scope.scope
+         ) do
       # The kind follows the outcome: a save that wrote or cleared nothing
       # informs, one that changed storage confirms.
       {:ok, %{written: [], cleared: []} = outcome} ->
@@ -262,8 +267,12 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
          |> load_fields()
          |> put_flash(:success, saved_message(outcome))}
 
+      {:error, :forbidden} ->
+        {:noreply,
+         put_flash(socket, :error, "You do not have permission to manage platform settings.")}
+
       {:error, key, message} ->
-        # Nothing was written -- Form.save/3 plans before it writes and rolls
+        # Nothing was written -- Form.save/4 plans before it writes and rolls
         # back on a persistence error -- so the form is redrawn from storage
         # rather than from the rejected submission.
         {:noreply,
@@ -278,13 +287,21 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     held_keys = Enum.map(socket.assigns.pending_restore, & &1.key)
     socket = load_fields(socket)
     fields = Enum.filter(socket.assigns.fields, &(&1.key in held_keys))
-    {:ok, cleared} = Form.restore_defaults(fields, scope(socket))
 
-    {:noreply,
-     socket
-     |> assign(:pending_restore, nil)
-     |> load_fields()
-     |> put_flash(if(cleared == [], do: :info, else: :success), restored_message(cleared))}
+    case Form.restore_defaults(fields, scope(socket), socket.assigns.current_scope.scope) do
+      {:ok, cleared} ->
+        {:noreply,
+         socket
+         |> assign(:pending_restore, nil)
+         |> load_fields()
+         |> put_flash(if(cleared == [], do: :info, else: :success), restored_message(cleared))}
+
+      {:error, :forbidden} ->
+        {:noreply,
+         socket
+         |> assign(:pending_restore, nil)
+         |> put_flash(:error, "You do not have permission to manage platform settings.")}
+    end
   end
 
   defp scope_form(scope) do

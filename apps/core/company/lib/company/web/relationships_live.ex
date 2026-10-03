@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Relationship
 
@@ -51,11 +52,83 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   end
 
   @impl true
-  def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
-      when event in ["new", "edit", "save", "delete"],
-      do: write_forbidden(socket)
-
   def handle_event("new", _params, socket) do
+    if permit?(socket) do
+      open_new_relationship(socket)
+    else
+      write_forbidden(socket)
+    end
+  end
+
+  def handle_event("edit", %{"id" => id}, socket) do
+    if permit?(socket) do
+      open_relationship(socket, id)
+    else
+      write_forbidden(socket)
+    end
+  end
+
+  def handle_event("close_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:modal_action, nil)
+     |> assign(:editing_rel, nil)
+     |> assign_form(nil)}
+  end
+
+  def handle_event("validate", %{"relationship" => params}, socket) do
+    changeset =
+      case socket.assigns.modal_action do
+        :edit ->
+          socket.assigns.editing_rel.relationship
+          |> Relationship.update_changeset(params)
+          |> Map.put(:action, :validate)
+
+        _ ->
+          %Relationship{company_id: socket.assigns.company.id}
+          |> Relationship.changeset(params)
+          |> Map.put(:action, :validate)
+      end
+
+    {:noreply, assign_form(socket, changeset)}
+  end
+
+  def handle_event("save", %{"relationship" => params}, socket) do
+    if permit?(socket) do
+      save_relationship(socket, params)
+    else
+      write_forbidden(socket)
+    end
+  end
+
+  # Removing confirms through the shared dialog: the request holds the
+  # relationship whose consequence the dialog states, and `delete` acts on that
+  # held relationship rather than on a client-supplied id, so what was
+  # confirmed is what runs.
+  def handle_event("request_delete", %{"id" => id}, socket) do
+    if permit?(socket) do
+      request_relationship_delete(socket, id)
+    else
+      write_forbidden(socket)
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, %{assigns: %{pending_delete: nil}} = socket),
+    do: {:noreply, socket}
+
+  def handle_event("delete", _params, %{assigns: %{pending_delete: item}} = socket) do
+    if permit?(socket) do
+      delete_held_relationship(socket, item)
+    else
+      write_forbidden(assign(socket, :pending_delete, nil))
+    end
+  end
+
+  defp open_new_relationship(socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
@@ -80,7 +153,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  def handle_event("edit", %{"id" => id}, socket) do
+  defp open_relationship(socket, id) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
@@ -112,32 +185,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  def handle_event("close_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:modal_action, nil)
-     |> assign(:editing_rel, nil)
-     |> assign_form(nil)}
-  end
-
-  def handle_event("validate", %{"relationship" => params}, socket) do
-    changeset =
-      case socket.assigns.modal_action do
-        :edit ->
-          socket.assigns.editing_rel.relationship
-          |> Relationship.update_changeset(params)
-          |> Map.put(:action, :validate)
-
-        _ ->
-          %Relationship{company_id: socket.assigns.company.id}
-          |> Relationship.changeset(params)
-          |> Map.put(:action, :validate)
-      end
-
-    {:noreply, assign_form(socket, changeset)}
-  end
-
-  def handle_event("save", %{"relationship" => params}, socket) do
+  defp save_relationship(socket, params) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
@@ -157,6 +205,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply, assign_form(socket, changeset)}
+
+          {:error, :forbidden} ->
+            write_forbidden(socket)
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not create relationship.")}
@@ -180,6 +231,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply, assign_form(socket, changeset)}
 
+          {:error, :forbidden} ->
+            write_forbidden(socket)
+
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not update relationship.")}
         end
@@ -189,11 +243,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  # Removing confirms through the shared dialog: the request holds the
-  # relationship whose consequence the dialog states, and `delete` acts on that
-  # held relationship rather than on a client-supplied id, so what was
-  # confirmed is what runs.
-  def handle_event("request_delete", %{"id" => id}, socket) do
+  defp request_relationship_delete(socket, id) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
@@ -207,14 +257,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  def handle_event("cancel_delete", _params, socket) do
-    {:noreply, assign(socket, :pending_delete, nil)}
-  end
-
-  def handle_event("delete", _params, %{assigns: %{pending_delete: nil}} = socket),
-    do: {:noreply, socket}
-
-  def handle_event("delete", _params, %{assigns: %{pending_delete: item}} = socket) do
+  defp delete_held_relationship(socket, item) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
     socket = assign(socket, :pending_delete, nil)
@@ -228,6 +271,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
          |> put_flash(:success, "Relationship removed.")
          |> assign(:relationships_count, length(relationships))
          |> stream(:relationships, relationships, reset: true)}
+
+      {:error, :forbidden} ->
+        write_forbidden(socket)
 
       {:error, :not_found} ->
         {:ok, relationships} = Company.list_relationships(scope, company_id)
@@ -248,13 +294,22 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
+  # `can_update?` only decides which controls render. A LiveView outlives its
+  # mount, so every write asks Authz again with the sealed scope.
+  defp permit?(socket) do
+    Authz.can(socket.assigns.current_scope.scope, @update_capability).allowed
+  end
+
   defp write_forbidden(socket) do
-    {:noreply,
-     put_flash(
-       socket,
-       :error,
-       "You do not have permission to change company administration data."
-     )}
+    {:noreply, write_forbidden_socket(socket)}
+  end
+
+  defp write_forbidden_socket(socket) do
+    put_flash(
+      socket,
+      :error,
+      "You do not have permission to change company administration data."
+    )
   end
 
   defp assign_form(socket, nil), do: assign(socket, :form, nil)

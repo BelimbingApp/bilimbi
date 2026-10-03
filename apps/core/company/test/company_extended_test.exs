@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       assert {:ok, []} = Company.list_legal_entity_types()
 
       assert {:ok, type} =
-               Company.create_legal_entity_type(%{
+               Company.create_legal_entity_type(scope!(), %{
                  code: "LLC",
                  name: "Limited Liability Company",
                  description: "US LLC structure",
@@ -65,28 +65,28 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       assert fetched.id == type.id
 
       assert {:ok, updated} =
-               Company.update_legal_entity_type(type, %{
+               Company.update_legal_entity_type(scope!(), type, %{
                  name: "Limited Liability Co"
                })
 
       assert updated.name == "Limited Liability Co"
 
-      assert {:ok, toggled} = Company.toggle_legal_entity_type_active(type.id)
+      assert {:ok, toggled} = Company.toggle_legal_entity_type_active(scope!(), type.id)
       assert toggled.is_active == false
 
-      assert :ok = Company.delete_legal_entity_type(type.id)
+      assert :ok = Company.delete_legal_entity_type(scope!(), type.id)
       assert {:error, :not_found} = Company.get_legal_entity_type(type.id)
     end
 
     test "prevents duplicate codes for legal entity types" do
       assert {:ok, _} =
-               Company.create_legal_entity_type(%{
+               Company.create_legal_entity_type(scope!(), %{
                  code: "CORP",
                  name: "Corporation"
                })
 
       assert {:error, changeset} =
-               Company.create_legal_entity_type(%{
+               Company.create_legal_entity_type(scope!(), %{
                  code: "CORP",
                  name: "Duplicate Corp"
                })
@@ -96,7 +96,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
 
     test "refuses to delete legal entity type in use by a company" do
       {:ok, type} =
-        Company.create_legal_entity_type(%{
+        Company.create_legal_entity_type(scope!(), %{
           code: "HOLDING",
           name: "Holding Company"
         })
@@ -107,7 +107,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
         [type.id]
       )
 
-      assert {:error, :in_use} = Company.delete_legal_entity_type(type.id)
+      assert {:error, :in_use} = Company.delete_legal_entity_type(scope!(), type.id)
     end
   end
 
@@ -116,7 +116,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       assert {:ok, []} = Company.list_department_types()
 
       assert {:ok, eng} =
-               Company.create_department_type(%{
+               Company.create_department_type(scope!(), %{
                  code: "ENG",
                  name: "Engineering",
                  category: "operational",
@@ -125,7 +125,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
                })
 
       assert {:ok, hr} =
-               Company.create_department_type(%{
+               Company.create_department_type(scope!(), %{
                  code: "HR",
                  name: "Human Resources",
                  category: "administrative",
@@ -142,29 +142,29 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       assert only_hr.id == hr.id
 
       assert {:ok, updated} =
-               Company.update_department_type(eng, %{
+               Company.update_department_type(scope!(), eng, %{
                  name: "Software Engineering"
                })
 
       assert updated.name == "Software Engineering"
 
-      assert {:ok, toggled} = Company.toggle_department_type_active(eng.id)
+      assert {:ok, toggled} = Company.toggle_department_type_active(scope!(), eng.id)
       assert toggled.is_active == false
 
-      assert :ok = Company.delete_department_type(eng.id)
+      assert :ok = Company.delete_department_type(scope!(), eng.id)
       assert {:error, :not_found} = Company.get_department_type(eng.id)
     end
 
     test "prevents duplicate codes for department types" do
       assert {:ok, _} =
-               Company.create_department_type(%{
+               Company.create_department_type(scope!(), %{
                  code: "FIN",
                  name: "Finance",
                  category: "administrative"
                })
 
       assert {:error, changeset} =
-               Company.create_department_type(%{
+               Company.create_department_type(scope!(), %{
                  code: "FIN",
                  name: "Financials",
                  category: "administrative"
@@ -175,7 +175,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
 
     test "validates category enum" do
       assert {:error, changeset} =
-               Company.create_department_type(%{
+               Company.create_department_type(scope!(), %{
                  code: "INVALID",
                  name: "Invalid Dept",
                  category: "unsupported_category"
@@ -191,14 +191,14 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       other_scope: other_scope
     } do
       {:ok, eng} =
-        Company.create_department_type(%{
+        Company.create_department_type(scope!(), %{
           code: "ENG",
           name: "Engineering",
           category: "operational"
         })
 
       {:ok, hr} =
-        Company.create_department_type(%{
+        Company.create_department_type(scope!(), %{
           code: "HR",
           name: "Human Resources",
           category: "administrative"
@@ -246,7 +246,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
 
     test "refuses to delete department type in use by a company department", %{scope: scope} do
       {:ok, eng} =
-        Company.create_department_type(%{
+        Company.create_department_type(scope!(), %{
           code: "ENG",
           name: "Engineering",
           category: "operational"
@@ -258,7 +258,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
           status: "active"
         })
 
-      assert {:error, :in_use} = Company.delete_department_type(eng.id)
+      assert {:error, :in_use} = Company.delete_department_type(scope!(), eng.id)
     end
   end
 
@@ -328,6 +328,11 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
       # Cross tenant access fails
       assert {:error, :company_not_found} = Company.list_relationships(other_scope, 73)
     end
+  end
+
+  defp scope! do
+    {:ok, scope} = Tenancy.scope(41)
+    scope
   end
 
   defp errors_on(changeset) do
