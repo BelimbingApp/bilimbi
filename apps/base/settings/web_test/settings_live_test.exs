@@ -16,10 +16,10 @@ defmodule BilimbiWeb.SettingsLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
