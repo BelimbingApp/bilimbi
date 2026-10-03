@@ -75,8 +75,15 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     scope = current_scope.scope
 
     if allowed?(current_scope, "admin.address.view") do
+      sort_by = parse_sort_by(params["linked_sort_by"])
+      sort_dir = parse_sort_dir(params["linked_sort_dir"])
+
       with {:ok, address_id} <- parse_id(id_param),
-           {:ok, address} <- Address.get_address_detail(scope, address_id) do
+           {:ok, address} <-
+             Address.get_address_detail(scope, address_id,
+               owner_sort_by: sort_by,
+               owner_sort_dir: sort_dir
+             ) do
         company_context_id = resolve_company_context(scope, address, params["company"])
         countries = Geonames.list_countries()
 
@@ -89,8 +96,8 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
          |> assign(:can_update?, allowed?(current_scope, "admin.address.update"))
          |> assign(:company_context_id, company_context_id)
          |> assign(:countries, countries)
-         |> assign(:linked_sort_by, :type)
-         |> assign(:linked_sort_dir, :asc)
+         |> assign(:linked_sort_by, sort_by)
+         |> assign(:linked_sort_dir, sort_dir)
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
          |> assign(:editing_location?, false)
@@ -116,22 +123,29 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
       sort_by = parse_sort_by(params["linked_sort_by"])
       sort_dir = parse_sort_dir(params["linked_sort_dir"])
 
-      scope = socket.assigns.current_scope.scope
-      address_id = socket.assigns.address_id
+      # Mount already loaded this sort. Reloading here doubled the owner
+      # reads on every first paint, including the default sort.
+      if sort_by == socket.assigns.linked_sort_by and
+           sort_dir == socket.assigns.linked_sort_dir do
+        {:noreply, socket}
+      else
+        scope = socket.assigns.current_scope.scope
+        address_id = socket.assigns.address_id
 
-      case Address.get_address_detail(scope, address_id,
-             owner_sort_by: sort_by,
-             owner_sort_dir: sort_dir
-           ) do
-        {:ok, address} ->
-          {:noreply,
-           socket
-           |> assign(:address, address)
-           |> assign(:linked_sort_by, sort_by)
-           |> assign(:linked_sort_dir, sort_dir)}
+        case Address.get_address_detail(scope, address_id,
+               owner_sort_by: sort_by,
+               owner_sort_dir: sort_dir
+             ) do
+          {:ok, address} ->
+            {:noreply,
+             socket
+             |> assign(:address, address)
+             |> assign(:linked_sort_by, sort_by)
+             |> assign(:linked_sort_dir, sort_dir)}
 
-        _ ->
-          {:noreply, socket}
+          _ ->
+            {:noreply, socket}
+        end
       end
     else
       {:noreply, socket}

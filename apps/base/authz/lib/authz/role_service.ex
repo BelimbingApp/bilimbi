@@ -27,6 +27,43 @@ defmodule Bilimbi.Base.Authz.RoleService do
     |> Enum.map(&RoleSummary.from_schema/1)
   end
 
+  @spec role_grants(Scope.t(), [pos_integer()], map()) :: %{
+          pos_integer() => %{grant_all: boolean(), capabilities: [String.t()]}
+        }
+  def role_grants(%Scope{} = scope, role_ids, registry) when is_list(role_ids) do
+    role_ids = for id <- role_ids, is_integer(id) and id > 0, uniq: true, do: id
+
+    if role_ids == [] do
+      %{}
+    else
+      company_ids = directory!(registry).company_ids(scope)
+
+      from(role in Role,
+        left_join: grant in RoleCapability,
+        on: grant.role_id == role.id,
+        where: role.id in ^role_ids,
+        where:
+          (role.is_system and is_nil(role.company_id)) or
+            (not role.is_system and role.company_id in ^company_ids),
+        order_by: [asc: role.id, asc: grant.capability_key, asc: grant.id],
+        select: {role.id, role.grant_all, grant.capability_key}
+      )
+      |> Repo.all()
+      |> Enum.reduce(%{}, fn
+        {role_id, grant_all, nil}, acc ->
+          Map.put_new(acc, role_id, %{grant_all: grant_all, capabilities: []})
+
+        {role_id, grant_all, key}, acc ->
+          Map.update(acc, role_id, %{grant_all: grant_all, capabilities: [key]}, fn grant ->
+            %{grant | capabilities: [key | grant.capabilities]}
+          end)
+      end)
+      |> Map.new(fn {role_id, grant} ->
+        {role_id, %{grant | capabilities: Enum.reverse(grant.capabilities)}}
+      end)
+    end
+  end
+
   @spec get_role(Scope.t(), pos_integer(), map()) :: {:ok, RoleDetails.t()} | {:error, :not_found}
   def get_role(%Scope{} = scope, role_id, registry) when is_integer(role_id) and role_id > 0 do
     case eligible_role(scope, role_id, registry) do
