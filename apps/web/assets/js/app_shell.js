@@ -236,10 +236,7 @@ const AppShell = {
   },
 
   async loadPinnedItems() {
-    // The shell renders the list. GET /api/pins is only the fallback when
-    // that attribute is missing, or after a toggle that did not return pins.
-    const rendered = this.readRenderedPins()
-    let pins = rendered === null ? (await this.fetchServerPins()) || [] : rendered
+    let pins = this.readRenderedPins()
 
     if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
 
@@ -248,8 +245,6 @@ const AppShell = {
   },
 
   readRenderedPins() {
-    if (!Object.hasOwn(this.el.dataset, "pins")) return null
-
     try {
       const parsed = JSON.parse(this.el.dataset.pins || "[]")
       return this.acceptServerPins(Array.isArray(parsed) ? parsed : [])

@@ -14,7 +14,6 @@ defmodule BilimbiWeb.RequestContext do
   alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.DateTime, as: BaseDateTime
   alias Bilimbi.Base.Locale
-  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Address
@@ -68,18 +67,6 @@ defmodule BilimbiWeb.RequestContext do
   defp apply_locale(%{shell_preferences: %{language: language} = shell_preferences})
        when is_binary(language) do
     put_gettext_locale(language)
-    DateTimeDisplay.put(shell_preferences)
-  end
-
-  defp apply_locale(%{
-         user: %{"user_id" => user_id, "company_id" => company_id},
-         scope: %Scope{} = scope,
-         shell_preferences: shell_preferences
-       }) do
-    SettingsScope.user(user_id, company_id, Scope.tenant_id(scope))
-    |> Locale.resolve(locale_bootstrap())
-    |> then(&put_gettext_locale(&1.language))
-
     DateTimeDisplay.put(shell_preferences)
   end
 

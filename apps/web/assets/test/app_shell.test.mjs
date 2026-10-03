@@ -121,8 +121,11 @@ const flush = async () => {
   for (let i = 0; i < 4; i++) await settle()
 }
 
-function mount() {
-  shell = mountHook(AppShell, render(SHELL, "app-shell"))
+function mount(root = render(SHELL, "app-shell")) {
+  if (!Object.hasOwn(root.dataset, "pins")) {
+    root.dataset.pins = JSON.stringify(serverPins)
+  }
+  shell = mountHook(AppShell, root)
   return shell
 }
 
@@ -306,7 +309,6 @@ test("pinning and unpinning a navigation item uses the durable API", async () =>
   assert.equal($("nav-pin-companies").getAttribute("aria-pressed"), "true")
   assert.equal($("nav-pin-companies").title, "Unpin Companies to sidebar")
   assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), [
-    "GET /api/pins",
     "POST /api/pins/toggle",
   ])
 
@@ -314,6 +316,15 @@ test("pinning and unpinning a navigation item uses the durable API", async () =>
   await flush()
   assert.equal($("app-pinned").hidden, true)
   assert.equal(serverPins.length, 0)
+})
+
+test("a shell without rendered pins does not request /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests, [])
+  assert.equal($("app-pinned").hidden, true)
 })
 
 test("rendered pins hydrate without requesting /api/pins", async () => {
@@ -540,6 +551,7 @@ test("impersonated shells read pins but refuse pin writes and migration", async 
   localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}]))
   const root = render(SHELL, "app-shell")
   root.dataset.impersonating = "true"
+  root.dataset.pins = JSON.stringify(serverPins)
   shell = mountHook(AppShell, root)
   await flush()
 
@@ -548,7 +560,7 @@ test("impersonated shells read pins but refuse pin writes and migration", async 
   moveDown?.click()
   await flush()
 
-  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["GET /api/pins"])
+  assert.deepEqual(requests, [])
   assert.equal(localStorage.getItem("sidebarPinnedItems") !== null, true)
   assert.equal($("nav-pin-companies").disabled, true)
   assert.equal($("app-pinned-items").querySelector('[data-nav-unpin]').disabled, true)
