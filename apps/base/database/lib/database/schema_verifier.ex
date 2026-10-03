@@ -31,7 +31,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   @type index_spec :: %{
           required(:columns) => [String.t()],
           required(:unique) => boolean(),
-          required(:where) => String.t() | nil
+          required(:where) => String.t() | nil,
+          optional(:order) => [boolean()]
         }
 
   @type foreign_key_spec :: %{
@@ -197,6 +198,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
         SELECT index_class.relname,
                index_info.indisunique,
                array_agg(attribute.attname ORDER BY key_column.ordinality),
+               array_agg((index_info.indoption[key_column.ordinality - 1] & 1) = 1
+                         ORDER BY key_column.ordinality),
                pg_get_expr(index_info.indpred, index_info.indrelid)
         FROM pg_index AS index_info
         JOIN pg_class AS table_class ON table_class.oid = index_info.indrelid
@@ -215,8 +218,14 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
         [schema, table]
       )
 
-    Map.new(result.rows, fn [name, unique, column_names, where] ->
-      {name, %{unique: unique, columns: column_names, where: normalize_predicate(where)}}
+    Map.new(result.rows, fn [name, unique, column_names, order, where] ->
+      {name,
+       %{
+         unique: unique,
+         columns: column_names,
+         order: order,
+         where: normalize_predicate(where)
+       }}
     end)
   end
 
@@ -486,6 +495,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     object
     |> Map.put_new(:where, nil)
     |> Map.update!(:where, &normalize_predicate/1)
+    |> Map.put_new(:order, List.duplicate(false, length(Map.fetch!(object, :columns))))
   end
 
   defp normalize_named_object("foreign key", object),

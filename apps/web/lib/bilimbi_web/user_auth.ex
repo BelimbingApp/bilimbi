@@ -840,6 +840,11 @@ defmodule BilimbiWeb.UserAuth do
           impersonation_opts(impersonator, session_id)
         )
 
+      # Session metadata is housekeeping, not a user action. Touch only after
+      # this edge has proved the durable session and identity, throttled by the
+      # Session setting so ordinary requests do not amplify writes.
+      _ = Session.touch_session(session_id)
+
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed} = Authz.effective_capabilities(actor)
 

@@ -62,6 +62,8 @@ cannot reverse committed business work. `schedule.history.keep_days` is global,
 defaults to 90, accepts the operational range 0..3650, and treats zero as
 pruning disabled. Pruning is opportunistic at capability-worker start, avoiding
 a recurrence that depends on the scheduler to prune the scheduler itself.
+Finished occurrence history is pruned daily using this same operator setting;
+unfinished occurrence claims are never eligible for deletion.
 
 Rollback must first stop all Bilimbi producers and workers. The migrations
 refuse to discard non-empty history, suppression, occurrence, or review state.
