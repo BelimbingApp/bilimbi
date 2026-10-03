@@ -130,6 +130,21 @@ defmodule Bilimbi.Base.Authz.Contributions do
         },
         runtime_claims: []
       },
+      schedule: %{
+        definitions: [
+          %{
+            key: "base/authz.decision_log_retention",
+            name: "Prune authorization decision logs",
+            expression: "23 3 * * *",
+            timezone: "Etc/UTC",
+            task_name: "Base Authz decision log retention",
+            worker: Bilimbi.Base.Perf.AuthzRetentionWorker,
+            args: %{},
+            overlap: :forbid,
+            misfire: :coalesce
+          }
+        ]
+      },
       authz: %{
         domains: %{"admin" => "Administrative operations"},
         verbs: @verbs,

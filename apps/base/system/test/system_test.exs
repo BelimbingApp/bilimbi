@@ -30,6 +30,26 @@ defmodule Bilimbi.Base.SystemTest do
       end
     end
 
+    test "application facts use the configured runtime environment and real locale settings" do
+      previous = Application.get_env(:bilimbi_base_ui, :mix_env)
+      Application.put_env(:bilimbi_base_ui, :mix_env, :test)
+
+      on_exit(fn ->
+        if previous do
+          Application.put_env(:bilimbi_base_ui, :mix_env, previous)
+        else
+          Application.delete_env(:bilimbi_base_ui, :mix_env)
+        end
+      end)
+
+      facts = Map.new(SystemInfo.application(), &{&1.label, &1.value})
+
+      assert facts["Environment"] == "test"
+      assert facts["Debug Mode"] == "Disabled"
+      assert facts["Timezone"] == Application.get_env(:bilimbi_base_ui, :timezone, "Etc/UTC")
+      assert facts["Locale"] == Bilimbi.Base.Locale.locale(nil)
+    end
+
     test "runtime reports the real BEAM, not a hard-coded string" do
       facts = Map.new(SystemInfo.runtime(), &{&1.label, &1.value})
 

@@ -21,6 +21,7 @@ defmodule Bilimbi.Base.System do
   """
 
   alias Bilimbi.Base.Perf
+  alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
 
@@ -32,11 +33,11 @@ defmodule Bilimbi.Base.System do
   def application do
     [
       fact("Version", Application.get_env(:bilimbi_base_ui, :app_version, "0.1.0")),
-      fact("Environment", to_string(environment())),
+      fact("Environment", to_string(Application.get_env(:bilimbi_base_ui, :mix_env, :prod))),
       fact("Debug Mode", if(debug?(), do: "Enabled", else: "Disabled")),
       fact("URL", endpoint_url()),
       fact("Timezone", Application.get_env(:bilimbi_base_ui, :timezone, "Etc/UTC")),
-      fact("Locale", Application.get_env(:bilimbi_base_ui, :locale, "en"))
+      fact("Locale", Locale.locale(nil))
     ]
   end
 
@@ -124,12 +125,7 @@ defmodule Bilimbi.Base.System do
   defp fact(label, value) when is_binary(value), do: %{label: label, value: value}
   defp fact(label, value), do: %{label: label, value: to_string(value)}
 
-  defp environment do
-    Application.get_env(:bilimbi_base_ui, :environment) || Application.get_env(:web, :environment) ||
-      "dev"
-  end
-
-  defp debug?, do: environment() not in ["prod", "production", :prod]
+  defp debug?, do: Application.get_env(:bilimbi_base_ui, :mix_env, :prod) == :dev
 
   defp endpoint_url do
     case Application.get_env(:web, BilimbiWeb.Endpoint) do
