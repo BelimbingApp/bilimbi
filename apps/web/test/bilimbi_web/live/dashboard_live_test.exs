@@ -129,11 +129,11 @@ defmodule BilimbiWeb.DashboardLiveTest do
   end
 
   test "module pages and dashboard support navigation without an HTTP reload", %{conn: conn} do
-    {:ok, dashboard, _html} = conn |> log_in_as() |> live(~p"/dashboard")
-    assert has_element?(dashboard, "#app-shell")
-    assert {:ok, profile, _html} = live_redirect(dashboard, to: "/settings/profile")
-    assert {:ok, dashboard2, _html} = live_redirect(profile, to: "/dashboard")
-    assert has_element?(dashboard2, "#dashboard-current-company")
+    {:ok, profile, _html} = conn |> log_in_as() |> live(~p"/settings/profile")
+    assert has_element?(profile, "#app-shell")
+    assert {:ok, appearance, _html} = live_redirect(profile, to: "/settings/appearance")
+    assert {:ok, dashboard, _html} = live_redirect(appearance, to: "/dashboard")
+    assert has_element?(dashboard, "#dashboard-current-company")
   end
 
   test "live navigation denies a destination capability before mounting it", %{conn: conn} do
