@@ -67,7 +67,7 @@ defmodule BilimbiWeb.DashboardLive do
 
     available_sections = available_sections(default_section_ids, visible_sections)
 
-    audit_entries = audit_entries(scope)
+    audit_entries = audit_entries(scope, visible)
     session_count = session_count(visible)
     perf_diagnostics = perf_diagnostics(visible)
 
@@ -114,13 +114,13 @@ defmodule BilimbiWeb.DashboardLive do
     end
   end
 
-  defp audit_entries(scope) do
-    Audit.list_mutations(scope,
-      page: 1,
-      page_size: 5,
-      sort_by: :occurred_at,
-      sort_dir: :desc
-    ).entries
+  defp audit_entries(scope, visible_widgets) do
+    if Enum.any?(visible_widgets, &(&1.id == "base-dashboard-recent-audit")) do
+      {:ok, entries} = Audit.list_recent_mutations(scope, 5)
+      entries
+    else
+      []
+    end
   end
 
   defp widget_module(widget_id) do
@@ -266,6 +266,7 @@ defmodule BilimbiWeb.DashboardLive do
          socket
          |> assign(:widgets, widgets)
          |> assign(:available_widgets, available)
+         |> assign(:audit_entries, audit_entries(socket.assigns.current_scope.scope, widgets))
          |> schedule_refresh(widgets)
          |> put_flash(:success, "#{widget.label} added to dashboard.")}
     end
@@ -430,7 +431,7 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_info(:refresh_widgets, socket) do
     scope = socket.assigns.current_scope.scope
 
-    audit_entries = audit_entries(scope)
+    audit_entries = audit_entries(scope, socket.assigns.widgets)
 
     {:noreply,
      socket

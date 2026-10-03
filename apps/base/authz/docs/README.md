@@ -11,6 +11,14 @@ first installation. Run `mix bilimbi.authz.reconcile` after later contribution
 changes; application boot never mutates grants. Both paths serialize the same
 explicit reconciliation, and neither deletes principal grants.
 
+Once enabled through the [Base Schedule operator workflow](../../schedule/docs/README.md),
+authorization decision logs are pruned through `Authz.prune_decision_logs/0`
+by the daily schedule contributed in
+[`Base Perf.Contributions`](../../perf/lib/perf/contributions.ex). Each run
+reads the global **Authorization log retention** setting
+(`authz.decision_log_retention_days`) and deletes decisions older than that
+many days, preserving newer decisions.
+
 Base owns the six `base_authz_*` tables: the five compatible ones and the
 Bilimbi-only `base_authz_system_principal_capabilities`. `base_authz_roles.company_id` remains
 a bare nullable column in the Base migration. Core Company contributes the
@@ -37,6 +45,13 @@ refused. `mix bilimbi.authz.system_principal` (`declared`, `grants`, `grant`,
 revocation commits with a retained `authz.system_principal.granted` or
 `.revoked` audit action naming who made it. Decisions log `actor_type`
 `"system"`, `actor_id` `0`, and the principal's name in the context.
+
+## Re-authorizing inside a LiveView
+
+Use `Bilimbi.Base.Authz.LiveAuthorization` for additional operation checks in
+LiveView event handlers. Its [module documentation](../lib/authz/live_authorization.ex)
+owns requirement shapes, live decisions, and refusal handling. The host's
+page and session boundary is documented in [Live navigation](../../../web/docs/navigation.md).
 
 ## Administration facade
 

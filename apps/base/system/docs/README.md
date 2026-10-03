@@ -31,6 +31,11 @@ DateTime capability and is not implemented here.
 Ports Belimbing's `app/Base/System/Livewire/Info/Index.php` and
 `resources/core/views/livewire/admin/system/info/index.blade.php`.
 
+The Application card reads Environment from the configured Mix environment
+and Debug Mode from the endpoint's `debug_errors` flag, independently of that
+environment; an absent flag means Disabled. Locale is the installation's
+effective global locale resolved by Base Locale.
+
 Both screens present their facts through Base UI's `<.list>`, the record-facts
 list detail pages use, rather than their own `<dl>` markup. Each value cell keeps a
 stable id (`system-info-<card>-<label>`, `localization-<fact>`) so a test or an

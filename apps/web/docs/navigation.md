@@ -6,15 +6,24 @@ these routes as one block so navigation can use the live connection instead
 of reloading the document. Authentication is rehydrated on each destination
 mount. Anonymous and operator-only routes keep separate session boundaries.
 
-`BilimbiWeb.RouteAccess` checks each route's declared capability before the
-module's mount runs, and again before a URL patch enters a different route.
-Search, sort and pagination patches within the same route retain that page's
-existing mount policy. The router supplies
-a compile-time action key for this lookup; the hook clears that host-only key
-before the adapter runs, preserving the existing nil-action adapter contract.
-A missing policy fails closed. Modules sharing a LiveView (for example User
-create/edit) still have distinct policies. Event authorization remains the
-owning module's responsibility.
+An open page rechecks its session and page permission before each client
+event or URL patch, including events handled by Base UI LiveComponents.
+A terminated session or removed login sends the page to sign-in with the
+expired-session message. Revoking its page permission sends it to the
+dashboard with a refusal message before the action runs. Server-triggered
+callbacks are outside this boundary. The host refreshes `current_scope` for
+the handler; cached presentation flags are not authorization.
+
+[RouteAccess](../lib/bilimbi_web/route_access.ex) owns the hook, route-policy,
+and component callback contract. Additional operation permissions use
+[LiveAuthorization](../../base/authz/lib/authz/live_authorization.ex).
+
+Session termination also disconnects idle tabs through
+[SessionDisconnect](../lib/bilimbi_web/session_disconnect.ex). Sockets carrying
+`UserAuth.live_socket_id/1` reconnect and are refused at mount. The next-action
+check does not depend on receiving that notification. The
+[Session API](../../base/session/lib/session.ex) owns which deletion operations
+publish and the notification timing.
 
 The menu and content render together through Base UI. Sharing the session does
 not cache the actor's permissions or introduce a separate menu request. The
