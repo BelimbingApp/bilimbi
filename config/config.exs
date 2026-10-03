@@ -100,7 +100,12 @@ config :bilimbi_base_audit,
     # The password change they complete is audited on the user row; the
     # token rows are secrets, and the trail is better off not holding
     # their metadata at all.
-    Bilimbi.Core.User.PasswordResetToken
+    Bilimbi.Core.User.PasswordResetToken,
+
+    # Oban jobs are machine transport state, not actor decisions. Their
+    # lifecycle is visible in Queue diagnostics; captured args and metadata
+    # could otherwise copy delegated actor tokens into the audit trail.
+    Oban.Job
   ]
 
 config :esbuild,
