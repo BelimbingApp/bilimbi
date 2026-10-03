@@ -247,7 +247,7 @@ the ownership, migration, verification, and adoption semantics are defined in
 [Database Architecture](./database.md). Do not create a separate database
 dependency graph beside the module descriptors.
 
-Workflow status and process definitions use the same snapshot through the `:workflow`
+Workflow status, process and human action definitions use the same snapshot through the `:workflow`
 consumer ([ADR 0018](./decisions/0018-workflow-status-contribution-consumer.md)).
 Owner-proven adapters execute business rules; exact legacy aliases interpret
 retained data without introducing an upward dependency or another registry.

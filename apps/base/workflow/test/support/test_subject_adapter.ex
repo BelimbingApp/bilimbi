@@ -21,9 +21,18 @@ defmodule Bilimbi.Base.Workflow.TestSubjectAdapter do
            tenant_id: row.tenant_id,
            company_id: row.company_id,
            status: row.status,
+           version: version(row),
            facts: %{"marker" => row.marker}
          }}
     end
+  end
+
+  # The whole row, as Belimbing hashed every raw attribute.
+  defp version(row) do
+    [row.id, row.tenant_id, row.company_id, row.status, row.marker]
+    |> Enum.map_join("|", &inspect/1)
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 
   @impl true
