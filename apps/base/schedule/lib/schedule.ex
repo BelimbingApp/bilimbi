@@ -13,7 +13,6 @@ defmodule Bilimbi.Base.Schedule do
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
-  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule.Definition
@@ -27,6 +26,7 @@ defmodule Bilimbi.Base.Schedule do
   alias Bilimbi.Base.Schedule.Suppression
   alias Bilimbi.Base.Schedule.TaskSummary
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy.Scope
   alias Ecto.Adapters.SQL
   alias Ecto.Multi
 
