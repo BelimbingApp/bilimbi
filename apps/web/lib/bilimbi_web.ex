@@ -1,7 +1,7 @@
 defmodule BilimbiWeb do
   @moduledoc """
-  The entrypoint for defining your web interface, such
-  as controllers, components, channels, and so on.
+  The entrypoint for defining the host web interface, such
+  as controllers, LiveViews, and HTML.
 
   This can be used in your application as:
 

@@ -69,7 +69,8 @@ mechanics live with their owners:
   migrations valid and refuses a remount that changes an applied file
   (`docs/architecture/database.md`).
 - Formatter subdirectories, guard scans, Tailwind sources, `precommit.test`,
-  and `compile.strict` derive their paths from discovery.
+  and `compile.strict` follow the mounted-code traversal rule in
+  `docs/architecture/0010_composition-model.md`.
 - Settings, authorization, menu, and schema contributions come from the same
   provider mechanism as Base and Core; conflicts fail
   `mix bilimbi.contributions.verify`, host boot, and the release seed command,
