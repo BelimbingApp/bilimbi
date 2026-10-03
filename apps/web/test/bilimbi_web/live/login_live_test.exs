@@ -312,12 +312,8 @@ defmodule BilimbiWeb.LoginLiveTest do
 
     assert has_element?(view, "#login-workspace[data-state='ready']")
     assert has_element?(view, "#login-workspace", "Bilimbi Operations Sdn. Bhd.")
-
-    assert has_element?(
-             view,
-             "#login-workspace",
-             "tenant #{identity.tenant.id}"
-           )
+    refute has_element?(view, "#login-workspace", "tenant #{identity.tenant.id}")
+    refute render(view) =~ "tenant #{identity.tenant.id}"
   end
 
   test "shows an honest workspace state when identity is absent", %{conn: conn} do
