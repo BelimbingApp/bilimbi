@@ -267,8 +267,6 @@ defmodule BilimbiWeb.DashboardLive do
          |> assign(:widgets, widgets)
          |> assign(:available_widgets, available)
          |> assign(:audit_entries, audit_entries(socket.assigns.current_scope.scope, widgets))
-         |> assign(:session_count, session_count(widgets))
-         |> assign(:perf_diagnostics, perf_diagnostics(widgets))
          |> schedule_refresh(widgets)
          |> put_flash(:success, "#{widget.label} added to dashboard.")}
     end
