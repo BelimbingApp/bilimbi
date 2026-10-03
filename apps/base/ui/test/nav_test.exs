@@ -9,6 +9,8 @@ defmodule Bilimbi.Base.UI.NavTest do
   alias Bilimbi.Base.Menu.Item
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.UI.Nav
+  alias Phoenix.LiveView.Lifecycle
+  alias Phoenix.LiveView.Socket
 
   # `/dashboard` is served by the web host, so it is in this app's manifest.
   # Anything under /nowhere never will be.
@@ -126,5 +128,75 @@ defmodule Bilimbi.Base.UI.NavTest do
 
       assert Nav.tree(nil) == []
     end
+  end
+
+  describe "rendered_tree/1" do
+    test "reuses one tree until capabilities or pins change" do
+      install!([
+        Item.new!(%{id: "open", label: "Open", route: @served}),
+        Item.new!(%{
+          id: "shut",
+          label: "Shut",
+          route: @served,
+          capability: "admin.user.list"
+        })
+      ])
+
+      scope = scope(["admin.user.list"])
+      before = Nav.build_count()
+      first = Nav.rendered_tree(scope)
+
+      assert Nav.build_count() == before + 1
+      assert Nav.rendered_tree(scope) == first
+      assert Nav.build_count() == before + 1
+      assert ids(first) == ids(Nav.tree(scope))
+
+      narrowed = Nav.rendered_tree(scope([]))
+      assert ids(narrowed) == ["open"]
+      assert Nav.build_count() == before + 3
+
+      pinned = Map.put(scope, :pins, [%{id: 1, sort_order: 0}])
+      assert Nav.rendered_tree(pinned) == first
+      assert Nav.build_count() == before + 4
+      assert Nav.rendered_tree(pinned) == first
+      assert Nav.build_count() == before + 4
+    end
+  end
+
+  describe "on_mount/4" do
+    test "assigns the tree and keeps that same list while the scope is unchanged" do
+      install!([Item.new!(%{id: "open", label: "Open", route: @served})])
+      scope = scope([])
+
+      before = Nav.build_count()
+
+      assert {:cont, socket} =
+               Nav.on_mount(:prepare, %{}, %{}, nav_socket(%{current_scope: scope}))
+
+      assert Nav.build_count() == before + 1
+      assert socket.assigns.nav == Nav.rendered_tree(scope)
+      assert Nav.build_count() == before + 1
+
+      assert Nav.refresh(socket).assigns.nav == socket.assigns.nav
+      assert Nav.build_count() == before + 1
+    end
+
+    test "does not build a tree for a framed page" do
+      before = Nav.build_count()
+
+      assert {:cont, socket} =
+               Nav.on_mount(:prepare, %{}, %{}, nav_socket(%{current_scope: %{framed: true}}))
+
+      assert Nav.build_count() == before
+      refute Map.has_key?(socket.assigns, :nav)
+    end
+  end
+
+  defp nav_socket(assigns) do
+    %Socket{
+      router: __MODULE__,
+      assigns: Map.merge(%{__changed__: %{}}, assigns),
+      private: %{lifecycle: %Lifecycle{}, live_temp: %{}}
+    }
   end
 end

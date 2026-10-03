@@ -128,7 +128,10 @@ defmodule Bilimbi.Base.UI.Layouts do
   end
 
   def app(assigns) do
-    nav = Bilimbi.Base.UI.Nav.tree(assigns.current_scope)
+    # `Nav.on_mount/4` computes this once per LiveView and refreshes it only
+    # when capabilities or pins change. Calling `tree/1` here rebuilt it on
+    # every render of every page.
+    nav = Bilimbi.Base.UI.Nav.rendered_tree(assigns.current_scope)
 
     assigns =
       assigns
@@ -586,7 +589,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       id={"nav-pin-" <> String.trim_leading(@item_id, "nav-")}
       data-nav-pin={@item_id}
       disabled={@impersonating}
-      class="app-nav-pin opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      chrome={:nav}
+      class="app-nav-pin"
     />
     """
   end
@@ -611,7 +615,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       id={"nav-tile-" <> String.trim_leading(@item_id, "nav-")}
       navigate={@route}
       data-nav-tile={@route}
-      class="app-nav-tile opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      chrome={:nav}
+      class="app-nav-tile"
     />
     """
   end
