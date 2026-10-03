@@ -59,7 +59,12 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   defp aliases do
     [
-      setup: ["cmd mix setup", "bilimbi.migrate"],
+      setup: [
+        "deps.get",
+        "ecto.setup",
+        "cmd --app web mix assets.setup",
+        "cmd --app web mix assets.build"
+      ],
       "bilimbi.server": [&prepare_bilimbi_server/1, "bilimbi.server"],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
