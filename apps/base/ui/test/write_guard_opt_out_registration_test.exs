@@ -16,8 +16,10 @@ defmodule Bilimbi.Base.UI.WriteGuardOptOutRegistrationTest do
   import ExUnit.CaptureIO
 
   @adapters [
-    {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__), [:live_view, :live_component]},
-    {"apps/web/lib/bilimbi_web.ex", Path.expand("../../../web/lib/bilimbi_web.ex", __DIR__), [:live_view]}
+    {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__),
+     [:live_view, :live_component]},
+    {"apps/web/lib/bilimbi_web.ex", Path.expand("../../../web/lib/bilimbi_web.ex", __DIR__),
+     [:live_view]}
   ]
 
   for {label, path, shapes} <- @adapters do
