@@ -11,7 +11,9 @@ termination refuses to delete the caller's current session ID. The module-owned
 admin adapter is `Bilimbi.Base.Session.Web.IndexLive` at `/system/sessions`.
 The global operator setting `session.lifetime_minutes` defaults to 120 minutes
 of idle time. The Web authentication edge rejects older sessions and refreshes
-activity at most once per minute; Base Schedule prunes expired rows every five
+activity on each user interaction at second precision. Mounted views guard events,
+URL patches, component callbacks, and background refreshes; background work does
+not extend the idle lifetime. Base Schedule prunes expired rows every five
 minutes using the same setting.
 
 ## Ending a session

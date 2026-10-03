@@ -9,6 +9,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -43,6 +44,69 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
   end
 
   defp open(conn), do: conn |> log_in_as() |> live(~p"/notifications")
+
+  for action <- [:patch, :toggle_dropdown, :mark_all_read, :visit, :broadcast, :component_update] do
+    @expiry_action action
+    test "expired sessions reject #{@expiry_action}", %{conn: conn, scope: scope} do
+      {:ok, note} = User.send_notification(scope, 91, %{title: "Private update"})
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/notifications")
+      render_click(element(view, "#app-notifications-bell"))
+      {:ok, entry} = Session.fetch_session(session_id)
+
+      {:ok, _entry} =
+        Session.put_session(session_id, entry.payload, %{
+          user_id: 91,
+          last_activity: System.system_time(:second) - 120 * 60 - 1
+        })
+
+      case @expiry_action do
+        :patch ->
+          render_click(element(view, "#filter-unread-tab"))
+
+        :toggle_dropdown ->
+          render_click(element(view, "#app-notifications-bell"))
+
+        :mark_all_read ->
+          render_click(element(view, "#bell-mark-all-read"))
+
+        :visit ->
+          render_click(element(view, "#bell-item-#{note.id} button"))
+
+        :broadcast ->
+          send(view.pid, {:notification_event, :created})
+
+        :component_update ->
+          Phoenix.LiveView.send_update(view.pid, User.Web.NotificationBellComponent,
+            id: "topbar-notification-bell"
+          )
+      end
+
+      assert_redirect(view, "/")
+      assert {:ok, 1} = User.unread_notification_count(scope, 91)
+    end
+  end
+
+  test "background notifications do not extend activity, but component events do", %{conn: conn} do
+    conn = log_in_as(conn)
+    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+    {:ok, view, _html} = live(conn, ~p"/notifications")
+    {:ok, entry} = Session.fetch_session(session_id)
+    activity = System.system_time(:second) - 30
+
+    {:ok, _entry} =
+      Session.put_session(session_id, entry.payload, %{user_id: 91, last_activity: activity})
+
+    send(view.pid, {:notification_event, :created})
+    assert has_element?(view, "#app-notifications-bell")
+    assert {:ok, %{last_activity: ^activity}} = Session.fetch_session(session_id)
+
+    render_click(element(view, "#app-notifications-bell"))
+    assert has_element?(view, "#app-notifications-dropdown")
+    assert {:ok, %{last_activity: refreshed}} = Session.fetch_session(session_id)
+    assert refreshed > activity
+  end
 
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/notifications")

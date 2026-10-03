@@ -594,6 +594,31 @@ defmodule BilimbiWeb.UserAuth do
         end
       end
 
+      if Phoenix.LiveView.connected?(socket) do
+        Bilimbi.Base.UI.SessionGuard.install(fn activity? ->
+          durable_session_valid?(current_scope, activity?)
+        end)
+      end
+
+      socket =
+        socket
+        |> Phoenix.LiveView.attach_hook(:durable_session_params, :handle_params, fn
+          _params, _uri, socket ->
+            if Phoenix.LiveView.connected?(socket),
+              do: guard_session(socket, true),
+              else: {:cont, socket}
+        end)
+        |> Phoenix.LiveView.attach_hook(:durable_session_info, :handle_info, fn
+          :durable_session_expired, socket ->
+            {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+
+          _message, socket ->
+            guard_session(socket, false)
+        end)
+        |> Phoenix.LiveView.attach_hook(:durable_session_async, :handle_async, fn
+          _name, _result, socket -> guard_session(socket, false)
+        end)
+
       socket =
         Phoenix.LiveView.attach_hook(
           socket,
@@ -879,6 +904,25 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp current_scope_from(_session_user, _impersonation), do: nil
+
+  defp guard_session(socket, activity?) do
+    if durable_session_valid?(socket.assigns.current_scope, activity?) do
+      {:cont, socket}
+    else
+      {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+    end
+  end
+
+  defp durable_session_valid?(%{session_identity: identity}, activity?) do
+    with {:ok, %Entry{} = entry} <- Session.fetch_session(identity["session_id"]),
+         true <- entry.user_id == identity["user_id"],
+         true <- session_active?(entry) do
+      if activity?, do: Session.refresh_activity(entry.id, System.system_time(:second))
+      true
+    else
+      _ -> false
+    end
+  end
 
   defp session_active?(%Entry{last_activity: last_activity}) do
     lifetime_minutes = Bilimbi.Base.Settings.get("session.lifetime_minutes")

@@ -53,12 +53,12 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
-  @doc "Refreshes activity when the stored timestamp is at least one minute old."
+  @doc "Advances activity to the latest observed second."
   @spec refresh_activity(String.t(), non_neg_integer()) :: :ok
   def refresh_activity(id, now) when is_binary(id) and is_integer(now) and now >= 0 do
     Repo.update_all(
       from(session in Schema,
-        where: session.id == ^id and session.last_activity <= ^(now - 60)
+        where: session.id == ^id and session.last_activity < ^now
       ),
       set: [last_activity: now]
     )
