@@ -12,6 +12,7 @@
     "base/module_registry",
     "base/queue",
     "base/settings",
+    "base/tenancy",
     "base/ui"
   ],
   migrations: "priv/repo/migrations",
