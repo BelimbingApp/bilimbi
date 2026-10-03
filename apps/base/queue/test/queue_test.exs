@@ -1,14 +1,14 @@
 defmodule Bilimbi.Base.QueueTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.JobRef
   alias Bilimbi.Base.Queue.TestWorkers.Success
   alias Bilimbi.Base.Queue.TestWorkers.Unique
-  alias Bilimbi.Base.Audit.MutationSchema
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Base.Repo
   alias Ecto.Multi
 
   import Bilimbi.Base.Tenancy.TestFixtures
