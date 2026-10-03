@@ -23,7 +23,12 @@ config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Test
 config :web, :mailer_sender, {"Bilimbi Test", "no-reply@bilimbi.test"}
 config :swoosh, :api_client, false
 config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
-config :bilimbi_base_queue, testing: :manual
+config :bilimbi_base_queue,
+  testing: :disabled,
+  queues: [],
+  plugins: [],
+  stage_interval: :infinity,
+  peer: {Oban.Peers.Isolated, [leader?: false]}
 config :bilimbi_base_tenancy, :actor_secret, "test-actor-secret-ZbX2pQm9Lr4vT7wKc1Nd8Hs3Jf6Gy0Ue"
 config :bilimbi_base_schedule, scheduler_enabled: false
 config :bilimbi_base_perf, instrumentation_enabled: false

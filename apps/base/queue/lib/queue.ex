@@ -48,7 +48,9 @@ defmodule Bilimbi.Base.Queue do
             :plugins,
             :shutdown_grace_period,
             :testing,
-            :get_dynamic_repo
+            :get_dynamic_repo,
+            :peer,
+            :stage_interval
           ],
           value = Application.get_env(@application, key),
           value != nil,
