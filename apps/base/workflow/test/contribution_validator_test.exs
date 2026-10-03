@@ -49,6 +49,45 @@ defmodule Bilimbi.Base.Workflow.ContributionValidatorTest do
     end
   end
 
+  test "human actions need an owned subject, a handler behaviour and unique keys" do
+    entry = TestFixtures.entry()
+    [approve | _] = entry.payload.human_actions
+    snapshot = ContributionRegistry.build!([entry.descriptor])
+    registered = snapshot.consumers.workflow.human_actions
+
+    assert %{
+             owner: "domain/example",
+             executor_key: "example.first",
+             capability: "admin.test.record.view"
+           } =
+             registered[{"example.record", "example.first"}]
+
+    assert registered[{"example.record", "example.approve"}].executor_key == nil
+
+    failures = [
+      {~r/must implement/, %{approve | handler: TestContributions}},
+      {~r/missing or belongs to another owner/, %{approve | subject: "absent.record"}},
+      {~r/stable public key/, %{approve | capability: "Legacy\\Capability"}},
+      {~r/expected a nonempty string/, %{approve | label: ""}},
+      {~r/invalid executor_key/, Map.put(approve, :executor_key, " ")},
+      {~r/unknown fields/, Map.put(approve, :aliases, ["Legacy\\Action"])}
+    ]
+
+    for {message, action} <- failures do
+      bad = put_in(entry.payload.human_actions, [action])
+
+      assert_raise ArgumentError, message, fn ->
+        ContributionValidator.validate_contributions!([bad])
+      end
+    end
+
+    bad = put_in(entry.payload.human_actions, [approve, approve])
+
+    assert_raise ArgumentError, ~r/duplicate human_actions key/, fn ->
+      ContributionValidator.validate_contributions!([bad])
+    end
+  end
+
   test "stored classes cannot be new keys and unknown references fail" do
     entry = TestFixtures.entry()
     [flow] = entry.payload.flows
