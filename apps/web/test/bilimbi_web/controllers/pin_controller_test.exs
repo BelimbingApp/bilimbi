@@ -43,6 +43,7 @@ defmodule BilimbiWeb.PinControllerTest do
     response =
       conn
       |> log_in_as()
+      |> put_req_header("accept", "application/json")
       |> get(~p"/api/pins")
       |> json_response(200)
 
@@ -53,6 +54,8 @@ defmodule BilimbiWeb.PinControllerTest do
     conn =
       conn
       |> log_in_as()
+      |> put_req_header("accept", "application/json")
+      |> put_req_header("content-type", "application/json")
       |> post(~p"/api/pins/toggle", %{
         "label" => "Admin / Companies",
         "url" => "/companies",

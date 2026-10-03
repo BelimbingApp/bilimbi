@@ -4,7 +4,8 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
 
   Contributed as the `"dashboard.performance"` embed; the dashboard renders it
   by that key and never names this module (ADR 0009). Health is read again
-  each time the dashboard counts a refresh.
+  each time the dashboard counts a refresh, and only after the socket is
+  connected. Until then the strip shows an em dash and does not query.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -15,7 +16,13 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
   def update(assigns, socket) do
     stale? = socket.assigns[:refresh] != assigns.refresh
     socket = assign(socket, assigns)
-    {:ok, if(stale?, do: assign(socket, :diagnostics, Perf.diagnostics()), else: socket)}
+
+    {:ok,
+     cond do
+       not socket.assigns.connected -> assign(socket, :diagnostics, :not_loaded)
+       stale? -> assign(socket, :diagnostics, Perf.diagnostics())
+       true -> socket
+     end}
   end
 
   @impl true
@@ -34,12 +41,14 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
     """
   end
 
+  defp health(:not_loaded), do: "—"
   defp health(%{store: :unavailable}), do: "History unavailable"
   defp health(%{recorder: :unavailable}), do: "Recorder unavailable"
   defp health(%{recorder: :degraded, store: :available}), do: "Degraded"
   defp health(%{recorder: :available, store: :available}), do: "Available"
   defp health(_diagnostics), do: "Unknown"
 
+  defp samples(:not_loaded), do: "—"
   defp samples(%{samples: samples}) when is_integer(samples), do: samples
   defp samples(_diagnostics), do: "—"
 end

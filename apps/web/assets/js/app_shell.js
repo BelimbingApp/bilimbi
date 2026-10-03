@@ -1,7 +1,7 @@
 import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
-// rail choice (localStorage), durable pin hydration/migration, the mobile
+// rail choice (localStorage), pin hydration from `data-pins` (and migration), the mobile
 // drawer, Escape/backdrop close, returning focus to the toggle, and pointing
 // each row's "Open in a tile" link at the workspace from wherever the
 // browser is. The top-bar display controls and account disclosure belong to
@@ -236,21 +236,36 @@ const AppShell = {
   },
 
   async loadPinnedItems() {
-    let pins = []
+    // The shell renders the list. GET /api/pins is only the fallback when
+    // that attribute is missing, or after a toggle that did not return pins.
+    const rendered = this.readRenderedPins()
+    let pins = rendered === null ? (await this.fetchServerPins()) || [] : rendered
 
-    try {
-      const response = await this.pinRequest("/api/pins")
-      if (!response.ok) throw new Error(`Pin load failed with status ${response.status}`)
-
-      pins = this.acceptServerPins((await response.json()).pins)
-      if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
-    } catch (_error) {
-      // Keep the durable API as the only source of truth. A transient outage
-      // keeps the pins already read; a failed first read leaves legacy data for retry.
-    }
+    if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
 
     this.pinnedEntries = pins
     this.renderPinnedItems()
+  },
+
+  readRenderedPins() {
+    if (!Object.hasOwn(this.el.dataset, "pins")) return null
+
+    try {
+      const parsed = JSON.parse(this.el.dataset.pins || "[]")
+      return this.acceptServerPins(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      return []
+    }
+  },
+
+  async fetchServerPins() {
+    try {
+      const response = await this.pinRequest("/api/pins")
+      if (!response.ok) return null
+      return this.acceptServerPins((await response.json()).pins)
+    } catch (_error) {
+      return null
+    }
   },
 
   async migrateLegacyPins(pins) {
@@ -535,7 +550,7 @@ const AppShell = {
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
-      this.setPinAnnouncement("Unable to update pinned pages.")
+      await this.fallbackPinsAfterToggle()
     }
   },
 
@@ -554,6 +569,17 @@ const AppShell = {
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
+      await this.fallbackPinsAfterToggle()
+    }
+  },
+
+  async fallbackPinsAfterToggle() {
+    const pins = await this.fetchServerPins()
+
+    if (pins) {
+      this.pinnedEntries = pins
+      this.renderPinnedItems()
+    } else {
       this.setPinAnnouncement("Unable to update pinned pages.")
     }
   },

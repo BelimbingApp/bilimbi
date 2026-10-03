@@ -82,6 +82,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
     assert has_element?(view, "#app-version", "v#{version}")
     assert has_element?(view, "#app-topbar-main")
     assert has_element?(view, "#app-shell[phx-hook='AppShell']")
+    assert has_element?(view, ~s(#app-shell[data-pins="[]"]))
     assert has_element?(view, "#app-sidebar-drag")
     refute has_element?(view, "#nav-dashboard")
     # The workspace needs no capability, so even an account with no role has

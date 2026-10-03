@@ -9,6 +9,11 @@ defmodule BilimbiWeb.RouteAccess do
   session hooks. A missing policy fails closed; routes sharing a LiveView
   still carry distinct policies.
 
+  The mount gate answers from `current_scope.capabilities`, the allowed list
+  stored when the scope was rehydrated. A key on that list is allowed without
+  another `Bilimbi.Base.Authz.can/2`, so an allowed page view writes no
+  decision-log row. A key absent from the list is still evaluated and logged.
+
   ## After mount
 
   A LiveView process outlives its mount. Its session can be terminated, its
@@ -20,10 +25,14 @@ defmodule BilimbiWeb.RouteAccess do
        (`BilimbiWeb.UserAuth.refresh_scope/1`: durable session row, company,
        tenant, user, effective capabilities). A miss ends the page: it is sent
        to the login screen with the expired-session flash;
-    2. the route's capability (including an `{:any_of, keys}` guard) is
-       re-evaluated against the refreshed actor, one `Bilimbi.Base.Authz.can/2`
-       decision per key. A page whose capability no longer holds is sent to
-       the dashboard with a flash saying why.
+    2. the route's capability (including an `{:any_of, keys}` guard) is judged
+       again. An event, or a patch that stays on the same route, calls
+       `Bilimbi.Base.Authz.LiveAuthorization.allowed_now?/2`: one
+       `Bilimbi.Base.Authz.can/2` decision per key, so a grant removed since
+       the page opened is refused and logged. Entering a different route uses
+       the list just refreshed onto the scope, the same rule as the mount
+       gate. A page whose capability no longer holds is sent to the dashboard
+       with a flash saying why.
 
   Both run before every `handle_event/3`, through a `:handle_event` hook, and
   before every `handle_params/3` that live navigation triggers, whether the

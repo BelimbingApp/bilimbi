@@ -26,8 +26,11 @@ defmodule BilimbiWeb.Router do
                              "; "
                            )
 
+  # `json` is here because the shell's pin requests send `Accept: application/json`
+  # through this same session pipeline. An HTML navigation still negotiates
+  # `html` from the browser's Accept header.
   pipeline :browser do
-    plug :accepts, ["html"]
+    plug :accepts, ["html", "json"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {Bilimbi.Base.UI.Layouts, :root}

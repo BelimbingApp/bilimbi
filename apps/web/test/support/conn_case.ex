@@ -62,6 +62,7 @@ defmodule BilimbiWeb.ConnCase do
     apply(Module.concat(["Bilimbi.Base.Audit.TestFixtures"]), :create_audit_tables!, [])
     apply(Module.concat(["Bilimbi.Base.Perf.TestFixtures"]), :create_perf_table!, [])
     apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :create_notifications_table!, [])
+    apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :create_user_pins_table!, [])
 
     # Employee Show loads attached addresses on mount, and both the show suite
     # and the form suite (which redirects into it) reach them. Until #409 the

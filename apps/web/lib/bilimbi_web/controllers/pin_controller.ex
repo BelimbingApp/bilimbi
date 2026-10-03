@@ -12,9 +12,9 @@ defmodule BilimbiWeb.PinController do
   def index(conn, _params) do
     case tenancy_scope(conn) do
       %Scope{} = scope ->
-        case User.list_user_pins(scope) do
+        case shell_pins(scope) do
           {:ok, pins} ->
-            json(conn, %{pins: format_pins(Enum.filter(pins, &served_pin?/1))})
+            json(conn, %{pins: pins})
 
           {:error, reason} ->
             respond_to_actor_error(conn, reason)
@@ -22,6 +22,24 @@ defmodule BilimbiWeb.PinController do
 
       nil ->
         respond_to_actor_error(conn, :unauthorized)
+    end
+  end
+
+  @doc """
+  The signed-in user's pins whose routes this deployment still serves.
+
+  `BilimbiWeb.UserAuth` stores the list on the scope and the shell renders
+  it. `GET /api/pins` remains for a refresh after a toggle when the rendered
+  list is not what the hook should keep. An unauthorized scope stays an
+  error so that endpoint does not answer `200` with an empty list.
+  """
+  def shell_pins(%Scope{} = scope) do
+    case User.list_user_pins(scope) do
+      {:ok, pins} ->
+        {:ok, pins |> Enum.filter(&served_pin?/1) |> format_pins()}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

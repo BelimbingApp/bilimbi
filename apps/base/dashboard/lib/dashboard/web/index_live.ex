@@ -14,9 +14,10 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
   While editing, widgets can be reordered by drag (a `DashboardSort` hook
   pushes the new order; the server validates it is a permutation of the
   current ids before persisting) or by the keyboard move buttons Belimbing
-  pairs with its own drag handles. A visible entry with a non-zero
-  `refresh_interval` makes the page count a refresh; every panel receives the
-  count and decides for itself whether to read again.
+  pairs with its own drag handles.   A visible entry with a non-zero
+  `refresh_interval` makes the page count a refresh once the socket is
+  connected. Every panel receives that count and whether the socket is
+  connected, and decides for itself whether to read.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -57,6 +58,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
      |> assign(:layout_editing, false)
      |> assign(:refresh, 0)
      |> assign(:refresh_timer, nil)
+     |> assign(:connected, Phoenix.LiveView.connected?(socket))
      |> assign_widgets(widgets)
      |> assign_sections(sections)}
   end
@@ -75,7 +77,10 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
     |> schedule_refresh()
   end
 
-  # One timer at the shortest interval any visible entry asks for.
+  # One timer at the shortest interval any visible entry asks for. The
+  # disconnected render exits with the response, so it does not start one.
+  defp schedule_refresh(%{assigns: %{connected: false}} = socket), do: socket
+
   defp schedule_refresh(socket) do
     if timer = socket.assigns[:refresh_timer] do
       Process.cancel_timer(timer)
@@ -446,7 +451,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
               key={widget.embed}
               id={"dashboard-panel-#{widget.id}"}
               current_scope={@current_scope}
-              opts={%{editing: @layout_editing, refresh: @refresh}}
+              opts={%{editing: @layout_editing, refresh: @refresh, connected: @connected}}
             />
           </div>
         </div>
@@ -523,7 +528,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
             key={section.embed}
             id={"dashboard-panel-#{section.id}"}
             current_scope={@current_scope}
-            opts={%{editing: @layout_editing, refresh: @refresh}}
+            opts={%{editing: @layout_editing, refresh: @refresh, connected: @connected}}
           />
         </div>
       </.page>

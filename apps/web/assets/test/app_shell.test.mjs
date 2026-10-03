@@ -316,6 +316,32 @@ test("pinning and unpinning a navigation item uses the durable API", async () =>
   assert.equal(serverPins.length, 0)
 })
 
+test("rendered pins hydrate without requesting /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.deepEqual(requests, [])
+})
+
+test("a failed toggle falls back to GET /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = "[]"
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  failToggle = reply({}, 500)
+  click("nav-pin-companies")
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), [
+    "POST /api/pins/toggle",
+    "GET /api/pins",
+  ])
+})
+
 test("pins survive reload through the authenticated API", async () => {
   serverPins = [{id: 1, label: "Companies", url: "/companies"}]
   mount()

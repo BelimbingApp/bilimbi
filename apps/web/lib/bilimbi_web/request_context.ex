@@ -4,8 +4,11 @@ defmodule BilimbiWeb.RequestContext do
   LiveView.
 
   `BilimbiWeb.UserAuth` calls `apply/2` after it has rehydrated who is signed
-  in. Anonymous requests use the global locale. The language is put on the
-  shared UI Gettext backend, which is the only catalogue the host renders.
+  in. An authenticated scope already carries the resolved language on
+  `shell_preferences`; this module applies that language and does not resolve
+  the locale again. Anonymous requests use the global locale. The language is
+  put on the shared UI Gettext backend, which is the only catalogue the host
+  renders.
   """
 
   alias Bilimbi.Base.Audit.Context, as: AuditContext
@@ -57,6 +60,17 @@ defmodule BilimbiWeb.RequestContext do
     DateTimeDisplay.put(BaseDateTime.display(nil))
   end
 
+  # The authenticated snapshot already holds the one locale resolution for
+  # this scope. Applying it is process state only: a second `Locale.resolve`
+  # here would read the same rows again. Timestamp display uses that same
+  # snapshot, so no user's mode or company zone leaks into another request
+  # or LiveView process (#459).
+  defp apply_locale(%{shell_preferences: %{language: language} = shell_preferences})
+       when is_binary(language) do
+    put_gettext_locale(language)
+    DateTimeDisplay.put(shell_preferences)
+  end
+
   defp apply_locale(%{
          user: %{"user_id" => user_id, "company_id" => company_id},
          scope: %Scope{} = scope,
@@ -66,10 +80,6 @@ defmodule BilimbiWeb.RequestContext do
     |> Locale.resolve(locale_bootstrap())
     |> then(&put_gettext_locale(&1.language))
 
-    # Timestamp display policy resolves in the same per-process lifecycle as
-    # the locale, so no user's mode or company zone leaks into another
-    # request or LiveView process (#459). The scope already carries the one
-    # resolved snapshot; re-resolving it here would read the same rows twice.
     DateTimeDisplay.put(shell_preferences)
   end
 

@@ -68,6 +68,22 @@ revocation commits with a retained `authz.system_principal.granted` or
 `.revoked` audit action naming who made it. Decisions log `actor_type`
 `"system"`, `actor_id` `0`, and the principal's name in the context.
 
+## Route gate
+
+The HTTP plug and the LiveView mount gate answer from
+`current_scope.capabilities`, the allowed list
+`Authz.effective_capabilities/1` stored when the request scope was
+rehydrated. A key present on that list is allowed without another
+`Authz.can/2`, so an allowed page view does not write a decision-log row.
+A key absent from the list is still evaluated with `Authz.can/2`, and that
+denial is logged.
+
+An open page does not use this shortcut for later events or for a patch that
+stays on the same route. Those re-check through
+`LiveAuthorization.allowed_now?/2`, one logged decision per key, so a grant
+revoked after the page opened is refused. Entering a different route
+refreshes the scope first, then uses the same gate.
+
 ## Re-authorizing inside a LiveView
 
 Use `Bilimbi.Base.Authz.LiveAuthorization` for additional operation checks in
