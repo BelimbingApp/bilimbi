@@ -1,10 +1,10 @@
 # Working under apps/
 
-Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note only holds what no component owns.
+Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note holds only what no component owns.
 
 ## List filters and pagination
 
-Use `<.filter_toolbar>` and `<.pagination>` for an operational list. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.
+Use `<.filter_toolbar>` and `<.pagination>` for an operational list, which keeps its page, search, filters, sort and page size in URL state. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.
 
 ## LiveView bindings
 
@@ -16,11 +16,11 @@ Flash `:success` only for a completed write. `:info` informs and confirms nothin
 
 ## Withheld controls
 
-If a button or editor is absent, the page says why and what to do next, through `empty_state/1` (`title`, `reason`, or `forbidden`) or `<.table>`'s `<:empty>` slot. The Roles picker, a settings group, and an archived-company account each hid a control until the page said why.
+If a button or editor is absent, the page says why and what to do next, through `empty_state/1` (`title`, `reason`, or `forbidden`) or `<.table>`'s `<:empty>` slot. The Roles picker, a settings group, and an archived-company account each hid a control until the page said why. The component only speaks when it is used: a caller can still hide a control with `:if` and no `empty_state`, and nothing yet stops that.
 
 ## Clocks
 
-Render a timestamp with `<.datetime>`, which follows the reader's saved clock, streamed rows included. Pass `display` only to pin one instant to a context of your own. A value inside an audit diff uses `precision={:second}` so two edits in one minute stay distinct; that call is `Bilimbi.Base.Audit.Web.MutationDiff.diff_value/1`.
+Render a timestamp with `<.datetime>`, which follows the reader's saved clock, streamed rows included. Pass `display` only to pin one instant to a context of your own. The precision of a value inside an audit diff is `apps/base/audit/AGENTS.md`'s rule.
 
 ## Read-first pages
 
@@ -32,13 +32,13 @@ Take the person who performed an operation (an approver, an overrider, a request
 
 ## Tests
 
-Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.
+Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary is proved by making PostgreSQL refuse; `apps/base/database/AGENTS.md` names the control.
 
 `insert_tenant!/1` creates the platform operator by default; pass `is_platform_operator: false` for any other tenant. See `Bilimbi.Base.Tenancy.TestFixtures.insert_tenant!/1`.
 
 For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.MixDiscovery`'s validated module and container paths. A fixed `apps/*/*` glob misses mounted Domain and Extension packages. See `module_source_files/2`, `module_route_files/1`, and `container_paths/1` in `apps/base/module_registry/mix/module_discovery.exs`.
 
-A test that runs host tasks such as `bilimbi.migrate` from the umbrella root takes its expected migrations from the root runtime, not from `Compatibility.migration_entries()` in the package VM. The package loads only its own closure, so a mounted Domain's migrations are missing there and the expectations stop matching. `workspace_migration_entries/1` and `MountedDomainFixture` in `apps/core/compatibility/test/` show the pattern.
+A test that runs host tasks such as `bilimbi.migrate` from the umbrella root takes its expected migrations from the root runtime, not from `Compatibility.migration_entries()` in the package VM. The package loads only its own closure, so a mounted Domain's migrations are missing there and the expectations stop matching. `workspace_migration_entries/1` in `apps/core/compatibility/test/platform_baseline_e2e_test.exs` and `MountedDomainFixture` in that package's `test/support/` show the pattern.
 
 ## Routes
 
@@ -47,10 +47,6 @@ Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A r
 ## Composition lock
 
 Use `Bilimbi.CompositionLock.lockfile!/1` from `mix/composition_lock.exs` for every Mix project. A mounted optional repository resolves into the composition overlay; a literal root `mix.lock` path lets `deps.get` or `deps.unlock --unused` rewrite the Platform's tracked lock. The publish and pinned CI sequence is in `docs/architecture/0010_composition-model.md`.
-
-## Follow-up
-
-A caller can still hide a control with `:if` and no `empty_state`. The component only speaks when it is used. Moving that into something a caller cannot skip is product work, and it is not done here.
 
 ## Maintaining this file
 

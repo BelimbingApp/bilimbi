@@ -1,11 +1,13 @@
 # Base UI
 
-Read the component comment before fighting a default. `DESIGN.md` is the design source. This note is the mistakes, plus the asset rules that used to sit only in the root guide.
+Read the component comment before fighting a default. `DESIGN.md` is the design source. This note is the mistakes, plus the asset rules.
 
 ## Defaults the component owns
 
 Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
 The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value. If that audit write cannot land, refuse the reveal and send nothing — see the `:audit_unavailable` path in `BilimbiWeb.SecretReveal` and its LiveView coverage in `apps/base/settings/web_test/settings_live_test.exs`.
+
+Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
 
 A table is flat. `table/1` takes no radius, so a rounded table is hand-written markup. See `DESIGN.md` "Table geometry" and the comment on `table/1`.
 
@@ -15,7 +17,7 @@ Rendered text carries no catalog identifier. A Design Spec number may be the ele
 
 ## Design Library
 
-A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`. Its two guards, `design_library_coverage_test.exs` and `design_library_imitation_test.exs`, run in every `mix test`. When one fails, fix the specimen or the component, never the guard.
+A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`. Its guards, `design_library_coverage_test.exs` and `design_library_imitation_test.exs`, run in every `mix test`, and `design_library_rules_test.exs` proves on fixtures that the rules still match. When one fails, fix the specimen or the component, never the guard.
 
 Each area page (`DesignLibraryComponentsLive`, `DesignLibraryGraphicLive`, …) is a thin wrapper over `DesignLibraryLive`. A wrapper that serves an interactive specimen delegates `handle_event/3` too; without it the first event raises `UndefinedFunctionError` and the view crashes.
 
@@ -25,13 +27,13 @@ An action that cannot be undone uses `<.confirm_dialog>`. A native `data-confirm
 
 ## Assets and generators
 
-Colours come from the `@theme` block in `apps/web/assets/css/app.css`. A raw palette class outside that block is a defect:
+Colours come from the `@theme` block in `apps/web/assets/css/app.css`. A raw palette class outside that block is a defect, and `.github/scripts/mandates.sh` fails CI on one:
 
 ```bash
 grep -rnE '\b(bg|text|border|ring|shadow|divide|accent)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]+' apps/*/lib
 ```
 
-Do not use `@apply`. Do not add an external script or stylesheet URL. Do not write a raw `<script>` in HEEx. A colocated hook uses `:type={Phoenix.LiveView.ColocatedHook}` and a name that starts with `.`. An external hook lives in `assets/js/`, has a DOM id, and `phx-update="ignore"` when it owns its DOM. Rebind the socket `push_event/3` returns.
+Do not use `@apply`. Do not add an external script or stylesheet URL. Do not write a raw `<script>` in HEEx. A colocated hook follows `apps/web/mix/README.md`: `:type={Phoenix.LiveView.ColocatedHook}`, a dot-prefixed local name, the owner's descriptor namespace, and no `runtime`. An external hook lives in `apps/web/assets/js/`, has a DOM id, and `phx-update="ignore"` when it owns its DOM. Rebind the socket `push_event/3` returns.
 
 Copy to the clipboard through the `ClipboardCopy` hook (`apps/web/assets/js/clipboard_copy.js`), not a click handler that shows "Copied" on its own. The hook reports whether the browser accepted the write, and the server shows the outcome, so a refused copy is never announced as done. The Graphic page's icon catalogue is the caller.
 
@@ -49,8 +51,6 @@ A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hoo
 
 happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`. Shell out only for what this runner cannot give: another host locale, the shipped LiveView bundle, or markup the server renders in the same test.
 
-Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
-
 ## Tiled workspace
 
 A page shown inside a workspace tile renders chromeless through the `framed` branch of `Layouts.app/1`; the flag comes from `BilimbiWeb.FramedRender` through the LiveView session, never from a page. Do not add a tile special case to a page: if a page needs to know it is in a tile beyond that branch, that is the signal to design a tile contract, not a special case. The tile bar is `<.tile_header>` and the divider `<.split_handle>`; the tree, the host page and its hook are `apps/base/tiling` and `apps/web/assets/js/tiling.js`. See `DESIGN.md` "Tiled workspace".
@@ -58,12 +58,6 @@ A page shown inside a workspace tile renders chromeless through the `framed` bra
 The one tile contract so far is the follow channel, `Bilimbi.Base.UI.Workspace`. A list row that opens a record is `<.record_link workspace={@workspace} kind="core/company" record_id={id} navigate={...}>`, and a record page calls `Workspace.announce/2` once it has loaded the record; both are inert outside a workspace. Pass `@workspace` to the component; do not branch a page template on it, and do not decide from the followed kinds at render time: rows are streamed and re-render only when re-streamed, so the component decides when the row is clicked. `kind` is the record's owning module id, which for `/users/:id` is `core/user`, not the list's module. The comment on `record_link/1` and the moduledoc of `Workspace` own the rest.
 
 Opening a page in a tile from anywhere is a link to `/workspace` with `open=<the page>`, which the workspace resolves and replaces (URL form in `apps/base/tiling/docs/README.md`); the sidebar's control is `nav_tile/1` in `layouts.ex`, retargeted by `AppShell.retargetTileLink`. Do not encode a workspace tree on the client or add a second "open in a tile" control that builds its own address. The tile count has no cap, and a page does not check its own tile size.
-
-## Lists
-
-An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
-
-Those filters are `<.filter_toolbar>` and that pager is `<.pagination>`. A local form or Previous/Next pair is the pair those two replaced. The comments on `filter_toolbar/1` and `pagination/1` own the framing.
 
 ## Summaries
 
