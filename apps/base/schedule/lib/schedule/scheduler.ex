@@ -32,7 +32,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   def poll(now \\ DateTime.utc_now()) do
     Schedule.reconcile_terminal_occurrences()
     definitions = Schedule.definitions()
-    latest = Schedule.latest_scheduled_occurrences(Enum.map(definitions, & &1.key))
+    latest = latest_scheduled_occurrences(definitions)
     Enum.each(definitions, &enqueue_latest_due(&1, now, latest))
     :ok
   rescue
@@ -46,6 +46,14 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
     :exit, _reason ->
       Logger.warning("schedule registry unavailable; recurrence poll skipped")
       :ok
+  end
+
+  defp latest_scheduled_occurrences(definitions) do
+    Schedule.latest_scheduled_occurrences(Enum.map(definitions, & &1.key))
+  rescue
+    _error -> %{}
+  catch
+    :exit, _reason -> %{}
   end
 
   defp enqueue_latest_due(%Definition{} = definition, now, latest_occurrences) do

@@ -106,3 +106,7 @@ the audit's measured 24 definitions and 300 pending occurrences, this changes
 the reads from 24 + 300 SELECTs to 1 + 1 SELECTs (99.4% fewer). This is a
 statement-count comparison; no isolated wall-clock benchmark was run for this
 change.
+
+The grouped occurrence read propagates failures so diagnostics report unknown
+due work when history is unavailable. Only scheduler polling falls back to an
+empty history, leaving the durable occurrence claim to prevent duplicate work.

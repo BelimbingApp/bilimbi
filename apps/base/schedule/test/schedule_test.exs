@@ -247,6 +247,40 @@ defmodule Bilimbi.Base.ScheduleTest do
     )
   end
 
+  test "diagnostics retain uncertainty when occurrence history is unavailable", %{
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert :ok = Scheduler.poll()
+    assert Schedule.diagnostics().due_work == :none_due
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE base_schedule_occurrences RENAME COLUMN intended_at TO unavailable_intended_at",
+      []
+    )
+
+    assert_raise Postgrex.Error, fn ->
+      Schedule.latest_scheduled_occurrences([definition.key])
+    end
+
+    diagnostics = Schedule.diagnostics()
+    assert diagnostics.recorder == :available
+    assert diagnostics.due_work == :unknown
+
+    ExUnit.CaptureLog.capture_log(fn ->
+      assert :ok = Scheduler.poll()
+    end)
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE base_schedule_occurrences RENAME COLUMN unavailable_intended_at TO intended_at",
+      []
+    )
+
+    assert Schedule.diagnostics().due_work == :none_due
+  end
+
   test "new definitions fail closed until their exact fingerprint is reviewed", %{
     definition: definition
   } do

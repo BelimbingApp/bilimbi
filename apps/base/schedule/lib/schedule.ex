@@ -339,10 +339,6 @@ defmodule Bilimbi.Base.Schedule do
     )
     |> Repo.all()
     |> Map.new()
-  rescue
-    _error -> %{}
-  catch
-    :exit, _reason -> %{}
   end
 
   @doc false
