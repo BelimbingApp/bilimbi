@@ -118,8 +118,6 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
     assert render(view) =~ "Choose a supported locale."
   end
 
-  # The route and the save share one capability, so the host closes the page
-  # before the handler runs; the page's own refusal is the second line.
   test "a save forged after grant revocation changes nothing and closes the page", %{conn: conn} do
     assert %{locale: "en-US", source: "platform_operator_address"} =
              Locale.resolve(nil, %Bootstrap{country_iso: "US"})

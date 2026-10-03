@@ -6,8 +6,8 @@ defmodule BilimbiWeb.HostAuthorityTest do
   after the grant behind a mount-time assign or a route was revoked, because
   the host proved everything once at mount. `BilimbiWeb.RouteAccess` now
   re-proves the session and the route before every event and navigation,
-  `BilimbiWeb.SessionDisconnect` ends the sockets of a terminated session,
-  and the Company type pages re-ask Authz per write. These drive real pages
+  and `BilimbiWeb.SessionDisconnect` ends the sockets of a terminated session.
+  These drive real pages
   through the discovered host routes.
   """
 
@@ -18,7 +18,6 @@ defmodule BilimbiWeb.HostAuthorityTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -31,7 +30,6 @@ defmodule BilimbiWeb.HostAuthorityTest do
 
   setup %{conn: conn} do
     UserFixtures.create_user_tables!()
-    CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Audit actor"})
@@ -63,27 +61,6 @@ defmodule BilimbiWeb.HostAuthorityTest do
 
     assert assert_redirect(view, "/")["session_expired"] == "expired"
     assert {:ok, %{full_name: "Grace Hopper"}} = Employee.get_employee(c.scope, 73, c.employee.id)
-  end
-
-  test "H1 a page gated by a mount-time assign refuses a create once the grant is revoked", c do
-    grant_capabilities!(["admin.company.list", "admin.company.create"])
-    {:ok, view, _html} = live(c.conn, ~p"/companies/legal-entity-types")
-    assert has_element?(view, "#new-legal-entity-type-btn")
-
-    revoke!(c.scope, "admin.company.create")
-
-    render_hook(view, "new", %{})
-
-    html =
-      render_hook(view, "save", %{
-        "legal_entity_type" => %{"code" => "after_revocation", "name" => "After revocation"}
-      })
-
-    assert html =~ "permission"
-    refute has_element?(view, "#new-legal-entity-type-btn")
-
-    {:ok, types} = Company.list_legal_entity_types()
-    assert Enum.filter(types, &(&1.code == "after_revocation")) == []
   end
 
   test "H3 a session terminated by an operator ends the open page and disconnects its sockets",

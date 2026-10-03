@@ -7,16 +7,14 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
   through its public global API, and never reaches into Core Company bootstrap
   data. Bootstrap provenance is read-only here, matching pinned Belimbing.
 
-  The host re-checks the route capability before every event; the save
-  re-asks for the same grant through `LiveAuthorization.authorize_event/2`
-  so the refusal names this page's operation, because the capability shown
-  when the LiveView mounted is presentation state, not an authorization
-  decision.
+  The route capability check happens at mount; every save re-evaluates the
+  actor's current grants, because the capability shown when the LiveView
+  mounted is presentation state, not an authorization decision.
   """
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Base.Authz.LiveAuthorization
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Locale
 
   @manage_capability "admin.system.localization.manage"
@@ -39,9 +37,10 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
 
   @impl true
   def handle_event("save", params, socket) do
-    case LiveAuthorization.authorize_event(socket, @manage_capability) do
-      {:ok, socket} -> save(params, socket)
-      {:denied, socket} -> write_forbidden(socket)
+    if can_manage?(socket) do
+      save(params, socket)
+    else
+      write_forbidden(socket)
     end
   end
 
@@ -64,6 +63,10 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
 
   defp save(_params, socket) do
     {:noreply, put_flash(socket, :error, "Choose a supported locale.")}
+  end
+
+  defp can_manage?(socket) do
+    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
   end
 
   defp write_forbidden(socket) do
