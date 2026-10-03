@@ -2554,6 +2554,13 @@ defmodule Bilimbi.Base.UI.Components do
   A tab that carries `href` or `patch` renders as a link; one that carries
   `click` renders as a button so in-page switching still works.
 
+  The labels stay on one line. The strip's inline size ignores those labels
+  (`contain-inline-size`), so a card or grid cannot grow to fit them; what
+  does not fit scrolls inside the strip. `TabStrip`
+  (`apps/web/assets/js/tab_strip.js`) shows an edge control only while a tab
+  sits outside the strip, keeps those controls out of tab order, and scrolls
+  a focused tab clear of the edge.
+
   ## Examples
 
       <.tabs id="example-tabs" aria-label="Example views">
@@ -2576,8 +2583,41 @@ defmodule Bilimbi.Base.UI.Components do
 
   def tabs(assigns) do
     ~H"""
-    <nav id={@id} class={["flex gap-1 border-b border-line", @class]} {@rest}>
-      <.tab_item :for={tab <- @tab} tab={tab} />
+    <nav
+      id={@id}
+      class={["relative w-full min-w-0 max-w-full contain-inline-size", @class]}
+      phx-hook="TabStrip"
+      {@rest}
+    >
+      <div
+        id={"#{@id}-scroller"}
+        data-tab-scroller
+        class="flex w-full min-w-0 max-w-full flex-nowrap gap-1 overflow-x-auto overscroll-x-contain scroll-px-8 border-b border-line [scrollbar-width:thin]"
+      >
+        <.tab_item :for={tab <- @tab} tab={tab} />
+      </div>
+      <button
+        type="button"
+        id={"#{@id}-scroll-start"}
+        data-tab-scroll="start"
+        tabindex="-1"
+        hidden
+        aria-label="Show earlier tabs"
+        class="absolute top-1/2 left-0 z-10 grid size-6 -translate-y-1/2 place-items-center text-ink-muted"
+      >
+        <.icon name="hero-chevron-left" class="size-4" />
+      </button>
+      <button
+        type="button"
+        id={"#{@id}-scroll-end"}
+        data-tab-scroll="end"
+        tabindex="-1"
+        hidden
+        aria-label="Show later tabs"
+        class="absolute top-1/2 right-0 z-10 grid size-6 -translate-y-1/2 place-items-center text-ink-muted"
+      >
+        <.icon name="hero-chevron-right" class="size-4" />
+      </button>
     </nav>
     """
   end
@@ -2599,6 +2639,7 @@ defmodule Bilimbi.Base.UI.Components do
       href={@tab[:href]}
       patch={@tab[:patch]}
       id={@tab[:id]}
+      data-tab
       class={@tab_class}
       aria-current={@tab[:current] && "page"}
     >
@@ -2608,6 +2649,7 @@ defmodule Bilimbi.Base.UI.Components do
       :if={not @linked?}
       type="button"
       id={@tab[:id]}
+      data-tab
       class={@tab_class}
       aria-current={@tab[:current] && "page"}
       phx-click={@tab[:click]}
@@ -2622,7 +2664,7 @@ defmodule Bilimbi.Base.UI.Components do
     current? = tab[:current] == true
 
     [
-      "-mb-px border-b-2 px-3 py-2 text-sm transition",
+      "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
       current? && "border-brand-strong font-medium text-ink-strong",
       not current? && "border-transparent text-ink-muted hover:text-ink"
