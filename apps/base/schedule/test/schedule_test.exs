@@ -294,7 +294,7 @@ defmodule Bilimbi.Base.ScheduleTest do
   test "suppression prevents both scheduled and manual enqueue", %{definition: definition} do
     assert :ok = Schedule.review_definition(definition.key, true)
     assert :ok = Schedule.suppress(definition.key)
-    assert Repo.exists?(from row in Suppression, where: row.key == ^definition.key)
+    assert Repo.exists?(from(row in Suppression, where: row.key == ^definition.key))
     assert {:error, :suppressed} = Schedule.run_now(definition.key)
     assert :ok = Schedule.resume(definition.key)
     assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
@@ -312,10 +312,11 @@ defmodule Bilimbi.Base.ScheduleTest do
     refute_received {:schedule_business_effect, _value}
 
     assert Repo.exists?(
-             from occurrence in Occurrence,
+             from(occurrence in Occurrence,
                where:
                  occurrence.key == ^definition.key and occurrence.state == "failed" and
                    not is_nil(occurrence.finished_at) and is_nil(occurrence.overlap_key)
+             )
            )
   end
 
@@ -373,10 +374,11 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:error, :overlap} = Schedule.run_now(definition.key)
 
     assert Repo.exists?(
-             from row in Run,
+             from(row in Run,
                where:
                  row.key == ^definition.key and row.status == "skipped" and
                    row.output_excerpt == "overlap"
+             )
            )
 
     assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
@@ -390,7 +392,7 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:ok, %JobRef{id: claimed_job_id}} = Schedule.run_now(definition.key)
 
     claimed_args =
-      Repo.one!(from job in Oban.Job, where: job.id == ^claimed_job_id, select: job.args)
+      Repo.one!(from(job in Oban.Job, where: job.id == ^claimed_job_id, select: job.args))
 
     assert {:ok, %JobRef{id: forged_job_id}} = Queue.enqueue(TestWorker, claimed_args)
     refute forged_job_id == claimed_job_id
@@ -419,10 +421,11 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
 
     assert Repo.exists?(
-             from row in Occurrence,
+             from(row in Occurrence,
                where:
                  row.key == ^definition.key and row.state == "succeeded" and
                    not is_nil(row.finished_at)
+             )
            )
   end
 
@@ -449,10 +452,11 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:ok, %JobRef{}} = Schedule.run_now(failing.key)
 
     assert Repo.exists?(
-             from occurrence in Occurrence,
+             from(occurrence in Occurrence,
                where:
                  occurrence.key == ^failing.key and occurrence.state == "succeeded" and
                    not is_nil(occurrence.finished_at)
+             )
            )
   end
 
@@ -509,8 +513,8 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
     assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
 
-    refute Repo.exists?(from run in Run, where: run.key == "test.old")
-    assert Repo.exists?(from run in Run, where: run.key == "test.recent")
+    refute Repo.exists?(from(run in Run, where: run.key == "test.old"))
+    assert Repo.exists?(from(run in Run, where: run.key == "test.recent"))
   end
 
   test "coalescing selects only the latest missed local occurrence across DST", %{

@@ -101,12 +101,12 @@ from missing rows.
 The scheduler reads the latest scheduled occurrence for every installed key
 with one grouped query per poll. Reconciliation reads Queue state once per
 bounded batch of up to 300 occurrences. Before batching, those reads were one
-occurrence query per definition and one Queue query per distinct job ID. For
-the audit's measured 24 definitions and 300 pending occurrences, this changes
-the reads from 24 + 300 SELECTs to 1 + 1 SELECTs (99.4% fewer). This is a
-statement-count comparison; no isolated wall-clock benchmark was run for this
-change.
+occurrence query per definition and one Queue query per pending occurrence.
+For the audit's measured 24 definitions and 300 pending occurrences, this
+changes the reads from 24 + 300 SELECTs to 1 + 1 SELECTs (99.4% fewer). This
+is a statement-count comparison; no isolated wall-clock benchmark was run for
+this change.
 
-The grouped occurrence read propagates failures so diagnostics report unknown
-due work when history is unavailable. Only scheduler polling falls back to an
-empty history, leaving the durable occurrence claim to prevent duplicate work.
+The grouped occurrence read propagates failures, so diagnostics report unknown
+due work when history is unavailable. Scheduler polling falls back to an empty
+history, and the durable occurrence claim prevents duplicate work.
