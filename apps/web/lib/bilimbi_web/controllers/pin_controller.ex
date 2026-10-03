@@ -12,7 +12,7 @@ defmodule BilimbiWeb.PinController do
   def index(conn, _params) do
     scope = conn.assigns[:current_scope]
 
-    case self_service_user_id(scope) do
+    case authenticated_user_id(scope) do
       {:ok, user_id} ->
         pins =
           user_id
@@ -86,10 +86,12 @@ defmodule BilimbiWeb.PinController do
   defp self_service_user_id(%{impersonator: impersonator}) when not is_nil(impersonator),
     do: {:error, :impersonating}
 
-  defp self_service_user_id(%{user: user} = scope) when not is_nil(user),
+  defp self_service_user_id(scope), do: authenticated_user_id(scope)
+
+  defp authenticated_user_id(%{user: user} = scope) when not is_nil(user),
     do: {:ok, UI.current_user_id(scope)}
 
-  defp self_service_user_id(_scope), do: {:error, :unauthorized}
+  defp authenticated_user_id(_scope), do: {:error, :unauthorized}
 
   defp respond_to_actor_error(conn, :impersonating) do
     conn

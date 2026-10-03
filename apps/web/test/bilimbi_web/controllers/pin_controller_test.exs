@@ -121,7 +121,12 @@ defmodule BilimbiWeb.PinControllerTest do
     assert Enum.map(response["pins"], & &1["id"]) == [pin.id]
   end
 
-  test "pin writes are refused while impersonating", %{conn: conn} do
+  test "pins remain readable but cannot be changed while impersonating", %{conn: conn} do
+    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
+
+    {:ok, :pinned, pins} =
+      User.toggle_user_pin(91, %{"label" => "Gone", "url" => "/gone"})
+
     impersonating =
       conn
       |> log_in_as()
@@ -129,14 +134,23 @@ defmodule BilimbiWeb.PinControllerTest do
         "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
       })
 
+    response = impersonating |> get(~p"/api/pins") |> json_response(200)
+    assert Enum.map(response["pins"], & &1["url"]) == ["/companies"]
+
+    for url <- ["/companies", "/new"] do
+      assert json_response(
+               post(impersonating, ~p"/api/pins/toggle", %{"label" => "Pin", "url" => url}),
+               403
+             ) == %{"error" => "impersonating"}
+    end
+
     assert json_response(
-             post(impersonating, ~p"/api/pins/toggle", %{
-               "label" => "Companies",
-               "url" => "/companies"
+             post(impersonating, ~p"/api/pins/reorder", %{
+               "pins" => pins |> Enum.reverse() |> Enum.map(& &1.id)
              }),
              403
            ) == %{"error" => "impersonating"}
 
-    assert User.list_user_pins(91) == []
+    assert User.list_user_pins(91) == pins
   end
 end
