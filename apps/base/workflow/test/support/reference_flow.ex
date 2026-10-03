@@ -89,21 +89,20 @@ defmodule Bilimbi.Base.Workflow.ReferenceFlow do
   end
 
   @impl true
-  def authorize(scope, subject, _operation) do
-    if subject.company_id do
-      resource =
-        Resource.new!("reference.record", subject.id,
-          scope: scope,
-          company_id: subject.company_id
-        )
+  def authorize(scope, %{company_id: company_id} = subject, _operation)
+      when not is_nil(company_id) do
+    resource =
+      Resource.new!("reference.record", subject.id,
+        scope: scope,
+        company_id: company_id
+      )
 
-      if Authz.can(scope, "admin.reference.record.approve", resource).allowed,
-        do: :ok,
-        else: {:error, :missing_capability}
-    else
-      :ok
-    end
+    if Authz.can(scope, "admin.reference.record.approve", resource).allowed,
+      do: :ok,
+      else: {:error, :missing_capability}
   end
+
+  def authorize(_scope, _subject, _operation), do: {:error, :missing_capability}
 
   @impl true
   def authorize(scope, subject, _run, _operation) do
