@@ -18,14 +18,38 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
           "/companies/73",
           "/users",
           "/users/new",
-          "/settings/profile",
-          "/system/sessions"
+          "/settings/profile"
         ] do
       assert session.(path) == :authenticated
     end
 
+    for path <- [
+          "/system/sessions",
+          "/system/settings",
+          "/tenancy/tenants",
+          "/system/schedule",
+          "/system/localization",
+          "/system/info",
+          "/system/performance",
+          "/system/menu-inspector",
+          "/companies/legal-entity-types",
+          "/companies/department-types",
+          "/admin/system/database-queries"
+        ] do
+      assert session.(path) == :operator
+    end
+
     refute session.("/") == :authenticated
-    refute session.("/admin/system/database-queries") == :authenticated
+  end
+
+  test "operator literal company routes are registered before the company record route" do
+    paths = BilimbiWeb.Router.__routes__() |> Enum.map(& &1.path)
+    types = Enum.find_index(paths, &(&1 == "/companies/legal-entity-types"))
+    departments = Enum.find_index(paths, &(&1 == "/companies/department-types"))
+    record = Enum.find_index(paths, &(&1 == "/companies/:id"))
+
+    assert types < record
+    assert departments < record
   end
 
   @user_routes [
