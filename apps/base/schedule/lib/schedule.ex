@@ -11,8 +11,9 @@ defmodule Bilimbi.Base.Schedule do
   require Logger
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule.Definition
@@ -38,6 +39,8 @@ defmodule Bilimbi.Base.Schedule do
   @task_sorts [:last_run, :name, :next_due]
   @run_sorts [:name, :source, :started_at, :status]
   @retention_key "schedule.history.keep_days"
+  @execute "admin.system.schedule.execute"
+  @manage "admin.system.schedule.manage"
   @utc "UTC"
   @tz_db TimeZoneInfo.TimeZoneDatabase
 
@@ -147,66 +150,109 @@ defmodule Bilimbi.Base.Schedule do
     }
   end
 
-  @doc "Reviews one immutable definition and records the actor-attributed decision."
-  @spec review_definition(Actor.t(), String.t(), boolean()) ::
-          :ok | {:error, :audit_unavailable | :not_found | :unavailable}
-  def review_definition(%Actor{} = actor, key, enabled)
+  @doc """
+  Reviews one immutable definition and records who decided.
+
+  The caller is the sealed scope. Manage is the capability the schedule board
+  already requires for this command. A system actor names nobody and is refused.
+  """
+  @spec review_definition(Scope.t(), String.t(), boolean()) ::
+          :ok | {:error, :audit_unavailable | :forbidden | :not_found | :unavailable}
+  def review_definition(%Scope{} = scope, key, enabled)
       when is_binary(key) and is_boolean(enabled) do
     event = if enabled, do: "schedule.task.enabled", else: "schedule.task.disabled"
 
-    operator_action(actor, event, key, %{"enabled" => enabled}, fn ->
-      review_definition(key, enabled)
-    end)
+    with :ok <- authorize(scope, @manage) do
+      operator_action(scope, event, key, %{"enabled" => enabled}, fn ->
+        review_definition(key, enabled)
+      end)
+    end
   end
 
-  def review_definition(%Actor{}, _key, _enabled), do: {:error, :not_found}
-
-  @doc "Pauses a definition and records the actor-attributed action atomically."
-  @spec suppress(Actor.t(), String.t()) ::
-          :ok | {:error, :audit_unavailable | :not_found | :unavailable}
-  def suppress(%Actor{} = actor, key) when is_binary(key) do
-    operator_action(actor, "schedule.task.paused", key, %{}, fn -> suppress(key) end)
+  def review_definition(%Scope{} = scope, _key, _enabled) do
+    with :ok <- authorize(scope, @manage), do: {:error, :not_found}
   end
 
-  def suppress(%Actor{}, _key), do: {:error, :not_found}
+  @doc """
+  Pauses a definition and records the action in the same transaction.
 
-  @doc "Resumes a definition and records the actor-attributed action atomically."
-  @spec resume(Actor.t(), String.t()) ::
-          :ok | {:error, :audit_unavailable | :not_found | :unavailable}
-  def resume(%Actor{} = actor, key) when is_binary(key) do
-    operator_action(actor, "schedule.task.resumed", key, %{}, fn -> resume(key) end)
+  Requires the manage capability the schedule board already uses.
+  """
+  @spec suppress(Scope.t(), String.t()) ::
+          :ok | {:error, :audit_unavailable | :forbidden | :not_found | :unavailable}
+  def suppress(%Scope{} = scope, key) when is_binary(key) do
+    with :ok <- authorize(scope, @manage) do
+      operator_action(scope, "schedule.task.paused", key, %{}, fn -> suppress(key) end)
+    end
   end
 
-  def resume(%Actor{}, _key), do: {:error, :not_found}
+  def suppress(%Scope{} = scope, _key) do
+    with :ok <- authorize(scope, @manage), do: {:error, :not_found}
+  end
 
-  @doc "Queues run-now and records actor attribution in the same database transaction."
-  @spec run_now(Actor.t(), String.t()) ::
+  @doc """
+  Resumes a definition and records the action in the same transaction.
+
+  Requires the manage capability the schedule board already uses.
+  """
+  @spec resume(Scope.t(), String.t()) ::
+          :ok | {:error, :audit_unavailable | :forbidden | :not_found | :unavailable}
+  def resume(%Scope{} = scope, key) when is_binary(key) do
+    with :ok <- authorize(scope, @manage) do
+      operator_action(scope, "schedule.task.resumed", key, %{}, fn -> resume(key) end)
+    end
+  end
+
+  def resume(%Scope{} = scope, _key) do
+    with :ok <- authorize(scope, @manage), do: {:error, :not_found}
+  end
+
+  @doc """
+  Queues run-now and records who queued it in the same transaction.
+
+  Requires the execute capability the schedule board already uses. Execution
+  stays on the queue.
+  """
+  @spec run_now(Scope.t(), String.t()) ::
           {:ok, Queue.JobRef.t()} | {:error, atom()}
-  def run_now(%Actor{} = actor, key) when is_binary(key) do
-    operator_action(actor, "schedule.run.queued", key, %{}, fn -> run_now(key) end)
+  def run_now(%Scope{} = scope, key) when is_binary(key) do
+    with :ok <- authorize(scope, @execute) do
+      operator_action(scope, "schedule.run.queued", key, %{}, fn -> run_now(key) end)
+    end
   end
 
-  def run_now(%Actor{}, _key), do: {:error, :not_found}
+  def run_now(%Scope{} = scope, _key) do
+    with :ok <- authorize(scope, @execute), do: {:error, :not_found}
+  end
 
-  @doc "Changes global history retention with actor-attributed audit evidence."
-  @spec set_history_retention(Actor.t(), integer()) ::
-          {:ok, integer()} | {:error, :audit_unavailable | :invalid_retention | :unavailable}
-  def set_history_retention(%Actor{} = actor, days) when is_integer(days) and days in 0..3650 do
-    operator_action(
-      actor,
-      "schedule.retention.changed",
-      @retention_key,
-      %{"days" => days},
-      fn ->
-        case Settings.put(@retention_key, days) do
-          {:ok, value} -> {:ok, value}
-          {:error, _changeset} -> {:error, :unavailable}
+  @doc """
+  Changes global history retention and records who changed it.
+
+  Requires the manage capability the schedule board already uses.
+  """
+  @spec set_history_retention(Scope.t(), integer()) ::
+          {:ok, integer()}
+          | {:error, :audit_unavailable | :forbidden | :invalid_retention | :unavailable}
+  def set_history_retention(%Scope{} = scope, days) when is_integer(days) and days in 0..3650 do
+    with :ok <- authorize(scope, @manage) do
+      operator_action(
+        scope,
+        "schedule.retention.changed",
+        @retention_key,
+        %{"days" => days},
+        fn ->
+          case Settings.put(@retention_key, days) do
+            {:ok, value} -> {:ok, value}
+            {:error, _changeset} -> {:error, :unavailable}
+          end
         end
-      end
-    )
+      )
+    end
   end
 
-  def set_history_retention(%Actor{}, _days), do: {:error, :invalid_retention}
+  def set_history_retention(%Scope{} = scope, _days) do
+    with :ok <- authorize(scope, @manage), do: {:error, :invalid_retention}
+  end
 
   @doc "Reviews the current definition fingerprint and explicitly enables or disables it."
   @spec review_definition(String.t(), boolean()) :: :ok | {:error, :not_found | :unavailable}
@@ -791,14 +837,26 @@ defmodule Bilimbi.Base.Schedule do
     end
   end
 
-  defp operator_action(%Actor{} = actor, event, key, payload, operation) do
+  # The board's `can_*` assigns only decide which controls to draw. These
+  # commands are the authority: each one asks Authz with the scope the edge
+  # sealed, using the capability that screen already uses. An anonymous system
+  # actor has no grant and is refused. The scheduler does not come through
+  # here; it enqueues with `enqueue_due/2`.
+  defp authorize(%Scope{} = scope, capability) do
+    case Authz.can(scope, capability) do
+      %{allowed: true} -> :ok
+      %{allowed: false} -> {:error, :forbidden}
+    end
+  end
+
+  defp operator_action(%Scope{} = scope, event, key, payload, operation) do
     case Repo.transaction(fn ->
            case operation.() do
              {:error, reason} ->
                Repo.rollback(reason)
 
              result ->
-               case record_operator_action(actor, event, key, payload) do
+               case record_operator_action(scope, event, key, payload) do
                  {:ok, _action} -> result
                  {:error, _reason} -> Repo.rollback(:audit_unavailable)
                end
@@ -813,11 +871,15 @@ defmodule Bilimbi.Base.Schedule do
     :exit, _reason -> {:error, :unavailable}
   end
 
-  defp record_operator_action(actor, event, key, payload) do
-    Audit.record_action(actor.scope, %{
+  defp record_operator_action(%Scope{} = scope, event, key, payload) do
+    actor = Scope.actor(scope)
+
+    Audit.record_action(scope, %{
       company_id: actor.company_id,
-      actor_type: Actor.principal_type(actor),
-      actor_id: actor.id,
+      actor_type: Atom.to_string(actor.type),
+      actor_id: actor.user_id || 0,
+      impersonator_id: actor.impersonator_id,
+      system_principal: actor.system_principal,
       event: event,
       payload: Map.merge(%{"source" => @source, "key" => key}, payload),
       occurred_at: NaiveDateTime.utc_now()

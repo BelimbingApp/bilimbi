@@ -5,7 +5,9 @@ defmodule Bilimbi.Base.ScheduleTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
-  alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.JobRef
@@ -21,8 +23,12 @@ defmodule Bilimbi.Base.ScheduleTest do
   alias Bilimbi.Base.Schedule.TestWorker
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Identity
   alias Bilimbi.Base.Tenancy.Scope
+
+  @execute "admin.system.schedule.execute"
+  @manage "admin.system.schedule.manage"
   alias Crontab.CronExpression.Parser
 
   setup do
@@ -197,15 +203,15 @@ defmodule Bilimbi.Base.ScheduleTest do
   test "operator commands persist actor-attributed audit facts and reject stale definitions", %{
     definition: definition
   } do
-    actor = actor()
+    scope = granted_operator([@manage])
 
-    assert :ok = Schedule.review_definition(actor, definition.key, true)
-    assert :ok = Schedule.suppress(actor, definition.key)
-    assert :ok = Schedule.resume(actor, definition.key)
-    assert {:ok, 45} = Schedule.set_history_retention(actor, 45)
+    assert :ok = Schedule.review_definition(scope, definition.key, true)
+    assert :ok = Schedule.suppress(scope, definition.key)
+    assert :ok = Schedule.resume(scope, definition.key)
+    assert {:ok, 45} = Schedule.set_history_retention(scope, 45)
     assert Settings.get("schedule.history.keep_days") == 45
 
-    assert {:ok, actions} = Audit.list_actions(actor.scope)
+    assert {:ok, actions} = Audit.list_actions(scope)
 
     assert Enum.map(actions, & &1.event) == [
              "schedule.task.enabled",
@@ -214,14 +220,42 @@ defmodule Bilimbi.Base.ScheduleTest do
              "schedule.retention.changed"
            ]
 
-    assert Enum.all?(actions, &(&1.actor_type == "user" and &1.actor_id == actor.id))
-    assert Enum.all?(actions, &(&1.company_id == actor.company_id))
+    assert Enum.all?(actions, &(&1.actor_type == "user" and &1.actor_id == 91))
+    assert Enum.all?(actions, &(&1.company_id == 73))
     assert Enum.all?(actions, &(&1.payload["source"] == "scheduler"))
 
-    assert {:error, :not_found} = Schedule.suppress(actor, "removed.definition")
-    assert {:ok, unchanged} = Audit.list_actions(actor.scope)
+    assert {:error, :not_found} = Schedule.suppress(scope, "removed.definition")
+    assert {:ok, unchanged} = Audit.list_actions(scope)
     assert length(unchanged) == 4
-    assert {:error, :invalid_retention} = Schedule.set_history_retention(actor, 3651)
+    assert {:error, :invalid_retention} = Schedule.set_history_retention(scope, 3651)
+  end
+
+  test "operator writes refuse a user without the capability and the system actor", %{
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    install_operator_authz!()
+    AuthzFixtures.create_authz_tables!()
+
+    system = system_scope()
+    refused = Authentication.sign_in(system, 91, 73)
+
+    for scope <- [system, refused] do
+      assert {:error, :forbidden} = Schedule.review_definition(scope, definition.key, false)
+      assert {:error, :forbidden} = Schedule.suppress(scope, definition.key)
+      assert {:error, :forbidden} = Schedule.resume(scope, definition.key)
+      assert {:error, :forbidden} = Schedule.run_now(scope, definition.key)
+      assert {:error, :forbidden} = Schedule.set_history_retention(scope, 45)
+    end
+
+    assert Settings.get("schedule.history.keep_days") == 90
+    refute Repo.exists?(Suppression)
+    refute Repo.exists?(Occurrence)
+
+    allowed = granted_operator([@execute, @manage])
+    assert {:ok, %JobRef{}} = Schedule.run_now(allowed, definition.key)
+    assert {:ok, 45} = Schedule.set_history_retention(allowed, 45)
+    assert Settings.get("schedule.history.keep_days") == 45
   end
 
   test "diagnostics distinguish recorder failure from Queue evidence" do
@@ -601,16 +635,48 @@ defmodule Bilimbi.Base.ScheduleTest do
     )
   end
 
-  defp actor do
-    scope =
-      Scope.for_tenant(%Identity{
-        id: 41,
-        name: "Operator tenant",
-        status: "active",
-        is_platform_operator: true
-      })
+  defp system_scope do
+    Scope.for_tenant(%Identity{
+      id: 41,
+      name: "Operator tenant",
+      status: "active",
+      is_platform_operator: true
+    })
+  end
 
-    Actor.new!(:user, 91, scope, 73)
+  defp granted_operator(capabilities) do
+    install_operator_authz!()
+    AuthzFixtures.create_authz_tables!()
+    scope = system_scope()
+
+    Enum.each(capabilities, fn capability ->
+      {:ok, :stored} = Authz.put_principal_capability(scope, 73, :user, 91, capability, true)
+    end)
+
+    Authentication.sign_in(scope, 91, 73)
+  end
+
+  defp install_operator_authz! do
+    authz =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "base/schedule", otp_app: :bilimbi_base_schedule},
+          payload: %{
+            domains: %{"admin" => "Schedule administration"},
+            verbs: ["execute", "manage", "view"],
+            capabilities: [
+              "admin.system.schedule.view",
+              @execute,
+              @manage
+            ],
+            company_directory: Bilimbi.Base.Schedule.TestCompanyDirectory
+          }
+        }
+      ])
+
+    snapshot = ContributionRegistry.snapshot!()
+
+    ContributionRegistry.put_snapshot_for_test!(put_in(snapshot, [:consumers, :authz], authz))
   end
 
   defp restore_occurrence_table do
