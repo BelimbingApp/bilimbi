@@ -65,7 +65,7 @@ a recurrence that depends on the scheduler to prune the scheduler itself.
 Finished occurrence history is pruned daily using this same operator setting;
 unfinished occurrence claims and the latest scheduled claim per source/key are
 never eligible for deletion, preserving the scheduler's durable watermark.
-`SchemaContract.verify_runtime/2` verifies occurrence structure after migration,
+Call `SchemaContract.verify_runtime/2` to verify occurrence structure after migration,
 separately from compatible baseline verification and adoption.
 
 Rollback must first stop all Bilimbi producers and workers. The migrations

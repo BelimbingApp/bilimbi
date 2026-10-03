@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.SessionTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Contributions
@@ -9,7 +10,6 @@ defmodule Bilimbi.Base.SessionTest do
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
-  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
 
   import Bilimbi.Base.Session.TestFixtures
 
@@ -328,4 +328,3 @@ test "touches activity only after the throttle boundary and does not audit house
     entry
   end
 end
-

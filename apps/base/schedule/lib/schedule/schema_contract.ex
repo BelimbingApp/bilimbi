@@ -14,7 +14,13 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   @impl true
   def tables, do: [runs(), suppressions()]
 
-  @doc "Verifies Bilimbi-only occurrence state after runtime migrations have run."
+  @doc """
+  Verifies Bilimbi-only occurrence state after runtime migrations have run.
+
+  Baseline verification and adoption do not include this table. The
+  unfinished-claim index may be absent; a present index must match its
+  columns, predicate, and ascending order.
+  """
   def verify_runtime(repo, opts \\ []) do
     SchemaVerifier.verify(repo, [occurrences()], opts)
   end
@@ -133,4 +139,3 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   defp index(columns, unique \\ false, where \\ nil, order \\ nil),
     do: %{columns: columns, unique: unique, where: where, order: order}
 end
-

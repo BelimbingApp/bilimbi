@@ -284,4 +284,3 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
 
   defp check(expression), do: %{expression: expression, validated: true}
 end
-

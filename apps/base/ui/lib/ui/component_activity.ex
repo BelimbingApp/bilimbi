@@ -34,4 +34,3 @@ defmodule Bilimbi.Base.UI.ComponentActivity do
 
   def notify(_socket), do: :ok
 end
-

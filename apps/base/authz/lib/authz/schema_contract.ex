@@ -1,5 +1,12 @@
 defmodule Bilimbi.Base.Authz.SchemaContract do
-  @moduledoc "Pinned PostgreSQL contract for the Base Authz compatibility baseline."
+  @moduledoc """
+  Pinned PostgreSQL contract for the Base Authz compatibility baseline.
+
+  The company timeline index on `base_authz_decision_logs` is optional.
+  Migration `20261003120001` adds `company_id`, then `occurred_at` and `id`
+  descending. An adopted Belimbing database verifies without it. A present
+  index must match those columns and that order.
+  """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
 
@@ -185,4 +192,3 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
 
   defp check(expression), do: %{expression: expression, validated: true}
 end
-

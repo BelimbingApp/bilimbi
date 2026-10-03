@@ -55,7 +55,13 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
-@doc "Advances session activity when the configured throttle interval elapsed."
+  @doc """
+  Advances session activity when the configured throttle interval elapsed.
+
+  Activity updates to `sessions` bypass audit capture: they are machine
+  housekeeping, not changes to the user's identity or opaque payload.
+  A missing session is never recreated.
+  """
   @spec touch_session(String.t(), non_neg_integer()) :: :ok | {:error, :not_found}
   def touch_session(id, now \\ System.system_time(:second))
       when is_binary(id) and is_integer(now) and now >= 0 do

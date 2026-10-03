@@ -114,4 +114,3 @@ defmodule Bilimbi.Base.UI do
     apply(__MODULE__, which, [])
   end
 end
-

@@ -10,7 +10,7 @@ Secrets and opaque blobs, including a session `payload`, are redacted in `@redac
 
 An instant inside a diff includes seconds. `MutationDiff.diff_value/1` passes `precision={:second}` so two edits in one minute stay distinct. The history entry's own clock can stay at minute precision.
 
-Tenant timeline indexes are part of the audit schema contract; update the contract and Bilimbi-only migration together when their ordering changes.
+Tenant timeline indexes are optional in `SchemaContract`, not required for baseline adoption. Change their ordering in that contract and the Bilimbi-only migration together.
 
 The mutations table shows `MutationDiff.summary/1` on each row. Field values render only while `Bilimbi.Base.Audit.Web.MutationDetails` is open. Do not call `MutationDiff.rows/1` for every row of that table.
 

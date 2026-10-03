@@ -804,4 +804,3 @@ defmodule Bilimbi.Base.ScheduleTest do
     end
   end
 end
-
