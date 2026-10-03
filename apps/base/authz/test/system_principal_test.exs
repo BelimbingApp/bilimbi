@@ -258,7 +258,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
 
       assert {:ok, []} = Authz.list_system_capabilities(admin, principal: "coating.other")
 
-      assert [%{name: @principal, capabilities: [@view, @import]}] =
+      assert [%{name: @principal, capabilities: [@platform, @view, @import]}] =
                Authz.list_system_principals()
     end
 

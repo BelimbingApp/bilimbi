@@ -123,7 +123,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
           },
           payload: %{
             domains: %{"admin" => "Administrative operations"},
-            verbs: ["view"],
+            verbs: ["view", "manage"],
             capabilities: ["admin.test.record.view", "admin.test.platform.manage"],
             platform_capabilities: ["admin.test.platform.manage"],
             roles: %{
