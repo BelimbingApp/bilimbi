@@ -108,6 +108,26 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     assert refreshed > activity
   end
 
+  for framed? <- [true, false] do
+    @framed framed?
+    test "notification actions preserve framed=#{@framed} rendering", %{conn: conn, scope: scope} do
+      {:ok, _note} = User.send_notification(scope, 91, %{title: "Workspace update"})
+      conn = log_in_as(conn)
+      conn = if @framed, do: put_req_header(conn, "sec-fetch-dest", "iframe"), else: conn
+      {:ok, view, _html} = live(conn, ~p"/notifications")
+
+      assert has_element?(view, "#app-shell[data-framed='true']") == @framed
+      render_click(element(view, "#mark-all-read-btn"))
+      assert {:ok, 0} = User.unread_notification_count(scope, 91)
+      assert has_element?(view, "#app-shell[data-framed='true']") == @framed
+      assert has_element?(view, "#app-topbar") == not @framed
+
+      render_click(element(view, "#filter-read-tab"))
+      assert has_element?(view, "#app-shell[data-framed='true']") == @framed
+      assert has_element?(view, "#notifications-list")
+    end
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/notifications")
   end

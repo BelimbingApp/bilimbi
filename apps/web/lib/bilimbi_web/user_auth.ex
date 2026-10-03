@@ -642,13 +642,7 @@ defmodule BilimbiWeb.UserAuth do
       socket =
         Phoenix.LiveView.attach_hook(socket, :durable_session_activity, :handle_event, fn
           _event, _params, socket ->
-            case refresh_scope(socket.assigns.current_scope) do
-              {:ok, current_scope} ->
-                {:cont, Phoenix.Component.assign(socket, :current_scope, current_scope)}
-
-              {:error, :unauthenticated} ->
-                {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
-            end
+            guard_session(socket, true)
         end)
 
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
