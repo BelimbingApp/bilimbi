@@ -5,7 +5,9 @@ defmodule BilimbiWeb.AuditLiveTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -359,6 +361,46 @@ defmodule BilimbiWeb.AuditLiveTest do
 
       render_hook(view, "toggle_retain", %{"id" => to_string(action.id)})
       assert render(view) =~ "You do not have permission to manage audit logs."
+      refute reload_retained?(scope, action.id)
+    end
+
+    test "the API refuses a system actor and a user without the manage capability, and allows a user who holds it",
+         %{scope: scope} do
+      {:ok, action} = record_plain_action(scope)
+
+      assert {:error, :forbidden} = Audit.toggle_retained(scope, action.id)
+      refute reload_retained?(scope, action.id)
+
+      user = Authentication.sign_in(scope, 91, 73)
+      assert {:error, :forbidden} = Audit.toggle_retained(user, action.id)
+      refute reload_retained?(scope, action.id)
+
+      grant_capabilities!("admin.audit.log.manage")
+      assert {:ok, updated} = Audit.toggle_retained(user, action.id)
+      assert updated.is_retained == true
+    end
+
+    test "refuses retention after the manage capability is revoked on an open page", %{
+      conn: conn,
+      scope: scope
+    } do
+      {:ok, action} = record_plain_action(scope)
+      grant_capabilities!(["admin.audit.log.list", "admin.audit.log.manage"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+      assert has_element?(view, "#action-retain-#{action.id}")
+
+      grant =
+        Authz.list_principal_capabilities(scope, page_size: 100)
+        |> Map.fetch!(:entries)
+        |> Enum.find(&(&1.capability == "admin.audit.log.manage"))
+
+      assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+      view |> element("#action-retain-#{action.id}") |> render_click()
+
+      assert render(view) =~ "You do not have permission to manage audit logs."
+      refute reload_retained?(scope, action.id)
     end
 
     test "requires authentication", %{conn: conn} do
@@ -740,6 +782,22 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#actions-table", "bilimbi.migrate")
       refute has_element?(view, "#actions-table", "hacker@example.test")
     end
+  end
+
+  defp record_plain_action(scope) do
+    Audit.record_action(scope, %{
+      company_id: 73,
+      actor_type: "user",
+      actor_id: 91,
+      event: "employee.updated",
+      occurred_at: ~N[2026-08-18 10:15:00],
+      is_retained: false
+    })
+  end
+
+  defp reload_retained?(scope, action_id) do
+    {:ok, actions} = Audit.list_actions(scope)
+    Enum.find(actions, &(&1.id == action_id)).is_retained
   end
 
   # Signing in and mounting the page are themselves captured mutations, so the
