@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListState
+  alias Bilimbi.Base.UI.Params
 
   # Belimbing also sorts by actor name, which needs a join this read model does
   # not offer. The rest map one to one.
@@ -29,9 +31,24 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   # and had no header, so it was accepted from a URL and offered nowhere --
   # configuration that looks like a feature. Belimbing sorts by actor *name*,
   # which needs a join this read model does not have (#185).
-  @sortable ~w(occurred_at capability allowed reason resource actor_type)
-  @results ~w(allowed denied)
-  @page_sizes [25, 50, 100, 300]
+  # `occurred_at` opens descending: a log read ascending starts at the oldest
+  # decision, which is never what the reader wanted. A URL that names a column
+  # and no direction uses that same default. The URL key is `per_page`.
+  @list ListState.spec!(
+          sortable: %{
+            occurred_at: :desc,
+            capability: :asc,
+            allowed: :asc,
+            reason: :asc,
+            resource: :asc,
+            actor_type: :asc
+          },
+          default_sort: :occurred_at,
+          page_sizes: [25, 50, 100, 300],
+          default_page_size: 25,
+          page_size_param: "per_page",
+          filters: [result: {:one_of, ~w(allowed denied), ""}]
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -40,65 +57,45 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load(socket, state_from_params(params))}
+    {:noreply, load(socket, ListState.parse(params, @list))}
   end
 
   @impl true
   # The toolbar and `<.pagination>`'s page-size select both post under
-  # `filters` and funnel through this event.
+  # `filters` and funnel through this event. A key the form did not post
+  # keeps its current value.
   def handle_event("filter", params, socket) do
-    current = socket.assigns.state
-    filters = Map.get(params, "filters", %{})
-
-    state = %{
-      current
-      | search: Map.get(filters, "search", current.search),
-        result: result_from(Map.get(filters, "result", current.result)),
-        page_size: page_size_from(Map.get(filters, "perPage"), current.page_size),
-        page: 1
-    }
-
-    {:noreply, push_state(socket, state)}
+    {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
   @impl true
   # `<.table>` pushes the column as `phx-value-sort`, so the param is "sort"
   # rather than the "column" this screen used while it hand-rolled its headers.
-  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
-    column = String.to_existing_atom(column)
 
-    direction =
-      cond do
-        state.sort_by != column -> default_direction(column)
-        state.sort_dir == :asc -> :desc
-        true -> :asc
-      end
-
-    {:noreply, push_state(socket, %{state | sort_by: column, sort_dir: direction, page: 1})}
+    case ListState.next_sort(state, column) do
+      ^state -> {:noreply, socket}
+      next -> {:noreply, push_state(socket, next)}
+    end
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
+    {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
   end
 
-  # Belimbing defaults occurred_at to descending: a log read ascending starts
-  # at the oldest decision, which is never what the reader wanted.
-  defp default_direction(:occurred_at), do: :desc
-  defp default_direction(_column), do: :asc
-
   defp push_state(socket, state) do
-    push_patch(socket, to: ~p"/authz/decision-logs?#{state_to_params(state)}")
+    push_patch(socket, to: ~p"/authz/decision-logs?#{ListState.to_params(state)}")
   end
 
   defp load(socket, state) do
     page =
       Authz.list_decision_logs(socket.assigns.current_scope.scope,
-        search: nilify(state.search),
-        allowed: allowed_filter(state.result),
+        search: Params.blank_to_nil(state.search),
+        allowed: allowed_filter(state.filters.result),
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
@@ -110,95 +107,25 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
     # rows, no empty-state text (the filters are not why it is empty), and no
     # pager, because the pager only appears when there is more than one page.
     # Land the reader on the last real page instead.
-    if beyond_last_page?(page) do
-      load(socket, %{state | page: page.total_pages})
+    corrected = ListState.clamp_to_last_page(state, page)
+
+    if corrected.page != state.page do
+      load(socket, corrected)
     else
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(:filters_form, filters_form(state))
+      |> assign(:filters_form, ListState.filters_form(state))
       |> stream(:logs, page.entries, reset: true)
     end
   end
-
-  defp beyond_last_page?(page),
-    do: page.total_pages > 0 and page.page > page.total_pages
 
   defp allowed_filter("allowed"), do: true
   defp allowed_filter("denied"), do: false
   defp allowed_filter(_result), do: nil
 
-  defp state_from_params(params) do
-    %{
-      search: Map.get(params, "search", ""),
-      result: result_from(Map.get(params, "result")),
-      sort_by: sort_by_from(Map.get(params, "sort_by")),
-      sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1),
-      page_size: page_size_from(Map.get(params, "per_page"), 25)
-    }
-  end
-
-  defp state_to_params(state) do
-    %{
-      "search" => state.search,
-      "result" => state.result,
-      "sort_by" => state.sort_by,
-      "sort_dir" => state.sort_dir,
-      "page" => state.page,
-      "per_page" => state.page_size
-    }
-  end
-
-  defp filters_form(state) do
-    to_form(
-      %{
-        "search" => state.search,
-        "result" => state.result,
-        "perPage" => Integer.to_string(state.page_size)
-      },
-      as: :filters
-    )
-  end
-
-  defp page_size_from(value, fallback) do
-    case to_int(value, fallback) do
-      size when size in @page_sizes -> size
-      _ -> fallback
-    end
-  end
-
-  defp result_from(value) when value in @results, do: value
-  defp result_from(_value), do: ""
-
-  # A hand-edited URL reaches String.to_existing_atom, so anything unrecognised
-  # falls back rather than raising.
-  defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
-  defp sort_by_from(_value), do: :occurred_at
-
-  # A URL naming a column but no direction must mean what clicking that column
-  # means, or a shared link shows a different page than the click that made it.
-  # Same defect as the one fixed in #186; I fixed it there and left it here.
-  defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
-  defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
-
-  defp sort_dir_from(params),
-    do: params |> Map.get("sort_by") |> sort_by_from() |> default_direction()
-
-  defp to_int(nil, default), do: default
-
-  defp to_int(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} when int > 0 -> int
-      _ -> default
-    end
-  end
-
-  defp to_int(value, _default) when is_integer(value) and value > 0, do: value
-  defp to_int(_value, default), do: default
-
-  defp nilify(""), do: nil
-  defp nilify(value), do: value
+  defp filters(params) when is_map(params), do: Map.get(params, "filters", %{})
+  defp filters(_params), do: %{}
 
   defp actor_label(%{actor_type: "agent"}), do: "Employee"
   defp actor_label(%{actor_type: "user"}), do: "User"

@@ -71,7 +71,7 @@
         </:col>
 
         <:empty :if={@page.total_entries == 0}>
-          {if @state.search == "" and @state.domain == "",
+          {if @state.search == "" and @state.filters.domain == "",
             do: "No capabilities found.",
             else: "No capabilities match these filters."}
         </:empty>

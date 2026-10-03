@@ -43,7 +43,7 @@
       />
     </.filter_toolbar>
 
-    <p :if={@state.diagnostics == "hide"} class="mt-2 text-xs text-ink-muted">
+    <p :if={@state.filters.diagnostics == "hide"} class="mt-2 text-xs text-ink-muted">
       Successful Livewire updates, AI event streams, and media streams are hidden. Failures still appear; switch to Show Diagnostics to inspect transport noise.
     </p>
 
@@ -129,7 +129,8 @@
         </:col>
 
         <:empty :if={@page.total_entries == 0}>
-          {if @state.search == "" and @state.actor_type == "" and @state.event_family == "" and @state.result == "",
+          {if @state.search == "" and @state.filters.actor_type == "" and @state.filters.event_family == "" and
+      @state.filters.result == "",
             do: "No action logs match the current filters. Try Show Diagnostics if you are looking for Livewire or stream traffic.",
             else: "No action logs match the current filters."}
         </:empty>

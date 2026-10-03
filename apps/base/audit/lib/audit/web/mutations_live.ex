@@ -10,14 +10,28 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.Page
   alias Bilimbi.Base.Audit.Web.MutationDiff
+  alias Bilimbi.Base.UI.ListState
+  alias Bilimbi.Base.UI.Params
 
   import MutationDiff, only: [diff_value: 1]
 
-  @sortable ~w(occurred_at actor_type event auditable_type trace_id)
-  @events ~w(created updated deleted)
-  @page_sizes [25, 50, 100, 300]
+  # `occurred_at` opens descending. The URL keeps this screen's `page_size`
+  # key; `<.pagination>` still posts `perPage`.
+  @list ListState.spec!(
+          sortable: %{
+            occurred_at: :desc,
+            actor_type: :asc,
+            event: :asc,
+            auditable_type: :asc,
+            trace_id: :asc
+          },
+          default_sort: :occurred_at,
+          page_sizes: [25, 50, 100, 300],
+          default_page_size: 25,
+          page_size_param: "page_size",
+          filters: [event: {:one_of, ~w(created updated deleted), ""}]
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -26,7 +40,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load(socket, state_from_params(params))}
+    {:noreply, load(socket, ListState.parse(params, @list))}
   end
 
   @impl true
@@ -34,141 +48,56 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   # `filters` and funnel through this event, so a key the posting form did not
   # carry keeps its current value rather than resetting to the default.
   def handle_event("filter", params, socket) do
-    current = socket.assigns.state
-    filters = Map.get(params, "filters", %{})
-
-    state = %{
-      current
-      | search: Map.get(filters, "search", current.search),
-        event: filter_event(Map.get(filters, "event", current.event)),
-        page_size: to_page_size(Map.get(filters, "perPage"), current.page_size),
-        page: 1
-    }
-
-    {:noreply, push_state(socket, state)}
+    {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
   @impl true
-  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
-    column_atom = String.to_existing_atom(column)
 
-    direction =
-      cond do
-        state.sort_by != column_atom -> default_direction(column_atom)
-        state.sort_dir == :asc -> :desc
-        true -> :asc
-      end
-
-    {:noreply, push_state(socket, %{state | sort_by: column_atom, sort_dir: direction, page: 1})}
+    case ListState.next_sort(state, column) do
+      ^state -> {:noreply, socket}
+      next -> {:noreply, push_state(socket, next)}
+    end
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
+    {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
   end
 
-  defp default_direction(:occurred_at), do: :desc
-  defp default_direction(_column), do: :asc
-
   defp push_state(socket, state) do
-    push_patch(socket, to: ~p"/audit/mutations?#{state_to_params(state)}")
+    push_patch(socket, to: ~p"/audit/mutations?#{ListState.to_params(state)}")
   end
 
   defp load(socket, state) do
     page =
       Audit.list_mutations(socket.assigns.current_scope.scope,
-        search: nilify(state.search),
-        event: nilify(state.event),
+        search: Params.blank_to_nil(state.search),
+        event: Params.blank_to_nil(state.filters.event),
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
         page_size: state.page_size
       )
 
-    if beyond_last_page?(page) do
-      load(socket, %{state | page: page.total_pages})
+    corrected = ListState.clamp_to_last_page(state, page)
+
+    if corrected.page != state.page do
+      load(socket, corrected)
     else
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(:filters_form, page_size_form(state))
+      |> assign(:filters_form, ListState.filters_form(state))
       |> stream(:mutations, page.entries, reset: true)
     end
   end
 
-  defp beyond_last_page?(%Page{total_pages: total, page: page}) do
-    total > 0 and page > total
-  end
-
-  # `<.pagination>` reads its rows-per-page value from `filters[:perPage]`; the
-  # URL keeps this screen's own `page_size` key.
-  defp page_size_form(state) do
-    to_form(
-      %{
-        "search" => state.search,
-        "event" => state.event,
-        "perPage" => Integer.to_string(state.page_size)
-      },
-      as: :filters
-    )
-  end
-
-  defp state_from_params(params) do
-    %{
-      search: Map.get(params, "search", ""),
-      event: filter_event(Map.get(params, "event")),
-      sort_by: sort_by_from(Map.get(params, "sort_by")),
-      sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1),
-      page_size: to_page_size(Map.get(params, "page_size"), 25)
-    }
-  end
-
-  defp state_to_params(state) do
-    %{
-      "search" => state.search,
-      "event" => state.event,
-      "sort_by" => to_string(state.sort_by),
-      "sort_dir" => to_string(state.sort_dir),
-      "page" => to_string(state.page),
-      "page_size" => to_string(state.page_size)
-    }
-  end
-
-  defp filter_event(val) when val in @events, do: val
-  defp filter_event(_), do: ""
-
-  defp sort_by_from(val) when val in @sortable, do: String.to_existing_atom(val)
-  defp sort_by_from(_), do: :occurred_at
-
-  defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
-  defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
-
-  defp sort_dir_from(params),
-    do: params |> Map.get("sort_by") |> sort_by_from() |> default_direction()
-
-  defp to_int(nil, default), do: default
-
-  defp to_int(val, default) when is_binary(val) do
-    case Integer.parse(val) do
-      {int, ""} when int > 0 -> int
-      _ -> default
-    end
-  end
-
-  defp to_int(val, _default) when is_integer(val) and val > 0, do: val
-  defp to_int(_val, default), do: default
-
-  defp to_page_size(val, default) do
-    parsed = to_int(val, default)
-    if parsed in @page_sizes, do: parsed, else: default
-  end
-
-  defp nilify(""), do: nil
-  defp nilify(val), do: val
+  defp filters(params) when is_map(params), do: Map.get(params, "filters", %{})
+  defp filters(_params), do: %{}
 
   defp actor_label(%{actor_type: "user", actor_id: id}) when is_integer(id) and id > 0,
     do: "User ##{id}"

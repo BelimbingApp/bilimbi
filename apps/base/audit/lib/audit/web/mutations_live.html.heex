@@ -96,7 +96,7 @@
         </:col>
 
         <:empty :if={@page.total_entries == 0}>
-          {if @state.search == "" and @state.event == "",
+          {if @state.search == "" and @state.filters.event == "",
             do: "No mutation logs found.",
             else: "No mutation logs match the current filters."}
         </:empty>

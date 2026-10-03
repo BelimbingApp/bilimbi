@@ -61,6 +61,10 @@ The one tile contract so far is the follow channel, `Bilimbi.Base.UI.Workspace`.
 
 Opening a page in a tile from anywhere is a link to `/workspace` with `open=<the page>`, which the workspace resolves and replaces (URL form in `apps/base/tiling/docs/README.md`); the sidebar's control is `nav_tile/1` in `layouts.ex`, retargeted by `AppShell.retargetTileLink`. Do not encode a workspace tree on the client or add a second "open in a tile" control that builds its own address. The tile count has no cap, and a page does not check its own tile size.
 
+## Lists
+
+Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced. The moduledocs own the contract; `<.filter_toolbar>` and `<.pagination>` still own the framing.
+
 ## Summaries
 
 A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip and keeps its own markup, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
