@@ -1,7 +1,12 @@
 defmodule Bilimbi.Core.AddressTest do
-  use Bilimbi.Base.Database.DataCase, async: true
+  use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Address.Page
@@ -12,6 +17,9 @@ defmodule Bilimbi.Core.AddressTest do
 
   setup do
     create_owner_identity_tables!()
+    AuthzFixtures.create_authz_tables!()
+    install_authz_registry!()
+    on_exit(&ContributionRegistry.clear_for_test!/0)
     create_geonames_tables!()
     create_address_tables!()
 
@@ -26,7 +34,34 @@ defmodule Bilimbi.Core.AddressTest do
     {:ok, operator} = Tenancy.scope(41)
     {:ok, customer} = Tenancy.scope(42)
 
-    %{operator: operator, customer: customer}
+    {:ok, :stored} =
+      Authz.put_principal_capability(operator, 73, :user, 91, "admin.address.delete", true)
+
+    authorized_operator = Authentication.sign_in(operator, 91, 73)
+
+    %{operator: operator, authorized_operator: authorized_operator, customer: customer}
+  end
+
+  defp install_authz_registry! do
+    authz =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "core/address", otp_app: :bilimbi_core_address},
+          payload: %{
+            domains: %{"admin" => "Address administration"},
+            verbs: ["delete"],
+            capabilities: ["admin.address.delete"],
+            company_directory: Bilimbi.Core.Address.AuthzCompanyDirectory
+          }
+        }
+      ])
+
+    base = ContributionRegistry.build!([])
+
+    ContributionRegistry.put_snapshot_for_test!(%{
+      base
+      | consumers: Map.put(base.consumers, :authz, authz)
+    })
   end
 
   test "creates and reads addresses only inside the explicit tenant", context do
@@ -268,7 +303,7 @@ defmodule Bilimbi.Core.AddressTest do
     assert {:ok, deleted} =
              Address.create_address(context.operator, %{label: "Needle deleted"})
 
-    assert :ok = Address.delete_address(context.operator, deleted.id)
+    assert :ok = Address.delete_address(context.authorized_operator, deleted.id)
 
     assert %Page{
              entries: first_page,
@@ -414,7 +449,7 @@ defmodule Bilimbi.Core.AddressTest do
     assert updated.label == "New label"
     assert updated.tenant_id == 41
 
-    assert :ok = Address.delete_address(context.operator, address.id)
+    assert :ok = Address.delete_address(context.authorized_operator, address.id)
     assert {:ok, []} = Address.list_addresses(context.operator)
     assert {:error, :address_not_found} = Address.get_address(context.operator, address.id)
   end
@@ -459,7 +494,7 @@ defmodule Bilimbi.Core.AddressTest do
 
     assert {:ok, :attached} = Address.attach_to_company(context.operator, linked.id, 73)
     assert {:ok, :attached} = Address.attach_to_company(context.operator, zulu.id, 75)
-    assert :ok = Address.delete_address(context.operator, deleted.id)
+    assert :ok = Address.delete_address(context.authorized_operator, deleted.id)
 
     assert {:ok, available} =
              Address.list_available_company_addresses(context.operator, 73)
@@ -661,12 +696,14 @@ defmodule Bilimbi.Core.AddressTest do
     assert {:ok, address} = Address.create_address(context.operator, %{label: "HQ"})
     assert {:ok, :attached} = Address.attach_to_company(context.operator, address.id, 73)
 
-    assert {:error, :address_in_use} = Address.delete_address(context.operator, address.id)
+    assert {:error, :address_in_use} =
+             Address.delete_address(context.authorized_operator, address.id)
+
     assert {:ok, same_address} = Address.get_address(context.operator, address.id)
     assert same_address.id == address.id
 
     assert :ok = Address.detach_from_company(context.operator, address.id, 73)
-    assert :ok = Address.delete_address(context.operator, address.id)
+    assert :ok = Address.delete_address(context.authorized_operator, address.id)
   end
 
   test "fails closed for cross-tenant and soft-deleted owners", context do

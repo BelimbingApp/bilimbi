@@ -4,7 +4,7 @@
 **Status:** Accepted
 **Agents:** codex/sol-hard-tasks
 **Scope:** Deterministic installation-global recurrence registration
-**Last Updated:** 2026-08-21
+**Last Updated:** 2026-10-03
 
 ## Context
 
@@ -42,10 +42,11 @@ fingerprint and reauthorizes it immediately before business execution, so a
 later suppression, disable, removal, or material definition change prevents
 the stale job from running.
 
-Base Queue remains the transport owner. Schedule may ask Queue for one bounded
-job state to reconcile terminal cancellation, discard, completion, or pruning
-with its own occurrence lease. Queue does not depend on Schedule and does not
-learn recurrence semantics.
+Base Queue remains the transport owner. Schedule reconciles terminal
+cancellation, discard, completion, or pruning from Queue's bounded job state
+and its own occurrence leases. The poll and reconciliation read budget is the
+poll query budget in `apps/base/schedule/docs/README.md`. Queue does not
+depend on Schedule and does not learn recurrence semantics.
 
 ## Consequences
 

@@ -321,17 +321,24 @@ defmodule Bilimbi.Base.Schedule do
 
   @doc false
   def latest_scheduled_occurrence(%Definition{} = definition) do
-    Repo.one(
-      from(item in Occurrence,
-        where:
-          item.source == @source and item.key == ^definition.key and item.trigger == "scheduled",
-        select: max(item.intended_at)
-      )
-    )
+    latest_scheduled_occurrences([definition.key]) |> Map.get(definition.key)
   rescue
     _error -> nil
   catch
     :exit, _reason -> nil
+  end
+
+  @doc false
+  def latest_scheduled_occurrences([]), do: %{}
+
+  def latest_scheduled_occurrences(keys) when is_list(keys) do
+    from(item in Occurrence,
+      where: item.source == @source and item.trigger == "scheduled" and item.key in ^keys,
+      group_by: item.key,
+      select: {item.key, max(item.intended_at)}
+    )
+    |> Repo.all()
+    |> Map.new()
   end
 
   @doc false
@@ -766,20 +773,6 @@ defmodule Bilimbi.Base.Schedule do
     :exit, _reason -> :unknown
   end
 
-  defp latest_scheduled_occurrences([]), do: %{}
-
-  defp latest_scheduled_occurrences(keys) do
-    from(occurrence in Occurrence,
-      where:
-        occurrence.source == @source and occurrence.trigger == "scheduled" and
-          occurrence.key in ^keys,
-      group_by: occurrence.key,
-      select: {occurrence.key, max(occurrence.intended_at)}
-    )
-    |> Repo.all()
-    |> Map.new()
-  end
-
   defp due?(definition, reviews, suppressions, latest, now) do
     enabled? = review_state(definition, reviews) == :enabled
     paused? = MapSet.member?(suppressions, definition.key)
@@ -1048,27 +1041,31 @@ defmodule Bilimbi.Base.Schedule do
   end
 
   defp reconcile_occurrences(occurrences) do
-    Enum.reduce_while(occurrences, :ok, fn {occurrence_id, job_id}, :ok ->
-      case Queue.job_state(job_id) do
-        {:ok, state} when state in @active_job_states ->
-          {:cont, :ok}
+    job_ids = occurrences |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
 
-        {:ok, :completed} ->
-          reconcile_occurrence(occurrence_id, "succeeded")
-          {:cont, :ok}
+    with {:ok, job_states} <- Queue.job_states(job_ids) do
+      Enum.reduce_while(occurrences, :ok, fn {occurrence_id, job_id}, :ok ->
+        case Map.fetch(job_states, job_id) do
+          {:ok, state} when state in @active_job_states ->
+            {:cont, :ok}
 
-        {:ok, state} when state in [:cancelled, :discarded] ->
-          reconcile_occurrence(occurrence_id, "failed")
-          {:cont, :ok}
+          {:ok, :completed} ->
+            reconcile_occurrence(occurrence_id, "succeeded")
+            {:cont, :ok}
 
-        {:error, :not_found} ->
-          reconcile_occurrence(occurrence_id, "failed")
-          {:cont, :ok}
+          {:ok, state} when state in [:cancelled, :discarded] ->
+            reconcile_occurrence(occurrence_id, "failed")
+            {:cont, :ok}
 
-        _unavailable ->
-          {:halt, {:error, :unavailable}}
-      end
-    end)
+          :error ->
+            reconcile_occurrence(occurrence_id, "failed")
+            {:cont, :ok}
+
+          _unknown ->
+            {:halt, {:error, :unavailable}}
+        end
+      end)
+    end
   end
 
   defp reconcile_occurrence(occurrence_id, state) do
