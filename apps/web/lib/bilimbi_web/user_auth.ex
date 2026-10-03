@@ -613,6 +613,18 @@ defmodule BilimbiWeb.UserAuth do
           end
         )
 
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :durable_session_activity, :handle_event, fn
+          _event, _params, socket ->
+            case refresh_scope(socket.assigns.current_scope) do
+              {:ok, current_scope} ->
+                {:cont, Phoenix.Component.assign(socket, :current_scope, current_scope)}
+
+              {:error, :unauthenticated} ->
+                {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+            end
+        end)
+
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
@@ -824,9 +836,11 @@ defmodule BilimbiWeb.UserAuth do
               is_integer(company_id) and company_id > 0 do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
          true <- entry.user_id == user_id,
+         true <- session_active?(entry),
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
+      :ok = Session.refresh_activity(session_id, System.system_time(:second))
       impersonator = extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
@@ -865,6 +879,11 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp current_scope_from(_session_user, _impersonation), do: nil
+
+  defp session_active?(%Entry{last_activity: last_activity}) do
+    lifetime_minutes = Bilimbi.Base.Settings.get("session.lifetime_minutes")
+    last_activity >= System.system_time(:second) - lifetime_minutes * 60
+  end
 
   # Belimbing's status bar warns only on the operator tenant when that tenant
   # has no primary company. Failures other than "not provisioned" stay quiet:

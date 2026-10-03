@@ -25,6 +25,21 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
   end
 
+  test "rejects a durable session that exceeded the configured idle lifetime", %{conn: conn} do
+    session_id = "expired-session"
+    old_activity = System.system_time(:second) - 120 * 60 - 1
+
+    {:ok, _entry} =
+      Session.put_session(session_id, "{}", %{user_id: 91, last_activity: old_activity})
+
+    conn =
+      Phoenix.ConnTest.init_test_session(conn, %{
+        "current_user" => %{"session_id" => session_id, "user_id" => 91, "company_id" => 73}
+      })
+
+    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
+  end
+
   test "initial HTTP render resolves the durable session only once", %{conn: conn} do
     conn = log_in_as(conn)
     session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
