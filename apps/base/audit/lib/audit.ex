@@ -32,6 +32,7 @@ defmodule Bilimbi.Base.Audit do
 
   alias Bilimbi.Base.Audit.Action
   alias Bilimbi.Base.Audit.ActionSchema
+  alias Bilimbi.Base.Audit.Authorization
   alias Bilimbi.Base.Audit.Context
   alias Bilimbi.Base.Audit.Mutation
   alias Bilimbi.Base.Audit.MutationSchema
@@ -43,6 +44,7 @@ defmodule Bilimbi.Base.Audit do
   @default_page_size 25
   @mutation_sort_fields [:occurred_at, :actor_type, :event, :auditable_type, :trace_id]
   @action_sort_fields [:occurred_at, :actor_type, :event, :url, :trace_id]
+  @manage_capability "admin.audit.log.manage"
 
   @doc """
   Runs `fun` with repo-level mutation capture disabled in this process.
@@ -248,24 +250,36 @@ defmodule Bilimbi.Base.Audit do
     )
   end
 
-  @doc "Toggles the is_retained flag for a scoped audit action."
-  @spec toggle_retained(Scope.t(), pos_integer()) :: {:ok, Action.t()} | {:error, :not_found}
+  @doc """
+  Toggles the is_retained flag for a scoped audit action.
+
+  The scope must hold `admin.audit.log.manage` now. The actions screen's
+  `can_manage` assign only shows the control.
+  """
+  @spec toggle_retained(Scope.t(), pos_integer()) ::
+          {:ok, Action.t()} | {:error, :not_found | :forbidden}
   def toggle_retained(%Scope{} = scope, action_id) when is_integer(action_id) do
-    query =
-      from(a in Tenancy.scope_query(ActionSchema, scope),
-        where: a.id == ^action_id
-      )
+    with :ok <- authorize(scope) do
+      query =
+        from(a in Tenancy.scope_query(ActionSchema, scope),
+          where: a.id == ^action_id
+        )
 
-    case Repo.one(query) do
-      nil ->
-        {:error, :not_found}
+      case Repo.one(query) do
+        nil ->
+          {:error, :not_found}
 
-      %ActionSchema{} = action ->
-        action
-        |> Ecto.Changeset.change(is_retained: not action.is_retained)
-        |> Repo.update()
-        |> map_action()
+        %ActionSchema{} = action ->
+          action
+          |> Ecto.Changeset.change(is_retained: not action.is_retained)
+          |> Repo.update()
+          |> map_action()
+      end
     end
+  end
+
+  defp authorize(scope) do
+    if Authorization.can?(scope, @manage_capability), do: :ok, else: {:error, :forbidden}
   end
 
   defp page_query(count_query, ordered_query, opts, mapper) do
