@@ -84,6 +84,20 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
     end
   end
 
+  test "platform capabilities must also be registered capabilities" do
+    assert_raise ArgumentError,
+                 ~r/platform capability admin\.authz\.role\.view is not declared/,
+                 fn ->
+                   ContributionValidator.validate_contributions!([
+                     entry("base/authz", %{
+                       domains: %{"admin" => "Administrative operations"},
+                       verbs: ["view"],
+                       platform_capabilities: ["admin.authz.role.view"]
+                     })
+                   ])
+                 end
+  end
+
   describe "company directory contract" do
     test "accepts a directory that answers every question the contract asks" do
       snapshot =

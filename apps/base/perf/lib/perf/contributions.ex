@@ -15,6 +15,7 @@ defmodule Bilimbi.Base.Perf.Contributions do
       },
       authz: %{
         capabilities: [@view, @manage],
+        platform_capabilities: [@view, @manage],
         roles: %{"system_viewer" => %{capabilities: [@view]}}
       },
       menu: [

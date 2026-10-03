@@ -28,7 +28,8 @@ defmodule Bilimbi.Base.Settings.Contributions do
           "base.settings.user.manage",
           "base.settings.support-override.manage",
           "base.settings.secret.view"
-        ]
+        ],
+        platform_capabilities: ["base.settings.global.manage"]
       }
     }
   end

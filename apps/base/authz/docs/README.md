@@ -19,6 +19,17 @@ reads the global **Authorization log retention** setting
 (`authz.decision_log_retention_days`) and deletes decisions older than that
 many days, preserving newer decisions.
 
+## Platform capabilities
+
+An Authz contribution may list registered keys under `platform_capabilities`.
+The shared evaluator denies those keys unless the actor's scope belongs to the
+platform-operator tenant, before checking direct grants, role grants, or
+`grant_all`. The same rule applies to named system principals. Use this for an
+authority that is platform-wide by meaning; keep route `operator: true` gates
+for screens whose entire data set or workflow is platform-wide. Do not infer
+platform authority from a key prefix or rely on each adapter to add its own
+tenant check.
+
 Base owns the six `base_authz_*` tables: the five compatible ones and the
 Bilimbi-only `base_authz_system_principal_capabilities`. `base_authz_roles.company_id` remains
 a bare nullable column in the Base migration. Core Company contributes the

@@ -42,6 +42,7 @@ defmodule Bilimbi.Base.Database.Contributions do
       ],
       authz: %{
         capabilities: @capabilities,
+        platform_capabilities: ["admin.system.database-table.list"],
         roles: %{
           # #650: these capabilities gate the menu and the read verbs, but the raw-SQL
           # console itself is operator-only tooling. The route and every write/execute

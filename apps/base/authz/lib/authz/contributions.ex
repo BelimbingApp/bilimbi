@@ -134,6 +134,7 @@ defmodule Bilimbi.Base.Authz.Contributions do
         domains: %{"admin" => "Administrative operations"},
         verbs: @verbs,
         capabilities: @capabilities,
+        platform_capabilities: ["admin.user.impersonate"],
         roles: %{
           "core_admin" => %{
             name: "Core Administrator",

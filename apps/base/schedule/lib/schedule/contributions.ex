@@ -39,6 +39,7 @@ defmodule Bilimbi.Base.Schedule.Contributions do
       ],
       authz: %{
         capabilities: [@view, @execute, @manage],
+        platform_capabilities: [@view, @execute, @manage],
         roles: %{"system_viewer" => %{capabilities: [@view]}}
       },
       schedule: %{definitions: []}

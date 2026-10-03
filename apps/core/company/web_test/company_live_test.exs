@@ -72,7 +72,23 @@ defmodule BilimbiWeb.CompanyLiveTest do
     })
 
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    UserFixtures.insert_user!(%{id: 92, company_id: 75, name: "Grace Hopper"})
     :ok
+  end
+
+  test "a non-operator tenant cannot add platform-wide legal entity types", %{conn: conn} do
+    grant_capabilities!("admin.company.list",
+      tenant_id: 42,
+      company_id: 75,
+      user_id: 92
+    )
+
+    conn = log_in_as(conn, session_user(%{"user_id" => 92, "company_id" => 75}))
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             live(conn, ~p"/companies/legal-entity-types")
+
+    assert {:ok, []} = Company.list_legal_entity_types()
   end
 
   describe "Index" do

@@ -42,6 +42,7 @@ defmodule Bilimbi.Core.Geonames.Contributions do
       ],
       authz: %{
         capabilities: ["admin.geonames.view", "admin.geonames.list", "admin.geonames.update"],
+        platform_capabilities: ["admin.geonames.update"],
         roles: %{
           "tenant_owner" => %{
             capabilities: ["admin.geonames.view", "admin.geonames.list", "admin.geonames.update"]
