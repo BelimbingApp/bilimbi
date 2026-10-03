@@ -30,12 +30,6 @@ defmodule BilimbiWeb do
     end
   end
 
-  def channel do
-    quote do
-      use Phoenix.Channel
-    end
-  end
-
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
@@ -52,17 +46,6 @@ defmodule BilimbiWeb do
     quote do
       use Phoenix.LiveView
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
-
-      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
-
-      unquote(html_helpers())
-    end
-  end
-
-  def live_component do
-    quote do
-      use Phoenix.LiveComponent
-      use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
 
       Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
 

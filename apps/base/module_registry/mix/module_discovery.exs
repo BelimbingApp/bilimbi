@@ -378,6 +378,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     entries = module_routes ++ host_routes
     validate_unique_embed_keys!(entries)
+    paths = Enum.filter(entries, &Map.has_key?(&1, :path))
+
+    if length(Enum.uniq_by(paths, &{&1.path, Map.get(&1, :verb, :get)})) != length(paths) do
+      raise ArgumentError, "duplicate route path"
+    end
+
     webhooks = Enum.filter(entries, &Map.has_key?(&1, :webhook))
 
     if length(Enum.uniq_by(webhooks, & &1.webhook)) != length(webhooks) do
