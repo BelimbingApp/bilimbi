@@ -186,6 +186,8 @@ defmodule BilimbiWeb.LoginLive do
 
   # The workspace strip: platform-level, non-tenant-owned identity, readable
   # before authentication by design (Company.platform_operator_company/0).
+  # The public line is the company name. The numeric tenant id is an internal
+  # key and stays off this screen.
   defp assign_workspace(socket) do
     case Company.platform_operator_company() do
       {:ok, company} ->
@@ -285,13 +287,8 @@ defmodule BilimbiWeb.LoginLive do
         >
           <%= if @workspace_state == :ready do %>
             <span class="size-1.5 rounded-full bg-success"></span>
-            <span class="truncate">
-              <span class="font-medium text-ink-muted">
-                {Bilimbi.Core.Company.Summary.display_name(@workspace_company)}
-              </span>
-              <span class="text-ink-faint">
-                · tenant <span class="tabular-nums">{@workspace_company.tenant_id}</span>
-              </span>
+            <span class="truncate font-medium text-ink-muted">
+              {Bilimbi.Core.Company.Summary.display_name(@workspace_company)}
             </span>
           <% else %>
             <span class="size-1.5 rounded-full bg-warning"></span>
