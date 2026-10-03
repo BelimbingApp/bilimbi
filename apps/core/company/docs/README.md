@@ -31,11 +31,16 @@ queries `companies` directly (BLB-S1-010 option a).
 ## Authorized company reach
 
 `list_selectable_companies/2` and `authorize_company_target/3` combine an
-actor's operation capability with its permitted company reach. An actor may
-always target its own company for an allowed operation. Targeting a sibling
-company additionally requires `admin.company.tenant-wide.manage`, which the
-configured `tenant_owner` role receives. The reach capability never authorizes
-an operation by itself.
+actor's operation capability with its permitted company reach. Pass the sealed
+`%Bilimbi.Base.Tenancy.Scope{}`: that clause derives the actor with
+`Bilimbi.Base.Authz.scope_actor/1`. The `%Bilimbi.Base.Authz.Actor{}` clauses
+remain for a caller that already holds one, and both forms return the same
+result for the same sealed user. A system scope names nobody and is
+unauthorized. Do not build an actor with `Authz.actor/5` to reach these
+functions. An actor may always target its own company for an allowed
+operation. Targeting a sibling company additionally requires
+`admin.company.tenant-wide.manage`, which the configured `tenant_owner` role
+receives. The reach capability never authorizes an operation by itself.
 
 Both APIs start from the actor's validated tenant scope, so a company in a
 different tenant remains unavailable even to `tenant_owner` and `core_admin`.
