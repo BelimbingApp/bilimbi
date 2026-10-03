@@ -34,7 +34,7 @@ defmodule BilimbiWeb.DiscoveredRoutes do
       routes
       |> Enum.filter(&(is_atom(&1[:live]) and not is_nil(&1[:live])))
       |> Enum.group_by(&session_group/1)
-      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.sort_by(&session_group_rank/1)
 
     blocks =
       for {group, routes} <- groups do
@@ -134,6 +134,20 @@ defmodule BilimbiWeb.DiscoveredRoutes do
 
   defp session_group(%{session: :auth, operator: true}), do: :operator
   defp session_group(route), do: Map.get(route, :session, :auth)
+
+  # The operator live session is its own scope. A literal path such as
+  # `/companies/legal-entity-types` has to be compiled before a parameterized
+  # sibling such as `/companies/:id`, or the parameter matches first and
+  # `RouteOverlap` rejects the pair. The other sessions keep their previous order.
+  defp session_group_rank({group, _routes}) do
+    case group do
+      :operator -> 0
+      :anonymous -> 1
+      :auth -> 2
+      :none -> 3
+      _other -> 4
+    end
+  end
 
   defp session_options(:auth) do
     {:authenticated, [:browser, :require_authenticated],

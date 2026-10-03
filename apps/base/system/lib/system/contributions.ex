@@ -42,6 +42,7 @@ defmodule Bilimbi.Base.System.Contributions do
       ],
       authz: %{
         capabilities: [@view, @inspector, @localization],
+        platform_capabilities: [@view, @inspector, @localization],
         roles: %{
           "system_viewer" => %{capabilities: [@view, @inspector]}
         }

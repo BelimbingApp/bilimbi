@@ -150,6 +150,34 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
     assert Phoenix.Flash.get(resp_conn.assigns.flash, :error) =~ "Unable to find that user"
   end
 
+  test "an ordinary tenant admin impersonates a coworker and is refused across tenants", %{
+    conn: conn
+  } do
+    insert_user!(%{
+      id: 95,
+      company_id: 74,
+      name: "Tenant Admin",
+      email: "tenant-admin@example.com"
+    })
+
+    grant_capabilities!(["admin.user.list", "admin.user.impersonate"],
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 95
+    )
+
+    authed_conn = conn |> log_in_as(%{"user_id" => 95, "company_id" => 74})
+
+    refused = post(authed_conn, ~p"/admin/impersonate/91")
+    assert redirected_to(refused) == ~p"/users"
+    assert Phoenix.Flash.get(refused.assigns.flash, :error) =~ "Unable to find that user"
+    assert [%Session.Summary{user_id: 95}] = Session.list_sessions()
+
+    allowed = post(authed_conn, ~p"/admin/impersonate/93")
+    assert redirected_to(allowed) == ~p"/dashboard"
+    assert [%Session.Summary{user_id: 93}] = Session.list_sessions()
+  end
+
   defp insert_user!(attributes) do
     id = Map.fetch!(attributes, :id)
 

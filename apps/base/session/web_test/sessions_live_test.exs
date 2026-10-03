@@ -24,6 +24,28 @@ defmodule BilimbiWeb.SessionsLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/system/sessions")
   end
 
+  test "a non-operator tenant cannot open the platform-wide session listing", %{conn: conn} do
+    CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.system.session.list", "admin.system.session.manage"],
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 92
+    )
+
+    conn = log_in_as(conn, session_user(%{"user_id" => 92, "company_id" => 74}))
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/system/sessions")
+  end
+
   test "redirects away when the actor lacks admin.system.session.list", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/dashboard"}}} =
              conn |> log_in_as() |> live(~p"/system/sessions")

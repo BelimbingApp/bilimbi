@@ -27,6 +27,10 @@ defmodule Bilimbi.Base.Tenancy.Contributions do
         capabilities: [
           "admin.tenancy.tenant.list",
           "admin.tenancy.tenant.create"
+        ],
+        platform_capabilities: [
+          "admin.tenancy.tenant.list",
+          "admin.tenancy.tenant.create"
         ]
       }
     }

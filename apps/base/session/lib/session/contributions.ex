@@ -36,6 +36,7 @@ defmodule Bilimbi.Base.Session.Contributions do
       ],
       authz: %{
         capabilities: [@list, "admin.system.session.manage"],
+        platform_capabilities: [@list, "admin.system.session.manage"],
         roles: %{
           "auditor" => %{capabilities: [@list]},
           "system_viewer" => %{capabilities: [@list]}

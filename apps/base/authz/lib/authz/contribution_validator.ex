@@ -6,7 +6,14 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
   alias Bilimbi.Base.Authz.CapabilityKey
   alias Bilimbi.Base.Authz.CompanyDirectory
 
-  @payload_keys [:capabilities, :company_directory, :domains, :roles, :verbs]
+  @payload_keys [
+    :capabilities,
+    :company_directory,
+    :domains,
+    :platform_capabilities,
+    :roles,
+    :verbs
+  ]
   @role_keys [:capabilities, :description, :grant_all, :name]
   @segment ~r/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
   @role_code ~r/^[a-z][a-z0-9_]*$/
@@ -24,6 +31,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
       domain_owners: %{},
       verbs: %{},
       capabilities: %{},
+      platform_capabilities: %{},
       roles: %{},
       company_directory: nil
     }
@@ -41,6 +49,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
     |> merge_domains!(descriptor.id, Map.get(payload, :domains, %{}))
     |> merge_verbs!(descriptor.id, Map.get(payload, :verbs, []))
     |> merge_capabilities!(descriptor.id, Map.get(payload, :capabilities, []))
+    |> merge_platform_capabilities!(descriptor.id, Map.get(payload, :platform_capabilities, []))
     |> merge_roles!(descriptor.id, Map.get(payload, :roles, %{}))
     |> merge_company_directory!(descriptor, Map.get(payload, :company_directory))
   end
@@ -111,6 +120,31 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
 
   defp merge_capabilities!(_snapshot, owner, _capabilities),
     do: invalid!(owner, "capabilities must be a list")
+
+  defp merge_platform_capabilities!(snapshot, owner, capabilities) when is_list(capabilities) do
+    Enum.reduce(capabilities, snapshot, fn capability, acc ->
+      unless CapabilityKey.valid?(capability) do
+        invalid!(owner, "invalid platform capability key #{inspect(capability)}")
+      end
+
+      case Map.fetch(acc.platform_capabilities, capability) do
+        :error ->
+          %{
+            acc
+            | platform_capabilities: Map.put(acc.platform_capabilities, capability, owner)
+          }
+
+        {:ok, first_owner} ->
+          invalid!(
+            owner,
+            "platform capability #{capability} is already declared by #{first_owner}"
+          )
+      end
+    end)
+  end
+
+  defp merge_platform_capabilities!(_snapshot, owner, _capabilities),
+    do: invalid!(owner, "platform_capabilities must be a list")
 
   defp merge_roles!(snapshot, owner, roles) when is_map(roles) do
     Enum.reduce(roles, snapshot, fn {code, definition}, acc ->
@@ -253,12 +287,19 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
       verbs: snapshot.verbs |> Map.keys() |> Enum.sort(),
       capabilities: snapshot.capabilities |> Map.keys() |> Enum.sort(),
       capability_owners: snapshot.capabilities,
+      platform_capabilities: snapshot.platform_capabilities |> Map.keys() |> Enum.sort(),
       roles: roles,
       company_directory: snapshot.company_directory
     }
   end
 
   defp validate_capabilities!(snapshot) do
+    Enum.each(snapshot.platform_capabilities, fn {capability, owner} ->
+      unless Map.has_key?(snapshot.capabilities, capability) do
+        invalid!(owner, "platform capability #{capability} is not declared")
+      end
+    end)
+
     Enum.each(snapshot.capabilities, fn {capability, owner} ->
       parts = CapabilityKey.parse!(capability)
 

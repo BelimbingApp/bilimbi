@@ -159,6 +159,12 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
       capability not in registry.capabilities ->
         Decision.deny(:denied_unknown_capability, policies ++ ["capability_registry"])
 
+      capability in registry.platform_capabilities and not Scope.platform_operator?(scope) ->
+        Decision.deny(
+          :denied_platform_scope,
+          policies ++ ["capability_registry", "platform_operator"]
+        )
+
       tenant_mismatch?(scope, resource) ->
         Decision.deny(:denied_tenant_scope, policies ++ ["capability_registry", "tenant_scope"])
 

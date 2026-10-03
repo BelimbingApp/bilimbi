@@ -123,8 +123,9 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
           },
           payload: %{
             domains: %{"admin" => "Administrative operations"},
-            verbs: ["view"],
-            capabilities: ["admin.test.record.view"],
+            verbs: ["view", "manage"],
+            capabilities: ["admin.test.record.view", "admin.test.platform.manage"],
+            platform_capabilities: ["admin.test.platform.manage"],
             roles: %{
               "all_access" => %{name: "All Access", grant_all: true},
               "viewer" => %{
@@ -170,6 +171,15 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       name: "Tenant #{tenant_id}",
       status: "active",
       is_platform_operator: false
+    })
+  end
+
+  def platform_scope do
+    Scope.for_tenant(%Identity{
+      id: 1,
+      name: "Platform operator",
+      status: "active",
+      is_platform_operator: true
     })
   end
 end

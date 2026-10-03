@@ -179,7 +179,16 @@ defmodule Bilimbi.Base.Authz do
     permissions = EffectivePermissions.load(actor, directory)
 
     %{
-      allowed: EffectivePermissions.allowed(permissions, registry.capabilities),
+      allowed:
+        permissions
+        |> EffectivePermissions.allowed(registry.capabilities)
+        |> then(fn allowed ->
+          if Scope.platform_operator?(actor.scope) do
+            allowed
+          else
+            allowed -- registry.platform_capabilities
+          end
+        end),
       denied: EffectivePermissions.denied(permissions)
     }
   end
@@ -193,7 +202,8 @@ defmodule Bilimbi.Base.Authz do
   def explicitly_allowed?(%Scope{} = scope, capability) when is_binary(capability) do
     registry = registry!()
 
-    if capability in capabilities() do
+    if capability in capabilities() and
+         (capability not in registry.platform_capabilities or Scope.platform_operator?(scope)) do
       case scope_actor(scope) do
         {:ok, actor} ->
           EffectivePermissions.explicitly_allowed?(actor, capability, directory!(registry))

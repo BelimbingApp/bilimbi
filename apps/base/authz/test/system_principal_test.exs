@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
   @principal "coating.line_import"
   @import "factory.material.import"
   @view "factory.item.view"
+  @platform "admin.test.platform.manage"
   @undeclared "admin.test.record.view"
   @grant "admin.authz.system-principal.grant"
   @revoke "admin.authz.system-principal.revoke"
@@ -44,7 +45,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
     {:ok, tenant} = Tenancy.scope(1)
     {:ok, other_tenant} = Tenancy.scope(2)
 
-    install_registry!(declared: [@import, @view])
+    install_registry!(declared: [@import, @view, @platform])
     on_exit(&ContributionRegistry.clear_for_test!/0)
     on_exit(fn -> AuditContext.put(nil) end)
 
@@ -64,6 +65,18 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
 
       refute decision.allowed
       assert decision.reason == :denied_missing_capability
+    end
+
+    test "a named principal cannot use a platform capability in an ordinary tenant", %{
+      tenant: tenant,
+      admin: admin
+    } do
+      assert {:ok, :granted} = Authz.grant_system_capability(admin, 10, @principal, @platform)
+
+      decision = Authz.can(principal(tenant, 10), @platform)
+
+      refute decision.allowed
+      assert decision.reason == :denied_platform_scope
     end
 
     test "a granted capability allows in that company, and the log names the principal", %{
@@ -245,7 +258,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
 
       assert {:ok, []} = Authz.list_system_capabilities(admin, principal: "coating.other")
 
-      assert [%{name: @principal, capabilities: [@view, @import]}] =
+      assert [%{name: @principal, capabilities: [@platform, @view, @import]}] =
                Authz.list_system_principals()
     end
 
@@ -400,8 +413,9 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
           descriptor: %{id: "base/authz", otp_app: :bilimbi_base_authz},
           payload: %{
             domains: %{"admin" => "Administrative operations", "factory" => "Factory"},
-            verbs: ["view", "grant", "revoke", "list", "import"],
-            capabilities: [@undeclared, @import, @view, @grant, @revoke, @list],
+            verbs: ["view", "grant", "revoke", "list", "import", "manage"],
+            capabilities: [@undeclared, @import, @view, @platform, @grant, @revoke, @list],
+            platform_capabilities: [@platform],
             roles: %{},
             company_directory: TestCompanyDirectory
           }

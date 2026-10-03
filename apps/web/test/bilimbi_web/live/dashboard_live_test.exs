@@ -129,11 +129,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
   end
 
   test "module pages and dashboard support navigation without an HTTP reload", %{conn: conn} do
-    grant_capabilities!(["admin.system.session.list"])
-    {:ok, sessions, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
-    assert has_element?(sessions, "#app-shell")
-    assert {:ok, profile, _html} = live_redirect(sessions, to: "/settings/profile")
-    assert {:ok, dashboard, _html} = live_redirect(profile, to: "/dashboard")
+    {:ok, profile, _html} = conn |> log_in_as() |> live(~p"/settings/profile")
+    assert has_element?(profile, "#app-shell")
+    assert {:ok, appearance, _html} = live_redirect(profile, to: "/settings/appearance")
+    assert {:ok, dashboard, _html} = live_redirect(appearance, to: "/dashboard")
     assert has_element?(dashboard, "#dashboard-current-company")
   end
 

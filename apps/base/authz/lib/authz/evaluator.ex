@@ -21,6 +21,13 @@ defmodule Bilimbi.Base.Authz.Evaluator do
       capability not in registry.capabilities ->
         Decision.deny(:denied_unknown_capability, policies ++ ["capability_registry"])
 
+      capability in registry.platform_capabilities and
+          not Scope.platform_operator?(actor.scope) ->
+        Decision.deny(
+          :denied_platform_scope,
+          policies ++ ["capability_registry", "platform_operator"]
+        )
+
       tenant_mismatch?(actor, resource) ->
         Decision.deny(
           :denied_tenant_scope,

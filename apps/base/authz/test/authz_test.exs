@@ -89,6 +89,35 @@ defmodule Bilimbi.Base.AuthzTest do
     assert decision.reason == :denied_explicitly
   end
 
+  test "platform capabilities require the operator tenant even through direct and grant-all grants" do
+    tenant_scope = scope()
+    actor = Authz.actor(:user, 7, tenant_scope, 10)
+
+    assert {:ok, _summary} = Authz.reconcile_system_roles()
+    all_access = system_role("all_access")
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, all_access.id)
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               10,
+               :user,
+               7,
+               "admin.test.platform.manage",
+               true
+             )
+
+    denied = Authz.can(actor, "admin.test.platform.manage")
+    refute denied.allowed
+    assert denied.reason == :denied_platform_scope
+
+    operator_actor = Authz.actor(:user, 7, platform_scope(), 10)
+    assert Authz.can(operator_actor, "admin.test.platform.manage").allowed
+
+    refute "admin.test.platform.manage" in Authz.effective_capabilities(actor).allowed
+    assert "admin.test.platform.manage" in Authz.effective_capabilities(operator_actor).allowed
+  end
+
   test "custom roles are tenant-scoped and grant their known capabilities" do
     tenant_scope = scope()
     actor = Authz.actor(:user, 9, tenant_scope, 10)

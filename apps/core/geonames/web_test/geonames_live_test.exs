@@ -18,6 +18,15 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
 
     GeonamesFixtures.insert_country!(%{updated_at: ~N[2026-07-24 12:34:56]})
 
@@ -52,6 +61,26 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     assert {:error, {:redirect, %{to: "/dashboard"}}} =
              conn |> log_in_as() |> live(~p"/geonames/countries")
+  end
+
+  test "a non-operator tenant can read but cannot edit platform-wide reference data", %{
+    conn: conn
+  } do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"],
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 92
+    )
+
+    conn = log_in_as(conn, session_user(%{"user_id" => 92, "company_id" => 74}))
+    {:ok, countries, _html} = live(conn, ~p"/geonames/countries")
+
+    assert has_element?(countries, "#country-1", "Malaysia")
+    refute has_element?(countries, "#countries-update")
+
+    render_click(countries, "save-country-name", %{"id" => "1", "country" => "Changed"})
+
+    assert Geonames.get_country("MY").country == "Malaysia"
   end
 
   test "renders source-faithful read-only GeoNames indexes and their stable controls", %{

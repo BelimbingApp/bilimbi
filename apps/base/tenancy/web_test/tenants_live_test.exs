@@ -19,6 +19,31 @@ defmodule BilimbiWeb.TenantsLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/tenancy/tenants")
   end
 
+  test "a non-operator tenant cannot list or create platform tenants", %{conn: conn} do
+    CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.tenancy.tenant.list", "admin.tenancy.tenant.create"],
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 92
+    )
+
+    conn = log_in_as(conn, session_user(%{"user_id" => 92, "company_id" => 74}))
+    before = Tenancy.count_tenants()
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/tenancy/tenants")
+    refute Enum.any?(Tenancy.list_tenants(), &(&1.name == "Unauthorized Tenant"))
+    assert Tenancy.count_tenants() == before
+  end
+
   test "redirects away when the actor lacks admin.tenancy.tenant.list", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/dashboard"}}} =
              conn |> log_in_as() |> live(~p"/tenancy/tenants")

@@ -41,6 +41,30 @@ defmodule BilimbiWeb.SettingsLiveTest do
     conn |> log_in_as() |> live(~p"/system/settings")
   end
 
+  test "a non-operator tenant cannot change platform-global settings", %{conn: conn} do
+    CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!("base.settings.global.manage",
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 92
+    )
+
+    assert {:ok, _entry} = Settings.put("webhooks.rate_limit", 120)
+    conn = log_in_as(conn, session_user(%{"user_id" => 92, "company_id" => 74}))
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/system/settings")
+    assert Settings.get("webhooks.rate_limit") == 120
+  end
+
   test "stored secret starts masked and grant_all confers no reveal action", %{
     conn: conn
   } do
