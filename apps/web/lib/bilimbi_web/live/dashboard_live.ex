@@ -467,7 +467,6 @@ defmodule BilimbiWeb.DashboardLive do
               :if={!@layout_editing}
               id="customize-layout"
               phx-click="toggle-layout-edit"
-              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
               Customize
             </.button>
@@ -475,17 +474,17 @@ defmodule BilimbiWeb.DashboardLive do
               :if={@layout_editing}
               id="close-customize"
               phx-click="toggle-layout-edit"
-              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
               Close
             </.button>
           </:actions>
         </.header>
 
-        <div
+        <.card
           :if={@layout_editing and (@available_widgets != [] or @available_sections != [])}
           id="add-widget-section"
-          class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-xs"
+          class="mb-3"
+          inner_class="flex flex-wrap items-center gap-2 p-3"
         >
           <span class="text-xs font-semibold text-ink-muted">Customize dashboard:</span>
           <button
@@ -508,7 +507,7 @@ defmodule BilimbiWeb.DashboardLive do
           >
             + {section_label(id)}
           </button>
-        </div>
+        </.card>
 
         <div
           :if={@widgets != []}
@@ -538,20 +537,19 @@ defmodule BilimbiWeb.DashboardLive do
              of the reader: widgets are available but none is placed; every
              contributed widget is withheld by capability; or no module
              contributes any. Only the first is recovered by Customize. --%>
-        <p
+        <.empty_state
           :if={@widgets == [] and @available_widgets != []}
           id="dashboard-widgets-empty"
-          class="mt-5 text-sm text-ink-subtle"
+          class="mt-5"
+          title="No widgets configured."
+          reason="Add widgets from the catalogue."
         >
-          No widgets configured.
-          <.link
-            phx-click="toggle-layout-edit"
-            class="font-medium text-ink underline underline-offset-2 hover:text-ink-strong"
-          >
-            Customize dashboard
-          </.link>
-          &nbsp;to add widgets.
-        </p>
+          <:action>
+            <.button id="dashboard-widgets-customize" phx-click="toggle-layout-edit">
+              Customize dashboard
+            </.button>
+          </:action>
+        </.empty_state>
 
         <.empty_state
           :if={@widgets == [] and @available_widgets == [] and @full_catalogue != []}
@@ -570,44 +568,28 @@ defmodule BilimbiWeb.DashboardLive do
         <%= for section_id <- @visible_sections do %>
           <%= case section_id do %>
             <% "current-company" -> %>
-              <section
+              <.card
                 :if={@current_company}
                 id="dashboard-current-company"
                 data-company-id={@current_company.id}
-                class="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]"
+                role="region"
+                aria-labelledby="dashboard-current-company-heading"
+                class="mt-6"
+                inner_class="p-5 sm:p-6"
               >
-                <div class="h-0.5 bg-brand" aria-hidden="true"></div>
-                <div class="flex items-center justify-between gap-4 px-5 py-4">
-                  <div class="min-w-0">
-                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-                      Your company
-                    </p>
-                    <h2
-                      id="dashboard-company-name"
-                      class="mt-1 truncate text-base font-semibold text-ink-strong"
-                    >
-                      {Company.Summary.display_name(@current_company)}
-                    </h2>
-                    <p class="mt-0.5 text-xs text-ink-subtle">
-                      <code class="font-medium">{@current_company.code}</code>
-                    </p>
-                  </div>
-                  <div class="flex shrink-0 flex-col items-end gap-2">
-                    <.badge kind={
-                      if @current_company.status == "active", do: :success, else: :warning
-                    }>
-                      {@current_company.status}
-                    </.badge>
-                    <.link
+                <.section_heading id="dashboard-current-company-heading" title="Your company">
+                  <:actions>
+                    <.action_link
                       :if={
                         !@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")
                       }
-                      navigate={~p"/companies/#{@current_company.id}"}
                       id="dashboard-company-open"
-                      class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
+                      icon="forward"
+                      navigate={~p"/companies/#{@current_company.id}"}
+                      title="Open company"
                     >
                       Open company
-                    </.link>
+                    </.action_link>
                     <div :if={@layout_editing} class="flex gap-0.5">
                       <.icon_button
                         icon="hero-chevron-up"
@@ -635,53 +617,78 @@ defmodule BilimbiWeb.DashboardLive do
                         phx-value-id="current-company"
                       />
                     </div>
-                  </div>
-                </div>
-              </section>
+                  </:actions>
+                </.section_heading>
+                <.list id="dashboard-company-facts">
+                  <:item title="Name" id="dashboard-company-name">
+                    {Company.Summary.display_name(@current_company)}
+                  </:item>
+                  <:item title="Code">
+                    <code class="font-medium">{@current_company.code}</code>
+                  </:item>
+                  <:item title="Status">
+                    <.badge kind={
+                      if @current_company.status == "active", do: :success, else: :warning
+                    }>
+                      {@current_company.status}
+                    </.badge>
+                  </:item>
+                </.list>
+              </.card>
             <% "recent-users" -> %>
-              <section id="dashboard-recent-users" class="mt-6">
-                <div class="mb-2 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
-                  <.link
-                    :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
-                    navigate={~p"/users"}
-                    class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
-                  >
-                    All users
-                  </.link>
-                  <div :if={@layout_editing} class="flex gap-0.5">
-                    <.icon_button
-                      icon="hero-chevron-up"
-                      label="Move people section up"
-                      context={:inline}
-                      id="move-section-up-recent-users"
-                      phx-click="move-section-up"
-                      phx-value-id="recent-users"
-                    />
-                    <.icon_button
-                      icon="hero-chevron-down"
-                      label="Move people section down"
-                      context={:inline}
-                      id="move-section-down-recent-users"
-                      phx-click="move-section-down"
-                      phx-value-id="recent-users"
-                    />
-                    <.icon_button
-                      icon="close"
-                      label="Remove people section"
-                      context={:inline}
-                      kind={:danger}
-                      id="remove-section-recent-users"
-                      phx-click="remove-section"
-                      phx-value-id="recent-users"
-                    />
-                  </div>
-                </div>
+              <.card
+                id="dashboard-recent-users"
+                role="region"
+                aria-labelledby="dashboard-recent-users-heading"
+                class="mt-6"
+                inner_class="p-5 sm:p-6"
+              >
+                <.section_heading id="dashboard-recent-users-heading" title="People in this workspace">
+                  <:actions>
+                    <.action_link
+                      :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
+                      id="dashboard-users-open"
+                      icon="forward"
+                      navigate={~p"/users"}
+                      title="All users"
+                    >
+                      All users
+                    </.action_link>
+                    <div :if={@layout_editing} class="flex gap-0.5">
+                      <.icon_button
+                        icon="hero-chevron-up"
+                        label="Move people section up"
+                        context={:inline}
+                        id="move-section-up-recent-users"
+                        phx-click="move-section-up"
+                        phx-value-id="recent-users"
+                      />
+                      <.icon_button
+                        icon="hero-chevron-down"
+                        label="Move people section down"
+                        context={:inline}
+                        id="move-section-down-recent-users"
+                        phx-click="move-section-down"
+                        phx-value-id="recent-users"
+                      />
+                      <.icon_button
+                        icon="close"
+                        label="Remove people section"
+                        context={:inline}
+                        kind={:danger}
+                        id="remove-section-recent-users"
+                        phx-click="remove-section"
+                        phx-value-id="recent-users"
+                      />
+                    </div>
+                  </:actions>
+                </.section_heading>
                 <.table
                   id="dashboard-users"
                   rows={@users}
                   row_id={&"dashboard-user-#{&1.id}"}
                   caption="People in this workspace"
+                  framed={false}
                 >
                   <:col :let={user} label="Name">
                     <span class="font-medium">{user.name}</span>
@@ -696,7 +703,7 @@ defmodule BilimbiWeb.DashboardLive do
                     No users are affiliated with a company in this tenant yet.
                   </:empty>
                 </.table>
-              </section>
+              </.card>
           <% end %>
         <% end %>
       </.page>
@@ -790,7 +797,7 @@ defmodule BilimbiWeb.DashboardLive do
             title="Sessions"
             navigate={
               if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.system.session.list"),
-                do: "/system/sessions"
+                do: ~p"/system/sessions"
             }
           >
             <:item label="Open" value={@session_count} />
@@ -810,20 +817,20 @@ defmodule BilimbiWeb.DashboardLive do
           <.stat_strip
             id="stat-performance"
             title="Performance"
-            navigate={if !@layout_editing, do: "/system/performance"}
+            navigate={if !@layout_editing, do: ~p"/system/performance"}
           >
             <:item label="Health" kind={:text} value={performance_health(@perf_diagnostics)} />
             <:item label="Samples" value={performance_samples(@perf_diagnostics)} />
           </.stat_strip>
         <% other_id -> %>
-          <div
+          <.card
             id={"dashboard-widget-#{other_id}"}
-            class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+            role="region"
+            aria-labelledby={"dashboard-widget-#{other_id}-heading"}
+            inner_class="p-5 sm:p-6"
           >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-              {@widget.label}
-            </p>
-          </div>
+            <.section_heading id={"dashboard-widget-#{other_id}-heading"} title={@widget.label} />
+          </.card>
       <% end %>
     </div>
     """
@@ -845,27 +852,29 @@ defmodule BilimbiWeb.DashboardLive do
 
   defp audit_activity_card(assigns) do
     ~H"""
-    <div id={@id} class="rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
-      <div class="flex items-center justify-between border-b border-line px-4 py-3">
-        <h3 class="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Recent Activity
-        </h3>
-        <.icon_button
-          :if={@navigate}
-          id={"#{@id}-open"}
-          icon="forward"
-          label="Open audit log"
-          context={:inline}
-          navigate={@navigate}
-        />
-      </div>
-      <div :if={Enum.empty?(@entries)} class="px-4 py-5 text-sm text-ink-subtle">
-        No recent activity.
-      </div>
+    <.card
+      id={@id}
+      role="region"
+      aria-labelledby={"#{@id}-heading"}
+      inner_class="p-5 sm:p-6"
+    >
+      <.section_heading id={"#{@id}-heading"} title="Recent Activity">
+        <:actions>
+          <.icon_button
+            :if={@navigate}
+            id={"#{@id}-open"}
+            icon="forward"
+            label="Open audit log"
+            context={:inline}
+            navigate={@navigate}
+          />
+        </:actions>
+      </.section_heading>
+      <.empty_state :if={Enum.empty?(@entries)} id={"#{@id}-empty"} title="No recent activity." />
       <div :if={Enum.any?(@entries)} class="divide-y divide-line">
         <div
           :for={entry <- @entries}
-          class="flex items-start gap-3 px-4 py-2.5 text-sm"
+          class="flex items-start gap-3 py-2.5 text-sm"
         >
           <.icon name="hero-document-text" class="size-4 shrink-0 text-ink-faint" />
           <div class="min-w-0 flex-1">
@@ -879,7 +888,7 @@ defmodule BilimbiWeb.DashboardLive do
           />
         </div>
       </div>
-    </div>
+    </.card>
     """
   end
 end
