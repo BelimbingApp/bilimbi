@@ -4,7 +4,7 @@ defmodule Bilimbi.Base.SystemTest do
   "Unavailable" -- never a crash, and never an invented value.
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   # Aliased, not imported as `System`: an `alias Bilimbi.Base.System` shadows
   # Elixir's own `System`, and these assertions compare against it.
@@ -45,9 +45,43 @@ defmodule Bilimbi.Base.SystemTest do
       facts = Map.new(SystemInfo.application(), &{&1.label, &1.value})
 
       assert facts["Environment"] == "test"
-      assert facts["Debug Mode"] == "Disabled"
       assert facts["Timezone"] == Application.get_env(:bilimbi_base_ui, :timezone, "Etc/UTC")
       assert facts["Locale"] == Bilimbi.Base.Locale.locale(nil)
+    end
+
+    test "debug mode follows endpoint configuration independently of environment" do
+      previous_env = Application.fetch_env(:bilimbi_base_ui, :mix_env)
+      previous_endpoint = Application.fetch_env(:web, BilimbiWeb.Endpoint)
+
+      on_exit(fn ->
+        for {app, key, previous} <- [
+              {:bilimbi_base_ui, :mix_env, previous_env},
+              {:web, BilimbiWeb.Endpoint, previous_endpoint}
+            ] do
+          case previous do
+            {:ok, value} -> Application.put_env(app, key, value)
+            :error -> Application.delete_env(app, key)
+          end
+        end
+      end)
+
+      for environment <- [:dev, :test, :prod],
+          {config, expected} <- [
+            {[debug_errors: true], "Enabled"},
+            {[debug_errors: false], "Disabled"},
+            {[], "Disabled"}
+          ] do
+        Application.put_env(:bilimbi_base_ui, :mix_env, environment)
+        Application.put_env(:web, BilimbiWeb.Endpoint, config)
+        facts = Map.new(SystemInfo.application(), &{&1.label, &1.value})
+
+        assert facts["Environment"] == to_string(environment)
+        assert facts["Debug Mode"] == expected
+      end
+
+      Application.delete_env(:web, BilimbiWeb.Endpoint)
+      facts = Map.new(SystemInfo.application(), &{&1.label, &1.value})
+      assert facts["Debug Mode"] == "Disabled"
     end
 
     test "runtime reports the real BEAM, not a hard-coded string" do

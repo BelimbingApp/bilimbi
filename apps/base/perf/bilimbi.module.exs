@@ -6,9 +6,9 @@
   otp_app: :bilimbi_base_perf,
   namespace: Bilimbi.Base.Perf,
   dependencies: [
+    "base/authz",
     "base/dashboard",
     "base/database",
-    "base/authz",
     "base/module_registry",
     "base/queue",
     "base/schedule",

@@ -125,7 +125,7 @@ defmodule Bilimbi.Base.System do
   defp fact(label, value) when is_binary(value), do: %{label: label, value: value}
   defp fact(label, value), do: %{label: label, value: to_string(value)}
 
-  defp debug?, do: Application.get_env(:bilimbi_base_ui, :mix_env, :prod) == :dev
+  defp debug?, do: Application.get_env(:web, BilimbiWeb.Endpoint, [])[:debug_errors] == true
 
   defp endpoint_url do
     case Application.get_env(:web, BilimbiWeb.Endpoint) do

@@ -33,7 +33,6 @@ defmodule Bilimbi.Base.AuthzTest do
              Authz.actor(:agent, 8, tenant_scope, 10, acting_for_user_id: 7)
   end
 
-
   test "unknown capabilities fail closed before stale persisted grants" do
     actor = Authz.actor(:user, 7, scope(), 10)
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
