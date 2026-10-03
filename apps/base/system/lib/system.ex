@@ -20,8 +20,8 @@ defmodule Bilimbi.Base.System do
   it could not read a disk is worse than one that says it could not read a disk.
   """
 
-  alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Locale
+  alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
 
