@@ -1490,7 +1490,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
       assert has_element?(view, "#btn-open-attach-address")
 
-      revoke_capability!(scope, "admin.company.update")
+revoke_capability!(scope, "admin.company.update")
 
       render_hook(view, "save_field", %{"id" => "73", "name" => "Forged"})
 
@@ -1501,7 +1501,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
              )
 
       refute has_element?(view, "#btn-open-attach-address")
-      refute has_element?(view, "#btn-open-create-address")
+refute has_element?(view, "#btn-open-create-address")
 
       grant_capabilities!(["admin.company.update"])
       render_hook(view, "cancel_edit_field", %{})
@@ -1510,6 +1510,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#btn-open-attach-address") |> render_click()
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
       refute has_element?(view, "#flash-error")
+refute has_element?(view, "#flash-error")
     end
 
     test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do

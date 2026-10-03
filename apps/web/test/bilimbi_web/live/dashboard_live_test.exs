@@ -50,8 +50,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
       handler,
       Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
       fn _event, _measurements, metadata, {owner, session_id} ->
+        # Activity writes also read rows for audit capture, using an activity cutoff.
         if self() == owner and metadata.source == "sessions" and
-             session_id in (metadata.params || []) do
+             match?({:ok, %{command: :select}}, metadata.result) and
+             metadata.params == [session_id] do
           send(owner, :session_read)
         end
       end,

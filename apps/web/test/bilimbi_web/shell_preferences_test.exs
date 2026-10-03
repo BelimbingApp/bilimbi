@@ -72,7 +72,7 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     :ok = Session.delete_session(session_id)
     render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
-    assert has_element?(view, "#app-display-system[aria-pressed='true']")
+    assert_redirect(view, "/")
   end
 
   test "a keyboard-only time display save confirms in place without leaving the page", %{
