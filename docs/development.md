@@ -81,10 +81,12 @@ Phoenix. If it finds stale or missing workspace-graph metadata, it rebuilds
 the dependencies once and retries; other startup errors are reported without
 automatic recovery.
 
-`mix precommit` is the required final check for a change. It compiles with
-warnings as errors, unlocks unused dependencies, formats the project, runs the
-LiveView hook tests in Node (`mix assets.test`), runs every installed module's
-tests and the Web host's integration tests, and verifies module contributions.
+`mix precommit` is the required final check for a change. It compiles the
+umbrella with warnings as errors, strictly compiles each discovered module and
+the Web host (`mix compile.strict`), unlocks unused dependencies, formats the
+project, runs the LiveView hook tests in Node (`mix assets.test`), runs every
+installed module's tests and the Web host's integration tests, and verifies
+module contributions.
 The hook tests need Node.js 22 or
 later, with npm, on the `PATH`; `.mise.toml` does not pin it.
 
