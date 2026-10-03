@@ -104,7 +104,10 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Workflow.Migrations.CreateStatusCompatibilityBaseline,
              Bilimbi.Base.Workflow.Migrations.CreateCoordinationCompatibilityBaseline,
              Bilimbi.Base.Workflow.Migrations.CreateHumanActionCompatibilityBaseline,
-             Bilimbi.Base.Workflow.Migrations.CreateSubjectBindings
+             Bilimbi.Base.Workflow.Migrations.CreateSubjectBindings,
+             Bilimbi.Base.Audit.Migrations.AddTenantTimelineIndexes,
+             Bilimbi.Base.Authz.Migrations.AddDecisionLogTimelineIndex,
+             Bilimbi.Base.Schedule.Migrations.IndexAndPruneScheduleOccurrences
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -134,6 +137,9 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
+             :bilimbi_only,
+             :bilimbi_only,
              :bilimbi_only
            ]
 
