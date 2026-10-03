@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Locale do
     2. a valid explicitly stored global locale and its provenance;
     3. a supported locale inferred from bounded bootstrap facts and persisted
        globally once;
-    4. the declared `en-MY` default.
+       4. the declared settings default.
 
   The regional code remains intact for number, currency, and later date/time
   consumers. `language/1` separately returns the language code a Gettext
@@ -30,7 +30,9 @@ defmodule Bilimbi.Base.Locale do
   alias Bilimbi.Base.Locale.Bootstrap
   alias Bilimbi.Base.Locale.Resolved
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Settings.Scope
+  # Settings scope, not `Bilimbi.Base.Tenancy.Scope`. A bare `Scope` in this
+  # facade would read as the tenancy scope root AGENTS.md §13 requires.
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
 
   @locale_key "ui.locale"
   @source_key "ui.locale_source"
@@ -40,8 +42,6 @@ defmodule Bilimbi.Base.Locale do
   @platform_operator_address "platform_operator_address"
   @declared_default "declared_default"
   @sources [@manual, @platform_operator_address, @declared_default]
-
-  @fallback_locale "en-MY"
 
   @supported_locales %{
     "ar-SA" => %{label: "Arabic (Saudi Arabia)", language: "ar"},
@@ -125,11 +125,11 @@ defmodule Bilimbi.Base.Locale do
     "VN" => "vi-VN"
   }
 
-  @type locale_scope :: %Scope{type: :user} | nil
+  @type locale_scope :: %SettingsScope{type: :user} | nil
 
   @doc "The canonical installation fallback and declared Settings default."
   @spec fallback_locale() :: String.t()
-  def fallback_locale, do: @fallback_locale
+  def fallback_locale, do: Settings.definition!(@locale_key).default
 
   @doc "The immutable supported regional catalogue keyed by canonical code."
   @spec supported_locales() :: %{
@@ -191,14 +191,14 @@ defmodule Bilimbi.Base.Locale do
   @spec locale(locale_scope()) :: String.t()
   def locale(nil), do: normalize_setting(Settings.get(@locale_key, nil))
 
-  def locale(%Scope{type: :user} = scope),
+  def locale(%SettingsScope{type: :user} = scope),
     do: normalize_setting(Settings.get(@locale_key, scope))
 
   @doc "Whether the explicit global or user scope has its own locale row."
   @spec overridden?(locale_scope()) :: boolean()
   def overridden?(nil), do: Settings.overridden?(@locale_key, nil)
 
-  def overridden?(%Scope{type: :user} = scope),
+  def overridden?(%SettingsScope{type: :user} = scope),
     do: Settings.overridden?(@locale_key, scope)
 
   @doc """
@@ -219,7 +219,7 @@ defmodule Bilimbi.Base.Locale do
     end
   end
 
-  def put(%Scope{type: :user} = scope, locale) when is_binary(locale) do
+  def put(%SettingsScope{type: :user} = scope, locale) when is_binary(locale) do
     locale = normalize_setting(locale)
     Settings.put(@locale_key, locale, scope)
   end
@@ -232,7 +232,7 @@ defmodule Bilimbi.Base.Locale do
     Settings.delete(@inferred_country_key, nil)
   end
 
-  def delete(%Scope{type: :user} = scope), do: Settings.delete(@locale_key, scope)
+  def delete(%SettingsScope{type: :user} = scope), do: Settings.delete(@locale_key, scope)
 
   @doc """
   Resolves one scope without changing process-global locale state.
@@ -249,13 +249,13 @@ defmodule Bilimbi.Base.Locale do
   rescue
     error in Postgrex.Error ->
       if match?(%{postgres: %{code: :undefined_table}}, error) do
-        resolved(@fallback_locale, @declared_default)
+        resolved(fallback_locale(), @declared_default)
       else
         reraise error, __STACKTRACE__
       end
   end
 
-  defp do_resolve(%Scope{type: :user} = scope, bootstrap) do
+  defp do_resolve(%SettingsScope{type: :user} = scope, bootstrap) do
     if overridden?(scope) do
       resolved(locale(scope), @manual)
     else
@@ -326,7 +326,7 @@ defmodule Bilimbi.Base.Locale do
     }
   end
 
-  defp normalize_setting(locale), do: normalize(locale) || @fallback_locale
+  defp normalize_setting(locale), do: normalize(locale) || fallback_locale()
 
   defp normalize_parts([language]) when language != "" do
     Map.get(@language_defaults, String.downcase(language))

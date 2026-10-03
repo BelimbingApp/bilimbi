@@ -12,7 +12,11 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   @default_poll_interval 15_000
 
   def start_link(options \\ []) do
-    GenServer.start_link(__MODULE__, options, name: Keyword.get(options, :name, __MODULE__))
+    name = Keyword.get(options, :name, __MODULE__)
+    # `Schedule.diagnostics/0` reads this name instead of calling this module,
+    # which is what kept the facade and the scheduler in an xref cycle.
+    Application.put_env(@application, :scheduler_name, name)
+    GenServer.start_link(__MODULE__, options, name: name)
   end
 
   @impl true

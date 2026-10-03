@@ -14,6 +14,8 @@ defmodule Bilimbi.Base.DateTime do
   company-timezone management surface and resolution (#447): it writes the
   value through the public Settings API under its own capability, and this
   module reads it by explicit company scope — Base never queries Core.
+  Invalid stored values fall back to the definition's own default, not a
+  second copy kept here.
 
   The time zone database is `TimeZoneInfo.TimeZoneDatabase`, the same
   explicit-database idiom `base/schedule` established — Elixir's default
@@ -23,14 +25,14 @@ defmodule Bilimbi.Base.DateTime do
   alias Bilimbi.Base.DateTime.Display
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Settings.Scope
+  # Settings scope, not `Bilimbi.Base.Tenancy.Scope`. A bare `Scope` in this
+  # facade would read as the tenancy scope root AGENTS.md §13 requires.
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
 
   @mode_key "ui.timezone.mode"
   @timezone_key "localization.timezone"
 
   @modes [:company, :local, :utc]
-  @default_mode :company
-  @default_timezone "UTC"
   @tz_db TimeZoneInfo.TimeZoneDatabase
 
   @type mode :: :company | :local | :utc
@@ -49,17 +51,18 @@ defmodule Bilimbi.Base.DateTime do
   def time_zone_database, do: @tz_db
 
   @doc "Reads the account's display mode; unset or invalid resolves to `:company`."
-  @spec mode(Scope.t()) :: mode()
-  def mode(%Scope{type: :user} = scope) do
+  @spec mode(SettingsScope.t()) :: mode()
+  def mode(%SettingsScope{type: :user} = scope) do
     case Settings.get(@mode_key, scope) do
       value when is_binary(value) -> parse_mode(value)
-      _other -> @default_mode
+      _other -> default_mode()
     end
   end
 
   @doc "Whether the account has its own stored display mode."
-  @spec mode_overridden?(Scope.t()) :: boolean()
-  def mode_overridden?(%Scope{type: :user} = scope), do: Settings.overridden?(@mode_key, scope)
+  @spec mode_overridden?(SettingsScope.t()) :: boolean()
+  def mode_overridden?(%SettingsScope{type: :user} = scope),
+    do: Settings.overridden?(@mode_key, scope)
 
   @doc """
   Stores the signed-in account's display mode.
@@ -67,8 +70,9 @@ defmodule Bilimbi.Base.DateTime do
   The caller derives `scope` from the authenticated context; a request can
   never name another user here. Only the three canonical modes persist.
   """
-  @spec put_mode(Scope.t(), mode() | String.t()) :: {:ok, mode()} | {:error, :invalid_mode}
-  def put_mode(%Scope{type: :user} = scope, mode) do
+  @spec put_mode(SettingsScope.t(), mode() | String.t()) ::
+          {:ok, mode()} | {:error, :invalid_mode}
+  def put_mode(%SettingsScope{type: :user} = scope, mode) do
     if valid_mode?(mode) do
       mode = parse_mode(mode)
 
@@ -82,8 +86,8 @@ defmodule Bilimbi.Base.DateTime do
   end
 
   @doc "Removes the account's stored mode so the default resolves again."
-  @spec delete_mode(Scope.t()) :: :ok
-  def delete_mode(%Scope{type: :user} = scope), do: Settings.delete(@mode_key, scope)
+  @spec delete_mode(SettingsScope.t()) :: :ok
+  def delete_mode(%SettingsScope{type: :user} = scope), do: Settings.delete(@mode_key, scope)
 
   @doc "Whether the value names a convertible IANA time zone in the real database."
   @spec valid_timezone?(term()) :: boolean()
@@ -109,16 +113,16 @@ defmodule Bilimbi.Base.DateTime do
   rather than raising in presentation — the invalid value stays visible on
   the company management surface, which is where it gets fixed.
   """
-  @spec company_timezone(Scope.t() | nil) :: String.t()
-  def company_timezone(nil), do: @default_timezone
+  @spec company_timezone(SettingsScope.t() | nil) :: String.t()
+  def company_timezone(nil), do: default_timezone()
 
-  def company_timezone(%Scope{} = scope) do
+  def company_timezone(%SettingsScope{} = scope) do
     case Settings.get(@timezone_key, scope) do
       value when is_binary(value) and value != "" ->
-        if valid_timezone?(value), do: value, else: @default_timezone
+        if valid_timezone?(value), do: value, else: default_timezone()
 
       _other ->
-        @default_timezone
+        default_timezone()
     end
   end
 
@@ -131,14 +135,14 @@ defmodule Bilimbi.Base.DateTime do
   Before the canonical Settings table exists, resolution returns defaults;
   every other database error stays visible.
   """
-  @spec display(Scope.t() | nil, Scope.t() | nil) :: Display.t()
+  @spec display(SettingsScope.t() | nil, SettingsScope.t() | nil) :: Display.t()
   def display(user_scope, company_scope \\ nil)
 
   def display(nil, _company_scope) do
-    %Display{mode: :local, timezone: @default_timezone, tz_db: @tz_db}
+    %Display{mode: :local, timezone: default_timezone(), tz_db: @tz_db}
   end
 
-  def display(%Scope{type: :user} = user_scope, company_scope) do
+  def display(%SettingsScope{type: :user} = user_scope, company_scope) do
     %Display{
       mode: mode(user_scope),
       timezone: company_timezone(company_scope),
@@ -148,7 +152,7 @@ defmodule Bilimbi.Base.DateTime do
   rescue
     error in Postgrex.Error ->
       if match?(%{postgres: %{code: :undefined_table}}, error) do
-        %Display{mode: @default_mode, timezone: @default_timezone, tz_db: @tz_db}
+        %Display{mode: default_mode(), timezone: default_timezone(), tz_db: @tz_db}
       else
         reraise error, __STACKTRACE__
       end
@@ -175,5 +179,15 @@ defmodule Bilimbi.Base.DateTime do
   defp parse_mode("company"), do: :company
   defp parse_mode("local"), do: :local
   defp parse_mode("utc"), do: :utc
-  defp parse_mode(_other), do: @default_mode
+  defp parse_mode(_other), do: default_mode()
+
+  defp default_mode do
+    case Settings.definition!(@mode_key).default do
+      "local" -> :local
+      "utc" -> :utc
+      _company -> :company
+    end
+  end
+
+  defp default_timezone, do: Settings.definition!(@timezone_key).default
 end

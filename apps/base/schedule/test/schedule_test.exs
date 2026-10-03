@@ -49,7 +49,9 @@ defmodule Bilimbi.Base.ScheduleTest do
                 %{
                   type: :integer,
                   scopes: [:global],
-                  default: 90
+                  default: 90,
+                  minimum: 0,
+                  maximum: 3650
                 }
               )
           },
