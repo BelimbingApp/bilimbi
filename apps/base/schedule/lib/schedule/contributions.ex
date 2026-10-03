@@ -41,7 +41,21 @@ defmodule Bilimbi.Base.Schedule.Contributions do
         capabilities: [@view, @execute, @manage],
         roles: %{"system_viewer" => %{capabilities: [@view]}}
       },
-      schedule: %{definitions: []}
+      schedule: %{
+        definitions: [
+          %{
+            key: "base/schedule.occurrence-retention",
+            name: "Prune schedule occurrence history",
+            expression: "37 3 * * *",
+            timezone: "Etc/UTC",
+            task_name: "Base Schedule occurrence retention",
+            worker: Bilimbi.Base.Schedule.OccurrenceRetentionWorker,
+            args: %{},
+            overlap: :forbid,
+            misfire: :coalesce
+          }
+        ]
+      }
     }
   end
 end

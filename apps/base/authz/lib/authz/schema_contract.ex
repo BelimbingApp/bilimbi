@@ -1,5 +1,12 @@
 defmodule Bilimbi.Base.Authz.SchemaContract do
-  @moduledoc "Pinned PostgreSQL contract for the Base Authz compatibility baseline."
+  @moduledoc """
+  Pinned PostgreSQL contract for the Base Authz compatibility baseline.
+
+  The company timeline index on `base_authz_decision_logs` is optional.
+  Migration `20261003120001` adds `company_id`, then `occurred_at` and `id`
+  descending. An adopted Belimbing database verifies without it. A present
+  index must match those columns and that order.
+  """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
 
@@ -160,6 +167,10 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
           index(["actor_type", "actor_id", "occurred_at"]),
         "base_authz_decision_logs_capability_allowed_index" => index(["capability", "allowed"])
       },
+      optional_indexes: %{
+        "base_authz_decision_logs_company_timeline_index" =>
+          index(["company_id", "occurred_at", "id"], false, nil, [false, true, true])
+      },
       foreign_keys: %{}
     }
   end
@@ -168,7 +179,8 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
     %{type: type, nullable: nullable, default: default}
   end
 
-  defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
+  defp index(columns, unique \\ false, where \\ nil, order \\ nil),
+    do: %{columns: columns, unique: unique, where: where, order: order}
 
   defp foreign_key(column, table, on_delete \\ :cascade) do
     %{

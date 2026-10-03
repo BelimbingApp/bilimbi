@@ -613,6 +613,24 @@ defmodule BilimbiWeb.UserAuth do
           end
         )
 
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :session_activity, :handle_event, fn _event,
+                                                                                  _params,
+                                                                                  socket ->
+          _ = Session.touch_session(socket.assigns.current_scope.session_identity["session_id"])
+          {:cont, socket}
+        end)
+
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :component_session_activity, :handle_info, fn
+          {Bilimbi.Base.UI.ComponentActivity, :activity}, socket ->
+            _ = Session.touch_session(socket.assigns.current_scope.session_identity["session_id"])
+            {:halt, socket}
+
+          _message, socket ->
+            {:cont, socket}
+        end)
+
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
@@ -685,6 +703,7 @@ defmodule BilimbiWeb.UserAuth do
     Phoenix.LiveView.attach_hook(socket, :audit_context_url, :handle_params, fn _params,
                                                                                 uri,
                                                                                 socket ->
+      _ = Session.touch_session(socket.assigns.current_scope.session_identity["session_id"])
       AuditContext.put(%{AuditContext.get() | url: uri})
       {:cont, socket}
     end)
@@ -839,6 +858,11 @@ defmodule BilimbiWeb.UserAuth do
           company_id,
           impersonation_opts(impersonator, session_id)
         )
+
+      # Session metadata is housekeeping, not a user action. Touch only after
+      # this edge has proved the durable session and identity, throttled by the
+      # Session setting so ordinary requests do not amplify writes.
+      _ = Session.touch_session(session_id)
 
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed} = Authz.effective_capabilities(actor)

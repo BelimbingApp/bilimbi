@@ -421,6 +421,36 @@ defmodule Bilimbi.Base.Schedule do
     :exit, _reason -> {:error, :unavailable}
   end
 
+  @doc "Prunes completed occurrence history older than the configured retention period."
+  @spec prune_occurrences() :: non_neg_integer()
+  def prune_occurrences do
+    case Settings.get(@retention_key) do
+      0 ->
+        0
+
+      days ->
+        cutoff = DateTime.utc_now() |> DateTime.add(-days * 86_400, :second)
+
+        latest =
+          from(item in Occurrence,
+            where: item.trigger == "scheduled",
+            distinct: [item.source, item.key],
+            order_by: [asc: item.source, asc: item.key, desc: item.intended_at],
+            select: item.id
+          )
+
+        {count, _rows} =
+          Repo.delete_all(
+            from(item in Occurrence,
+              where: not is_nil(item.finished_at) and item.finished_at < ^cutoff,
+              where: item.id not in subquery(latest)
+            )
+          )
+
+        count
+    end
+  end
+
   @doc false
   def fingerprint(%Definition{} = definition) do
     worker_id = definition.worker.__queue_worker__().id

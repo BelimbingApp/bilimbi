@@ -10,6 +10,8 @@ Secrets and opaque blobs, including a session `payload`, are redacted in `@redac
 
 An instant inside a diff includes seconds. `MutationDiff.diff_value/1` passes `precision={:second}` so two edits in one minute stay distinct. The history entry's own clock can stay at minute precision.
 
+Tenant timeline indexes are optional in `SchemaContract`, not required for baseline adoption. Change their ordering in that contract and the Bilimbi-only migration together.
+
 Silencing capture is not done from this folder. `Bilimbi.Base.Database.WriteCapture.without_capture/1` needs a written, table-level reason. See `apps/base/database/AGENTS.md`.
 
 A retention change goes through `toggle_retained/2`, which asks `Bilimbi.Base.Audit.Authorization`. The workspace wires that to Base Authz in `config/config.exs`. Do not add a `base/authz` dependency: Authz already depends on Audit, and discovery rejects the cycle. The actions screen's `can_manage` assign only shows the control.

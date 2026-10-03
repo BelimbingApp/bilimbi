@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.SessionTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Contributions
@@ -8,11 +9,42 @@ defmodule Bilimbi.Base.SessionTest do
   alias Bilimbi.Base.Session.Page
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
 
   import Bilimbi.Base.Session.TestFixtures
 
   setup do
     create_sessions_table!()
+    SettingsFixtures.create_settings_table!()
+
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: "session-test",
+      consumers: %{
+        settings: %{
+          definitions: %{
+            "session.last_activity_touch_minutes" =>
+              Bilimbi.Base.Settings.Definition.new!(
+                "session.last_activity_touch_minutes",
+                "base/session",
+                %{
+                  type: :integer,
+                  scopes: [:global],
+                  default: 5
+                }
+              ),
+            "session.retention_days" =>
+              Bilimbi.Base.Settings.Definition.new!("session.retention_days", "base/session", %{
+                type: :integer,
+                scopes: [:global],
+                default: 30
+              })
+          },
+          runtime_claims: []
+        }
+      }
+    })
+
+    on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
   end
 
@@ -249,6 +281,16 @@ defmodule Bilimbi.Base.SessionTest do
 
     assert Session.prune_expired(100) == 1
     assert Enum.map(Session.list_sessions(), & &1.id) == ["active", "boundary"]
+  end
+
+  test "touches activity only after the throttle boundary and does not audit housekeeping" do
+    put_session!("activity", 100)
+
+    assert :ok = Session.touch_session("activity", 400)
+    assert {:ok, %Entry{last_activity: 100}} = Session.fetch_session("activity")
+
+    assert :ok = Session.touch_session("activity", 401)
+    assert {:ok, %Entry{last_activity: 401}} = Session.fetch_session("activity")
   end
 
   test "validates canonical column limits and activity metadata" do

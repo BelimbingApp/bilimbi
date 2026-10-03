@@ -551,6 +551,111 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert Repo.exists?(from(run in Run, where: run.key == "test.recent"))
   end
 
+  test "prunes only finished occurrences older than schedule retention", %{definition: definition} do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    old = DateTime.add(now, -100 * 86_400, :second)
+
+    old_finished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: old,
+        trigger: "manual",
+        state: "succeeded",
+        claimed_at: old,
+        finished_at: old
+      })
+
+    recent_finished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: now,
+        trigger: "manual",
+        state: "succeeded",
+        claimed_at: now,
+        finished_at: now
+      })
+
+    unfinished =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: DateTime.add(old, -1, :second),
+        trigger: "manual",
+        state: "queued",
+        claimed_at: old
+      })
+
+    assert Schedule.prune_occurrences() == 1
+    assert Repo.get(Occurrence, old_finished.id) == nil
+    assert Repo.get(Occurrence, recent_finished.id)
+    assert Repo.get(Occurrence, unfinished.id)
+  end
+
+  test "disabled retention preserves completed occurrences", %{definition: definition} do
+    old = DateTime.add(DateTime.utc_now(), -100, :day)
+
+    occurrence =
+      Repo.insert!(%Occurrence{
+        source: "scheduler",
+        key: definition.key,
+        intended_at: old,
+        trigger: "manual",
+        state: "succeeded",
+        claimed_at: old,
+        finished_at: old
+      })
+
+    assert {:ok, 0} = Schedule.set_history_retention(actor(), 0)
+    assert Schedule.prune_occurrences() == 0
+    assert :ok = Bilimbi.Base.Schedule.OccurrenceRetentionWorker.handle_scheduled_job(%{}, %{})
+    assert Repo.get(Occurrence, occurrence.id)
+  end
+
+  test "retention preserves the scheduled watermark for each source and key", %{
+    definition: definition
+  } do
+    old = DateTime.add(DateTime.utc_now(), -100, :day)
+    older = DateTime.add(old, -365, :day)
+
+    for {source, key} <- [
+          {"scheduler", definition.key},
+          {"scheduler", "another.key"},
+          {"another-source", definition.key}
+        ],
+        intended <- [older, old] do
+      Repo.insert!(%Occurrence{
+        source: source,
+        key: key,
+        intended_at: intended,
+        trigger: "scheduled",
+        state: "succeeded",
+        claimed_at: intended,
+        finished_at: intended
+      })
+    end
+
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert Schedule.prune_occurrences() == 3
+    assert Repo.aggregate(Occurrence, :count) == 3
+    assert DateTime.compare(Schedule.latest_scheduled_occurrence(definition), old) == :eq
+    assert {:error, :already_claimed} = Schedule.enqueue_due(definition, old)
+    assert {:ok, %JobRef{}} = Schedule.enqueue_due(definition, DateTime.utc_now())
+  end
+
+  test "baseline verification does not require Bilimbi occurrence state" do
+    alias Bilimbi.Base.Database.SchemaVerifier
+    alias Bilimbi.Base.Schedule.SchemaContract
+
+    assert :ok = SchemaContract.verify_runtime(Repo)
+    Ecto.Adapters.SQL.query!(Repo, "DROP TABLE base_schedule_occurrences", [])
+    assert :ok = SchemaVerifier.verify(Repo, SchemaContract.tables())
+
+    assert {:error, ["missing table public.base_schedule_occurrences"]} =
+             SchemaContract.verify_runtime(Repo)
+  end
+
   test "coalescing selects only the latest missed local occurrence across DST", %{
     definition: definition
   } do
