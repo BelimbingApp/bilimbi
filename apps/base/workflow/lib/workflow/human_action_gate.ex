@@ -280,10 +280,10 @@ defmodule Bilimbi.Base.Workflow.HumanActionGate do
       Map.keys(request) -- @request_keys != [] ->
         {:error, :invalid_request}
 
-      not (text?(request.action_key) and text?(request.idempotency_key)) ->
+      not (text?(request[:action_key]) and text?(request[:idempotency_key])) ->
         {:error, :invalid_request}
 
-      not (is_binary(request.expected_subject_version) and request.expected_subject_version != "") ->
+      not (is_binary(request[:expected_subject_version]) and request[:expected_subject_version] != "") ->
         {:error, :invalid_request}
 
       not Enum.all?(
@@ -349,9 +349,19 @@ defmodule Bilimbi.Base.Workflow.HumanActionGate do
   defp due_work(_scope, _subject_ref, []), do: []
 
   defp due_work(scope, subject_ref, executors) do
-    case PendingWork.list(scope, subject: subject_ref, executor_keys: executors, limit: 500) do
-      {:ok, %{entries: entries}} -> entries
-      {:error, _} -> []
+    due_work(scope, subject: subject_ref, executor_keys: executors, limit: 500)
+  end
+
+  defp due_work(scope, opts) do
+    case PendingWork.list(scope, opts) do
+      {:ok, %{entries: entries, next_cursor: nil}} ->
+        entries
+
+      {:ok, %{entries: entries, next_cursor: cursor}} ->
+        entries ++ due_work(scope, Keyword.put(opts, :after, cursor))
+
+      {:error, _} ->
+        []
     end
   end
 

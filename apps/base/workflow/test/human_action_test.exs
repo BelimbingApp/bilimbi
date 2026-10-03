@@ -65,6 +65,25 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
              Workflow.available_actions(c.scope, subject!(%{marker: "private"}))
   end
 
+  test "availability includes work beyond the first candidate page", c do
+    process = Bilimbi.Base.Workflow.TestProcessContributions.parallel()
+
+    steps =
+      for index <- 1..501 do
+        %{key: "step-#{index}", label: "Step #{index}", executor_key: "example.first"}
+      end
+
+    install_registry!([%{process | steps: steps}])
+    run = start!(c)
+
+    assert {:ok, %{work_items: items}} = Workflow.get_run(c.scope, run.id)
+    assert {:ok, %{actions: [approve | actions]}} = Workflow.available_actions(c.scope, c.subject)
+    assert approve.key == "example.approve"
+    assert length(actions) == 501
+    assert Enum.map(actions, & &1.work_item_id) == Enum.sort(Enum.map(items, & &1.id))
+    assert Enum.all?(actions, &(&1.key == "example.first" and &1.process_run_id == run.id))
+  end
+
   test "a non-work action commits the handler effect, the request and the audit fact together",
        c do
     assert {:ok, %{subject_version: version}} = Workflow.available_actions(c.scope, c.subject)
@@ -443,6 +462,13 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
   test "request shape, work binding and unknown actions fail closed", c do
     assert {:ok, %{subject_version: version}} = Workflow.available_actions(c.scope, c.subject)
     base = approve("shape", version, %{})
+
+    missing_fields =
+      Enum.map([:action_key, :idempotency_key, :expected_subject_version], &Map.delete(base, &1))
+
+    for request <- [%{} | missing_fields] do
+      assert {:error, :invalid_request} = Workflow.execute_action(c.scope, c.subject, request)
+    end
 
     assert {:error, :invalid_request} =
              Workflow.execute_action(c.scope, c.subject, Map.put(base, :actor_id, 7))
