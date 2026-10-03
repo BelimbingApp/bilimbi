@@ -222,6 +222,21 @@ defmodule Bilimbi.Base.Authz do
   def get_role(%Scope{} = scope, role_id), do: RoleService.get_role(scope, role_id, registry!())
 
   @doc """
+  Grant flag and capability keys for many roles the scope may see, in one query.
+
+  A role outside the scope is omitted. A visible role with no capability rows
+  is present with an empty list. Use this when deciding which roles an actor
+  may grant; `get_role/2` also loads every principal assignment and is one
+  lookup per role.
+  """
+  @spec role_grants(Scope.t(), [pos_integer()]) :: %{
+          pos_integer() => %{grant_all: boolean(), capabilities: [String.t()]}
+        }
+  def role_grants(%Scope{} = scope, role_ids) when is_list(role_ids) do
+    RoleService.role_grants(scope, role_ids, registry!())
+  end
+
+  @doc """
   Companies the scope may own a custom role in, named for display.
 
   Role create needs a picker, and Belimbing builds one from

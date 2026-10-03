@@ -120,20 +120,49 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
-  @doc "Resolves an employee through any live company visible to the tenant scope."
+  @doc """
+  Resolves an employee through any live company visible to the tenant scope.
+
+  The company check is `Company.live_company_ids_query/1` inside this
+  statement. Do not load `Company.list_companies/1` and filter the ids in
+  memory: that reads every company row in the tenant for one employee.
+  """
   @spec get_employee(Scope.t(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, :employee_not_found}
   def get_employee(%Scope{} = scope, employee_id) do
-    {:ok, companies} = Company.list_companies(scope)
-    company_ids = Enum.map(companies, & &1.id)
-
     case Repo.one(
            from(employee in Schema,
-             where: employee.id == ^employee_id and employee.company_id in ^company_ids
+             where:
+               employee.id == ^employee_id and
+                 employee.company_id in subquery(Company.live_company_ids_query(scope))
            )
          ) do
       nil -> {:error, :employee_not_found}
       employee -> {:ok, Summary.from_schema(employee)}
+    end
+  end
+
+  @doc """
+  Full names of the given employees whose company is still live in the tenant.
+
+  Same visibility as `get_employee/2`: an employee of a soft-deleted or
+  other-tenant company is omitted. An empty id list does not touch the database.
+  """
+  @spec live_full_names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
+  def live_full_names(%Scope{} = scope, employee_ids) when is_list(employee_ids) do
+    employee_ids = for id <- employee_ids, is_integer(id) and id > 0, uniq: true, do: id
+
+    if employee_ids == [] do
+      %{}
+    else
+      from(employee in Schema,
+        where:
+          employee.id in ^employee_ids and
+            employee.company_id in subquery(Company.live_company_ids_query(scope)),
+        select: {employee.id, employee.full_name}
+      )
+      |> Repo.all()
+      |> Map.new()
     end
   end
 
@@ -151,8 +180,9 @@ defmodule Bilimbi.Core.Employee do
   know whose it is in order to revoke it. Archiving a company does not unmake
   the grant, so it must not hide the name.
 
-  That differs from `get_employee/2`, which uses `Company.list_companies/1` and
-  sees live companies only. The difference is intended: that function answers
+  That differs from `get_employee/2`, which keeps an employee only when the
+  company is still live (`Company.live_company_ids_query/1`). The difference
+  is intended: that function answers
   "may this actor work with this employee", this one answers "who is this
   principal a grant already names".
   """
