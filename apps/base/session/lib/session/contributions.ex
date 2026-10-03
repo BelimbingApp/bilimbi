@@ -8,6 +8,22 @@ defmodule Bilimbi.Base.Session.Contributions do
   @impl true
   def contributions do
     %{
+      settings: %{
+        definitions: %{
+          "session.lifetime_minutes" => %{
+            type: :integer,
+            scopes: [:global],
+            default: 120,
+            minimum: 1,
+            maximum: 525_600,
+            label: "Session lifetime",
+            help: "Minutes of inactivity before a sign-in expires.",
+            editable: "operator",
+            capability: "admin.system.session.manage"
+          }
+        },
+        runtime_claims: []
+      },
       menu: [
         %{
           id: "admin.system.session",
@@ -24,6 +40,21 @@ defmodule Bilimbi.Base.Session.Contributions do
           "auditor" => %{capabilities: [@list]},
           "system_viewer" => %{capabilities: [@list]}
         }
+      },
+      schedule: %{
+        definitions: [
+          %{
+            key: "base/session-expiry",
+            name: "Prune expired sessions",
+            expression: "*/5 * * * *",
+            timezone: "Etc/UTC",
+            task_name: "Base Session expiry",
+            worker: Bilimbi.Base.Session.ExpiryWorker,
+            args: %{},
+            overlap: :forbid,
+            misfire: :coalesce
+          }
+        ]
       }
     }
   end

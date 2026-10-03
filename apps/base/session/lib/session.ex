@@ -53,6 +53,23 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
+  @doc "Refreshes activity when the stored timestamp is at least one minute old."
+  @spec refresh_activity(String.t(), non_neg_integer()) :: :ok
+  def refresh_activity(id, now) when is_binary(id) and is_integer(now) and now >= 0 do
+    # Clock update, not a user decision: would write one audit row per
+    # active session per minute otherwise.
+    WriteCapture.without_capture(fn ->
+      Repo.update_all(
+        from(session in Schema,
+          where: session.id == ^id and session.last_activity <= ^(now - 60)
+        ),
+        set: [last_activity: now]
+      )
+    end)
+
+    :ok
+  end
+
   @spec list_sessions(keyword()) :: [Summary.t()]
   def list_sessions(opts \\ []) when is_list(opts) do
     opts = Keyword.validate!(opts, search: nil, limit: @default_limit)

@@ -12,11 +12,12 @@ defmodule BilimbiWeb.UserAuth do
 
   The Phoenix cookie stores only stable IDs under `"current_user"`:
   `session_id`, `user_id`, and `company_id`. Display fields and tenant
-  identity are never taken from the cookie. Every HTTP and LiveView
-  boundary rehydrates from live data:
+  identity are never taken from the cookie. HTTP requests, LiveView mounts,
+  and root LiveView events rehydrate from live data:
 
     1. `Session.fetch_session/1` — a terminated row ends the cookie;
-    2. the durable row's `user_id` must match the cookie;
+    2. the durable row's `user_id` must match the cookie, and its activity
+       must satisfy the idle-expiry policy in `apps/base/session/docs/README.md`;
     3. `Company.fetch_tenant_id_for_company/1` then `Tenancy.scope/1`;
     4. `User.get_user/3` must return that user in that company.
 
@@ -79,6 +80,10 @@ defmodule BilimbiWeb.UserAuth do
   # Opaque compatibility payload. Web never interprets session contents.
   @opaque_payload "{}"
   @denied_message "You do not have access to that page."
+  @expired_flash "expired"
+  # `Phoenix.LiveView.Router.fetch_live_flash/2` reads this cookie. The
+  # session cookie itself is dropped, so the notice has to travel separately.
+  @live_flash_cookie "__phoenix_flash__"
   @gettext_backends [BilimbiWeb.Gettext, Bilimbi.Base.UI.Gettext]
 
   # ------------------------------------------------------------------
@@ -482,7 +487,38 @@ defmodule BilimbiWeb.UserAuth do
   defp ui_theme(_current_scope), do: nil
 
   defp maybe_clear_stale_session(conn) do
-    if get_session(conn, @session_key), do: configure_session(conn, drop: true), else: conn
+    if get_session(conn, @session_key) do
+      conn
+      |> store_expired_flash()
+      |> configure_session(drop: true)
+    else
+      conn
+    end
+  end
+
+  # Store the notice before `configure_session(drop: true)`. A redirect cannot
+  # keep it in the session cookie that drop deletes, so a signed LiveView flash
+  # cookie carries it to the sign-in screen. A same-request render uses the assign.
+  defp store_expired_flash(conn) do
+    token = expired_flash_token()
+
+    conn
+    |> put_flash(:session_expired, @expired_flash)
+    |> register_before_send(fn conn ->
+      if conn.status in 300..308 do
+        put_resp_cookie(conn, @live_flash_cookie, token,
+          max_age: 60,
+          path: "/",
+          same_site: "Lax"
+        )
+      else
+        conn
+      end
+    end)
+  end
+
+  defp expired_flash_token do
+    Phoenix.LiveView.Utils.sign_flash(BilimbiWeb.Endpoint, %{"session_expired" => @expired_flash})
   end
 
   @doc """
@@ -504,7 +540,7 @@ defmodule BilimbiWeb.UserAuth do
 
   defp maybe_put_session_expired_flash(conn) do
     if conn.assigns[:session_expired] do
-      put_flash(conn, :session_expired, "expired")
+      put_flash(conn, :session_expired, @expired_flash)
     else
       conn
     end
@@ -594,6 +630,31 @@ defmodule BilimbiWeb.UserAuth do
         end
       end
 
+      if Phoenix.LiveView.connected?(socket) do
+        Bilimbi.Base.UI.SessionGuard.install(fn activity? ->
+          durable_session_valid?(current_scope, activity?)
+        end)
+      end
+
+      socket =
+        socket
+        |> Phoenix.LiveView.attach_hook(:durable_session_params, :handle_params, fn
+          _params, _uri, socket ->
+            if Phoenix.LiveView.connected?(socket),
+              do: guard_session(socket, true),
+              else: {:cont, socket}
+        end)
+        |> Phoenix.LiveView.attach_hook(:durable_session_info, :handle_info, fn
+          :durable_session_expired, socket ->
+            {:halt, expire_socket(socket)}
+
+          _message, socket ->
+            guard_session(socket, false)
+        end)
+        |> Phoenix.LiveView.attach_hook(:durable_session_async, :handle_async, fn
+          _name, _result, socket -> guard_session(socket, false)
+        end)
+
       socket =
         Phoenix.LiveView.attach_hook(
           socket,
@@ -613,9 +674,15 @@ defmodule BilimbiWeb.UserAuth do
           end
         )
 
+      socket =
+        Phoenix.LiveView.attach_hook(socket, :durable_session_activity, :handle_event, fn
+          _event, _params, socket ->
+            guard_session(socket, true)
+        end)
+
       {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
-      {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
+      {:halt, redirect_if_ended(socket, session)}
     end
   end
 
@@ -824,9 +891,11 @@ defmodule BilimbiWeb.UserAuth do
               is_integer(company_id) and company_id > 0 do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
          true <- entry.user_id == user_id,
+         true <- session_active?(entry),
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
+      :ok = Session.refresh_activity(session_id, System.system_time(:second))
       impersonator = extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
@@ -865,6 +934,44 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp current_scope_from(_session_user, _impersonation), do: nil
+
+  defp guard_session(socket, activity?) do
+    if durable_session_valid?(socket.assigns.current_scope, activity?) do
+      {:cont, socket}
+    else
+      {:halt, expire_socket(socket)}
+    end
+  end
+
+  defp redirect_if_ended(socket, session) do
+    if session[@session_key] do
+      expire_socket(socket)
+    else
+      Phoenix.LiveView.redirect(socket, to: ~p"/")
+    end
+  end
+
+  defp expire_socket(socket) do
+    socket
+    |> Phoenix.LiveView.put_flash(:session_expired, @expired_flash)
+    |> Phoenix.LiveView.redirect(to: ~p"/")
+  end
+
+  defp durable_session_valid?(%{session_identity: identity}, activity?) do
+    with {:ok, %Entry{} = entry} <- Session.fetch_session(identity["session_id"]),
+         true <- entry.user_id == identity["user_id"],
+         true <- session_active?(entry) do
+      if activity?, do: Session.refresh_activity(entry.id, System.system_time(:second))
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp session_active?(%Entry{last_activity: last_activity}) do
+    lifetime_minutes = Bilimbi.Base.Settings.get("session.lifetime_minutes")
+    last_activity >= System.system_time(:second) - lifetime_minutes * 60
+  end
 
   # Belimbing's status bar warns only on the operator tenant when that tenant
   # has no primary company. Failures other than "not provisioned" stay quiet:
