@@ -19,6 +19,41 @@ defmodule Bilimbi.Base.Repo do
   # (seed ledger, compatibility cutover), a review convention (ADR 0013).
   defoverridable Ecto.Repo
 
+  @doc "Runs a callback after the outer transaction commits, or immediately outside one."
+  @spec after_commit((-> term())) :: :ok
+  def after_commit(callback) when is_function(callback, 0) do
+    if in_transaction?() do
+      callbacks = Process.get({__MODULE__, :after_commit}, [])
+      Process.put({__MODULE__, :after_commit}, [callback | callbacks])
+    else
+      callback.()
+    end
+
+    :ok
+  end
+
+  def transact(fun_or_multi, opts) do
+    if in_transaction?() do
+      super(fun_or_multi, opts)
+    else
+      Process.put({__MODULE__, :after_commit}, [])
+
+      try do
+        result = super(fun_or_multi, opts)
+        callbacks = Process.delete({__MODULE__, :after_commit})
+
+        case result do
+          {:ok, _} -> Enum.each(Enum.reverse(callbacks), & &1.())
+          _ -> :ok
+        end
+
+        result
+      after
+        Process.delete({__MODULE__, :after_commit})
+      end
+    end
+  end
+
   def insert(struct, opts) do
     with {:ok, result} <- super(struct, opts) do
       WriteCapture.dispatch(:insert, struct, result)

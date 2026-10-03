@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Settings do
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Encryption
   alias Bilimbi.Base.Settings.Schema
@@ -64,7 +65,70 @@ defmodule Bilimbi.Base.Settings do
 
   @spec get_many([String.t()], Scope.t() | nil) :: %{required(String.t()) => term()}
   def get_many(keys, scope \\ nil) when is_list(keys) do
-    Map.new(Enum.uniq(keys), &{&1, get(&1, scope)})
+    Map.new(resolve_many(keys, scope), fn {key, resolved} -> {key, resolved.value} end)
+  end
+
+  @doc """
+  Resolves values and override metadata from one uncached query snapshot.
+
+  Returns a map keyed by setting key. Each entry contains the decoded `:value`,
+  `:overridden?` (whether the first allowed scope in the chain supplied a row),
+  and `:source_scope` (the supplying scope type). A default or missing runtime
+  value uses `:global` as its source and is not overridden. Encrypted values
+  are decoded here; presentation callers must mask them through `Settings.Form`.
+
+  An empty key list returns an empty map without querying storage.
+  """
+  @spec resolve_many([String.t()], Scope.t() | nil) :: map()
+  def resolve_many(keys, scope \\ nil) when is_list(keys) do
+    plans =
+      Map.new(keys, fn key ->
+        definition = definition(key)
+        unless definition, do: assert_runtime_claimed!(key)
+
+        scopes =
+          Enum.filter(Scope.chain(scope), fn candidate ->
+            is_nil(definition) or Definition.allows_scope?(definition, candidate)
+          end)
+
+        {key, {definition, scopes}}
+      end)
+
+    pairs =
+      Enum.flat_map(plans, fn {key, {_definition, scopes}} ->
+        Enum.map(scopes, &{key, &1})
+      end)
+
+    rows = fetch_rows(pairs)
+
+    Map.new(plans, fn {key, {definition, scopes}} ->
+      found =
+        Enum.find_value(scopes, fn candidate ->
+          case Map.get(rows, row_cache_key(key, candidate)) do
+            nil -> nil
+            row -> {candidate, row}
+          end
+        end)
+
+      resolved =
+        case found do
+          {candidate, row} ->
+            %{
+              value: decode(row),
+              overridden?: candidate == List.first(scopes),
+              source_scope: if(candidate, do: candidate.type, else: :global)
+            }
+
+          nil ->
+            %{
+              value: if(definition, do: definition.default, else: nil),
+              overridden?: false,
+              source_scope: :global
+            }
+        end
+
+      {key, resolved}
+    end)
   end
 
   @spec put(String.t(), term(), Scope.t() | nil) :: {:ok, term()} | {:error, Ecto.Changeset.t()}
@@ -132,8 +196,12 @@ defmodule Bilimbi.Base.Settings do
           conflict_target: conflict_target(scope)
         )
         |> case do
-          {:ok, _setting} -> {:ok, value}
-          {:error, changeset} -> {:error, changeset}
+          {:ok, _setting} ->
+            Repo.after_commit(fn -> Cache.invalidate(key, scope_type, scope_id) end)
+            {:ok, value}
+
+          {:error, changeset} ->
+            {:error, changeset}
         end
     end
   end
@@ -146,6 +214,8 @@ defmodule Bilimbi.Base.Settings do
     key
     |> setting_scope_query(scope_type, scope_id)
     |> Repo.delete_all()
+
+    Repo.after_commit(fn -> Cache.invalidate(key, scope_type, scope_id) end)
 
     :ok
   end
@@ -166,13 +236,49 @@ defmodule Bilimbi.Base.Settings do
   end
 
   defp fetch_row(key, scope) do
-    {scope_type, scope_id} = Scope.database_identity(scope)
+    loader = fn ->
+      {scope_type, scope_id} = Scope.database_identity(scope)
 
-    key
-    |> setting_scope_query(scope_type, scope_id)
-    |> limit(1)
-    |> Repo.one()
+      key
+      |> setting_scope_query(scope_type, scope_id)
+      |> limit(1)
+      |> Repo.one()
+    end
+
+    if Repo.in_transaction?(), do: loader.(), else: Cache.fetch(row_cache_key(key, scope), loader)
   end
+
+  defp fetch_rows([]), do: %{}
+
+  defp fetch_rows(pairs) do
+    filters =
+      Enum.reduce(pairs, dynamic(false), fn {key, scope}, filters ->
+        {scope_type, scope_id} = Scope.database_identity(scope)
+
+        scope_filter =
+          if is_nil(scope_type) do
+            dynamic([setting], is_nil(setting.scope_type) and is_nil(setting.scope_id))
+          else
+            dynamic(
+              [setting],
+              setting.scope_type == ^scope_type and setting.scope_id == ^scope_id
+            )
+          end
+
+        dynamic([setting], ^filters or (setting.key == ^key and ^scope_filter))
+      end)
+
+    from(setting in Schema, where: ^filters)
+    |> Repo.all()
+    |> Map.new(fn row -> {{row.key, row.scope_type, row.scope_id}, row} end)
+  end
+
+  defp row_cache_key(key, %Scope{} = scope) do
+    {scope_type, scope_id} = Scope.database_identity(scope)
+    {key, scope_type, scope_id}
+  end
+
+  defp row_cache_key(key, nil), do: {key, nil, nil}
 
   defp setting_scope_query(key, nil, nil) do
     from(setting in Schema,
