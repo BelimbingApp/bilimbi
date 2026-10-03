@@ -26,10 +26,24 @@ defmodule BilimbiWeb.Router do
                              "; "
                            )
 
-  # `json` is here because the shell's pin requests send `Accept: application/json`
-  # through this same session pipeline. An HTML navigation still negotiates
-  # `html` from the browser's Accept header.
   pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {Bilimbi.Base.UI.Layouts, :root}
+    plug :protect_from_forgery
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" => @content_security_policy
+    }
+
+    plug :fetch_current_scope
+  end
+
+  # The shell calls theme with Accept: application/json. The browser
+  # pipeline accepts only html, so that header is refused before the controller.
+  # Session, CSRF, and authentication stay the same as the browser pipeline.
+  pipeline :api do
     plug :accepts, ["html", "json"]
     plug :fetch_session
     plug :fetch_live_flash
@@ -43,14 +57,11 @@ defmodule BilimbiWeb.Router do
     plug :fetch_current_scope
   end
 
-  # The shell calls pins and theme with Accept: application/json. The browser
-  # pipeline accepts only html, so that header is refused before the controller.
-  # Session, CSRF, and authentication stay the same as the browser pipeline.
-  pipeline :api do
-    plug :accepts, ["html", "json"]
+  # Pin routes answer JSON only. A navigation Accept header is refused here
+  # rather than in the controller.
+  pipeline :pins do
+    plug :accepts, ["json"]
     plug :fetch_session
-    plug :fetch_live_flash
-    plug :put_root_layout, html: {Bilimbi.Base.UI.Layouts, :root}
     plug :protect_from_forgery
 
     plug :put_secure_browser_headers, %{
@@ -105,6 +116,11 @@ defmodule BilimbiWeb.Router do
     pipe_through [:api, :require_authenticated]
 
     post "/theme", ThemeController, :update
+  end
+
+  scope "/api", BilimbiWeb do
+    pipe_through [:pins, :require_authenticated]
+
     get "/pins", PinController, :index
     post "/pins/toggle", PinController, :toggle
     post "/pins/reorder", PinController, :reorder
