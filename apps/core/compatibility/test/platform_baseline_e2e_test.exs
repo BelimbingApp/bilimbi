@@ -27,9 +27,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   @host_tasks ~w(bilimbi.migrate bilimbi.rollback bilimbi.schema.verify bilimbi.schema.adopt bilimbi.seeds.run)
 
   setup_all %{mounted_domain: mounted_domain} do
-    # A root build recompiles this package as a dependency, without
-    # test/support, and deletes those beams. Load them before the first
-    # nested run.
+    # Load this package's runtime smoke and schema fixtures before nested
+    # commands start. Host and package commands now share the same test build.
     {:ok, modules} = :application.get_key(:bilimbi_core_compatibility, :modules)
     Enum.each(modules, &Code.ensure_loaded!/1)
 

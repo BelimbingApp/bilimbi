@@ -3,6 +3,7 @@ defmodule Bilimbi.Base.PerfConcurrencyTest do
 
   @moduletag timeout: 60_000
 
+  alias Bilimbi.Base.Database.DataCase
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Perf
@@ -18,7 +19,7 @@ defmodule Bilimbi.Base.PerfConcurrencyTest do
   setup do
     require_migrations!()
     unique = System.unique_integer([:positive])
-    database = "bilimbi_perf_concurrency_#{unique}"
+    database = DataCase.unique_database_name("bilimbi_perf_concurrency")
     quoted_database = SchemaVerifier.quote_identifier!(database)
 
     Sandbox.unboxed_run(Repo, fn -> SQL.query!(Repo, "CREATE DATABASE #{quoted_database}", []) end)

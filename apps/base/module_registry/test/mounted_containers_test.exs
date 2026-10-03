@@ -75,14 +75,14 @@ defmodule Bilimbi.Base.ModuleRegistry.MountedContainersTest do
              ]
 
       assert MixDiscovery.optional_container_dependencies(web) == [
-               {:people, path: "../domains/people"},
-               {:acme, path: "../extensions/acme"}
+               {:people, path: "../domains/people", env: :test},
+               {:acme, path: "../extensions/acme", env: :test}
              ]
 
       people = Path.join(root, "apps/domains/people")
 
       assert MixDiscovery.container_dependencies(people) == [
-               {:test_people_employee, path: "employee"}
+               {:test_people_employee, path: "employee", env: :test}
              ]
 
       assert [bilimbi_module: descriptor] =

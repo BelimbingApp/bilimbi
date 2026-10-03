@@ -1,4 +1,4 @@
-Code.require_file(Path.expand("../../database/test/support/data_case.ex", __DIR__))
+Code.ensure_loaded!(Bilimbi.Base.Database.DataCase)
 
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Bilimbi.Base.Repo, :manual)

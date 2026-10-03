@@ -178,6 +178,18 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      # Asset tools live beside _build/test, so the build cache above does not
+      # retain them. Keep their configured versions and npm's locked downloads
+      # in a separate cache; the install steps still verify/install as needed.
+      - name: Restore asset tool cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            _build/tailwind-*
+            _build/esbuild-*
+            ~/.npm
+          key: ${{ runner.os }}-${{ runner.arch }}-asset-tools-${{ hashFiles('config/config.exs', 'apps/web/assets/package-lock.json') }}
+
       # The mounted Tailwind source test builds CSS with the pinned binary.
       - name: Install Tailwind
         run: (cd apps/web && mix tailwind.install --if-missing)

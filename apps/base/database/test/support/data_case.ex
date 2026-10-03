@@ -1,6 +1,9 @@
 defmodule Bilimbi.Base.Database.DataCase do
   @moduledoc """
   Shared SQL sandbox case for tests that use Bilimbi's one Ecto Repo.
+
+  Discovered local dependencies compile their support in the test environment;
+  load this case with `Code.ensure_loaded!/1` rather than recompiling its source.
   """
 
   use ExUnit.CaseTemplate
@@ -23,6 +26,14 @@ defmodule Bilimbi.Base.Database.DataCase do
 
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(owner) end)
     :ok
+  end
+
+  @doc false
+  def unique_database_name(prefix) when is_binary(prefix) and byte_size(prefix) <= 38 do
+    # unique_integer/1 is VM-local. Parallel CI lanes share PostgreSQL, so a
+    # counter alone can collide with another run or an interrupted fixture.
+    # The prefix cap keeps the whole name within PostgreSQL's 63-byte limit.
+    prefix <> "_" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
   end
 
   @doc false

@@ -316,6 +316,8 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     overlay = Bilimbi.CompositionLock.lockfile!(root)
 
     resolve = fn deps, version ->
+      expected_lock = {:git, shared, Map.fetch!(revisions, version), []}
+
       File.write!(
         Path.join(root, "mix.exs"),
         "Code.require_file(#{inspect(@helper)})\n" <>
@@ -323,7 +325,23 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
             mix_project(:composition, "0.1.0", deps),
             "version: \"0.1.0\",",
             "version: \"0.1.0\", lockfile: Bilimbi.CompositionLock.lockfile!(__DIR__),"
-          )
+          ) <>
+          """
+
+          defmodule Mix.Tasks.CheckedDepsGet do
+            use Mix.Task
+
+            def run(_args) do
+              Mix.Task.run("deps.get")
+
+              unless Mix.Dep.Lock.read(#{inspect(overlay)}).shared == #{inspect(expected_lock)} do
+                Mix.raise("deps.get changed the locked revision")
+              end
+
+              IO.puts("deps.get succeeded before requirement validation")
+            end
+          end
+          """
       )
 
       File.rm_rf!(Path.join(root, "deps"))
@@ -335,9 +353,17 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
       )
 
       mix = System.find_executable("mix")
-      {output, 0} = System.cmd(mix, ["deps.get"], cd: root, stderr_to_stdout: true)
+      # Keep both real Mix tasks and prove that fetching succeeded before the
+      # version check, while paying for only one fresh VM per resolution.
+      {output, status} =
+        System.cmd(mix, ["do", "checked_deps_get", "+", "deps.loadpaths"],
+          cd: root,
+          stderr_to_stdout: true
+        )
+
+      assert output =~ "deps.get succeeded before requirement validation"
       assert Mix.Dep.Lock.read(overlay).shared == {:git, shared, revisions[version], []}, output
-      System.cmd(mix, ["deps.loadpaths"], cd: root, stderr_to_stdout: true)
+      {output, status}
     end
 
     both = ~s([{:a, path: "apps/domains/a"}, {:b, path: "apps/extensions/b"}])

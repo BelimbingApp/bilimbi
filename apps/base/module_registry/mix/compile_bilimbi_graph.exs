@@ -19,7 +19,17 @@ defmodule Mix.Tasks.Compile.BilimbiGraph do
         refresh_marker(module_root)
 
       {nil, workspace_root} when is_binary(workspace_root) ->
-        write_host_route_manifest(workspace_root)
+        route_result = write_host_route_manifest(workspace_root)
+
+        # A mounted container can change the host's OTP application list
+        # without contributing any routes. Refresh its .app on graph changes
+        # too, so unmounting does not leave a missing application at startup.
+        graph_result = refresh_marker(workspace_root)
+
+        case {route_result, graph_result} do
+          {{:noop, []}, {:noop, []}} -> {:noop, []}
+          _changed -> {:ok, []}
+        end
 
       _other ->
         {:noop, []}
@@ -43,9 +53,9 @@ defmodule Mix.Tasks.Compile.BilimbiGraph do
     end
   end
 
-  defp refresh_marker(module_root) do
+  defp refresh_marker(project_root) do
     fingerprint =
-      Bilimbi.Base.ModuleRegistry.MixDiscovery.workspace_fingerprint(module_root)
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.workspace_fingerprint(project_root)
 
     compile_path = Mix.Project.compile_path()
     marker = Path.join(compile_path, @marker_prefix <> fingerprint)

@@ -1,6 +1,14 @@
-Code.require_file(Path.expand("../test/support/test_fixtures.ex", __DIR__))
+Code.ensure_loaded!(Bilimbi.Base.Schedule.TestFixtures)
 
-Code.require_file(Path.expand("../test/support/workers.ex", __DIR__))
+Enum.each(
+  [
+    Bilimbi.Base.Schedule.TestWorker,
+    Bilimbi.Base.Schedule.RetryOnceTestWorker,
+    Bilimbi.Base.Schedule.FinalizeFailureTestWorker,
+    Bilimbi.Base.Schedule.SystemPrincipalTestWorker
+  ],
+  &Code.ensure_loaded!/1
+)
 
 defmodule BilimbiWeb.ScheduleLiveTest do
   use BilimbiWeb.ConnCase, async: false

@@ -83,9 +83,28 @@ automatic recovery.
 
 `mix precommit` is the required final check for a change. It compiles with
 warnings as errors, unlocks unused dependencies, formats the project, runs the
-LiveView hook tests in Node (`mix assets.test`), runs every container's test
-suite, and verifies module contributions. The hook tests need Node.js 22 or
+LiveView hook tests in Node (`mix assets.test`), runs every installed module's
+tests and the Web host's integration tests, and verifies module contributions.
+The hook tests need Node.js 22 or
 later, with npm, on the `PATH`; `.mise.toml` does not pin it.
+
+`mix precommit.test` runs every discovered module's tests in its own Mix
+project, plus the Web host's integration tests. It reports each package's wall
+time, including compilation and database setup. Profiling arguments reach every
+package: `mix precommit.test --slowest 10 --slowest-modules 5`. Elixir's
+`--slowest` enables trace mode and serial execution, so use a normal full
+precommit run when comparing total elapsed time. Suites remain sequential
+because compatibility tests temporarily mount source and refresh the shared
+build graph. Local path dependencies use the test environment consistently to
+avoid rebuilding their test support between host and package runs.
+
+The Web host loads its helper and every discovered module bridge through
+`apps/web/test_bootstrap/test_helper.exs` before compiling tests. Elixir 1.20.3's
+helper loader otherwise stops at the first warning; the bootstrap keeps all
+helpers loaded and preserves the normal warning diagnostics.
+
+See [the CI performance measurements](ci-performance.md) for the full before/after
+comparison, profiler findings, and shared-machine limits.
 
 A release built with `mix release` has no Mix. Migrate and seed it with
 `bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and

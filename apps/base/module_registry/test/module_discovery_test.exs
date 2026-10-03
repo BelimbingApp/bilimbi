@@ -275,8 +275,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     put_module!(root, "base", "alpha")
 
     assert MixDiscovery.container_dependencies(base) == [
-             {:test_base_alpha, [path: "alpha"]},
-             {:test_base_zeta, [path: "zeta"]}
+             {:test_base_alpha, [path: "alpha", env: :test]},
+             {:test_base_zeta, [path: "zeta", env: :test]}
            ]
 
     assert MixDiscovery.container_test_commands(base) == [
@@ -338,6 +338,32 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     first_fingerprint = MixDiscovery.workspace_fingerprint(root)
     File.write!(migration_path, "defmodule UpdatedTestMigration do\nend\n")
     refute MixDiscovery.workspace_fingerprint(root) == first_fingerprint
+  end
+
+  test "fingerprints read the bytes at a module's declared route path", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/routes.exs")
+    route_file = Path.join(module_root, "priv/routes.exs")
+    File.mkdir_p!(Path.dirname(route_file))
+    File.write!(route_file, ~s([%{path: "/first", live: Test.WidgetLive}]))
+    before = File.stat!(route_file)
+    fingerprint = MixDiscovery.workspace_fingerprint(root)
+    MixDiscovery.write_route_manifest!(root)
+    {[first], _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+    assert first.path == "/first"
+
+    File.write!(route_file, ~s([%{path: "/other", live: Test.WidgetLive}]))
+    File.touch!(route_file, before.mtime)
+    refute MixDiscovery.workspace_fingerprint(root) == fingerprint
+    MixDiscovery.write_route_manifest!(root)
+    {[other], _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+    assert other.path == "/other"
+
+    File.rm!(route_file)
+
+    assert_raise ArgumentError, ~r/declared web route data file does not exist/, fn ->
+      MixDiscovery.workspace_fingerprint(root)
+    end
   end
 
   test "rejects missing, unknown, and non-exact migration dispositions", %{root: root} do
@@ -648,6 +674,26 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
                layer: :base
              }
            ] = routes
+  end
+
+  test "executable route data is reevaluated when writing a manifest", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), ~S"""
+    counter = Process.get(:route_evaluations, 0) + 1
+    Process.put(:route_evaluations, counter)
+    [%{path: "/widgets/#{counter}", live: Test.WidgetLive}]
+    """)
+
+    for expected <- ["/widgets/1", "/widgets/2"] do
+      MixDiscovery.write_route_manifest!(root)
+      {[route], _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+      assert route.path == expected
+    end
+
+    assert Process.get(:route_evaluations) == 2
   end
 
   test "route manifest validates and preserves any-of requirements", %{root: root} do

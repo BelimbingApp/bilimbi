@@ -1,6 +1,6 @@
-Code.require_file(Path.expand("../../database/test/support/data_case.ex", __DIR__))
-Code.require_file(Path.expand("../../tenancy/test/support/test_fixtures.ex", __DIR__))
-Code.require_file(Path.expand("../../audit/test/support/test_fixtures.ex", __DIR__))
+Code.ensure_loaded!(Bilimbi.Base.Database.DataCase)
+Code.ensure_loaded!(Bilimbi.Base.Tenancy.TestFixtures)
+Code.ensure_loaded!(Bilimbi.Base.Audit.TestFixtures)
 
 ExUnit.start()
 

@@ -40,6 +40,7 @@ defmodule Bilimbi.Web.MixProject do
 
   defp test_paths(:test) do
     [
+      "test_bootstrap",
       "test"
       | Bilimbi.Base.ModuleRegistry.MixDiscovery.web_test_paths(Path.expand("../..", __DIR__))
     ]

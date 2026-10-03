@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Geonames.PostcodeConcurrencyTest do
 
   @moduletag timeout: 60_000
 
+  alias Bilimbi.Base.Database.DataCase
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Geonames
@@ -31,7 +32,7 @@ defmodule Bilimbi.Core.Geonames.PostcodeConcurrencyTest do
     )
 
     unique = System.unique_integer([:positive])
-    database = "bilimbi_geonames_concurrency_#{unique}"
+    database = DataCase.unique_database_name("bilimbi_geonames_concurrency")
     quoted_database = SchemaVerifier.quote_identifier!(database)
 
     Sandbox.unboxed_run(Repo, fn ->

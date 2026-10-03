@@ -13,13 +13,18 @@ application resource when composition changes. Mix records each descriptor,
 its resolved order, and that fingerprint in OTP application metadata. The
 compiled runtime registry consumes that approved order without reimplementing
 the dependency graph or depending on source-checkout paths.
+The host uses the same graph marker to refresh its OTP dependency list even
+when a mounted container adds no routes. Unmounting must not leave that
+container in the host's generated `.app` file.
 
-Development reload checks reuse parsed literal descriptors in the calling Mix
-process, keyed by the full file contents. Executable descriptors are evaluated
+Development reload checks reuse parsed literal descriptors and route data in the
+calling Mix process, keyed by the full file contents. Executable source is evaluated
 on every call. Directory discovery, migration checks, and graph validation still
 run each time; same-size edits, restored timestamps, and newly mounted modules
 cannot hide behind the parse cache. Application metadata fingerprints reuse the
 graph just validated for that metadata rather than discovering it a second time.
+Fingerprints read module and route files at their validated descriptor paths,
+including nonstandard route filenames, without repeating module-tree scans.
 
 An immediate child directory with a valid `bilimbi.module.exs` is an installed
 module. The Mix-time registry validates the complete installed graph before
@@ -27,6 +32,15 @@ returning deterministically ordered local path dependencies. Runtime validates
 that every package was compiled from the same graph and that the generated
 positions are complete and dependency-safe before exposing module and
 migration contributions.
+
+In the test environment, all discovered local path dependencies explicitly use
+`:test`, including mounted containers and their module dependencies. They share
+`_build/test` with package-local test runs, so compiling a host or a dependent
+package retains the same test support instead of deleting and rebuilding it.
+Other environments retain Mix's default production dependency environment;
+production builds exclude test support. Third-party dependencies are unchanged.
+Test helpers load support from declared dependencies with `Code.ensure_loaded!/1`
+instead of recompiling the same `.ex` files with `Code.require_file/1`.
 
 A non-null migration path has a mandatory `migration_dispositions` map whose
 positive version keys exactly equal the migration filenames and whose values
