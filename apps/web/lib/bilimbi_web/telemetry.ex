@@ -53,23 +53,23 @@ defmodule BilimbiWeb.Telemetry do
       ),
 
       # Database Metrics
-      summary("bilimbi.repo.query.total_time",
+      summary("bilimbi.base.repo.query.total_time",
         unit: {:native, :millisecond},
         description: "The sum of the other measurements"
       ),
-      summary("bilimbi.repo.query.decode_time",
+      summary("bilimbi.base.repo.query.decode_time",
         unit: {:native, :millisecond},
         description: "The time spent decoding the data received from the database"
       ),
-      summary("bilimbi.repo.query.query_time",
+      summary("bilimbi.base.repo.query.query_time",
         unit: {:native, :millisecond},
         description: "The time spent executing the query"
       ),
-      summary("bilimbi.repo.query.queue_time",
+      summary("bilimbi.base.repo.query.queue_time",
         unit: {:native, :millisecond},
         description: "The time spent waiting for a database connection"
       ),
-      summary("bilimbi.repo.query.idle_time",
+      summary("bilimbi.base.repo.query.idle_time",
         unit: {:native, :millisecond},
         description:
           "The time the connection spent waiting before being checked out for the query"

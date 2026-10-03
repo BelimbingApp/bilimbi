@@ -59,6 +59,38 @@ commands capture their own output. The after run includes rebuilding the test
 closure following the baseline's production dependency builds. No test timeout,
 assertion, password-hash setting, or database lifecycle check was relaxed.
 
+## Lane G build-loop follow-up
+
+The performance audit's hook collector baseline loaded 428 compiled modules in
+a fresh Mix VM and spent **2,756 ms** doing so, despite finding no colocated
+hooks. The collector now intersects the compiled application's module list with
+the extracted `phoenix-colocated/<otp_app>/` directories and loads only those
+owners. A fresh-VM direct collector call in the isolated implementation
+worktree took **224 ms** and returned `{:noop, []}`. The existing unmount test
+still retains extracted files and proves they do not re-enter the bundle.
+
+Root `mix compile --warnings-as-errors` failed on the Web project's webhook
+registry lookup. That lookup now uses a pinned-key map match, and the same root
+command passes. A temporary warning in a nested Base package printed during
+root compilation but still exited successfully, confirming that the separate
+`compile.strict` module subprocesses remain necessary for path dependencies.
+
+| Measurement | Audit baseline | Implementation worktree |
+| --- | ---: | ---: |
+| Hook collector, fresh VM | 2,756 ms | 224 ms |
+| Root no-op `mix compile` | 11.0 s | 25.84 s |
+| Focused colocated-hook tests | existing behavior | 4 passed |
+
+The root compile samples are not a matched timing comparison: the audit had a
+warm, mounted composition and its own shared build cache, while this disposable
+worktree began without dependencies or compiled applications and does not have
+the optional mounted repositories. The 25.84 s figure is reported as observed,
+not as an improvement. The audit's mtime-keyed graph cache proposal was not
+adopted: module discovery must keep reading changed file contents and
+revalidating directories and migrations on every call, as specified in the
+Module Registry guide. The existing full-content literal-data cache remains in
+place.
+
 ExUnit-reported durations by layer, separate from process/setup wall time:
 
 | Suite | Before | After | After package wall time |

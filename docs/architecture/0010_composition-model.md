@@ -338,7 +338,9 @@ The chosen mechanisms, each owned where it is enforced:
   build gate for this rule.
 - **Mounted-code traversal.** Formatter subdirectories, guard scans, Tailwind
   sources, `precommit.test`, and `compile.strict` derive their paths from
-  discovery rather than fixed-depth globs.
+  discovery rather than fixed-depth globs. The strict task compiles each path
+  package in its own project context because root compilation does not pass
+  `--warnings-as-errors` into path dependencies.
 - **Repository CI.** A mounted repository's CI checks out the Platform at a
   pinned revision, mounts itself, resolves the composition lock, and runs the
   Platform's precommit, once mounted and once absent; the Factory workflow is

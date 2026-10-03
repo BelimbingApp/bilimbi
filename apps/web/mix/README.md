@@ -31,7 +31,10 @@ Use a stable descriptive declaring module and hook name; never manufacture
 names from source paths or numeric module IDs.
 
 The host's final `:bilimbi_hooks` compiler reads the validated graph and compiled
-HEEx metadata after dependencies and the host compile. It imports the extracted
+HEEx metadata after dependencies and the host compile. It intersects each
+compiled application's module list with that application's extracted
+`phoenix-colocated` directories before loading hook metadata, so unmounted files
+and modules without extracted assets are not loaded. It imports the selected
 hook files into `_build/<env>/bilimbi-hooks/index.js`. `app.js` consumes that
 entry via the existing build-path `NODE_PATH`. The adapter is
 [`module_hooks.exs`](module_hooks.exs); its comment records the pinned LiveView

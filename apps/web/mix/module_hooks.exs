@@ -67,8 +67,26 @@ defmodule BilimbiWeb.ModuleHooks do
           )
       end
 
+    extracted_root = Path.join([build_path, "phoenix-colocated", to_string(owner.otp_app)])
+
+    extracted_modules =
+      case File.ls(extracted_root) do
+        {:ok, entries} ->
+          MapSet.new(entries)
+
+        {:error, :enoent} ->
+          MapSet.new()
+
+        {:error, reason} ->
+          Mix.raise("Cannot inspect extracted hooks for #{owner.id}: #{inspect(reason)}")
+      end
+
     modules
     |> Enum.sort()
+    # Phoenix extracts one directory per declaring module. Intersect that
+    # manifest with the compiled app list so stale files from unmounted owners
+    # and names outside the OTP application can never be selected.
+    |> Enum.filter(&MapSet.member?(extracted_modules, inspect(&1)))
     |> Enum.flat_map(fn module ->
       unless Code.ensure_loaded?(module),
         do: Mix.raise("Cannot load hook owner #{inspect(module)}")
