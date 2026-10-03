@@ -536,6 +536,9 @@ defmodule Bilimbi.Core.Employee do
         {:ok, :ok} -> :ok
         {:error, reason} -> {:error, reason}
       end
+    else
+      {:error, :forbidden} = error -> error
+      {:error, :company_not_found} = error -> error
     end
   end
 
