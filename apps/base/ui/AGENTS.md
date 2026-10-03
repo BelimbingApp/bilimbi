@@ -9,6 +9,8 @@ The optional stored-value reveal button is separate from the eye. Wire its `stor
 
 Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
 
+Use `<.tabs>` for sibling views of one page. Its comment owns the narrow-screen strip: one line, horizontal scroll, and edge controls only while a tab is out of view. A hand-rolled flex row of links clips the later labels on a phone.
+
 A table is flat. `table/1` takes no radius, so a rounded table is hand-written markup. See `DESIGN.md` "Table geometry" and the comment on `table/1`.
 
 A caller's `inner_class` padding wins over the card's `p-2`. `inner_padding/1` resolves that before the classes reach the markup; two utilities of equal specificity are decided by stylesheet order, where a caller's `p-0` would lose.
