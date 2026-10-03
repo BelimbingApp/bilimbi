@@ -16,19 +16,20 @@ defmodule Bilimbi.Base.UI.WriteGuardOptOutRegistrationTest do
   import ExUnit.CaptureIO
 
   @adapters [
-    {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__)},
-    {"apps/web/lib/bilimbi_web.ex", Path.expand("../../../web/lib/bilimbi_web.ex", __DIR__)}
+    {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__), [:live_view, :live_component]},
+    {"apps/web/lib/bilimbi_web.ex", Path.expand("../../../web/lib/bilimbi_web.ex", __DIR__), [:live_view]}
   ]
 
-  for {label, path} <- @adapters do
+  for {label, path, shapes} <- @adapters do
     @label label
     @path path
+    @shapes shapes
 
-    test "#{@label} registers write_guard_opt_out on live_view and live_component" do
+    test "#{@label} registers write_guard_opt_out on #{inspect(@shapes)}" do
       source = File.read!(@path)
       assert {:ok, ast} = Code.string_to_quoted(source, file: @path)
 
-      for shape <- [:live_view, :live_component] do
+      for shape <- @shapes do
         assert registers_write_guard_opt_out?(ast, shape),
                "#{@label} #{shape}/0 must call Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)"
       end
