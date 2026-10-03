@@ -29,6 +29,9 @@ defmodule BilimbiWeb.UserAuth do
   with an opaque payload; logout calls `Session.delete_session/1` before
   dropping the cookie.
 
+  For connected-page reauthorization, see `BilimbiWeb.RouteAccess`. Session
+  termination transport handling belongs to `BilimbiWeb.SessionDisconnect`.
+
   Once identity is rehydrated, this edge also resolves Base Locale from the
   authenticated user's explicit Settings scope and applies its language to the
   Web and shared-UI Gettext backends. Anonymous requests use the global locale.
@@ -54,7 +57,6 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.DateTime, as: BaseDateTime
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
@@ -171,6 +173,7 @@ defmodule BilimbiWeb.UserAuth do
           "user_id" => user_id,
           "company_id" => company_id
         })
+        |> put_session(:live_socket_id, live_socket_id(session_id))
         |> redirect(to: destination)
 
       :error ->
@@ -235,7 +238,20 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  @doc "Deletes the durable session row, drops the cookie, and redirects to login."
+  @doc """
+  The transport topic every live socket of a durable session listens on.
+
+  `Phoenix.LiveView.Socket.id/1` reads it from the cookie session, so a
+  `"disconnect"` broadcast on it closes every tab of that session. Base
+  Session reports terminations and `BilimbiWeb.SessionDisconnect` sends it.
+  """
+  @spec live_socket_id(String.t()) :: String.t()
+  def live_socket_id(session_id) when is_binary(session_id), do: "session:" <> session_id
+
+  @doc """
+  Deletes the durable session row, drops the cookie, and redirects to login.
+  Base Session reports the deletion, which disconnects the session's sockets.
+  """
   def log_out_user(conn) do
     case get_session(conn, @session_key) do
       %{"session_id" => session_id} when is_binary(session_id) ->
@@ -629,13 +645,13 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
+  # The same live decision `BilimbiWeb.RouteAccess` repeats before every
+  # event and navigation of an open page, and the one a module re-asks for an
+  # operation capability of its own.
   defp capability_allowed?(_actor, nil), do: false
 
-  defp capability_allowed?(actor, requirement) do
-    Bilimbi.Base.Menu.Capability.allowed?(requirement, fn key ->
-      match?(%Decision{allowed: true}, Authz.can(actor, key))
-    end)
-  end
+  defp capability_allowed?(actor, requirement),
+    do: Bilimbi.Base.Authz.LiveAuthorization.allowed_now?(actor, requirement)
 
   # An operator-only screen (#650) requires the actor's tenant to be the platform
   # operator, not merely a capability grant. This mount checks the scope rehydrated

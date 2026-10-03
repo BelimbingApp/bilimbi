@@ -46,6 +46,13 @@ revocation commits with a retained `authz.system_principal.granted` or
 `.revoked` audit action naming who made it. Decisions log `actor_type`
 `"system"`, `actor_id` `0`, and the principal's name in the context.
 
+## Re-authorizing inside a LiveView
+
+Use `Bilimbi.Base.Authz.LiveAuthorization` for additional operation checks in
+LiveView event handlers. Its [module documentation](../lib/authz/live_authorization.ex)
+owns requirement shapes, live decisions, and refusal handling. The host's
+page and session boundary is documented in [Live navigation](../../../web/docs/navigation.md).
+
 ## Administration facade
 
 Administration adapters use `Bilimbi.Base.Authz`; they never query these
