@@ -114,6 +114,60 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.supervision_lists(owner, 73, lead.id + 9_000)
   end
 
+  test "orders both supervision lists by case-insensitive name, then id", %{owner: owner} do
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, late_report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ZULU-REPORT",
+               full_name: "Zulu Report"
+             })
+
+    assert {:ok, early_report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-EREPORT",
+               full_name: "eReport"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ZULU",
+               full_name: "Zulu"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-EMART",
+               full_name: "eMart"
+             })
+
+    assert {:ok, earlier_same_name} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-SAM",
+               full_name: "Sam"
+             })
+
+    assert {:ok, later_same_name} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-sam",
+               full_name: "sam"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, late_report.id)
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, early_report.id)
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+
+    assert Enum.map(lists.subordinates, & &1.full_name) == ["eReport", "Zulu Report"]
+
+    assert Enum.map(lists.available, & &1.full_name) == ["eMart", "Sam", "sam", "Zulu"]
+    assert earlier_same_name.id < later_same_name.id
+  end
+
   test "returns a bounded administration page with source search, filters, and stable order", %{
     owner: owner
   } do

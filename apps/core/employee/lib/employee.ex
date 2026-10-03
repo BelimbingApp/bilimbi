@@ -286,12 +286,12 @@ defmodule Bilimbi.Core.Employee do
       subordinates =
         employees
         |> Enum.filter(&(&1.supervisor_id == employee_id))
-        |> Enum.sort_by(&{&1.full_name, &1.id})
+        |> Enum.sort_by(&{String.downcase(&1.full_name), &1.id})
 
       available =
         employees
         |> Enum.filter(&(&1.id != employee_id and &1.supervisor_id != employee_id))
-        |> Enum.sort_by(&{&1.full_name, &1.id})
+        |> Enum.sort_by(&{String.downcase(&1.full_name), &1.id})
 
       {:ok, %{employees: employees, subordinates: subordinates, available: available}}
     else
