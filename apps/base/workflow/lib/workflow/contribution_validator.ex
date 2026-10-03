@@ -8,13 +8,33 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
   """
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionConsumer
 
-  alias Bilimbi.Base.Workflow.{ActionAdapter, GuardAdapter, JSON, SubjectAdapter}
+  alias Bilimbi.Base.Workflow.{
+    ActionAdapter,
+    GuardAdapter,
+    JSON,
+    ProcessAdapter,
+    ProcessDefinition,
+    SubjectAdapter
+  }
 
   @impl true
   def validate_contributions!(entries) do
-    registry = %{subjects: %{}, guards: %{}, actions: %{}, flows: %{}, aliases: %{}}
+    registry = %{
+      subjects: %{},
+      guards: %{},
+      actions: %{},
+      flows: %{},
+      processes: %{},
+      aliases: %{}
+    }
+
     registry = Enum.reduce(entries, registry, &collect!/2)
     Enum.each(registry.flows, fn {_key, flow} -> validate_flow_links!(registry, flow) end)
+
+    Enum.each(registry.processes, fn {_identity, process} ->
+      owned!(registry.subjects, process.subject, process.owner)
+    end)
+
     registry
   end
 
@@ -22,7 +42,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
     unless "base/workflow" in Map.get(descriptor, :dependencies, []),
       do: invalid!("#{descriptor.id} must declare base/workflow")
 
-    keys!(payload, [:subjects, :guards, :actions, :flows])
+    keys!(payload, [:subjects, :guards, :actions, :flows, :processes])
 
     registry =
       Enum.reduce(
@@ -44,9 +64,27 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
         end
       )
 
-    Enum.reduce(list!(payload, :flows), registry, fn flow, acc ->
-      flow = flow!(flow) |> Map.put(:owner, descriptor.id)
-      unique_put!(acc, :flows, flow.code, flow)
+    registry =
+      Enum.reduce(list!(payload, :flows), registry, fn flow, acc ->
+        flow = flow!(flow) |> Map.put(:owner, descriptor.id)
+        unique_put!(acc, :flows, flow.code, flow)
+      end)
+
+    Enum.reduce(list!(payload, :processes), registry, fn process, acc ->
+      process = ProcessDefinition.validate!(process)
+      adapter!(Map.take(process, [:key, :adapter]), descriptor, ProcessAdapter)
+      # All versions of one key belong to one owner and one subject.
+      for {{key, _version}, existing} <- acc.processes, key == process.key do
+        unless existing.owner == descriptor.id and existing.subject == process.subject,
+          do: invalid!("process key crosses ownership or subject boundaries")
+      end
+
+      unique_put!(
+        acc,
+        :processes,
+        {process.key, process.version},
+        Map.put(process, :owner, descriptor.id)
+      )
     end)
   end
 
@@ -215,7 +253,9 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
   end
 
   defp unique_put!(registry, kind, key, value) do
-    if Map.has_key?(Map.fetch!(registry, kind), key), do: invalid!("duplicate #{kind} key #{key}")
+    if Map.has_key?(Map.fetch!(registry, kind), key),
+      do: invalid!("duplicate #{kind} key #{inspect(key)}")
+
     put_in(registry, [kind, key], value)
   end
 

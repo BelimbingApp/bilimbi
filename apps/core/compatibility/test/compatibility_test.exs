@@ -1,4 +1,8 @@
 Code.require_file(
+  Path.expand("../../../base/workflow/test/support/legacy_coordination_fixture.ex", __DIR__)
+)
+
+Code.require_file(
   Path.expand("../../../base/workflow/test/support/legacy_status_fixture.ex", __DIR__)
 )
 
@@ -614,6 +618,139 @@ defmodule Bilimbi.Core.CompatibilityTest do
                """,
                []
              ).rows
+  end
+
+  test "verify then adopt preserves legacy coordination rows, in-flight work, states and sequences",
+       %{schema: schema} do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+
+    tables =
+      ~w(base_workflow_process_events base_workflow_process_dependencies base_workflow_process_work_items base_workflow_process_runs base_workflow_process_definition_versions base_workflow_transition_outbox)
+
+    for table <- tables,
+        do: SQL.query!(MigrationTestRepo, ~s(DROP TABLE "#{schema}"."#{table}"), [])
+
+    fixture = Bilimbi.Base.Workflow.LegacyCoordinationFixture
+    fixture.create!(MigrationTestRepo, schema)
+    saved = fixture.insert_in_flight!(MigrationTestRepo, schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_process_dependencies
+        (work_item_id, depends_on_work_item_id, acceptable_outcomes, tenant_id)
+      VALUES ($1, $2, '["completed", "waived"]', 1)
+      """,
+      [saved.items["third"], saved.items["first"]]
+    )
+
+    for status <- ~w(paused completed failed blocked) do
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".base_workflow_process_runs
+          (definition_key, definition_version, definition_fingerprint, status,
+           started_at, available_at, scope_type, tenant_id, pause_reason, input, output)
+        VALUES ('example.retired', 3, $1, $2, '2026-01-01', '2026-01-01', 'tenant', 1,
+          'Retained reason', '[1,{"carried":true}]', '{"saved":true}')
+        """,
+        [String.duplicate("a", 64), status]
+      )
+    end
+
+    [[unresolved]] =
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".base_workflow_process_runs
+          (definition_key, definition_version, definition_fingerprint, status, started_at, available_at)
+        VALUES ('example.retired', 3, $1, 'running', '2026-01-01', '2026-01-01') RETURNING id
+        """,
+        [String.duplicate("b", 64)]
+      ).rows
+
+    for {status, index} <-
+          Enum.with_index(~w(pending available leased completed failed waived blocked)) do
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".base_workflow_process_work_items
+          (process_run_id, step_key, label, executor_key, status, version, attempts,
+           lease_token, lease_expires_at, input, output, outcome)
+        VALUES ($1, $2, 'Retained work', 'example.retired', $3, 5, 1,
+          $4, '2026-01-02', '[1,{"saved":true}]', '{"fact":42}', $3)
+        """,
+        [unresolved, "retained-#{index}", status, "retained-lease-#{index}"]
+      )
+    end
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_transition_outbox
+        (event_key, event_type, payload, attempts, available_at, lease_token, lease_expires_at, last_error)
+      VALUES ('retained-dispatch', 'example.changed', '[1,{"saved":true}]', 2,
+        '2026-01-01', 'retained-outbox-lease', '2026-01-02', 'Retry delivery')
+      """,
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      CREATE TABLE "#{schema}".base_workflow_human_action_requests (
+        id bigserial PRIMARY KEY,
+        tenant_id bigint NOT NULL,
+        idempotency_key varchar(255) NOT NULL,
+        intent_hash char(64) NOT NULL,
+        action_key varchar(255) NOT NULL,
+        subject_type varchar(255) NOT NULL,
+        subject_id varchar(255) NOT NULL,
+        process_run_id bigint,
+        work_item_id bigint,
+        actor_type varchar(255) NOT NULL,
+        actor_id bigint NOT NULL,
+        result json,
+        completed_at timestamp(0) without time zone,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT base_workflow_human_request_unique UNIQUE (tenant_id, idempotency_key)
+      )
+      """,
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_human_action_requests
+        (tenant_id, idempotency_key, intent_hash, action_key, subject_type, subject_id,
+         process_run_id, work_item_id, actor_type, actor_id, result, completed_at)
+      VALUES (1, 'retained-request', $1, 'example.approve', 'Legacy\\Example\\Record', '41',
+        $2, $3, 'human_user', 7, '{"saved":true}', '2026-01-01')
+      """,
+      [String.duplicate("c", 64), saved.run_id, saved.items["second"]]
+    )
+
+    retained = ["base_workflow_human_action_requests" | tables]
+    before = workflow_snapshot(MigrationTestRepo, schema, retained)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) != []
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(ALTER TABLE "#{schema}".base_workflow_process_work_items ALTER COLUMN input TYPE jsonb USING input::jsonb),
+      []
+    )
+
+    assert {:error, drift} = Compatibility.verify(MigrationTestRepo, prefix: schema)
+
+    assert Enum.any?(drift, &String.contains?(&1, "base_workflow_process_work_items.input"))
   end
 
   test "Workflow adoption refuses JSON drift and a sequence behind retained history", %{

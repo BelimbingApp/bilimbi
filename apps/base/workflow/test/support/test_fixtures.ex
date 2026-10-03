@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
 
   alias Ecto.Adapters.SQL
 
-  def install_registry! do
+  def install_registry!(processes \\ Bilimbi.Base.Workflow.TestProcessContributions.processes()) do
     authz =
       Bilimbi.Base.Authz.ContributionValidator.validate_contributions!([
         %{
@@ -28,7 +28,9 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
 
     snapshot = ContributionRegistry.build!([])
     snapshot = put_in(snapshot.consumers.authz, authz)
-    workflow = ContributionValidator.validate_contributions!([entry()])
+    entry = entry()
+    entry = %{entry | payload: Map.put(entry.payload, :processes, processes)}
+    workflow = ContributionValidator.validate_contributions!([entry])
     ContributionRegistry.put_snapshot_for_test!(put_in(snapshot.consumers.workflow, workflow))
   end
 
@@ -51,6 +53,11 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
     Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
     LegacyStatusFixture.create!(Repo, Bilimbi.Base.Database.DataCase.temporary_schema!())
+
+    Bilimbi.Base.Workflow.LegacyCoordinationFixture.create!(
+      Repo,
+      Bilimbi.Base.Database.DataCase.temporary_schema!()
+    )
 
     SQL.query!(
       Repo,

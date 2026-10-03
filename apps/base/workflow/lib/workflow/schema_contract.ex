@@ -1,5 +1,5 @@
 defmodule Bilimbi.Base.Workflow.SchemaContract do
-  @moduledoc "Pinned status-table structure; unbound historical rows are preserved, never guessed."
+  @moduledoc "Pinned status and coordination structure; unbound historical rows are preserved, never guessed."
   @behaviour Bilimbi.Base.Database.SchemaContract
 
   @impl true
@@ -191,6 +191,6 @@ defmodule Bilimbi.Base.Workflow.SchemaContract do
         foreign_keys: %{},
         checks: %{}
       }
-    ]
+    ] ++ Bilimbi.Base.Workflow.CoordinationSchemaContract.tables()
   end
 end
