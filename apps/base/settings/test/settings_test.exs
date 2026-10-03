@@ -63,6 +63,52 @@ defmodule Bilimbi.Base.SettingsTest do
            }
   end
 
+  test "transactions bypass cached rows and invalidate only after the outer commit" do
+    for operation <- [:put, :delete] do
+      Settings.put("tests.inherited", "old")
+      assert Settings.get("tests.inherited") == "old"
+
+      assert {:ok, :done} =
+               Repo.transaction(fn ->
+                 assert {:ok, _} =
+                          Repo.transact(fn ->
+                            case operation do
+                              :put -> Settings.put("tests.inherited", "new")
+                              :delete -> Settings.delete("tests.inherited")
+                            end
+
+                            expected = if operation == :put, do: "new", else: "default"
+                            assert Settings.get("tests.inherited") == expected
+                            {:ok, :nested}
+                          end)
+
+                 assert %Bilimbi.Base.Settings.Schema{value: "old"} =
+                          Cache.fetch({"tests.inherited", nil, nil}, fn ->
+                            flunk("invalidated before commit")
+                          end)
+
+                 :done
+               end)
+
+      expected = if operation == :put, do: "new", else: "default"
+      assert Settings.get("tests.inherited") == expected
+    end
+  end
+
+  test "rollback discards deferred invalidations and never caches uncommitted reads" do
+    Settings.put("tests.inherited", "old")
+    assert Settings.get("tests.inherited") == "old"
+
+    assert {:error, :cancelled} =
+             Repo.transaction(fn ->
+               Settings.put("tests.inherited", "temporary")
+               assert Settings.get("tests.inherited") == "temporary"
+               Repo.rollback(:cancelled)
+             end)
+
+    assert collect_queries(fn -> assert Settings.get("tests.inherited") == "old" end) == 0
+  end
+
   defp collect_queries(fun) do
     ref = make_ref()
     handler = "settings-query-count-#{inspect(ref)}"

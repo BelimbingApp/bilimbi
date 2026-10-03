@@ -21,8 +21,8 @@ defmodule Bilimbi.Base.Settings.Form do
   instead would pin an empty string *as* the override, and the field would look
   cleared while permanently shadowing the value it should have inherited.
 
-  **Inherited is not the same as set here.** `Settings.overridden?/2` is the
-  only thing that distinguishes them, and a screen that does not show the
+  **Inherited is not the same as set here.** The override metadata returned
+  by `Settings.resolve_many/2` distinguishes them, and a screen that does not show the
   difference makes clearing a field look like it did nothing — the value comes
   straight back, because it was always inherited.
 
@@ -86,10 +86,10 @@ defmodule Bilimbi.Base.Settings.Form do
       end)
       |> Enum.sort_by(fn {position, key, _definition} -> {position, key} end)
 
-    values = Settings.get_many(Enum.map(selected, &elem(&1, 1)), scope)
+    values = Settings.resolve_many(Enum.map(selected, &elem(&1, 1)), scope)
 
     Enum.map(selected, fn {_position, key, definition} ->
-      build_field(key, definition, scope, values)
+      build_field(key, definition, values)
     end)
   end
 
@@ -252,11 +252,9 @@ defmodule Bilimbi.Base.Settings.Form do
     {:ok, cleared}
   end
 
-  defp build_field(key, definition, scope, values) do
-    scope = narrow_to_allowed(scope, definition)
-    stored = Map.fetch!(values, key)
-    overridden? = Settings.overridden?(key, scope)
-    source_scope = source_scope(key, scope, definition)
+  defp build_field(key, definition, values) do
+    %{value: stored, overridden?: overridden?, source_scope: source_scope} =
+      Map.fetch!(values, key)
 
     %{
       key: key,
@@ -288,19 +286,6 @@ defmodule Bilimbi.Base.Settings.Form do
   end
 
   defp display_value(stored, _definition, _overridden?), do: stored
-
-  # Which scope the visible value actually came from -- the first in the
-  # cascade that holds an override, or the definition's default at the end.
-  defp source_scope(key, scope, definition) do
-    scope
-    |> Scope.chain()
-    |> Enum.filter(&(scope_type(&1) in definition.scopes))
-    |> Enum.find(fn candidate -> Settings.overridden?(key, candidate) end)
-    |> case do
-      nil -> scope_type(nil)
-      candidate -> scope_type(candidate)
-    end
-  end
 
   @doc """
   Casts one submitted value to the type its definition declares.
