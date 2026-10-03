@@ -3,7 +3,9 @@
 Workflow owns status configuration and history. Its public facade accepts a
 `Bilimbi.Base.Tenancy.Scope` and `%{type: "owner.record", id: 42}`. It never
 queries an owner's subject table. The status kernel, durable coordinator and
-human action gate share this boundary. UI and external/outbox dispatch are later slices.
+human action gate share this boundary. The module-owned reference adapter
+exercises these contracts; it is an integration specimen, not an administration
+UI. External/outbox dispatch remains a later slice.
 
 An owner declares `base/workflow` and contributes immutable defaults:
 
@@ -77,6 +79,24 @@ operator configuration always wins, including inactive flags and legacy aliases.
 New identities use stable public keys; no business flow is hard-coded in Base.
 
 The architectural ownership decision is [ADR 0018](../../../../docs/architecture/decisions/0018-workflow-status-contribution-consumer.md).
+The frozen consumer API and review boundary are in [api-freeze.md](api-freeze.md).
+
+## Module author reference
+
+Keep an owner's subject adapter, guards, actions, process adapter and human
+action handler in the contributing module. Call Workflow's public facade from
+that module's application service or LiveView adapter; do not query Workflow
+tables directly. The generic reference owner and its action/history panel are
+executable examples in `test/support/reference_flow.ex` and
+`lib/workflow/web/reference_live.ex`. The panel's route requires
+`admin.reference.record.approve`, which this module declares and does not
+grant to a system role. The reference owner itself stays a test fixture.
+
+Use `Workflow.available_actions/2` and `Workflow.execute_action/3` for human
+actions. The LiveView echoes the opaque subject version and, for work-bound
+actions, the process run, work item, and work version; it never supplies actor,
+tenant, or capability claims. The gate repeats those checks inside the
+transaction, as described below.
 
 
 ## Durable coordination
