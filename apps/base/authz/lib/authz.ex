@@ -172,7 +172,17 @@ defmodule Bilimbi.Base.Authz do
     end)
   end
 
-  @spec effective_capabilities(Actor.t()) :: %{allowed: [String.t()], denied: [String.t()]}
+  @doc """
+  Effective allows, denies, and whether a grant-all role is in effect.
+
+  `grant_all` is the boolean `EffectivePermissions.load/2` already computed.
+  Callers that only need the allow list keep reading `:allowed`.
+  """
+  @spec effective_capabilities(Actor.t()) :: %{
+          allowed: [String.t()],
+          denied: [String.t()],
+          grant_all: boolean()
+        }
   def effective_capabilities(%Actor{} = actor) do
     registry = registry!()
     directory = directory!(registry)
@@ -189,7 +199,8 @@ defmodule Bilimbi.Base.Authz do
             allowed -- registry.platform_capabilities
           end
         end),
-      denied: EffectivePermissions.denied(permissions)
+      denied: EffectivePermissions.denied(permissions),
+      grant_all: permissions.grant_all
     }
   end
 
