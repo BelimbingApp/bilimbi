@@ -37,7 +37,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
         "current_user" => %{"session_id" => session_id, "user_id" => 91, "company_id" => 73}
       })
 
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
+    assert {:error, {:redirect, %{to: "/", flash: %{"session_expired" => "expired"}}}} =
+             live(conn, ~p"/dashboard")
+
+    conn = get(conn, ~p"/dashboard")
+    assert redirected_to(conn) == ~p"/"
+
+    assert html_response(get(recycle(conn), ~p"/"), 200) =~
+             "Your session expired. Sign in again to continue."
   end
 
   test "authentication honors changes to the idle lifetime", %{conn: conn} do

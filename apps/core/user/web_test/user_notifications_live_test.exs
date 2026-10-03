@@ -93,7 +93,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
     {:ok, view, _html} = live(conn, ~p"/notifications")
     {:ok, entry} = Session.fetch_session(session_id)
-    activity = System.system_time(:second) - 30
+    activity = System.system_time(:second) - 90
 
     {:ok, _entry} =
       Session.put_session(session_id, entry.payload, %{user_id: 91, last_activity: activity})

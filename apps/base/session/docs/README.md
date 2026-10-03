@@ -13,7 +13,7 @@ The global operator setting `session.lifetime_minutes` is editable as **Session
 lifetime** at `/system/settings`. Its bounds and default are declared in
 [`Session.Contributions`](../lib/session/contributions.ex). The Web
 authentication edge rejects sessions older than that idle lifetime and refreshes
-activity on each user interaction at second precision. Mounted views guard events,
+activity on authenticated requests and user events at most once a minute. Mounted views guard events,
 URL patches, component callbacks, and background refreshes; background work does
 not extend the idle lifetime. Expired requests and mounted callbacks redirect
 to sign-in when checked; an idle page has no expiry timer.

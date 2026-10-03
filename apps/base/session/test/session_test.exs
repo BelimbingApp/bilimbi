@@ -251,21 +251,20 @@ defmodule Bilimbi.Base.SessionTest do
     assert Enum.map(Session.list_sessions(), & &1.id) == ["active", "boundary"]
   end
 
-  test "records every activity second without moving backwards" do
+  test "refreshes activity at most once per minute" do
     put_session!("active", 100)
 
     assert :ok = Session.refresh_activity("active", 159)
-    assert {:ok, %Entry{last_activity: 159}} = Session.fetch_session("active")
+    assert {:ok, %Entry{last_activity: 100}} = Session.fetch_session("active")
 
     assert :ok = Session.refresh_activity("active", 160)
     assert {:ok, %Entry{last_activity: 160}} = Session.fetch_session("active")
 
     assert :ok = Session.refresh_activity("active", 200)
-    assert {:ok, %Entry{last_activity: 200}} = Session.fetch_session("active")
+    assert {:ok, %Entry{last_activity: 160}} = Session.fetch_session("active")
 
     assert :ok = Session.refresh_activity("active", 199)
-    assert {:ok, %Entry{last_activity: 200}} = Session.fetch_session("active")
-    assert Session.prune_expired(170) == 0
+    assert {:ok, %Entry{last_activity: 160}} = Session.fetch_session("active")
   end
 
   test "validates canonical column limits and activity metadata" do
