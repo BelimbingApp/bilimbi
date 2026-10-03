@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Perf.AuthzRetentionWorker do
   @moduledoc false
 
+  # Lives in Perf because Schedule depends on Authz; an Authz-owned worker would create a cycle.
   use Bilimbi.Base.Schedule.Worker,
     id: "base/authz-decision-log-retention",
     queue: :default,
