@@ -313,8 +313,8 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
           </:actions>
         </.header>
 
-        <div class="mb-4 flex items-center gap-2">
-          <span class="text-xs font-semibold text-ink-subtle">Category:</span>
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+          <span class="w-full text-xs font-semibold text-ink-subtle sm:w-auto">Category:</span>
           <.button
             phx-click="filter_category"
             phx-value-category="all"

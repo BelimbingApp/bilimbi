@@ -18,9 +18,11 @@
 # PGPORT from `.mise.toml`.
 
 commands:
-  # Run worktrees start with tracked files only; materialize locked deps once
-  # before the first configured command, exactly as CI's "Install dependencies".
-  prepare: 'MISE_TRUSTED_CONFIG_PATHS="$PWD" mise exec -- mix deps.get'
+  # Run worktrees start with tracked files only; materialize locked deps and
+  # the pinned asset binaries required by the Web integration tests.
+  prepare: >-
+    MISE_TRUSTED_CONFIG_PATHS="$PWD" mise exec -- sh -c
+    'mix deps.get && cd apps/web && MIX_ENV=test mix assets.setup'
 
   # The test half of CI's `Elixir tests` job. That job runs `mix precommit`,
   # whose testing member is the `precommit.test` alias in mix.exs: `mix test`
