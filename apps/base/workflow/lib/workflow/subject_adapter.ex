@@ -8,8 +8,10 @@ defmodule Bilimbi.Base.Workflow.SubjectAdapter do
   even when an edge has no capability; operations are :read, :transition,
   :record_initial, :record_comment, :adopt, :start, :complete, :supersede,
   :reconcile, :signal, :pause, :resume, :claim, :heartbeat, :fail,
-  :block_claim, :waive and :block. Adoption requires explicit
+  :block_claim, :waive, :block and :execute_action (a human action; listing
+  available actions is :read). Adoption requires explicit
   owner authority and real subject ownership, never a tenant guessed from history.
+  An owner that contributes human actions returns `Subject.version`.
 
   `persist/4` writes only the proven subject, from the locked status to the
   requested status. Hooks and persistence must perform database effects only;
