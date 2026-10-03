@@ -16,6 +16,7 @@
   migration_dispositions: %{
     20_261_003_090_000 => :compatible_baseline,
     20_261_003_091_000 => :compatible_baseline,
+    20_261_003_092_000 => :compatible_baseline,
     20_261_003_100_000 => :bilimbi_only
   },
   web: nil,

@@ -3,10 +3,17 @@ defmodule Bilimbi.Base.Workflow.Engine do
   import Ecto.Query
 
   alias Bilimbi.Base.{Audit, Authz, Repo, Tenancy}
-  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz.Resource
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Base.Workflow.{BindingSchema, Definitions, HistorySchema, JSON, Subject}
+
+  alias Bilimbi.Base.Workflow.{
+    Attribution,
+    BindingSchema,
+    Definitions,
+    HistorySchema,
+    JSON,
+    Subject
+  }
 
   def transition(scope, ref, to, context) do
     Scope.actor(scope)
@@ -14,32 +21,30 @@ defmodule Bilimbi.Base.Workflow.Engine do
     with {:ok, ref} <- Definitions.subject(ref),
          {:ok, context} <- context(context) do
       attributed(scope, fn ->
-        Repo.transact(fn ->
-          with :ok <- writer(scope),
-               {:ok, subject} <- load(scope, ref, :lock, :transition),
-               {:ok, _flow} <- Definitions.flow(ref, :lock),
-               {:ok, edge} <- edge(ref, subject.status, to),
-               :ok <- capability(scope, ref, subject, edge.capability),
-               :ok <- hook(:guards, edge.guard, scope, subject, edge, context),
-               :ok <- bind(scope, ref),
-               :ok <- ref.adapter.persist(scope, subject, to, context),
-               :ok <- hook(:actions, edge.action, scope, %{subject | status: to}, edge, context),
-               {:ok, persisted} <- load(scope, ref, :read, :transition),
-               true <- persisted.status == to,
-               {:ok, history} <- append(scope, ref, subject, to, :transition, context),
-               {:ok, _action} <- audit(scope, ref, subject, to, history.id, :transition) do
-            {:ok,
-             %{
-               subject: %{type: ref.type, id: ref.id},
-               from: subject.status,
-               to: to,
-               history: fact(history)
-             }}
-          else
-            false -> {:error, :invalid_adapter_status}
-            {:error, _} = error -> error
-          end
-        end)
+        with :ok <- writer(scope),
+             {:ok, subject} <- load(scope, ref, :lock, :transition),
+             {:ok, _flow} <- Definitions.flow(ref, :lock),
+             {:ok, edge} <- edge(ref, subject.status, to),
+             :ok <- capability(scope, ref, subject, edge.capability),
+             :ok <- hook(:guards, edge.guard, scope, subject, edge, context),
+             :ok <- bind(scope, ref),
+             :ok <- ref.adapter.persist(scope, subject, to, context),
+             :ok <- hook(:actions, edge.action, scope, %{subject | status: to}, edge, context),
+             {:ok, persisted} <- load(scope, ref, :read, :transition),
+             true <- persisted.status == to,
+             {:ok, history} <- append(scope, ref, subject, to, :transition, context),
+             {:ok, _action} <- audit(scope, ref, subject, to, history.id, :transition) do
+          {:ok,
+           %{
+             subject: %{type: ref.type, id: ref.id},
+             from: subject.status,
+             to: to,
+             history: fact(history)
+           }}
+        else
+          false -> {:error, :invalid_adapter_status}
+          {:error, _} = error -> error
+        end
       end)
     end
   end
@@ -49,17 +54,15 @@ defmodule Bilimbi.Base.Workflow.Engine do
 
     with {:ok, ref} <- Definitions.subject(ref), {:ok, context} <- context(context) do
       attributed(scope, fn ->
-        Repo.transact(fn ->
-          with :ok <- writer(scope),
-               {:ok, subject} <- load(scope, ref, :lock, kind),
-               {:ok, _flow} <- Definitions.flow(ref, :lock),
-               :ok <- record_allowed(ref, subject, kind, context),
-               :ok <- bind(scope, ref),
-               {:ok, history} <- append(scope, ref, subject, subject.status, kind, context),
-               {:ok, _action} <- audit(scope, ref, subject, subject.status, history.id, kind) do
-            {:ok, fact(history)}
-          end
-        end)
+        with :ok <- writer(scope),
+             {:ok, subject} <- load(scope, ref, :lock, kind),
+             {:ok, _flow} <- Definitions.flow(ref, :lock),
+             :ok <- record_allowed(ref, subject, kind, context),
+             :ok <- bind(scope, ref),
+             {:ok, history} <- append(scope, ref, subject, subject.status, kind, context),
+             {:ok, _action} <- audit(scope, ref, subject, subject.status, history.id, kind) do
+          {:ok, fact(history)}
+        end
       end)
     end
   end
@@ -69,14 +72,12 @@ defmodule Bilimbi.Base.Workflow.Engine do
 
     with {:ok, ref} <- Definitions.subject(ref) do
       attributed(scope, fn ->
-        Repo.transact(fn ->
-          with :ok <- writer(scope),
-               {:ok, _subject} <- load(scope, ref, :lock, :adopt),
-               {:ok, _flow} <- Definitions.flow(ref, :adopt),
-               :ok <- bind(scope, ref) do
-            {:ok, %{type: ref.type, id: ref.id, flow: ref.flow}}
-          end
-        end)
+        with :ok <- writer(scope),
+             {:ok, _subject} <- load(scope, ref, :lock, :adopt),
+             {:ok, _flow} <- Definitions.flow(ref, :adopt),
+             :ok <- bind(scope, ref) do
+          {:ok, %{type: ref.type, id: ref.id, flow: ref.flow}}
+        end
       end)
     end
   end
@@ -118,7 +119,7 @@ defmodule Bilimbi.Base.Workflow.Engine do
     with {:ok, ref} <- Definitions.subject(ref),
          {:ok, _subject} <- load(scope, ref, :read, :read) do
       query =
-        from b in Tenancy.scope_query(BindingSchema, scope),
+        from(b in Tenancy.scope_query(BindingSchema, scope),
           join: h in HistorySchema,
           on: h.flow == b.flow and h.flow_id == b.flow_id,
           where:
@@ -127,6 +128,7 @@ defmodule Bilimbi.Base.Workflow.Engine do
           order_by: [asc: h.transitioned_at, asc: h.id],
           limit: ^(limit + 1),
           select: h
+        )
 
       query = cursor(query, opts[:after])
       rows = Repo.all(query)
@@ -242,9 +244,10 @@ defmodule Bilimbi.Base.Workflow.Engine do
 
     binding =
       Repo.one(
-        from b in BindingSchema,
+        from(b in BindingSchema,
           where: b.flow == ^ref.flow and b.flow_id == ^ref.id,
           lock: "FOR UPDATE"
+        )
       )
 
     case binding do
@@ -276,16 +279,18 @@ defmodule Bilimbi.Base.Workflow.Engine do
   defp tat_anchor(ref),
     do:
       Repo.one(
-        from h in latest_query(ref),
+        from(h in latest_query(ref),
           where:
             fragment("(?->'_workflow'->>'kind') IS DISTINCT FROM 'record_comment'", h.metadata)
+        )
       )
 
   defp latest_query(ref) do
-    from h in HistorySchema,
+    from(h in HistorySchema,
       where: h.flow == ^ref.flow and h.flow_id == ^ref.id,
       order_by: [desc: h.transitioned_at, desc: h.id],
       limit: 1
+    )
   end
 
   defp append(scope, ref, subject, status, kind, context) do
@@ -368,26 +373,7 @@ defmodule Bilimbi.Base.Workflow.Engine do
 
   defp context(_context), do: {:error, :invalid_context}
 
-  defp attributed(scope, fun) do
-    previous = AuditContext.get()
-    actor = Scope.actor(scope)
-
-    AuditContext.put(%{
-      previous
-      | tenant_id: Scope.tenant_id(scope),
-        company_id: actor.company_id,
-        actor_type: Atom.to_string(actor.type),
-        actor_id: actor.user_id || 0,
-        impersonator_id: actor.impersonator_id,
-        system_principal: actor.system_principal
-    })
-
-    try do
-      fun.()
-    after
-      AuditContext.put(previous)
-    end
-  end
+  defp attributed(scope, fun), do: Attribution.transact(scope, fun)
 
   defp fact(history), do: history |> Map.from_struct() |> Map.delete(:__meta__)
   defp now, do: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)

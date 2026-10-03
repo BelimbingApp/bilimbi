@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.Workflow.TestContributions do
   @moduledoc false
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
-  alias Bilimbi.Base.Workflow.{TestAction, TestGuard, TestSubjectAdapter}
+  alias Bilimbi.Base.Workflow.{TestAction, TestGuard, TestHumanActionHandler, TestSubjectAdapter}
   @impl true
   def contributions do
     %{
@@ -11,6 +11,30 @@ defmodule Bilimbi.Base.Workflow.TestContributions do
             key: "example.record",
             adapter: TestSubjectAdapter,
             aliases: ["Legacy\\Example\\Record"]
+          }
+        ],
+        human_actions: [
+          %{
+            key: "example.approve",
+            label: "Approve",
+            subject: "example.record",
+            capability: "admin.test.record.view",
+            handler: TestHumanActionHandler
+          },
+          %{
+            key: "example.first",
+            label: "Finish the first lane",
+            subject: "example.record",
+            capability: "admin.test.record.view",
+            handler: TestHumanActionHandler,
+            executor_key: "example.first"
+          },
+          %{
+            key: "example.restricted",
+            label: "Restricted",
+            subject: "example.record",
+            capability: "admin.test.record.approve",
+            handler: TestHumanActionHandler
           }
         ],
         guards: [%{key: "example.guard", adapter: TestGuard, aliases: ["Legacy\\Example\\Guard"]}],
