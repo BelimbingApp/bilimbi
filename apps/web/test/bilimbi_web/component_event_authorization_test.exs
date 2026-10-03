@@ -15,6 +15,7 @@ defmodule BilimbiWeb.ComponentEventAuthorizationTest do
 
   setup %{conn: conn} do
     UserFixtures.create_user_tables!()
+    CompanyFixtures.create_legal_entity_types_table!()
     AddressFixtures.create_address_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
