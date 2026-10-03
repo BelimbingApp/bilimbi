@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-canvas">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found · Bilimbi</title>
+    <link rel="icon" href={~p"/favicon.svg"} type="image/svg+xml" />
+    <link rel="stylesheet" href={~p"/assets/css/app.css"} />
+  </head>
+  <body class="h-full bg-canvas text-ink antialiased">
+    <Layouts.auth flash={%{}}>
+      <h1 id="error-not-found" class="text-base font-semibold text-ink-strong">Page not found</h1>
+      <p class="mt-2 text-sm leading-6 text-ink-muted">
+        That address is not a page in this workspace.
+      </p>
+      <p class="mt-4 text-sm">
+        <.link
+          id="error-not-found-home"
+          href={~p"/"}
+          class="font-medium text-ink-strong underline"
+        >
+          Return to Bilimbi
+        </.link>
+      </p>
+    </Layouts.auth>
+  </body>
+</html>

@@ -6,8 +6,24 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                    __DIR__
                  )
 
+  # The router compiles anonymous LiveViews, session posts, and impersonation
+  # posts itself. Every other host path in the manifest — `/dashboard` is the
+  # one today — is injected from that declaration, so the manifest is not a
+  # second copy of a route the router already wrote down.
+  @router_owned_host_paths [
+    "/",
+    "/forgot-password",
+    "/reset-password/:token",
+    "/session",
+    "/admin/impersonate/leave",
+    "/admin/impersonate/:id"
+  ]
+
   def module_routes(routes) when is_list(routes) do
-    Enum.reject(routes, &(&1[:source] == "web" or not Map.has_key?(&1, :path)))
+    Enum.reject(routes, fn route ->
+      not Map.has_key?(route, :path) or
+        (route[:source] == "web" and route.path in @router_owned_host_paths)
+    end)
   end
 
   defmacro inject do
@@ -18,17 +34,6 @@ defmodule BilimbiWeb.DiscoveredRoutes do
       else
         []
       end
-
-    routes = [
-      %{
-        path: "/dashboard",
-        live: BilimbiWeb.DashboardLive,
-        session: :auth,
-        source: "web",
-        layer: :web
-      }
-      | routes
-    ]
 
     groups =
       routes

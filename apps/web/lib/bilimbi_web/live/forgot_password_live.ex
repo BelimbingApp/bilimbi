@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.ForgotPasswordLive do
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.User
   alias BilimbiWeb.{Mailer, UserEmail}

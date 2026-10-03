@@ -10,7 +10,7 @@ defmodule BilimbiWeb.ImpersonationController do
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
-  alias BilimbiWeb.UserAuth
+  alias BilimbiWeb.Impersonation
 
   def create(conn, %{"id" => id}) do
     current_scope = conn.assigns[:current_scope]
@@ -27,7 +27,7 @@ defmodule BilimbiWeb.ImpersonationController do
           {target_user_id, ""} when target_user_id != current_user_id ->
             case User.get_tenant_user(scope, target_user_id) do
               {:ok, %Summary{} = target_user} ->
-                UserAuth.impersonate_user(conn, current_user, target_user)
+                Impersonation.impersonate_user(conn, current_user, target_user)
 
               {:error, _reason} ->
                 conn
@@ -50,6 +50,6 @@ defmodule BilimbiWeb.ImpersonationController do
   end
 
   def delete(conn, _params) do
-    UserAuth.leave_impersonation(conn)
+    Impersonation.leave_impersonation(conn)
   end
 end
