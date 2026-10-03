@@ -4,12 +4,35 @@ defmodule Bilimbi.Base.SystemTest do
   "Unavailable" -- never a crash, and never an invented value.
   """
 
-  use ExUnit.Case, async: false
+  use Bilimbi.Base.Database.DataCase, async: false
 
   # Aliased, not imported as `System`: an `alias Bilimbi.Base.System` shadows
   # Elixir's own `System`, and these assertions compare against it.
   alias Bilimbi.Base.System, as: SystemInfo
   alias Bilimbi.Base.System.Contributions
+
+  setup_all do
+    settings =
+      Bilimbi.Base.Settings.ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "base/locale"},
+          payload: Bilimbi.Base.Locale.Contributions.contributions().settings
+        }
+      ])
+
+    Bilimbi.Base.ModuleRegistry.ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: "base-system-test",
+      consumers: %{settings: settings}
+    })
+
+    on_exit(&Bilimbi.Base.ModuleRegistry.ContributionRegistry.clear_for_test!/0)
+    :ok
+  end
+
+  setup do
+    Bilimbi.Base.Settings.TestFixtures.create_settings_table!()
+    :ok
+  end
 
   describe "fact sections" do
     test "every section returns labelled facts and nothing raises" do
