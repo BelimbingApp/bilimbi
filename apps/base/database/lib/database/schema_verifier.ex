@@ -33,7 +33,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           required(:columns) => [String.t()],
           required(:unique) => boolean(),
           required(:where) => String.t() | nil,
-          optional(:order) => [boolean()]
+          optional(:order) => [boolean()] | nil
         }
 
   @type foreign_key_spec :: %{
@@ -500,7 +500,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     object
     |> Map.put_new(:where, nil)
     |> Map.update!(:where, &normalize_predicate/1)
-    |> Map.put_new(:order, List.duplicate(false, length(Map.fetch!(object, :columns))))
+    |> Map.put(:order, Map.get(object, :order) || List.duplicate(false, length(object.columns)))
   end
 
   defp normalize_named_object("foreign key", object),
@@ -541,3 +541,4 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     end
   end
 end
+

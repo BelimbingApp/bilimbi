@@ -51,8 +51,6 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "base_audit_mutations_pkey" => index(["id"], true),
         "base_audit_mutations_company_id_index" => index(["company_id"]),
         "base_audit_mutations_tenant_id_index" => index(["tenant_id"]),
-        "base_audit_mutations_tenant_timeline_index" =>
-          index(["tenant_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_audit_mutations_actor_type_index" => index(["actor_type"]),
         "base_audit_mutations_actor_id_index" => index(["actor_id"]),
         "base_audit_mutations_auditable_type_index" => index(["auditable_type"]),
@@ -77,6 +75,8 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "system_principal" => column({:varchar, 100})
       },
       optional_indexes: %{
+        "base_audit_mutations_tenant_timeline_index" =>
+          index(["tenant_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_audit_mutations_impersonator_id_index" =>
           index(["impersonator_id"], false, "impersonator_idisnotnull"),
         "base_audit_mutations_system_principal_index" =>
@@ -113,8 +113,6 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "base_audit_actions_pkey" => index(["id"], true),
         "base_audit_actions_company_id_index" => index(["company_id"]),
         "base_audit_actions_tenant_id_index" => index(["tenant_id"]),
-        "base_audit_actions_tenant_timeline_index" =>
-          index(["tenant_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_audit_actions_actor_type_index" => index(["actor_type"]),
         "base_audit_actions_actor_id_index" => index(["actor_id"]),
         "base_audit_actions_event_index" => index(["event"]),
@@ -129,6 +127,8 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "system_principal" => column({:varchar, 100})
       },
       optional_indexes: %{
+        "base_audit_actions_tenant_timeline_index" =>
+          index(["tenant_id", "occurred_at", "id"], false, nil, [false, true, true]),
         "base_audit_actions_impersonator_id_index" =>
           index(["impersonator_id"], false, "impersonator_idisnotnull"),
         "base_audit_actions_system_principal_index" =>
@@ -166,3 +166,4 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
     %{columns: columns, unique: unique, where: where, order: order}
   end
 end
+
