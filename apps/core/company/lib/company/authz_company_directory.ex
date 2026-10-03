@@ -9,13 +9,19 @@ defmodule Bilimbi.Core.Company.AuthzCompanyDirectory do
 
   @impl true
   def company_ids(%Scope{} = scope) do
-    {:ok, companies} = Company.list_companies(scope)
-    Enum.map(companies, & &1.id)
+    {:ok, ids} = Company.list_live_company_ids(scope)
+    ids
   end
 
-  # Same `list_companies/1` call as `company_ids/1` on purpose: the two lists
-  # have to describe the same set, or a picker built from this one could offer a
-  # company that `company_in_scope?/2` refuses.
+  @impl true
+  def live_company_ids_query(%Scope{} = scope) do
+    Company.live_company_ids_query(scope)
+  end
+
+  # `companies_in_scope/1` still loads rows because a picker needs display
+  # names. Its id set has to match `company_ids/1`, which now selects ids
+  # only: a picker that offered a company `company_in_scope?/2` then rejected
+  # would fail on submit for a value it supplied itself.
   #
   # `display_name/1` rather than `.name` because `core/user`'s index already
   # names companies that way; disagreeing here would have two screens calling
@@ -39,7 +45,7 @@ defmodule Bilimbi.Core.Company.AuthzCompanyDirectory do
   @impl true
   def company_in_scope?(%Scope{} = scope, company_id)
       when is_integer(company_id) and company_id > 0 do
-    match?({:ok, _company}, Company.get_company(scope, company_id))
+    Company.live_company?(scope, company_id)
   end
 
   def company_in_scope?(%Scope{}, _company_id), do: false

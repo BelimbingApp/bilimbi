@@ -313,6 +313,19 @@ defmodule Bilimbi.Core.CompanyTest do
       assert {:ok, [74]} = Company.list_tenant_company_ids(other)
     end
 
+    test "list_live_company_ids matches list_companies and excludes archived rows", %{
+      owner: owner,
+      other: other
+    } do
+      assert {:ok, companies} = Company.list_companies(owner)
+      assert {:ok, [73, 75]} = Company.list_live_company_ids(owner)
+      assert Company.list_live_company_ids(owner) == {:ok, Enum.map(companies, & &1.id)}
+      assert {:ok, [74]} = Company.list_live_company_ids(other)
+      assert Company.live_company?(owner, 73)
+      refute Company.live_company?(owner, 76)
+      refute Company.live_company?(owner, 74)
+    end
+
     test "Authz directory exposes only live companies in the tenant", %{
       owner: owner,
       other: other

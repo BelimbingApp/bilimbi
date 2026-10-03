@@ -23,6 +23,8 @@ the detail header contract.
 |---|---|
 | `list_companies/1` | Excluded — matches `get_company/2` |
 | `dashboard_summary/2` | Excluded — counts all live companies and returns the preferred company, or the first live company by ID |
+| `list_live_company_ids/1` | Excluded — id-only form of `list_companies/1` |
+| `live_company?/2` | Excluded — one id, existence only |
 | `list_tenant_company_ids/1` | Included — Belimbing-compatible user listing seam |
 
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never

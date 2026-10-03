@@ -299,6 +299,41 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
+  Live company ids in this tenant, oldest id first.
+
+  The same set as `list_companies/1` and `live_company_ids_query/1`, selected
+  as ids. `list_tenant_company_ids/1` is the other id list and includes
+  soft-deleted companies for the user listing; authorization must not use it.
+  """
+  @spec list_live_company_ids(Scope.t()) :: {:ok, [pos_integer()]}
+  def list_live_company_ids(%Scope{} = scope) do
+    ids =
+      scope
+      |> live_company_ids_query()
+      |> order_by([company], asc: company.id)
+      |> Repo.all()
+
+    {:ok, ids}
+  end
+
+  @doc """
+  Whether one company is live in this tenant.
+
+  A missing, soft-deleted, or other-tenant id is false. The check is an
+  existence query on `live_company_ids_query/1`, not a full company row.
+  """
+  @spec live_company?(Scope.t(), term()) :: boolean()
+  def live_company?(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    scope
+    |> live_company_ids_query()
+    |> where([company], company.id == ^company_id)
+    |> Repo.exists?()
+  end
+
+  def live_company?(%Scope{}, _company_id), do: false
+
+  @doc """
   Names of the given live companies in this tenant.
 
   Missing, soft-deleted, and other-tenant ids are omitted. The value is
