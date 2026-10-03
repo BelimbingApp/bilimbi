@@ -19,8 +19,8 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
           descriptor: %{id: "base/workflow", otp_app: :bilimbi_base_workflow},
           payload: %{
             domains: %{"admin" => "Example"},
-            verbs: ["view"],
-            capabilities: ["admin.test.record.view"],
+            verbs: ["view", "approve"],
+            capabilities: ["admin.test.record.view", "admin.test.record.approve"],
             company_directory: Bilimbi.Base.Workflow.TestCompanyDirectory
           }
         }
@@ -55,6 +55,11 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
     LegacyStatusFixture.create!(Repo, Bilimbi.Base.Database.DataCase.temporary_schema!())
 
     Bilimbi.Base.Workflow.LegacyCoordinationFixture.create!(
+      Repo,
+      Bilimbi.Base.Database.DataCase.temporary_schema!()
+    )
+
+    Bilimbi.Base.Workflow.LegacyHumanActionFixture.create!(
       Repo,
       Bilimbi.Base.Database.DataCase.temporary_schema!()
     )

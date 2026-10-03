@@ -2,8 +2,8 @@
 
 Workflow owns status configuration and history. Its public facade accepts a
 `Bilimbi.Base.Tenancy.Scope` and `%{type: "owner.record", id: 42}`. It never
-queries an owner's subject table. The status kernel and durable coordinator share
-this boundary. UI, human-action routing and external/outbox dispatch are later slices.
+queries an owner's subject table. The status kernel, durable coordinator and
+human action gate share this boundary. UI and external/outbox dispatch are later slices.
 
 An owner declares `base/workflow` and contributes immutable defaults:
 
@@ -198,6 +198,67 @@ also refuse explicitly because PHP arrays coerce/sort them and can become lists;
 express those as lists. Compatible owner mappings belong in private extensions,
 not the public platform.
 
-`base_workflow_human_action_requests` belongs to slice 3, the human action
-gate. This baseline neither creates nor reads it; adopting a database that has
-it leaves its rows untouched.
+## Human actions
+
+An owner contributes the actions a signed-in person may perform on its subject
+under `workflow.human_actions`. Each binds a stable key to the registered
+subject, the Authz capability the actor must hold, a descriptor-owned
+`HumanActionHandler`, and optionally the `executor_key` of the process work
+the action completes:
+
+```elixir
+%{key: "owner.approve", label: "Approve", subject: "owner.record",
+  capability: "owner.record.approve", handler: Owner.ApproveHandler}
+%{key: "owner.first.submit", label: "Submit first review", subject: "owner.record",
+  capability: "owner.record.first.submit", handler: Owner.SubmitHandler,
+  executor_key: "owner.first"}
+```
+
+Keys are unique per subject, as Belimbing registered them. A subject whose
+owner contributes human actions returns `Subject.version`, an opaque token
+over the whole row; Belimbing hashed every raw attribute, and a token that
+covers less lets a stale page act.
+
+`available_actions(scope, ref)` returns `%{subject_version: token, actions:
+entries}` for the signed-in actor: every action whose capability the actor
+holds and, for a work-bound action, one entry per due available item of a
+running tenant run of that subject with `process_run_id`, `work_item_id` and
+`work_version`. System actors, named principals included, get
+`:human_actor_required`; a person is required. Availability rechecks owner
+proof and due times but is not business eligibility.
+
+```elixir
+execute_action(scope, ref, %{
+  action_key: "owner.first.submit", idempotency_key: "7f3c...-first.submit",
+  expected_subject_version: token, payload: %{"lines" => [...]},
+  process_run_id: 12, work_item_id: 34, expected_work_version: 1
+})
+```
+
+Execution locks the subject through its adapter (`:execute_action`), checks the
+capability, then locks the tenant/key request row. A row with the same intent
+returns its saved result as `replayed: true` before any version check, because
+the first execution legitimately changed the subject; the same key with a
+different intent, another actor or another subject is `:idempotency_conflict`.
+A new request compares the subject version, writes its row, runs the handler
+and, for a work-bound action, completes the item through the coordinator's
+own lock path with the handler's output and result reference, recording the
+request on the `work.completed` event as Belimbing did. Stale subject or work
+versions, a wrong executor, a run of another subject, a missing capability,
+another tenant or a handler refusal roll back the request, the owner writes and
+the work completion together. Two connections submitting one key execute once.
+
+The intent digest is Belimbing's exactly: PHP `json_encode` with default flags
+over the recursively key-sorted intent (`subject_type`, `subject_id`,
+`actor_type`, `actor_id`, `action_key`, `process_run_id`, `work_item_id`,
+`payload`), then SHA-256. Retained rows carry only that digest, so one
+canonical form serves legacy and new requests; a legacy row is compared under
+its stored class alias and replayed without executing. Floats and
+PHP-numeric object keys serialize differently in PHP and are refused as
+`:unreproducible_intent` before any write; express such values as strings. A
+retained request whose completion and result disagree fails verification, and
+one the source left open is `:request_incomplete`, never re-executed.
+
+The human request baseline is the third compatible migration. Adoption keeps
+every row, hash, alias, actor type and result JSON; `actor_type` values other
+than `user` are history, not runtime authority.

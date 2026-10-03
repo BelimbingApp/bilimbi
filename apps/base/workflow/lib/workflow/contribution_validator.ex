@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
   alias Bilimbi.Base.Workflow.{
     ActionAdapter,
     GuardAdapter,
+    HumanActionHandler,
     JSON,
     ProcessAdapter,
     ProcessDefinition,
@@ -25,6 +26,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
       actions: %{},
       flows: %{},
       processes: %{},
+      human_actions: %{},
       aliases: %{}
     }
 
@@ -35,6 +37,10 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
       owned!(registry.subjects, process.subject, process.owner)
     end)
 
+    Enum.each(registry.human_actions, fn {_identity, action} ->
+      owned!(registry.subjects, action.subject, action.owner)
+    end)
+
     registry
   end
 
@@ -42,7 +48,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
     unless "base/workflow" in Map.get(descriptor, :dependencies, []),
       do: invalid!("#{descriptor.id} must declare base/workflow")
 
-    keys!(payload, [:subjects, :guards, :actions, :flows, :processes])
+    keys!(payload, [:subjects, :guards, :actions, :flows, :processes, :human_actions])
 
     registry =
       Enum.reduce(
@@ -70,22 +76,51 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
         unique_put!(acc, :flows, flow.code, flow)
       end)
 
-    Enum.reduce(list!(payload, :processes), registry, fn process, acc ->
-      process = ProcessDefinition.validate!(process)
-      adapter!(Map.take(process, [:key, :adapter]), descriptor, ProcessAdapter)
-      # All versions of one key belong to one owner and one subject.
-      for {{key, _version}, existing} <- acc.processes, key == process.key do
-        unless existing.owner == descriptor.id and existing.subject == process.subject,
-          do: invalid!("process key crosses ownership or subject boundaries")
-      end
+    registry =
+      Enum.reduce(list!(payload, :processes), registry, fn process, acc ->
+        process = ProcessDefinition.validate!(process)
+        adapter!(Map.take(process, [:key, :adapter]), descriptor, ProcessAdapter)
+        # All versions of one key belong to one owner and one subject.
+        for {{key, _version}, existing} <- acc.processes, key == process.key do
+          unless existing.owner == descriptor.id and existing.subject == process.subject,
+            do: invalid!("process key crosses ownership or subject boundaries")
+        end
 
-      unique_put!(
-        acc,
-        :processes,
-        {process.key, process.version},
-        Map.put(process, :owner, descriptor.id)
-      )
+        unique_put!(
+          acc,
+          :processes,
+          {process.key, process.version},
+          Map.put(process, :owner, descriptor.id)
+        )
+      end)
+
+    # A human action key is stable per subject, as Belimbing registered them.
+    Enum.reduce(list!(payload, :human_actions), registry, fn action, acc ->
+      action = human_action!(action, descriptor)
+      unique_put!(acc, :human_actions, {action.subject, action.key}, action)
     end)
+  end
+
+  defp human_action!(action, descriptor) do
+    keys!(action, [:key, :label, :subject, :capability, :handler, :executor_key])
+    key!(Map.get(action, :key))
+    key!(Map.get(action, :subject))
+    key!(Map.get(action, :capability))
+    string!(Map.get(action, :label))
+    executor = Map.get(action, :executor_key)
+
+    unless is_nil(executor) or
+             (is_binary(executor) and String.valid?(executor) and String.trim(executor) != "" and
+                byte_size(executor) <= 255),
+           do: invalid!("invalid executor_key")
+
+    adapter!(
+      %{key: action.key, adapter: Map.get(action, :handler)},
+      descriptor,
+      HumanActionHandler
+    )
+
+    Map.merge(%{executor_key: nil}, action) |> Map.put(:owner, descriptor.id)
   end
 
   defp adapter!(entry, descriptor, behaviour) do
