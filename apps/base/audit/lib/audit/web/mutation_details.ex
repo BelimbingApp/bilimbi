@@ -43,7 +43,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationDetails do
     assigns =
       assigns
       |> assign(:empty?, fields == [])
-      |> assign(:summary, MutationDiff.summary(assigns.mutation))
+      |> assign(:summary, MutationDiff.summary_from_fields(fields))
 
     ~H"""
     <div id={@id}>

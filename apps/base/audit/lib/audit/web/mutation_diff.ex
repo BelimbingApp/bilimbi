@@ -96,6 +96,15 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   def changed_fields(_mutation), do: []
 
   @doc """
+  Like `summary/1` but takes a precomputed field list so callers that already
+  called `changed_fields/1` avoid a second enumeration of the mutation keys.
+  """
+  @spec summary_from_fields([String.t()]) :: String.t()
+  def summary_from_fields([]), do: "No field changes recorded."
+  def summary_from_fields([field]), do: field
+  def summary_from_fields(fields), do: field_summary(fields)
+
+  @doc """
   One line naming the changed fields, without their values.
 
   At most four names are written out. A longer change says how many more
