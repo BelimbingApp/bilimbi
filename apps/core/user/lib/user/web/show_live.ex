@@ -167,9 +167,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     all_roles = Authz.list_roles(scope)
     unassigned_roles = Enum.reject(all_roles, &(&1.id in assigned_role_ids))
 
-    # One grant read for every unassigned role. `get_role/2` also loads each
-    # role's principal assignments, and doing that per role is the page's
-    # remaining query loop.
+    # One batch grantability check for all unassigned roles via
+    # `Authz.role_grants/2`, instead of N calls to `get_role/2`.
     available_roles =
       unassigned_roles
       |> grantable_roles(scope, acting_grant_all?, acting_allowed_set)
