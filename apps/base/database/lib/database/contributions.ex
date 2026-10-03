@@ -47,8 +47,9 @@ defmodule Bilimbi.Base.Database.Contributions do
           # #650: these capabilities gate the menu and the read verbs, but the raw-SQL
           # console itself is operator-only tooling. The route and every write/execute
           # handler additionally require the platform-operator tenant via
-          # `Scope.platform_operator?/1` — granting this role to a non-operator surfaces
-          # the pages but never lets them run or mutate a query.
+          # `Scope.platform_operator?/1` — granting this role to a non-operator does
+          # not surface the pages because `admin.system.database-table.list` is a
+          # platform capability; even the menu items require it.
           "system_viewer" => %{
             capabilities: [
               "admin.system.database-table.list",
