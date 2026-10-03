@@ -79,7 +79,7 @@
           <.badge :if={not item.allowed?} kind={:danger}>no</.badge>
         </:col>
         <:empty :if={@total_entries == 0}>
-          {if @state.search == "" and (@state.source == "" or @state.source == "all"),
+          {if @state.search == "" and (@state.filters.source == "" or @state.filters.source == "all"),
             do: "No menu items are registered.",
             else: "No menu items match the current filters."}
         </:empty>

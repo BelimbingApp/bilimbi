@@ -22,8 +22,26 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListState
+  alias Bilimbi.Base.UI.Params
 
-  @sortable ~w(created_at principal_type principal_id principal_name role_name company_id company_name)
+  # Newest first, matching Belimbing: an assignment is usually being read
+  # because somebody just granted or revoked one. The URL key is `per_page`.
+  @list ListState.spec!(
+          sortable: %{
+            created_at: :desc,
+            principal_type: :asc,
+            principal_id: :asc,
+            principal_name: :asc,
+            role_name: :asc,
+            company_id: :asc,
+            company_name: :asc
+          },
+          default_sort: :created_at,
+          page_sizes: [25, 50, 100, 300],
+          default_page_size: 25,
+          page_size_param: "per_page"
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -37,61 +55,41 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
      |> assign(:company_order, Enum.map(companies, & &1.id))}
   end
 
-  @page_sizes [25, 50, 100, 300]
-
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load(socket, state_from_params(params))}
+    {:noreply, load(socket, ListState.parse(params, @list))}
   end
 
   @impl true
   def handle_event("filter", params, socket) do
-    current = socket.assigns.state
-    filters = Map.get(params, "filters", %{})
-
-    state = %{
-      current
-      | search: Map.get(filters, "search", current.search),
-        page_size: page_size_from(Map.get(filters, "perPage"), current.page_size),
-        page: 1
-    }
-
-    {:noreply, push_state(socket, state)}
+    {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
   @impl true
-  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
-    column = String.to_existing_atom(column)
 
-    direction =
-      cond do
-        state.sort_by != column -> default_direction(column)
-        state.sort_dir == :asc -> :desc
-        true -> :asc
-      end
-
-    {:noreply, push_state(socket, %{state | sort_by: column, sort_dir: direction, page: 1})}
+    case ListState.next_sort(state, column) do
+      ^state -> {:noreply, socket}
+      next -> {:noreply, push_state(socket, next)}
+    end
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
+    {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
   end
 
-  defp default_direction(:created_at), do: :desc
-  defp default_direction(_column), do: :asc
-
   defp push_state(socket, state) do
-    push_patch(socket, to: ~p"/authz/principal-roles?#{state_to_params(state)}")
+    push_patch(socket, to: ~p"/authz/principal-roles?#{ListState.to_params(state)}")
   end
 
   defp load(socket, state) do
     page =
       Authz.list_principal_roles(socket.assigns.current_scope.scope,
-        search: nilify(state.search),
+        search: Params.blank_to_nil(state.search),
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
@@ -99,80 +97,21 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
         company_order: socket.assigns.company_order
       )
 
-    if beyond_last_page?(page) do
-      load(socket, %{state | page: page.total_pages})
+    corrected = ListState.clamp_to_last_page(state, page)
+
+    if corrected.page != state.page do
+      load(socket, corrected)
     else
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(:filters_form, filters_form(state))
+      |> assign(:filters_form, ListState.filters_form(state))
       |> stream(:assignments, page.entries, reset: true)
     end
   end
 
-  defp beyond_last_page?(page),
-    do: page.total_pages > 0 and page.page > page.total_pages
-
-  defp state_from_params(params) do
-    %{
-      search: Map.get(params, "search", ""),
-      sort_by: sort_by_from(Map.get(params, "sort_by")),
-      sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1),
-      page_size: page_size_from(Map.get(params, "per_page"), 25)
-    }
-  end
-
-  defp state_to_params(state) do
-    %{
-      "search" => state.search,
-      "sort_by" => state.sort_by,
-      "sort_dir" => state.sort_dir,
-      "page" => state.page,
-      "per_page" => state.page_size
-    }
-  end
-
-  defp filters_form(state) do
-    to_form(
-      %{
-        "search" => state.search,
-        "perPage" => Integer.to_string(state.page_size)
-      },
-      as: :filters
-    )
-  end
-
-  defp page_size_from(value, fallback) do
-    case to_int(value, fallback) do
-      size when size in @page_sizes -> size
-      _ -> fallback
-    end
-  end
-
-  defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
-  defp sort_by_from(_value), do: :created_at
-
-  defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
-  defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
-
-  defp sort_dir_from(params),
-    do: params |> Map.get("sort_by") |> sort_by_from() |> default_direction()
-
-  defp to_int(nil, default), do: default
-
-  defp to_int(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} when int > 0 -> int
-      _ -> default
-    end
-  end
-
-  defp to_int(value, _default) when is_integer(value) and value > 0, do: value
-  defp to_int(_value, default), do: default
-
-  defp nilify(""), do: nil
-  defp nilify(value), do: value
+  defp filters(params) when is_map(params), do: Map.get(params, "filters", %{})
+  defp filters(_params), do: %{}
 
   defp principal_label(%{principal_type: "agent"}), do: "Employee"
   defp principal_label(%{principal_type: "user"}), do: "User"

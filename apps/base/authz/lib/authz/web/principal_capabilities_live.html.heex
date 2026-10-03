@@ -108,7 +108,7 @@
         </:col>
 
         <:empty :if={@page.total_entries == 0}>
-          {if @state.search == "" and @state.result == "",
+          {if @state.search == "" and @state.filters.result == "",
             do: "No capabilities have been granted directly in this tenant.",
             else: "No direct capabilities match these filters."}
         </:empty>

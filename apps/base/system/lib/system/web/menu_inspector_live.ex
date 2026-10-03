@@ -14,14 +14,27 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Menu
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Nav
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
 
+  # No sort. Empty search and source stay off the URL. `source=all` is the
+  # same as no source. `perPage` is accepted inbound because the page-size
+  # select posts it; the URL writes `page_size`.
+  @list ListState.spec!(
+          page_sizes: @page_sizes,
+          default_page_size: @default_page_size,
+          page_size_param: "page_size",
+          page_size_aliases: ["perPage"],
+          omit_blank: [:search, :source],
+          filters: [source: {:string, "", %{"all" => ""}}]
+        )
+
   @impl true
   def mount(_params, _session, socket) do
-    state = default_state()
+    state = ListState.parse(%{}, @list)
 
     {:ok,
      socket
@@ -29,7 +42,7 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:state, state)
      |> assign(:sources, [])
-     |> assign(:filters_form, filters_form(state))
+     |> assign(:filters_form, ListState.filters_form(state))
      |> assign(:items_page, empty_page())
      |> assign(:total_entries, 0)
      |> stream(:items, [])}
@@ -37,57 +50,44 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    state = state_from_params(params)
+    state = ListState.parse(params, @list)
     {rows, sources} = visible_rows(socket, state)
     total_entries = length(rows)
     pages = total_pages(total_entries, state.page_size)
+    corrected = ListState.clamp_to_last_page(state, %{total_pages: pages}, empty: :reset)
 
-    cond do
-      pages > 0 and state.page > pages ->
-        {:noreply, push_state(socket, %{state | page: pages})}
-
-      pages == 0 and state.page > 1 ->
-        {:noreply, push_state(socket, %{state | page: 1})}
-
-      true ->
-        {:noreply, assign_listing(socket, state, rows, sources, total_entries, pages)}
+    if corrected.page != state.page do
+      {:noreply, push_state(socket, corrected)}
+    else
+      {:noreply, assign_listing(socket, state, rows, sources, total_entries, pages)}
     end
   end
 
   @impl true
   # The toolbar and `<.pagination>`'s rows-per-page select both post under
   # `filters`. A key the posting form did not carry keeps its current value.
-  # The URL keeps this screen's `page_size` key; the select posts `perPage`.
   def handle_event("filter", params, socket) do
-    current = socket.assigns.state
-    filters = Map.get(params, "filters", %{})
-
-    state = %{
-      current
-      | search: Map.get(filters, "search", current.search),
-        source: Map.get(filters, "source", current.source),
-        page_size: page_size(Map.get(filters, "perPage"), current.page_size),
-        page: 1
-    }
-
-    {:noreply, push_state(socket, state)}
+    {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
+    {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
   end
 
   defp push_state(socket, state) do
-    push_patch(socket, to: ~p"/system/menu-inspector?#{state_to_params(state)}")
+    push_patch(socket, to: ~p"/system/menu-inspector?#{ListState.to_params(state)}")
   end
+
+  defp filters(params) when is_map(params), do: Map.get(params, "filters", %{})
+  defp filters(_params), do: %{}
 
   defp visible_rows(socket, state) do
     all_rows = inspect_rows(socket.assigns.current_scope)
 
     rows =
       all_rows
-      |> filter_by_source(state.source)
+      |> filter_by_source(state.filters.source)
       |> search_rows(state.search)
 
     {rows, available_sources(all_rows)}
@@ -99,7 +99,7 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
     socket
     |> assign(:sources, sources)
     |> assign(:state, state)
-    |> assign(:filters_form, filters_form(state))
+    |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:total_entries, total_entries)
     |> assign(:items_page, %{
       page: state.page,
@@ -110,23 +110,8 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
     |> stream(:items, entries, reset: true)
   end
 
-  defp default_state do
-    %{search: "", source: "", page: 1, page_size: @default_page_size}
-  end
-
   defp empty_page do
     %{page: 1, page_size: @default_page_size, total_entries: 0, total_pages: 0}
-  end
-
-  defp filters_form(state) do
-    to_form(
-      %{
-        "search" => state.search,
-        "source" => state.source,
-        "perPage" => Integer.to_string(state.page_size)
-      },
-      as: :filters
-    )
   end
 
   defp inspect_rows(current_scope) do
@@ -177,46 +162,6 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
     end)
   end
 
-  defp state_from_params(params) do
-    source = Map.get(params, "source", "")
-
-    %{
-      search: Map.get(params, "search", ""),
-      source: if(source == "all", do: "", else: source),
-      page: to_int(Map.get(params, "page"), 1),
-      page_size:
-        page_size(Map.get(params, "page_size") || Map.get(params, "perPage"), @default_page_size)
-    }
-  end
-
-  defp state_to_params(state) do
-    params = %{"page" => state.page, "page_size" => state.page_size}
-    params = if state.search != "", do: Map.put(params, "search", state.search), else: params
-
-    if state.source != "" and state.source != "all" do
-      Map.put(params, "source", state.source)
-    else
-      params
-    end
-  end
-
   defp total_pages(0, _page_size), do: 0
   defp total_pages(total, page_size), do: div(total + page_size - 1, page_size)
-
-  defp page_size(value, default) do
-    parsed = to_int(value, default)
-    if parsed in @page_sizes, do: parsed, else: default
-  end
-
-  defp to_int(nil, default), do: default
-
-  defp to_int(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} when int > 0 -> int
-      _ -> default
-    end
-  end
-
-  defp to_int(value, _default) when is_integer(value) and value > 0, do: value
-  defp to_int(_value, default), do: default
 end
