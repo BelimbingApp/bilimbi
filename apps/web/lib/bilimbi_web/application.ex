@@ -16,7 +16,9 @@ defmodule BilimbiWeb.Application do
       {Phoenix.PubSub, name: BilimbiWeb.PubSub},
       BilimbiWeb.RateLimit,
       BilimbiWeb.WebhookRateLimit,
-      BilimbiWeb.Endpoint
+      BilimbiWeb.Endpoint,
+      # Broadcasts through the endpoint, so it starts after it.
+      BilimbiWeb.SessionDisconnect
     ]
 
     Supervisor.start_link(children,

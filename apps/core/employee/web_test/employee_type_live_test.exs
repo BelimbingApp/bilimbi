@@ -279,31 +279,25 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    # The sandbox hands every process the one connection, so a transaction held
-    # here pins the delete task on its first query and the delete stays in
-    # flight for the whole block. Neither click needs the database: the
-    # capability check and the guard both read assigns.
-    Bilimbi.Base.Repo.transaction(fn ->
-      view |> element("#employee-type-delete-#{running.id}") |> render_click()
-      view |> element("#delete-employee-type-confirm-confirm") |> render_click()
+    task = start_held_delete(view, running.id)
 
-      # Only the deleting row's own control goes busy, so another row's
-      # request still reaches the server. One delete runs at a time, and the
-      # operator is told this one was not served before any dialog opens,
-      # rather than confirming a delete that would be dropped.
-      refused =
-        view
-        |> element("#employee-type-delete-#{other.id}")
-        |> render_click()
+    # Only the deleting row's own control goes busy, so another row's
+    # request still reaches the server. One delete runs at a time, and the
+    # operator is told this one was not served before any dialog opens,
+    # rather than confirming a delete that would be dropped.
+    refused =
+      view
+      |> element("#employee-type-delete-#{other.id}")
+      |> render_click()
 
-      assert refused =~ "Another employee type is still being deleted."
-      refute has_element?(view, "#delete-employee-type-confirm")
+    assert refused =~ "Another employee type is still being deleted."
+    refute has_element?(view, "#delete-employee-type-confirm")
 
-      # The deleting row's own control is busy and disabled; a forged repeat is
-      # the running request and needs nothing.
-      render_click(view, "request_delete", %{"id" => to_string(running.id)})
-      refute has_element?(view, "#delete-employee-type-confirm")
-    end)
+    # The deleting row's own control is busy and disabled; a forged repeat is
+    # the running request and needs nothing.
+    render_click(view, "request_delete", %{"id" => to_string(running.id)})
+    refute has_element?(view, "#delete-employee-type-confirm")
+    send(task, :release_delete)
 
     render_async(view, 5_000)
 
@@ -344,46 +338,8 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    test_pid = self()
-
-    # The sandbox hands every process the one connection, so a transaction
-    # held here pins the delete task on its first query. The delete is
-    # provably still in flight until this holder is released.
-    holder =
-      spawn_link(fn ->
-        Bilimbi.Base.Repo.transaction(fn ->
-          send(test_pid, :pinned)
-
-          receive do
-            :release -> :ok
-          end
-        end)
-      end)
-
-    assert_receive :pinned, 5_000
-
-    # Confirming the delete needs no database: the capability check and the
-    # guard both read assigns.
-    view |> element("#employee-type-delete-#{type.id}") |> render_click()
-    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
-
-    # The patch a sort header pushes, driven while the delete is pinned.
-    # `render_patch/2` parses no DOM, so the patch is two local message hops
-    # and reaches the LiveView's mailbox well before the released task can
-    # reach it across five round trips to PostgreSQL. The LiveView therefore
-    # runs `handle_params` -> `load_page` with the delete still in flight,
-    # which is the moment this test exists to cover; it queues for the same
-    # connection behind the task and completes once the task lets go.
-    patch =
-      Task.async(fn ->
-        send(test_pid, :patching)
-        render_patch(view, ~p"/employee-types?sort=code")
-      end)
-
-    assert_receive :patching, 5_000
-    send(holder, :release)
-
-    patched = Task.await(patch, 5_000)
+    task = start_held_delete(view, type.id)
+    patched = render_patch(view, ~p"/employee-types?sort=code")
 
     # The patch did not clear the delete marker: the row the operator is
     # deleting still says so, so the guard that stops a second confirmed
@@ -396,6 +352,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     assert Enum.count(busy) == 1
 
+    send(task, :release_delete)
     render_async(view, 5_000)
 
     # That first delete's own outcome still reaches the operator, and the row
@@ -618,5 +575,38 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     # action names. #292 fixed the titles and left this one behind, so it is
     # pinned rather than trusted (#296).
     assert has_element?(view, "#employee-type-new", "New Type")
+  end
+
+  # Pause the delete task after its initial company lookup has returned the
+  # connection, before it starts the delete transaction. Page events and
+  # patches can then perform their real authorization and database reads.
+  defp start_held_delete(view, type_id) do
+    handler = {__MODULE__, make_ref()}
+    test_pid = self()
+    event = Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query]
+
+    :ok =
+      :telemetry.attach(handler, event, &__MODULE__.hold_delete/4, {handler, test_pid, view.pid})
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+    view |> element("#employee-type-delete-#{type_id}") |> render_click()
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
+    assert_receive {:delete_held, task}, 5_000
+    task
+  end
+
+  def hold_delete(_event, _measurements, metadata, {handler, test_pid, view_pid}) do
+    if metadata.source == "companies" and view_pid in Process.get(:"$callers", []) do
+      :telemetry.detach(handler)
+      monitor = Process.monitor(test_pid)
+      send(test_pid, {:delete_held, self()})
+
+      receive do
+        :release_delete -> :ok
+        {:DOWN, ^monitor, :process, ^test_pid, _reason} -> :ok
+      end
+
+      Process.demonitor(monitor, [:flush])
+    end
   end
 end

@@ -269,42 +269,19 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     # A signed-in actor's own company is always a live row of this list, so an
-    # unfiltered empty page cannot be reached by a fresh request. It can be
-    # reached by a mounted view whose rows vanish before its next patch, which
-    # is also the honest shape of the state: the list went empty under them.
-    test "a tenant with no companies yet says so and offers the first create", %{conn: conn} do
+    # unfiltered empty page cannot be reached by a fresh request, and not by a
+    # mounted view either: the host rehydrates the session before the next
+    # patch, and an actor whose company is gone is signed out, not shown an
+    # empty list.
+    test "an actor whose company vanished is signed out at the next patch", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.create"])
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=zzz")
       Repo.delete_all(from(c in "companies", where: c.tenant_id == 41))
 
-      view |> element("#companies-clear-search") |> render_click()
-      assert_patch(view, ~p"/companies")
+      assert {:error, {:redirect, %{to: "/"}}} =
+               view |> element("#companies-clear-search") |> render_click()
 
-      assert has_element?(view, "#companies-empty", "No companies yet")
-      refute has_element?(view, "#companies-empty", "match")
-      refute has_element?(view, "#companies-clear-search")
-      assert has_element?(view, "#companies-empty-add[href='/companies/create']", "Add Company")
-    end
-
-    test "a tenant with no companies yet offers no create to an actor who cannot", %{
-      conn: conn
-    } do
-      grant_capabilities!(["admin.company.list"])
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=zzz")
-      Repo.delete_all(from(c in "companies", where: c.tenant_id == 41))
-
-      view |> element("#companies-clear-search") |> render_click()
-      assert_patch(view, ~p"/companies")
-
-      assert has_element?(view, "#companies-empty", "No companies yet")
-
-      assert has_element?(
-               view,
-               "#companies-empty",
-               "Companies created in this tenant appear here."
-             )
-
-      refute has_element?(view, "#companies-empty-add")
+      assert assert_redirect(view, "/")["session_expired"] == "expired"
     end
   end
 
@@ -1502,16 +1479,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
              )
     end
 
-    test "opening a panel dialog dismisses an earlier page flash", %{conn: conn} do
+    # A refusal is the page's remaining flash, and the host hands every event
+    # the refreshed scope, so the panel's controls vanish with the grant: no
+    # dialog can open over the flash, and a restored grant brings the controls
+    # back at the next event.
+    test "a refused write withholds the panel's controls until the grant returns", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      assert has_element?(view, "#btn-open-attach-address")
 
-      # Success reports on the fact, so the page's remaining flash is the
-      # refusal of a write the actor may no longer perform: revoke the grant
-      # the page mounted with, then forge a commit. The panel's controls were
-      # rendered while the grant stood, so its dialogs still open.
       revoke_capability!(scope, "admin.company.update")
 
       render_hook(view, "save_field", %{"id" => "73", "name" => "Forged"})
@@ -1522,24 +1500,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "You do not have permission to change company administration data."
              )
 
-      # The panel is a LiveComponent, so its dialog owns no flash copy. An
-      # open dialog makes the page inert, so the layout copy must go rather
-      # than sit unreadable behind it.
+      refute has_element?(view, "#btn-open-attach-address")
+      refute has_element?(view, "#btn-open-create-address")
+
+      grant_capabilities!(["admin.company.update"])
+      render_hook(view, "cancel_edit_field", %{})
+
+      assert has_element?(view, "#btn-open-attach-address")
       view |> element("#btn-open-attach-address") |> render_click()
-
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
-      refute has_element?(view, "#flash-error")
-
-      # The page behind an open dialog is inert, so the second dialog is
-      # reachable only once the first has closed, and needs its own flash.
-      view |> element("button[phx-click='close_attach_modal']") |> render_click()
-      refute has_element?(view, "#attach-address-modal")
-
-      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged again"})
-      assert has_element?(view, "#flash-error")
-
-      view |> element("#btn-open-create-address") |> render_click()
-      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
       refute has_element?(view, "#flash-error")
     end
 
@@ -1750,6 +1719,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute Enum.any?(companies, &(&1.name == "Invalid Parent Child"))
     end
 
+    # The route mounts under the create capability, so the host closes the
+    # page at the next event once that grant is gone.
     test "revoking create capability after mount prevents a parentless write", %{conn: conn} do
       grant_capabilities!(["admin.company.create"])
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
@@ -1765,16 +1736,18 @@ defmodule BilimbiWeb.CompanyLiveTest do
                  false
                )
 
-      html =
-        render_submit(view, "save", %{
-          "company" => %{
-            "parent_id" => "",
-            "name" => "Revoked Create",
-            "status" => "active"
-          }
-        })
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               render_submit(view, "save", %{
+                 "company" => %{
+                   "parent_id" => "",
+                   "name" => "Revoked Create",
+                   "status" => "active"
+                 }
+               })
 
-      assert html =~ "is not available"
+      assert assert_redirect(view, "/dashboard")["error"] ==
+               BilimbiWeb.RouteAccess.revoked_message()
+
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Revoked Create"))
     end
