@@ -27,7 +27,7 @@ defmodule BilimbiWeb.SessionsLiveTest do
   test "a non-operator tenant cannot open the platform-wide session listing", %{conn: conn} do
     CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
-    UserFixtures.insert_user!(%{id: 92, company_id: 74, name: "Grace Hopper"})
+    UserFixtures.insert_user!(%{id: 92, company_id: 74, name: "Grace Hopper", email: "grace@example.com"})
 
     grant_capabilities!(["admin.system.session.list", "admin.system.session.manage"],
       tenant_id: 42,
