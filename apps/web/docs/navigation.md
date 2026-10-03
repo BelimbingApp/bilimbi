@@ -7,14 +7,28 @@ of reloading the document. Authentication is rehydrated on each destination
 mount. Anonymous and operator-only routes keep separate session boundaries.
 
 `BilimbiWeb.RouteAccess` checks each route's declared capability before the
-module's mount runs, and again before a URL patch enters a different route.
-Search, sort and pagination patches within the same route retain that page's
-existing mount policy. The router supplies
-a compile-time action key for this lookup; the hook clears that host-only key
-before the adapter runs, preserving the existing nil-action adapter contract.
-A missing policy fails closed. Modules sharing a LiveView (for example User
-create/edit) still have distinct policies. Event authorization remains the
-owning module's responsibility.
+module's mount runs, then re-proves the page before every event it handles
+and before every URL patch, whether the patch stays on the same route or
+enters a different one. The re-proof first rehydrates the scope exactly as
+an HTTP request does (`UserAuth.refresh_scope/1`: durable session row,
+company, tenant, user and effective capabilities), sending a page whose
+session was terminated or whose login was removed to the login screen with
+the expired-session flash, and assigns the refreshed `current_scope`. It
+then re-checks the route capability against that actor, one `Authz.can/2`
+decision per key, logged like any other, and a grant revoked while the page
+is open sends it to the dashboard with a flash saying so instead of letting
+it keep acting until remount. The first `handle_params` of a mount is not
+checked a second time. Separately, the cookie session carries
+`UserAuth.live_socket_id/1`; Base Session publishes every termination and
+`BilimbiWeb.SessionDisconnect` broadcasts `"disconnect"` on that id, so the
+idle tabs of a session that ended reconnect and are refused at mount. The router supplies a compile-time action key for the
+policy lookup; the hook clears that host-only key before the adapter runs,
+preserving the existing nil-action adapter contract. A missing policy fails
+closed. Modules sharing a LiveView (for example User create/edit) still have
+distinct policies. An operation that needs a capability other than the
+route's, and every LiveComponent event (component events never pass through
+the parent view's hooks), re-asks through
+`Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
 
 The menu and content render together through Base UI. Sharing the session does
 not cache the actor's permissions or introduce a separate menu request. The

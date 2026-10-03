@@ -38,6 +38,20 @@ revocation commits with a retained `authz.system_principal.granted` or
 `.revoked` audit action naming who made it. Decisions log `actor_type`
 `"system"`, `actor_id` `0`, and the principal's name in the context.
 
+## Re-authorizing inside a LiveView
+
+`Bilimbi.Base.Authz.LiveAuthorization` is the one way a module LiveView
+re-asks Authz after mount. `allowed_now?/2` evaluates a string or
+`{:any_of, keys}` requirement with one `can/2` decision per key against the
+actor the authentication edge sealed onto `current_scope`; the host's
+`BilimbiWeb.RouteAccess` uses it before every event and navigation of an
+open page. `authorize_event/2` wraps it for an event handler: `{:ok, socket}`
+proceeds, `{:denied, socket}` carries the refusal flash and drops the denied
+keys from `current_scope.capabilities` so controls hidden through
+`allowed?/2` disappear on the next render. A `nil` requirement raises; an
+operation always names what it needs. Base Menu's `Capability` owns the
+requirement shape.
+
 ## Administration facade
 
 Administration adapters use `Bilimbi.Base.Authz`; they never query these

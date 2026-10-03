@@ -35,8 +35,16 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
         if can_manage?(socket) do ... else {:noreply, flash_forbidden} end
       end
 
-  Idioms 2, 3 and 4 check that a guard is *present*, not that it is correct
-  — the same approximation idiom 1 makes. All four are guards; the deny clause
+      # 5. the shared live re-check (base/authz LiveAuthorization)
+      def handle_event("save", params, socket) do
+        case LiveAuthorization.authorize_event(socket, @manage_capability) do
+          {:ok, socket} -> ...
+          {:denied, socket} -> {:noreply, socket}
+        end
+      end
+
+  Idioms 2 to 5 check that a guard is *present*, not that it is correct
+  — the same approximation idiom 1 makes. All five are guards; the deny clause
   is a house style, not a security property, and a test that enforced one
   style while claiming to enforce authorization would be argued with and then
   ignored (review of #415).
@@ -150,8 +158,9 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     assert new == [],
            """
            These write-shaped handle_event/3 clauses have no guard (deny
-           clause, inline can_*? branch, allowed?/2 check, or a route mounted
-           under a write capability) and no opt-out:
+           clause, inline can_*? branch, allowed?/2 check,
+           LiveAuthorization.authorize_event/2, or a route mounted under a
+           write capability) and no opt-out:
 
            #{format_entries(new)}
 
@@ -296,9 +305,10 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     deny?
   end
 
-  # Idioms 2, 3 and 4: the clause body branches on a can_*? assign read through
-  # `.assigns` (`socket.assigns.can_manage?`), calls allowed?/2 in any form, or
-  # calls a local can_*? predicate (`can_manage?(socket)`).
+  # Idioms 2 to 5: the clause body branches on a can_*? assign read through
+  # `.assigns` (`socket.assigns.can_manage?`), calls allowed?/2 in any form,
+  # calls a local can_*? predicate (`can_manage?(socket)`), or re-asks Authz
+  # through `LiveAuthorization.authorize_event/2`.
   defp body_guarded?(body) do
     {_, guarded?} =
       Macro.prewalk(body, false, fn
@@ -312,6 +322,15 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
 
         # allowed?(...) or Some.Alias.allowed?(...)
         {:allowed?, _, _} = node, _guarded? ->
+          {node, true}
+
+        # Idiom 5: authorize_event(...) or Some.Alias.authorize_event(...).
+        # The remote form is the outer call node whose function is the `.`
+        # access naming the function; the imported form is a plain call.
+        {{:., _, [_, :authorize_event]}, _, _} = node, _guarded? ->
+          {node, true}
+
+        {:authorize_event, _, args} = node, _guarded? when is_list(args) ->
           {node, true}
 
         # Idiom 4: a local predicate — `if can_manage?(socket)`. There is no

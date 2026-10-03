@@ -16,6 +16,8 @@ defmodule Bilimbi.Base.Session do
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
 
+  @termination_topic "bilimbi:base:session:terminated"
+
   @default_limit 100
   @maximum_limit 500
   @page_sizes [25, 50, 100, 300]
@@ -124,7 +126,8 @@ defmodule Bilimbi.Base.Session do
 
   @spec delete_session(String.t()) :: :ok
   def delete_session(id) when is_binary(id) do
-    Repo.delete_all(from(session in Schema, where: session.id == ^id))
+    {count, _rows} = Repo.delete_all(from(session in Schema, where: session.id == ^id))
+    if count > 0, do: publish_terminated([id])
     :ok
   end
 
@@ -136,6 +139,7 @@ defmodule Bilimbi.Base.Session do
       {:error, :current_session}
     else
       {count, _rows} = Repo.delete_all(from(session in Schema, where: session.id == ^id))
+      if count == 1, do: publish_terminated([id])
       {:ok, if(count == 1, do: :terminated, else: :not_found)}
     end
   end
@@ -159,14 +163,63 @@ defmodule Bilimbi.Base.Session do
   def terminate_user_sessions(user_id, current_session_id)
       when is_integer(user_id) and user_id > 0 and is_binary(current_session_id) and
              byte_size(current_session_id) > 0 do
-    {count, _rows} =
-      Repo.delete_all(
+    ids =
+      Repo.all(
         from(session in Schema,
-          where: session.user_id == ^user_id and session.id != ^current_session_id
+          where: session.user_id == ^user_id and session.id != ^current_session_id,
+          select: session.id
         )
       )
 
+    {count, _rows} = Repo.delete_all(from(session in Schema, where: session.id in ^ids))
+    publish_terminated(ids)
+
     {:ok, count}
+  end
+
+  @doc """
+  Subscribes the calling process to every session that ends through this
+  module: `{:session_terminated, id}` for each deleted row, whoever ended it.
+
+  The transport is the configured `:pubsub_server`; without one the lifecycle
+  still completes and nothing is published. A subscriber that holds live
+  connections for a session ends them on this message; the host's
+  `BilimbiWeb.SessionDisconnect` is that subscriber.
+  """
+  @spec subscribe_terminations() :: :ok | {:error, :pubsub_unavailable}
+  def subscribe_terminations do
+    with_pubsub(&Phoenix.PubSub.subscribe(&1, @termination_topic))
+  end
+
+  # Published right after the delete, inside a transaction the caller may
+  # hold: a subscriber reacting to a row that is then rolled back ends
+  # connections of a session that still exists, and they reconnect, while a
+  # row deleted and not announced leaves a connection that outlives its
+  # session, which is the worse failure.
+  defp publish_terminated(ids) do
+    with_pubsub(fn server ->
+      Enum.each(
+        ids,
+        &Phoenix.PubSub.broadcast(server, @termination_topic, {:session_terminated, &1})
+      )
+    end)
+  end
+
+  defp with_pubsub(delivery) do
+    case Application.get_env(:bilimbi_base_session, :pubsub_server) do
+      nil ->
+        :ok
+
+      server ->
+        case delivery.(server) do
+          :ok -> :ok
+          {:error, _reason} -> {:error, :pubsub_unavailable}
+        end
+    end
+  rescue
+    # A configured transport that is not running (a package test VM): the
+    # registry lookup raises, and the session lifecycle is not its hostage.
+    ArgumentError -> {:error, :pubsub_unavailable}
   end
 
   @spec prune_expired(non_neg_integer()) :: non_neg_integer()

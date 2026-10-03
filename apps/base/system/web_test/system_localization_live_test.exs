@@ -118,7 +118,9 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
     assert render(view) =~ "Choose a supported locale."
   end
 
-  test "a save forged after grant revocation changes nothing", %{conn: conn} do
+  # The route and the save share one capability, so the host closes the page
+  # before the handler runs; the page's own refusal is the second line.
+  test "a save forged after grant revocation changes nothing and closes the page", %{conn: conn} do
     assert %{locale: "en-US", source: "platform_operator_address"} =
              Locale.resolve(nil, %Bootstrap{country_iso: "US"})
 
@@ -133,7 +135,11 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
 
     assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
 
-    render_submit(view, "save", %{"localization" => %{"locale" => "fr-FR"}})
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             render_submit(view, "save", %{"localization" => %{"locale" => "fr-FR"}})
+
+    assert assert_redirect(view, "/dashboard")["error"] ==
+             BilimbiWeb.RouteAccess.revoked_message()
 
     assert %{
              locale: "en-US",
@@ -142,6 +148,5 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
            } = Locale.resolve(nil)
 
     assert Settings.get("ui.locale_source", nil) != "manual"
-    assert render(view) =~ "You do not have permission to manage the installation locale."
   end
 end

@@ -1,5 +1,15 @@
 # Base Session
 
+## Ending a session
+
+`delete_session/1`, `terminate_session/2` and `terminate_user_sessions/2`
+publish `{:session_terminated, id}` for every row they delete on the
+configured `:pubsub_server` (the host's PubSub, `config/config.exs`), after
+the delete. `subscribe_terminations/0` is the subscriber side; the host's
+`BilimbiWeb.SessionDisconnect` is the one subscriber today and ends the live
+sockets of the session. Without a running transport the lifecycle completes
+and nothing is published, so a package test VM needs no PubSub.
+
 `Bilimbi.Base.Session` owns the durable session store compatible with
 Belimbing's root `sessions` table. It stores an opaque payload and session
 metadata without depending on Core User or Phoenix Web.

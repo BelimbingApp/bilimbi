@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.DepartmentType
 
@@ -20,9 +21,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
      socket
      |> assign(:page_title, "Department Types")
      |> assign(:active_nav, "admin.company.department-type")
-     |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
-     |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
-     |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
+     |> assign_permissions()
      |> assign(:types_count, length(types))
      |> assign(:selected_category, "all")
      |> assign(:modal_action, nil)
@@ -54,43 +53,47 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
     do: write_forbidden(socket)
 
   def handle_event("new", _params, socket) do
-    changeset =
-      DepartmentType.changeset(%DepartmentType{}, %{
-        category: "operational",
-        is_active: true
-      })
+    with {:ok, socket} <- authorize(socket, @create_capability) do
+      changeset =
+        DepartmentType.changeset(%DepartmentType{}, %{
+          category: "operational",
+          is_active: true
+        })
 
-    {:noreply,
-     socket
-     |> clear_flash()
-     |> assign(:modal_action, :new)
-     |> assign(:editing_type, %DepartmentType{category: "operational"})
-     |> assign_form(changeset)}
+      {:noreply,
+       socket
+       |> clear_flash()
+       |> assign(:modal_action, :new)
+       |> assign(:editing_type, %DepartmentType{category: "operational"})
+       |> assign_form(changeset)}
+    end
   end
 
   def handle_event("edit", _params, %{assigns: %{can_update?: false}} = socket),
     do: write_forbidden(socket)
 
   def handle_event("edit", %{"id" => id}, socket) do
-    case Integer.parse(id) do
-      {type_id, ""} ->
-        case Company.get_department_type(type_id) do
-          {:ok, type} ->
-            changeset = DepartmentType.update_changeset(type, %{})
+    with {:ok, socket} <- authorize(socket, @update_capability) do
+      case Integer.parse(id) do
+        {type_id, ""} ->
+          case Company.get_department_type(type_id) do
+            {:ok, type} ->
+              changeset = DepartmentType.update_changeset(type, %{})
 
-            {:noreply,
-             socket
-             |> clear_flash()
-             |> assign(:modal_action, :edit)
-             |> assign(:editing_type, type)
-             |> assign_form(changeset)}
+              {:noreply,
+               socket
+               |> clear_flash()
+               |> assign(:modal_action, :edit)
+               |> assign(:editing_type, type)
+               |> assign_form(changeset)}
 
-          {:error, :not_found} ->
-            {:noreply, put_flash(socket, :error, "Department type not found.")}
-        end
+            {:error, :not_found} ->
+              {:noreply, put_flash(socket, :error, "Department type not found.")}
+          end
 
-      _ ->
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
+      end
     end
   end
 
@@ -135,50 +138,52 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
       do: write_forbidden(socket)
 
   def handle_event("save", %{"department_type" => params}, socket) do
-    case socket.assigns.modal_action do
-      :new ->
-        case Company.create_department_type(params) do
-          {:ok, _type} ->
-            {:ok, types} = reload_types(socket.assigns.selected_category)
+    with {:ok, socket} <- authorize(socket, save_capability(socket)) do
+      case socket.assigns.modal_action do
+        :new ->
+          case Company.create_department_type(params) do
+            {:ok, _type} ->
+              {:ok, types} = reload_types(socket.assigns.selected_category)
 
-            {:noreply,
-             socket
-             |> put_flash(:success, "Department type created successfully.")
-             |> assign(:modal_action, nil)
-             |> assign(:editing_type, nil)
-             |> assign(:types_count, length(types))
-             |> assign_form(nil)
-             |> stream(:types, types, reset: true)}
+              {:noreply,
+               socket
+               |> put_flash(:success, "Department type created successfully.")
+               |> assign(:modal_action, nil)
+               |> assign(:editing_type, nil)
+               |> assign(:types_count, length(types))
+               |> assign_form(nil)
+               |> stream(:types, types, reset: true)}
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            {:noreply, assign_form(socket, changeset)}
-        end
+            {:error, %Ecto.Changeset{} = changeset} ->
+              {:noreply, assign_form(socket, changeset)}
+          end
 
-      :edit ->
-        type = socket.assigns.editing_type
+        :edit ->
+          type = socket.assigns.editing_type
 
-        case Company.update_department_type(type, params) do
-          {:ok, updated_type} ->
-            {:noreply,
-             socket
-             |> put_flash(:success, "Department type updated successfully.")
-             |> assign(:modal_action, nil)
-             |> assign(:editing_type, nil)
-             |> assign_form(nil)
-             |> stream_insert(:types, updated_type)}
+          case Company.update_department_type(type, params) do
+            {:ok, updated_type} ->
+              {:noreply,
+               socket
+               |> put_flash(:success, "Department type updated successfully.")
+               |> assign(:modal_action, nil)
+               |> assign(:editing_type, nil)
+               |> assign_form(nil)
+               |> stream_insert(:types, updated_type)}
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            {:noreply, assign_form(socket, changeset)}
+            {:error, %Ecto.Changeset{} = changeset} ->
+              {:noreply, assign_form(socket, changeset)}
 
-          {:error, :not_found} ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "Department type not found.")
-             |> assign(:modal_action, nil)}
-        end
+            {:error, :not_found} ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "Department type not found.")
+               |> assign(:modal_action, nil)}
+          end
 
-      _ ->
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
+      end
     end
   end
 
@@ -186,21 +191,23 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
     do: write_forbidden(socket)
 
   def handle_event("toggle_active", %{"id" => id}, socket) do
-    case Integer.parse(id) do
-      {type_id, ""} ->
-        case Company.toggle_department_type_active(type_id) do
-          {:ok, updated_type} ->
-            {:noreply,
-             socket
-             |> put_flash(:success, "Status updated successfully.")
-             |> stream_insert(:types, updated_type)}
+    with {:ok, socket} <- authorize(socket, @update_capability) do
+      case Integer.parse(id) do
+        {type_id, ""} ->
+          case Company.toggle_department_type_active(type_id) do
+            {:ok, updated_type} ->
+              {:noreply,
+               socket
+               |> put_flash(:success, "Status updated successfully.")
+               |> stream_insert(:types, updated_type)}
 
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Could not update status.")}
-        end
+            {:error, _reason} ->
+              {:noreply, put_flash(socket, :error, "Could not update status.")}
+          end
 
-      _ ->
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
+      end
     end
   end
 
@@ -211,18 +218,20 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
   # whose consequence the dialog states, and `delete` acts on that held type
   # rather than on a client-supplied id, so what was confirmed is what runs.
   def handle_event("request_delete", %{"id" => id}, socket) do
-    case Integer.parse(id) do
-      {type_id, ""} ->
-        case Company.get_department_type(type_id) do
-          {:ok, type} ->
-            {:noreply, socket |> clear_flash() |> assign(:pending_delete, type)}
+    with {:ok, socket} <- authorize(socket, @delete_capability) do
+      case Integer.parse(id) do
+        {type_id, ""} ->
+          case Company.get_department_type(type_id) do
+            {:ok, type} ->
+              {:noreply, socket |> clear_flash() |> assign(:pending_delete, type)}
 
-          {:error, :not_found} ->
-            {:noreply, put_flash(socket, :error, "Department type not found.")}
-        end
+            {:error, :not_found} ->
+              {:noreply, put_flash(socket, :error, "Department type not found.")}
+          end
 
-      _ ->
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
+      end
     end
   end
 
@@ -237,30 +246,53 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
     do: {:noreply, socket}
 
   def handle_event("delete", _params, %{assigns: %{pending_delete: type}} = socket) do
-    socket = assign(socket, :pending_delete, nil)
+    with {:ok, socket} <- authorize(socket, @delete_capability) do
+      socket = assign(socket, :pending_delete, nil)
 
-    case Company.delete_department_type(type.id) do
-      :ok ->
-        {:ok, types} = reload_types(socket.assigns.selected_category)
+      case Company.delete_department_type(type.id) do
+        :ok ->
+          {:ok, types} = reload_types(socket.assigns.selected_category)
 
-        {:noreply,
-         socket
-         |> put_flash(:success, "Department type deleted.")
-         |> assign(:types_count, length(types))
-         |> stream(:types, types, reset: true)}
+          {:noreply,
+           socket
+           |> put_flash(:success, "Department type deleted.")
+           |> assign(:types_count, length(types))
+           |> stream(:types, types, reset: true)}
 
-      {:error, :in_use} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "#{type.name} was not deleted: one or more company departments still use it. " <>
-             "Change those departments' type first."
-         )}
+        {:error, :in_use} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "#{type.name} was not deleted: one or more company departments still use it. " <>
+               "Change those departments' type first."
+           )}
 
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "Department type not found.")}
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Department type not found.")}
+      end
     end
+  end
+
+  # The `can_*?` assigns hide controls; they are presentation state copied at
+  # mount, and the deny clauses above only refuse early. Every write re-asks
+  # Authz here, and a refusal re-derives the assigns from the withheld scope so
+  # the controls disappear with the grant.
+  defp authorize(socket, capability) do
+    case LiveAuthorization.authorize_event(socket, capability) do
+      {:ok, socket} -> {:ok, socket}
+      {:denied, socket} -> write_forbidden(assign_permissions(socket))
+    end
+  end
+
+  defp save_capability(%{assigns: %{modal_action: :edit}}), do: @update_capability
+  defp save_capability(_socket), do: @create_capability
+
+  defp assign_permissions(socket) do
+    socket
+    |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
+    |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+    |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
   end
 
   defp write_forbidden(socket) do
