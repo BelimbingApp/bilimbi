@@ -191,6 +191,8 @@ defmodule Bilimbi.Base.Workflow.SchemaContract do
         foreign_keys: %{},
         checks: %{}
       }
-    ] ++ Bilimbi.Base.Workflow.CoordinationSchemaContract.tables()
+    ] ++
+      Bilimbi.Base.Workflow.CoordinationSchemaContract.tables() ++
+      Bilimbi.Base.Workflow.HumanActionSchemaContract.tables()
   end
 end
