@@ -95,3 +95,14 @@ Worker arguments and recorded output excerpts never cross the operator-facing
 Schedule API. Diagnostics report scheduler, Queue, recorder, and due-work evidence
 independently, using unknown or unavailable states rather than deriving health
 from missing rows.
+
+## Poll query budget
+
+The scheduler reads the latest scheduled occurrence for every installed key
+with one grouped query per poll. Reconciliation reads Queue state once per
+bounded batch of up to 300 occurrences. Before batching, those reads were one
+occurrence query per definition and one Queue query per distinct job ID. For
+the audit's measured 24 definitions and 300 pending occurrences, this changes
+the reads from 24 + 300 SELECTs to 1 + 1 SELECTs (99.4% fewer). This is a
+statement-count comparison; no isolated wall-clock benchmark was run for this
+change.

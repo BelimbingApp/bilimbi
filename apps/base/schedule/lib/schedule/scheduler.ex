@@ -31,7 +31,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   @doc false
   def poll(now \\ DateTime.utc_now()) do
     Schedule.reconcile_terminal_occurrences()
-    Enum.each(Schedule.definitions(), &enqueue_latest_due(&1, now))
+    definitions = Schedule.definitions()
+    latest = Schedule.latest_scheduled_occurrences(Enum.map(definitions, & &1.key))
+    Enum.each(definitions, &enqueue_latest_due(&1, now, latest))
     :ok
   rescue
     error in ArgumentError ->
@@ -46,13 +48,13 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
       :ok
   end
 
-  defp enqueue_latest_due(%Definition{} = definition, now) do
+  defp enqueue_latest_due(%Definition{} = definition, now, latest_occurrences) do
     case Recurrence.previous_occurrence(definition, now) do
       {:ok, local_intended} ->
         intended_at =
           DateTime.shift_zone!(local_intended, "Etc/UTC", TimeZoneInfo.TimeZoneDatabase)
 
-        latest = Schedule.latest_scheduled_occurrence(definition)
+        latest = Map.get(latest_occurrences, definition.key)
 
         if is_nil(latest) or DateTime.before?(latest, intended_at) do
           case Schedule.enqueue_due(definition, intended_at) do
