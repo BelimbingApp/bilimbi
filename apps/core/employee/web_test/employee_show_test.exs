@@ -5,6 +5,8 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -28,7 +30,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
         email: "john@example.test"
       })
 
-    %{employee: employee}
+    %{scope: scope, employee: employee}
   end
 
   test "requires authentication", %{conn: conn, employee: employee} do
@@ -842,6 +844,56 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert has_element?(view, "#flash-error", "the platform orchestrator cannot be deleted.")
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, _} = Employee.get_employee(scope, 73, orchestrator.id)
+  end
+
+  test "refuses deletion when permission is revoked after mount", %{
+    conn: conn,
+    scope: scope,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+    assert has_element?(view, "#employee-delete")
+
+    revoke_capability!(scope, "admin.employee.delete")
+
+    view |> element("#employee-delete") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#delete-employee-confirm")
+    refute has_element?(view, "#employee-delete")
+    assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
+  end
+
+  test "refuses deletion when permission is revoked after opening confirmation", %{
+    conn: conn,
+    scope: scope,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+    view |> element("#employee-delete") |> render_click()
+    assert has_element?(view, "#delete-employee-confirm-confirm")
+
+    revoke_capability!(scope, "admin.employee.delete")
+
+    view |> element("#delete-employee-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
+    refute has_element?(view, "#flash-success")
+    refute has_element?(view, "#employee-delete")
+    assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
+  end
+
+  defp revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   # The account panel is a `core/user`-owned discovered embed (#581); these

@@ -16,8 +16,10 @@ defmodule Bilimbi.Core.Employee do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee.AdministrationIndex
@@ -317,9 +319,10 @@ defmodule Bilimbi.Core.Employee do
   end
 
   @spec delete_employee(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, lookup_error()}
+          :ok | {:error, lookup_error() | :forbidden}
   def delete_employee(%Scope{} = scope, company_id, employee_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with :ok <- authorize(scope, "admin.employee.delete"),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
@@ -330,6 +333,7 @@ defmodule Bilimbi.Core.Employee do
         end
       end
     else
+      {:error, :forbidden} = error -> error
       {:error, :company_not_found} = error -> error
       nil -> {:error, :employee_not_found}
     end
@@ -488,10 +492,12 @@ defmodule Bilimbi.Core.Employee do
   end
 
   @spec delete_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :company_not_found | :type_not_found | :is_system | :in_use}
+          :ok
+          | {:error, :company_not_found | :type_not_found | :is_system | :in_use | :forbidden}
   def delete_employee_type(%Scope{} = scope, company_id, type_id)
       when is_integer(company_id) and is_integer(type_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with :ok <- authorize(scope, "admin.employee-type.delete"),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
       Repo.transaction(fn ->
         case Repo.one(
                from(type in EmployeeType,
@@ -529,6 +535,25 @@ defmodule Bilimbi.Core.Employee do
       |> case do
         {:ok, :ok} -> :ok
         {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :forbidden} = error -> error
+      {:error, :company_not_found} = error -> error
+    end
+  end
+
+  # The delete screens already ask for these capabilities. Seeds, mix tasks,
+  # and `Tenancy.scope/1` pass the anonymous system actor, which holds no
+  # grants; a person and a named system principal are decided by Authz.
+  defp authorize(%Scope{} = scope, capability) do
+    actor = Scope.actor(scope)
+
+    if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
+      :ok
+    else
+      case Authz.can(scope, capability) do
+        %{allowed: true} -> :ok
+        %{allowed: false} -> {:error, :forbidden}
       end
     end
   end
