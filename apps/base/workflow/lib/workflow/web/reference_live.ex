@@ -121,7 +121,12 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
   defp failure_copy(:invalid_subject), do: "This record address is not valid."
 
   defp failure_copy(reason)
-       when reason in [:stale_subject, :stale_work, :subject_version_conflict, :work_version_conflict],
+       when reason in [
+              :stale_subject,
+              :stale_work,
+              :subject_version_conflict,
+              :work_version_conflict
+            ],
        do: "This record changed. Refresh the page and try again."
 
   defp failure_copy(_reason),
