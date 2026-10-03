@@ -91,11 +91,9 @@ owners. A fresh-VM direct collector call in the isolated implementation
 worktree took **224 ms** and returned `{:noop, []}`. The existing unmount test
 still retains extracted files and proves they do not re-enter the bundle.
 
-Root `mix compile --warnings-as-errors` failed on the Web project's webhook
-registry lookup. That lookup now uses a pinned-key map match, and the same root
-command passes. A temporary warning in a nested Base package printed during
-root compilation but still exited successfully, confirming that the separate
-`compile.strict` module subprocesses remain necessary for path dependencies.
+The webhook registry lookup's empty-registry constraint is documented beside
+`BilimbiWeb.Webhooks.deliver/2`. For the separate `compile.strict` requirement,
+see [mounted-code traversal](architecture/0010_composition-model.md#realization-outcome).
 
 | Measurement | Audit baseline | Implementation worktree |
 | --- | ---: | ---: |
