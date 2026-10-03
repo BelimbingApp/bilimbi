@@ -253,6 +253,53 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  @doc """
+  One company read, partitioned for a supervisor's page.
+
+  Proves the company and the supervisor once. `employees` is that company's
+  list (the supervisor options). `subordinates` report to this employee.
+  `available` are the other employees. `list_subordinates/3` and
+  `list_available_subordinates/3` stay for callers that want one side only.
+  """
+  @spec supervision_lists(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok,
+           %{
+             employees: [Summary.t()],
+             subordinates: [Summary.t()],
+             available: [Summary.t()]
+           }}
+          | {:error, lookup_error()}
+  def supervision_lists(%Scope{} = scope, company_id, employee_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, employee_id) do
+      employees =
+        from(employee in Schema,
+          left_join: employee_type in EmployeeType,
+          on: employee_type.code == employee.employee_type,
+          where: employee.company_id == ^company_id,
+          order_by: employee.id,
+          select: {employee, employee_type.label}
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_query_result/1)
+
+      subordinates =
+        employees
+        |> Enum.filter(&(&1.supervisor_id == employee_id))
+        |> Enum.sort_by(&{&1.full_name, &1.id})
+
+      available =
+        employees
+        |> Enum.filter(&(&1.id != employee_id and &1.supervisor_id != employee_id))
+        |> Enum.sort_by(&{&1.full_name, &1.id})
+
+      {:ok, %{employees: employees, subordinates: subordinates, available: available}}
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
   @doc "Assigns an employee as direct subordinate to a supervisor."
   @spec assign_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}

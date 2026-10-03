@@ -76,6 +76,44 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.get_employee(owner, 73, employee.id + 1)
   end
 
+  test "partitions one company read into a supervisor's subordinate lists", %{owner: owner} do
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-REPORT",
+               full_name: "Report Person"
+             })
+
+    assert {:ok, other} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-OTHER",
+               full_name: "Other Person"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, report.id)
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+    assert Enum.map(lists.subordinates, & &1.id) == [report.id]
+    assert Enum.map(lists.available, & &1.id) == [other.id]
+
+    assert Enum.sort(Enum.map(lists.employees, & &1.id)) ==
+             Enum.sort([lead.id, report.id, other.id])
+
+    assert {:ok, same_subs} = Employee.list_subordinates(owner, 73, lead.id)
+    assert Enum.map(same_subs, & &1.id) == Enum.map(lists.subordinates, & &1.id)
+
+    assert {:ok, same_available} = Employee.list_available_subordinates(owner, 73, lead.id)
+    assert Enum.map(same_available, & &1.id) == Enum.map(lists.available, & &1.id)
+
+    assert {:error, :company_not_found} = Employee.supervision_lists(owner, 74, lead.id)
+    assert {:error, :employee_not_found} = Employee.supervision_lists(owner, 73, lead.id + 9_000)
+  end
+
   test "returns a bounded administration page with source search, filters, and stable order", %{
     owner: owner
   } do

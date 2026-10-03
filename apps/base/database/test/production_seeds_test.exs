@@ -220,7 +220,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
         :ok
       end)
 
-    assert_raise ArgumentError, ~r/status: expected default/, fn ->
+    assert_raise ArgumentError, ~r/status: incompatible default/, fn ->
       run([definition], context)
     end
 
@@ -237,7 +237,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
     )
 
     assert_raise ArgumentError,
-                 ~r/missing constraint bilimbi_production_seeds_status_check/,
+                 ~r/missing check bilimbi_production_seeds_status_check/,
                  fn ->
                    run([], context)
                  end

@@ -33,11 +33,6 @@ defmodule Bilimbi.Base.Authz.Actor do
   @spec principal_type(t()) :: String.t()
   def principal_type(%__MODULE__{type: type}), do: Atom.to_string(type)
 
-  @spec cache_key(t()) :: String.t()
-  def cache_key(%__MODULE__{} = actor) do
-    Enum.join([principal_type(actor), actor.id, actor.company_id], ":")
-  end
-
   defp validate!(%__MODULE__{} = actor) do
     unless actor.type in [:user, :agent],
       do: raise(ArgumentError, "authorization actor type must be :user or :agent")
