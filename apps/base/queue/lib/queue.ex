@@ -174,6 +174,33 @@ defmodule Bilimbi.Base.Queue do
 
   def job_state(_job_id), do: {:error, :invalid_job_id}
 
+  @doc "Returns the bounded transport states for a set of positive job IDs."
+  @spec job_states([term()]) ::
+          {:ok, %{optional(pos_integer()) => atom()}} | {:error, :invalid_job_id | :unavailable}
+  def job_states(job_ids) when is_list(job_ids) do
+    cond do
+      not Enum.all?(job_ids, &(is_integer(&1) and &1 > 0)) ->
+        {:error, :invalid_job_id}
+
+      job_ids == [] ->
+        {:ok, %{}}
+
+      true ->
+        states =
+          from(job in jobs_query(), where: job.id in ^job_ids, select: {job.id, job.state})
+          |> Repo.all()
+          |> Map.new(fn {id, state} -> {id, state_atom(state)} end)
+
+        {:ok, states}
+    end
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
+  def job_states(_job_ids), do: {:error, :invalid_job_id}
+
   @doc "Retries a positive inactive job ID without returning transport state."
   @spec retry(term()) :: :ok | {:error, :not_found | :invalid_job_id | :unavailable}
   def retry(job_id) when is_integer(job_id) and job_id > 0 do
