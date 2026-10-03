@@ -286,14 +286,14 @@ defmodule BilimbiWeb.UserAuth do
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
   `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()],
   grant_all: boolean(), impersonator: map | nil, session_identity: map,
-  shell_preferences: map, pins: [map()], operator_company_missing: boolean()}`
-  or `nil`. `capabilities` and `grant_all` are one `effective_capabilities/1`
-  result. Templates read
+  shell_preferences: map, operator_company_missing: boolean()}` or `nil`.
+  `capabilities` and `grant_all` are one `effective_capabilities/1` result.
+  Templates read
   `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
   `shell_preferences` is the single resolved theme, timestamp display, locale,
-  and language snapshot for the request or LiveView process. `pins` is that
-  user's shell pin list, rendered onto `#app-shell` so the browser does not
-  request it on load.
+  and language snapshot for the request or LiveView process. The shell pin
+  list is not part of this assign: an authenticated LiveView attaches it once
+  at mount, and a controller that never renders the shell does not query it.
 
   A cookie whose session, user, company, or tenant no longer proves out is
   dropped: the request falls through as unauthenticated.
@@ -455,7 +455,7 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   def on_mount(:require_authenticated, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
+    socket = socket |> mount_current_scope(session) |> put_shell_pins()
 
     if socket.assigns.current_scope do
       current_scope = socket.assigns.current_scope
@@ -612,7 +612,7 @@ defmodule BilimbiWeb.UserAuth do
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)
 
-      %{
+      current_scope = %{
         user: presentation_user(user, scope),
         scope: scope,
         actor: actor,
@@ -626,20 +626,32 @@ defmodule BilimbiWeb.UserAuth do
         },
         operator_company_missing: operator_company_missing?(scope)
       }
-      |> then(fn current_scope ->
-        current_scope
-        |> Map.put(
-          :shell_preferences,
-          DisplayPreferences.presentation(current_scope, locale_bootstrap())
-        )
-        |> Map.put(:pins, shell_pins(current_scope))
-      end)
+
+      Map.put(
+        current_scope,
+        :shell_preferences,
+        DisplayPreferences.presentation(current_scope, locale_bootstrap())
+      )
     else
       _ -> nil
     end
   end
 
   defp current_scope_from(_session_user, _impersonation), do: nil
+
+  defp put_shell_pins(%{assigns: %{current_scope: %{pins: pins}}} = socket) when is_list(pins),
+    do: socket
+
+  defp put_shell_pins(%{assigns: %{current_scope: current_scope}} = socket)
+       when is_map(current_scope) do
+    Phoenix.Component.assign(
+      socket,
+      :current_scope,
+      Map.put(current_scope, :pins, shell_pins(current_scope))
+    )
+  end
+
+  defp put_shell_pins(socket), do: socket
 
   defp shell_pins(%{scope: %Scope{} = scope}) do
     case BilimbiWeb.PinController.shell_pins(scope) do

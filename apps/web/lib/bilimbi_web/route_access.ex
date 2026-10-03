@@ -136,15 +136,19 @@ defmodule BilimbiWeb.RouteAccess do
     end)
   end
 
-  # The same four reads the HTTP plug pays per request. The frame flag is the
-  # one fact a refreshed scope cannot rebuild: it came from the LiveView
-  # session at mount (`BilimbiWeb.FramedRender`). A session group without a
-  # scope (public routes) has nothing to refresh.
+  # The same four reads the HTTP plug pays per request. A refreshed scope
+  # cannot rebuild the frame flag (`BilimbiWeb.FramedRender`) or the shell
+  # pin list loaded at mount, so both are copied from the open page. A
+  # session group without a scope (public routes) has nothing to refresh.
   defp refresh(%{assigns: %{current_scope: %{session_identity: _} = current_scope}} = socket) do
     case BilimbiWeb.UserAuth.refresh_scope(current_scope) do
       {:ok, refreshed} ->
         {:cont,
-         assign(socket, :current_scope, Map.merge(refreshed, Map.take(current_scope, [:framed])))}
+         assign(
+           socket,
+           :current_scope,
+           Map.merge(refreshed, Map.take(current_scope, [:framed, :pins]))
+         )}
 
       {:error, :unauthenticated} ->
         {:halt,

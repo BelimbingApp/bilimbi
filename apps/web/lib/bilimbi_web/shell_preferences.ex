@@ -14,13 +14,17 @@ defmodule BilimbiWeb.ShellPreferences do
   def handle_event("shell:preference", %{"kind" => kind, "value" => value}, socket) do
     # Rehydrate the durable session before a self-service write, just as the
     # HTTP preference endpoint does. A revoked session cannot keep writing.
-    with {:ok, current_scope} <- BilimbiWeb.UserAuth.refresh_scope(socket.assigns.current_scope),
+    previous = socket.assigns.current_scope
+
+    with {:ok, current_scope} <- BilimbiWeb.UserAuth.refresh_scope(previous),
          :ok <- DisplayPreferences.save(current_scope, kind, value) do
       socket =
         Phoenix.Component.assign(
           socket,
           :current_scope,
-          DisplayPreferences.refresh(current_scope)
+          current_scope
+          |> DisplayPreferences.refresh()
+          |> Map.merge(Map.take(previous, [:pins]))
         )
 
       {:halt, %{ok: true}, socket}

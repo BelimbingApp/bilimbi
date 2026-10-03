@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
@@ -62,6 +63,38 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
 
     assert has_element?(view, "#dashboard-users")
     assert has_element?(view, "#dashboard-user-91 td", "Ada Lovelace")
+  end
+
+  test "shell pins load with the page and stay across a refresh", %{conn: conn} do
+    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
+    conn = log_in_as(conn)
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, owner ->
+        if metadata.source == "user_pins" and match?({:ok, %{command: :select}}, metadata.result) do
+          send(owner, :pin_read)
+        end
+      end,
+      owner
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    {:ok, view, _html} = live(conn, ~p"/dashboard")
+    assert pin_reads() == 2
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+
+    view |> element("#customize-layout") |> render_click()
+    assert pin_reads() == 0
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+
+    render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+    assert pin_reads() == 0
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
   end
 
   test "renders the sidebar without gated destinations when capabilities are absent", %{
@@ -309,6 +342,43 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
                "#dashboard-widgets-none",
                "No installed module contributes dashboard widgets."
              )
+    end
+
+    test "the first HTML does not report deferred widgets as empty", %{conn: conn, scope: scope} do
+      grant_capabilities!([
+        "admin.audit.log.list",
+        "admin.system.session.list",
+        "admin.system.perf.view"
+      ])
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      conn = conn |> log_in_as() |> get(~p"/dashboard")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s(id="stat-recent-audit-pending")
+      refute html =~ "No recent activity."
+      refute html =~ "audit-entry-#{mutation.id}"
+      assert cell_text(html, "stat-sessions-item-0") == "Open—"
+      assert cell_text(html, "stat-performance-item-0") == "Health—"
+      refute cell_text(html, "stat-performance-item-0") =~ "Unknown"
+
+      {:ok, view, _html} = live(conn)
+
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+      refute has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      assert has_element?(view, "#stat-sessions", "1")
+      refute render(view) =~ "Unknown"
     end
 
     test "shows gated widgets when corresponding capabilities are granted", %{conn: conn} do
@@ -697,6 +767,19 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
 
       assert has_element?(view, "#stat-sessions", "2")
     end
+  end
+
+  defp pin_reads(count \\ 0) do
+    receive do
+      :pin_read -> pin_reads(count + 1)
+    after
+      0 -> count
+    end
+  end
+
+  defp cell_text(html, id) do
+    [_, inner] = Regex.run(~r/id="#{id}"[^>]*>(.*?)<\/div>/s, html)
+    inner |> String.replace(~r/<[^>]+>/, "") |> String.replace(~r/\s+/, "")
   end
 
   # The drag hook pushes DOM order, so order is what the test must observe:
