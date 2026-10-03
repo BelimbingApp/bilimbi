@@ -3,8 +3,14 @@ defmodule Bilimbi.Base.Perf.ContributionsTest do
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
 
-  test "installed retention schedules validate under their worker owner" do
-    schedules = ContributionRegistry.build!().consumers.schedule
+  test "retention contributions validate under their worker owner" do
+    # A package runtime loads only its dependency closure, not the whole workspace graph.
+    descriptors =
+      Enum.map([:bilimbi_base_authz, :bilimbi_base_perf], fn app ->
+        Application.fetch_env!(app, :bilimbi_module)
+      end)
+
+    schedules = ContributionRegistry.build!(descriptors).consumers.schedule
 
     for {key, worker} <- [
           {"base/authz.decision_log_retention", Bilimbi.Base.Perf.AuthzRetentionWorker},
