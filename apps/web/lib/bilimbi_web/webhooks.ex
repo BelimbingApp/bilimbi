@@ -46,18 +46,11 @@ defmodule BilimbiWeb.Webhooks do
   end
 
   def deliver(conn, identifier) do
-    # Match the registry rather than calling `Map.get/2`: an installation with
-    # no webhook module compiles the attribute to the literal `%{}`, and the
-    # type checker then proves a `Map.get/2` lookup always returns `nil`,
-    # which fails `mix compile --warnings-as-errors`. The match says the same
-    # thing honestly: an unregistered identifier falls through to "unknown".
-    {handler, registration} =
-      case @registrations do
-        %{^identifier => registration} -> {identifier, registration}
-        %{} -> {"unknown", nil}
-      end
-
-    {conn, result, record} = attempt(conn, registration)
+    # Map.get/2 expands against the literal empty registry in installations
+    # without webhooks. Use the defaulted Erlang lookup to keep both compiler
+    # and Dialyzer analysis valid for empty and populated registries.
+    handler = if Map.has_key?(@registrations, identifier), do: identifier, else: "unknown"
+    {conn, result, record} = attempt(conn, :maps.get(identifier, @registrations, nil))
 
     if record == :aggregated or match?({:ok, _}, audit(conn, handler, result)),
       do: respond(conn, result),
