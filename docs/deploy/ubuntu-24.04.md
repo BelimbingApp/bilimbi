@@ -67,7 +67,15 @@ PostgreSQL remains local; do not open port 5432 publicly.
 Create `/etc/bilimbi/bilimbi.env` from
 [`bilimbi.env.example`](../../scripts/deploy/bilimbi.env.example). Replace
 every placeholder. Generate `SECRET_KEY_BASE` with
-`mix phx.gen.secret` on a trusted build machine. Passwords in `DATABASE_URL`
+`mix phx.gen.secret` on a trusted build machine. Generate a fresh
+`BELIMBING_APP_KEY` as `base64:` followed by the base64 encoding of 32 random
+bytes. For example, on a trusted machine use
+`printf 'base64:'; openssl rand -base64 32` and remove any trailing newline
+from the generated value. When adopting a Belimbing database, set
+`BELIMBING_APP_KEY` to that database's legacy `APP_KEY` so existing encrypted
+settings remain readable. Preserve this key across deployments. Rotating it
+requires decrypting and re-encrypting every stored encrypted setting with the
+new key before deploying it; otherwise those settings cannot be read. Passwords in `DATABASE_URL`
 must be percent-encoded. Restrict the file:
 
 ```bash
@@ -75,8 +83,8 @@ sudo install -o root -g root -m 0600 bilimbi.env /etc/bilimbi/bilimbi.env
 ```
 
 The file stays outside each release. `DATABASE_URL`, `SECRET_KEY_BASE`,
-`PHX_HOST`, `PORT`, `POOL_SIZE`, and the optional `TRUSTED_PROXIES` are boot
-settings. The current Web
+`BELIMBING_APP_KEY`, `PHX_HOST`, `PORT`, `POOL_SIZE`, and the optional
+`TRUSTED_PROXIES` are boot settings. The current Web
 release also **requires** `MAIL_*` SMTP and sender variables at startup; its
 mail adapter has not yet moved them into operator settings. Keep these secrets
 only in the protected environment file, never in Git. Other operational
