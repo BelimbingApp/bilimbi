@@ -26,12 +26,7 @@ and reset-token hashes never leave the module; account reads return
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete |
-| `list_unaffiliated_users(actor, scope)` | Operator-only list of users without company affiliation (`admin.user.unaffiliated.manage`) |
-| `get_unaffiliated_user(actor, scope, user_id)` | Operator-only read of one unaffiliated user |
-| `create_unaffiliated_user(actor, scope, attributes)` | Operator-only creation of an unaffiliated user account |
-| `assign_unaffiliated_user(actor, scope, user_id, target_company_id, opts)` | Assign an unaffiliated user to a live company and optional employee |
 | `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
-| `clear_user_company(actor, scope, current_company_id, user_id, opts)` | Move an affiliated user back to unaffiliated state; no surface offers it today |
 | `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
 | `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
@@ -123,9 +118,8 @@ refusal names that company and never the chosen one.
 
 **An account with no company is reachable from no screen.** Tenancy is
 derived from `company_id`, so `get_tenant_user/2` resolves no user without
-one and no route reaches `list_unaffiliated_users/2` or
-`get_unaffiliated_user/3`; the detail page mounts no such account either, so
-every fact it shows has a company to be written through. An account whose
+one. The detail page mounts no such account, so every fact it shows has a
+company to be written through. An account whose
 company is archived (soft-deleted) reads as "Archived company" rather than
 as no company, and the page shows it read-only: no in-place editor, company
 select, role or capability picker, password form, employee action, delete
@@ -138,8 +132,7 @@ company) nor a next step (there is no restore or move, and `users.email` is
 unique platform-wide, so a replacement account cannot reuse the email). Hiding the controls is
 presentation: each write handler asks Authz and then Core Company again, so
 a forged or stale commit is still refused on its fact or through the error
-flash. `clear_user_company/5` remains in the API with no surface offering
-it. The header is Belimbing's quiet labelled row — History, Impersonate and
+flash. The header is Belimbing's quiet labelled row — History, Impersonate and
 "← Back" — with no button; the Impersonate guards (`admin.user.impersonate`,
 never the signed-in account, never while impersonating, and now never an
 archived-company account, as on the users list) are otherwise unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
