@@ -1162,8 +1162,7 @@ Shipped:
   `aria-describedby`, before the choice is made; it is a warning, not a
   second click. A user whose company is archived reads as "Archived
   company" in the fact and the subtitle instead of "None" and
-  "Unaffiliated". `clear_user_company/5` stays in the API with a note that
-  nothing offers it. Web tests cover the select without a blank option, the
+  "Unaffiliated". Web tests cover the select without a blank option, the
   warning in the open editor and not in the read state, a refused blank, a
   refused reassignment naming the current company, and the viewer without
   `admin.user.update` seeing no select, no warning and no editors.
@@ -1171,8 +1170,6 @@ Shipped:
 
 Not delivered by this slice, reported as follow-up:
 
-- **`clear_user_company/5` has no caller outside its tests.** Removing the
-  write path, or giving it an operator surface, is a separate decision.
 - **The rest of `/users/:id`** — the roles and capability pickers, the
   change-password disclosure, the employee records and external accesses
   sections — keep their existing buttons, flashes and permanent controls.
@@ -1180,11 +1177,10 @@ Not delivered by this slice, reported as follow-up:
   separate slice.
 - **`/users/:id/edit` is retired** by the records-whose-only-page-is-a-form
   slice below; `FormLive` is create-only.
-- **No unaffiliated-users surface.** Nothing routes to
-  `list_unaffiliated_users/2` or `get_unaffiliated_user/3`. The detail page
-  no longer creates such accounts, but accounts already detached in
-  existing data stay unreachable; shipping a surface for them is a captain
-  decision and is not taken here.
+- **Accounts already stored with no company stay unreachable.** No screen
+  resolves a user without `company_id`, and the unused operator API that
+  listed, created, assigned, or cleared that state was removed with
+  `admin.user.unaffiliated.manage`.
 - **The commit-status plumbing stays duplicated.** `put_field_status/3`,
   `drop_saved/1`, `refusal_message/3`, `rejected_value/1` and `fact_label/1`
   exist on both `/addresses/:id` and `/users/:id`. Extracting them beside
