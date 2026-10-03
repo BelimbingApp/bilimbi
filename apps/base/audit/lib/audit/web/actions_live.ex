@@ -78,7 +78,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   # capability, so a grant removed after the page opened still refuses.
   @impl true
   def handle_event("toggle_retain", %{"id" => id_str}, socket) do
-id = Params.positive_integer(id_str, 0)
+    id = Params.positive_integer(id_str, 0)
 
     case Audit.toggle_retained(socket.assigns.current_scope.scope, id) do
       {:ok, _updated_action} ->

@@ -53,7 +53,10 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       )
 
     {:noreply,
-     push_state(socket, ListState.apply_filters(socket.assigns.state, Map.put(posted, "domain", domain)))}
+     push_state(
+       socket,
+       ListState.apply_filters(socket.assigns.state, Map.put(posted, "domain", domain))
+     )}
   end
 
   @impl true
