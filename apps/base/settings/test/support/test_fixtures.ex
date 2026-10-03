@@ -2,6 +2,7 @@ defmodule Bilimbi.Base.Settings.TestFixtures do
   @moduledoc false
 
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.Schema
   alias Bilimbi.Base.Settings.Scope
   alias Ecto.Adapters.SQL
@@ -12,9 +13,13 @@ defmodule Bilimbi.Base.Settings.TestFixtures do
   def put_stored_value!(key, value, scope \\ nil) do
     {scope_type, scope_id} = Scope.database_identity(scope)
 
-    %{key: key, value: value, is_encrypted: false, scope_type: scope_type, scope_id: scope_id}
-    |> Schema.changeset()
-    |> Repo.insert!()
+    row =
+      %{key: key, value: value, is_encrypted: false, scope_type: scope_type, scope_id: scope_id}
+      |> Schema.changeset()
+      |> Repo.insert!()
+
+    Cache.invalidate(key, scope_type, scope_id)
+    row
   end
 
   # Idempotent on purpose: `BilimbiWeb.ConnCase` creates this table for every
@@ -22,6 +27,12 @@ defmodule Bilimbi.Base.Settings.TestFixtures do
   # swallowed by a caller's rescue (#359), while suites that predate that call
   # it themselves. Both paths have to be able to run.
   def create_settings_table! do
+    # Sandbox rollback resets rows, but the node-local cache outlives the test.
+    # Clear on exit too, including before a following pre-provisioning test
+    # that deliberately does not create the settings table.
+    Cache.clear()
+    ExUnit.Callbacks.on_exit(&Cache.clear/0)
+
     SQL.query!(
       Repo,
       """

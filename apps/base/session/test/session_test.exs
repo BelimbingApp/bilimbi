@@ -16,6 +16,45 @@ defmodule Bilimbi.Base.SessionTest do
     :ok
   end
 
+  describe "a session that ends is published" do
+    setup do
+      server = Application.fetch_env!(:bilimbi_base_session, :pubsub_server)
+      start_supervised!({Phoenix.PubSub, name: server})
+      :ok = Session.subscribe_terminations()
+
+      for {id, user_id} <- [{"own", 41}, {"other-a", 41}, {"other-b", 41}, {"theirs", 42}] do
+        {:ok, _entry} = Session.put_session(id, "{}", %{user_id: user_id, last_activity: 1})
+      end
+
+      :ok
+    end
+
+    test "deleting, terminating, and ending a user's other sessions name each ended id" do
+      :ok = Session.delete_session("other-a")
+      assert_receive {:session_terminated, "other-a"}
+
+      assert {:ok, :terminated} = Session.terminate_session("other-b", "own")
+      assert_receive {:session_terminated, "other-b"}
+
+      assert {:ok, :not_found} = Session.terminate_session("other-b", "own")
+      :ok = Session.delete_session("other-b")
+      refute_receive {:session_terminated, _}
+
+      {:ok, _entry} = Session.put_session("other-c", "{}", %{user_id: 41, last_activity: 1})
+      assert {:ok, 1} = Session.terminate_user_sessions(41, "own")
+      assert_receive {:session_terminated, "other-c"}
+      refute_receive {:session_terminated, "own"}
+      refute_receive {:session_terminated, "theirs"}
+    end
+  end
+
+  test "ending a session without a running transport still completes" do
+    {:ok, _entry} = Session.put_session("quiet", "{}", %{user_id: 41, last_activity: 1})
+    assert :ok = Session.delete_session("quiet")
+    assert {:error, :not_found} = Session.fetch_session("quiet")
+    assert {:error, :pubsub_unavailable} = Session.subscribe_terminations()
+  end
+
   test "contributes the canonical operational capabilities and read roles" do
     assert %{
              authz: %{

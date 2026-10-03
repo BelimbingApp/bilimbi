@@ -409,10 +409,8 @@ defmodule Bilimbi.Core.Company do
   @spec primary_company?(Scope.t(), pos_integer()) :: boolean()
   def primary_company?(%Scope{} = scope, company_id)
       when is_integer(company_id) and company_id > 0 do
-    tenant_id = Scope.tenant_id(scope)
-
-    from(primary in "tenant_primary_companies",
-      where: primary.tenant_id == ^tenant_id and primary.company_id == ^company_id,
+    from(primary in Tenancy.scope_query("tenant_primary_companies", scope),
+      where: primary.company_id == ^company_id,
       select: count(primary.company_id)
     )
     |> Repo.one()

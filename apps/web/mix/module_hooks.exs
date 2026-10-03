@@ -2,10 +2,11 @@ defmodule BilimbiWeb.ModuleHooks do
   @moduledoc """
   Build-time hook composition for the validated workspace.
 
-  Read compiled HEEx macro-component metadata, never glob phoenix-colocated:
-  that directory can retain files belonging to unmounted applications. Import
-  extracted hook files directly so duplicate names within a Phoenix manifest
-  cannot be silently overwritten before we check them.
+  Read compiled HEEx macro-component metadata only for selected application
+  modules with extracted assets. Extraction directories narrow that selection;
+  they cannot establish ownership because they may retain unmounted files.
+  Import extracted hook files directly so duplicate names within a Phoenix
+  manifest cannot be silently overwritten before we check them.
 
   This adapter uses LiveView 1.2.9's ColocatedAssets.Entry metadata contract.
   Recheck it and the extraction path when upgrading LiveView. The hook name is
@@ -67,8 +68,26 @@ defmodule BilimbiWeb.ModuleHooks do
           )
       end
 
+    extracted_root = Path.join([build_path, "phoenix-colocated", to_string(owner.otp_app)])
+
+    extracted_modules =
+      case File.ls(extracted_root) do
+        {:ok, entries} ->
+          MapSet.new(entries)
+
+        {:error, :enoent} ->
+          MapSet.new()
+
+        {:error, reason} ->
+          Mix.raise("Cannot inspect extracted hooks for #{owner.id}: #{inspect(reason)}")
+      end
+
     modules
     |> Enum.sort()
+    # Phoenix extracts one directory per declaring module. Intersect that
+    # manifest with the compiled app list so stale files from unmounted owners
+    # and names outside the OTP application can never be selected.
+    |> Enum.filter(&MapSet.member?(extracted_modules, inspect(&1)))
     |> Enum.flat_map(fn module ->
       unless Code.ensure_loaded?(module),
         do: Mix.raise("Cannot load hook owner #{inspect(module)}")

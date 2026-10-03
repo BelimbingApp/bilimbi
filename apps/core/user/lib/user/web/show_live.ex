@@ -255,20 +255,25 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           end
       end
 
-    # Unlinkable employees (tenant employees not linked to any user in the tenant)
-    tenant_employees =
-      Enum.flat_map(companies, fn company ->
-        case Employee.list_employees(scope, company.id) do
-          {:ok, emps} -> emps
-          _ -> []
-        end
-      end)
-
-    # Company employees not already linked to this user
+    # Unlinkable employees in this user's company.
+    # Load only the selected company's employees. list_employees/2 proves the
+    # company once, then reads that company's employees.
     unlinkable_employees =
-      tenant_employees
-      |> Enum.filter(&(&1.company_id == user.company_id and &1.id != user.employee_id))
-      |> Enum.sort_by(& &1.full_name)
+      case user.company_id do
+        nil ->
+          []
+
+        company_id ->
+          case Employee.list_employees(scope, company_id) do
+            {:ok, employees} ->
+              employees
+              |> Enum.reject(&(&1.id == user.employee_id))
+              |> Enum.sort_by(& &1.full_name)
+
+            _ ->
+              []
+          end
+      end
 
     # External accesses
     {:ok, external_accesses} = Company.list_external_accesses_for_user(scope, user.id)

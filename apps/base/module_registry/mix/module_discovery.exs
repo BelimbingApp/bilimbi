@@ -196,12 +196,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @doc """
   Returns deterministic module-local strict-compile commands for a container.
 
-  `mix compile --warnings-as-errors` at the umbrella root does **not** fail on a
+  `mix compile --warnings-as-errors` at the umbrella root does not fail on a
   path dependency's warnings: the flag applies to the current project, and path
-  deps compile as dependencies. A missing required `attr` therefore printed a
-  warning and exited 0, so `required: true` was documentation rather than a gate
-  (#176). Compiling each module in its own project context is what makes those
-  warnings fatal.
+  dependencies compile without it. Compile each module in its own project
+  context to make those warnings fatal.
   """
   @spec container_compile_commands(String.t()) :: [String.t()]
   def container_compile_commands(container_root) do

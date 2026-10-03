@@ -34,6 +34,57 @@ defmodule Bilimbi.Base.Settings.FormTest do
       assert field(fields, "tests.theme").definition.label == "Theme"
     end
 
+    test "loads all field overrides together and preserves inherited metadata" do
+      assert {:ok, "tenant"} = Settings.put("tests.theme", "tenant", Scope.tenant(30))
+      assert {:ok, "/mine"} = Settings.put("tests.landing", "/mine", @user)
+
+      fields = Form.fields(["profile"], @user)
+
+      assert field(fields, "tests.theme").value == "tenant"
+      assert field(fields, "tests.theme").source_scope == :tenant
+      refute field(fields, "tests.theme").overridden?
+      assert field(fields, "tests.landing").value == "/mine"
+      assert field(fields, "tests.landing").source_scope == :user
+      assert field(fields, "tests.landing").overridden?
+    end
+
+    test "values and metadata retain one snapshot when an override changes during loading" do
+      Settings.put("tests.landing", "/mine", @user)
+      assert Settings.get("tests.landing", @user) == "/mine"
+      handler = "settings-snapshot-#{inspect(make_ref())}"
+      owner = self()
+      Process.put(:delete_after_settings_query, true)
+
+      :telemetry.attach(
+        handler,
+        [:bilimbi, :base, :repo, :query],
+        fn _, _, metadata, _ ->
+          if self() == owner and String.starts_with?(metadata.query, "SELECT") do
+            send(owner, :settings_select)
+
+            if Process.delete(:delete_after_settings_query) do
+              Settings.delete("tests.landing", @user)
+            end
+          end
+        end,
+        nil
+      )
+
+      try do
+        fields = Form.fields(["profile"], @user)
+        assert field(fields, "tests.landing").value == "/mine"
+        assert field(fields, "tests.landing").overridden?
+        assert field(fields, "tests.landing").source_scope == :user
+        assert_receive :settings_select
+        refute_receive :settings_select
+      after
+        :telemetry.detach(handler)
+        Process.delete(:delete_after_settings_query)
+      end
+
+      refute Settings.overridden?("tests.landing", @user)
+    end
+
     test "keeps the caller's group order and sorts by key inside a group" do
       fields = Form.fields(["appearance", "profile"], @user)
 

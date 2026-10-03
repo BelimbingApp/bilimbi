@@ -147,6 +147,20 @@ defmodule Bilimbi.Base.Audit do
     {:ok, mutations}
   end
 
+  @doc "Lists the most recent mutations for a scope without a count query."
+  @spec list_recent_mutations(Scope.t(), pos_integer()) :: {:ok, [Mutation.t()]}
+  def list_recent_mutations(%Scope{} = scope, limit) when is_integer(limit) and limit > 0 do
+    mutations =
+      from(mutation in Tenancy.scope_query(MutationSchema, scope),
+        order_by: [desc: mutation.occurred_at, desc: mutation.id],
+        limit: ^limit
+      )
+      |> Repo.all()
+      |> Enum.map(&Mutation.from_schema/1)
+
+    {:ok, mutations}
+  end
+
   @doc "Lists mutations for the scope through a bounded administration page."
   @spec list_mutations(Scope.t(), keyword()) :: Page.t(Mutation.t())
   def list_mutations(%Scope{} = scope, opts) when is_list(opts) do

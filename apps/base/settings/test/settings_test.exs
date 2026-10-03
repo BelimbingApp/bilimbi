@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.SettingsTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Cache
   alias Bilimbi.Base.Settings.ContributionValidator
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Scope
@@ -29,6 +30,124 @@ defmodule Bilimbi.Base.SettingsTest do
     assert Settings.get("tests.inherited", Scope.user(11, 20, 30)) == "company"
     assert Settings.get("tests.inherited", Scope.company(21, 30)) == "tenant"
     assert Settings.get("tests.inherited", Scope.tenant(31)) == "global"
+  end
+
+  test "caches found rows and misses, then invalidates both after writes and deletes" do
+    scope = Scope.user(10, 20, 30)
+
+    assert collect_queries(fn -> Settings.get("tests.inherited", scope) end) == 4
+    assert collect_queries(fn -> Settings.get("tests.inherited", scope) end) == 0
+    assert {:ok, "new"} = Settings.put("tests.inherited", "new", Scope.tenant(30))
+    assert Settings.get("tests.inherited", scope) == "new"
+
+    assert :ok = Settings.delete("tests.inherited", Scope.tenant(30))
+    assert Settings.get("tests.inherited", scope) == "default"
+
+    assert {:ok, "global"} = Settings.put("tests.inherited", "global")
+    assert Settings.get("tests.inherited", scope) == "global"
+  end
+
+  test "a stored-value fixture replaces a cached miss" do
+    scope = Scope.user(10, 20, 30)
+    assert Settings.get("tests.inherited", scope) == "default"
+
+    put_stored_value!("tests.inherited", "legacy", scope)
+
+    assert Settings.get("tests.inherited", scope) == "legacy"
+    assert Settings.overridden?("tests.inherited", scope)
+  end
+
+  test "get_many resolves a set of keys in one query across the scope chain" do
+    scope = Scope.user(10, 20, 30)
+    assert {:ok, "tenant"} = Settings.put("tests.inherited", "tenant", Scope.tenant(30))
+
+    queries =
+      collect_queries(fn -> Settings.get_many(["tests.inherited", "tests.personal"], scope) end)
+
+    assert queries == 1
+
+    assert Settings.get_many(["tests.inherited", "tests.personal"], scope) == %{
+             "tests.inherited" => "tenant",
+             "tests.personal" => "system"
+           }
+  end
+
+  test "transactions bypass cached rows and invalidate only after the outer commit" do
+    for operation <- [:put, :delete] do
+      Settings.put("tests.inherited", "old")
+      assert Settings.get("tests.inherited") == "old"
+
+      assert {:ok, :done} =
+               Repo.transaction(fn ->
+                 assert {:ok, _} =
+                          Repo.transact(fn ->
+                            case operation do
+                              :put -> Settings.put("tests.inherited", "new")
+                              :delete -> Settings.delete("tests.inherited")
+                            end
+
+                            expected = if operation == :put, do: "new", else: "default"
+                            assert Settings.get("tests.inherited") == expected
+                            {:ok, :nested}
+                          end)
+
+                 assert %Bilimbi.Base.Settings.Schema{value: "old"} =
+                          Cache.fetch({"tests.inherited", nil, nil}, fn ->
+                            flunk("invalidated before commit")
+                          end)
+
+                 :done
+               end)
+
+      expected = if operation == :put, do: "new", else: "default"
+      assert Settings.get("tests.inherited") == expected
+    end
+  end
+
+  test "rollback discards deferred invalidations and never caches uncommitted reads" do
+    Settings.put("tests.inherited", "old")
+    assert Settings.get("tests.inherited") == "old"
+
+    assert {:error, :cancelled} =
+             Repo.transaction(fn ->
+               Settings.put("tests.inherited", "temporary")
+               assert Settings.get("tests.inherited") == "temporary"
+               Repo.rollback(:cancelled)
+             end)
+
+    assert collect_queries(fn -> assert Settings.get("tests.inherited") == "old" end) == 0
+  end
+
+  defp collect_queries(fun) do
+    ref = make_ref()
+    handler = "settings-query-count-#{inspect(ref)}"
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        [:bilimbi, :base, :repo, :query],
+        fn _event, _measurements, _metadata, pid ->
+          send(pid, {:query, ref})
+        end,
+        self()
+      )
+
+    flush_queries(ref)
+
+    fun.()
+
+    count = flush_queries(ref)
+
+    :telemetry.detach(handler)
+    count
+  end
+
+  defp flush_queries(ref) do
+    receive do
+      {:query, ^ref} -> 1 + flush_queries(ref)
+    after
+      0 -> 0
+    end
   end
 
   test "rejects a definition key the settings column cannot store" do

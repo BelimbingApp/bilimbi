@@ -109,7 +109,8 @@ defmodule BilimbiWeb.ConnCase do
         "session_id" => session_id,
         "user_id" => user_id,
         "company_id" => company_id
-      }
+      },
+      "live_socket_id" => BilimbiWeb.UserAuth.live_socket_id(session_id)
     })
   end
 
