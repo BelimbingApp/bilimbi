@@ -40,6 +40,17 @@ defmodule Bilimbi.Base.Perf.Contributions do
       schedule: %{
         definitions: [
           %{
+            key: "base/authz.decision_log_retention",
+            name: "Prune authorization decision logs",
+            expression: "23 3 * * *",
+            timezone: "Etc/UTC",
+            task_name: "Base Authz decision log retention",
+            worker: Bilimbi.Base.Perf.AuthzRetentionWorker,
+            args: %{},
+            overlap: :forbid,
+            misfire: :coalesce
+          },
+          %{
             key: "base/perf.retention",
             name: "Prune performance history",
             expression: "17 3 * * *",
