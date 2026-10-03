@@ -3,8 +3,10 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   Installation-global Schedule operator board.
 
   Definitions remain immutable contributor facts. This adapter filters and
-  paginates through the Schedule API, re-authorizes every command, and polls
-  bounded operational evidence without treating absence as proof of health.
+  paginates through the Schedule API and polls bounded operational evidence
+  without treating absence as proof of health. `can_execute` and `can_manage`
+  only choose which controls to show. Each command re-asks Authz, and the
+  Schedule API checks the same capability on the sealed scope.
 
   ## History days follow the Started column
 
@@ -22,8 +24,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Authz.Decision
+  alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.RunPage
   alias Bilimbi.Base.Settings
@@ -46,8 +47,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     socket =
       socket
       |> assign(:page_title, "Schedule")
-      |> assign(:can_execute, allowed?(socket.assigns.current_scope, @execute))
-      |> assign(:can_manage, allowed?(socket.assigns.current_scope, @manage))
+      |> present_capabilities()
       |> assign(:diagnostics, Schedule.diagnostics())
       |> assign(:task_count, 0)
       |> assign(:task_state, :available)
@@ -164,11 +164,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   def handle_event("run_now", %{"key" => key}, socket) do
-    if allowed?(socket.assigns.current_scope, @execute) do
-      command(socket, @execute, fn actor -> Schedule.run_now(actor, key) end, "Run queued.")
-    else
-      write_forbidden(socket)
-    end
+    command(socket, @execute, fn scope -> Schedule.run_now(scope, key) end, "Run queued.")
   end
 
   # Enabling approves the reviewed definition to run unattended, and pausing
@@ -194,7 +190,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       command(
         socket,
         @manage,
-        fn actor -> Schedule.review_definition(actor, key, true) end,
+        fn scope -> Schedule.review_definition(scope, key, true) end,
         "Task enabled.",
         :success
       )
@@ -206,7 +202,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       command(
         socket,
         @manage,
-        fn actor -> Schedule.review_definition(actor, key, false) end,
+        fn scope -> Schedule.review_definition(scope, key, false) end,
         "Task disabled.",
         :success
       )
@@ -218,7 +214,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       command(
         socket,
         @manage,
-        fn actor -> Schedule.suppress(actor, key) end,
+        fn scope -> Schedule.suppress(scope, key) end,
         "Task paused.",
         :success
       )
@@ -226,34 +222,34 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   def handle_event("resume", %{"key" => key}, socket) do
-    command(socket, @manage, fn actor -> Schedule.resume(actor, key) end, "Task resumed.")
+    command(socket, @manage, fn scope -> Schedule.resume(scope, key) end, "Task resumed.")
   end
 
   def handle_event("save_retention", %{"retention" => %{"days" => days}}, socket)
       when is_binary(days) do
-    if allowed?(socket.assigns.current_scope, @manage) do
-      case Integer.parse(days) do
-        {value, ""} ->
-          command(
-            socket,
-            @manage,
-            fn actor -> Schedule.set_history_retention(actor, value) end,
-            "Retention saved."
-          )
+    case authorize(socket, @manage) do
+      {:denied, socket} ->
+        {:noreply, socket}
 
-        _invalid ->
-          invalid_retention(socket)
-      end
-    else
-      write_forbidden(socket)
+      {:ok, socket} ->
+        case Integer.parse(days) do
+          {value, ""} ->
+            apply_command(
+              socket,
+              fn scope -> Schedule.set_history_retention(scope, value) end,
+              "Retention saved."
+            )
+
+          _invalid ->
+            invalid_retention(socket)
+        end
     end
   end
 
   def handle_event("save_retention", _params, socket) do
-    if allowed?(socket.assigns.current_scope, @manage) do
-      invalid_retention(socket)
-    else
-      write_forbidden(socket)
+    case authorize(socket, @manage) do
+      {:denied, socket} -> {:noreply, socket}
+      {:ok, socket} -> invalid_retention(socket)
     end
   end
 
@@ -266,30 +262,39 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   def handle_info(:refresh, socket), do: {:noreply, load(socket, socket.assigns.state)}
 
   defp request_command(socket, action, key) do
-    with true <- authorized?(socket, @manage),
-         {:ok, tasks} <- Schedule.list_tasks(),
-         %{} = task <- Enum.find(tasks, &(&1.key == key)) do
-      {:noreply, socket |> clear_flash() |> assign(:pending_command, {action, task})}
-    else
-      false -> write_forbidden(socket)
-      nil -> {:noreply, put_flash(socket, :error, error_message(:not_found))}
-      {:error, reason} -> {:noreply, put_flash(socket, :error, error_message(reason))}
+    case authorize(socket, @manage) do
+      {:denied, socket} ->
+        {:noreply, socket}
+
+      {:ok, socket} ->
+        case Schedule.list_tasks() do
+          {:ok, tasks} ->
+            case Enum.find(tasks, &(&1.key == key)) do
+              %{} = task ->
+                {:noreply, socket |> clear_flash() |> assign(:pending_command, {action, task})}
+
+              nil ->
+                {:noreply, put_flash(socket, :error, error_message(:not_found))}
+            end
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, error_message(reason))}
+        end
     end
   end
 
-  # The forbidden answer comes first so a revoked operator hears it even from a
-  # forged event; a confirm with nothing held is a stale click and does nothing.
+  # The refusal comes first so a revoked operator hears it even from a forged
+  # event; a confirm with nothing held is a stale click and does nothing.
   defp confirmed_command(socket, action, run) do
-    cond do
-      not authorized?(socket, @manage) ->
-        write_forbidden(socket)
-
-      match?({^action, _task}, socket.assigns.pending_command) ->
-        {^action, task} = socket.assigns.pending_command
-        run.(assign(socket, :pending_command, nil), task.key)
-
-      true ->
+    case authorize(socket, @manage) do
+      {:denied, socket} ->
         {:noreply, socket}
+
+      {:ok, socket} ->
+        case socket.assigns.pending_command do
+          {^action, task} -> run.(assign(socket, :pending_command, nil), task.key)
+          _stale -> {:noreply, socket}
+        end
     end
   end
 
@@ -297,39 +302,42 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   # success and the flash timer runs. The confirmed commands pass `:success`
   # explicitly; the one-click commands take the default.
   defp command(socket, capability, operation, success_message, kind \\ :success) do
-    if authorized?(socket, capability) do
-      case operation.(socket.assigns.current_scope.actor) do
-        :ok ->
-          {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
-
-        {:ok, _result} ->
-          {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, error_message(reason))}
-      end
-    else
-      write_forbidden(socket)
+    case authorize(socket, capability) do
+      {:denied, socket} -> {:noreply, socket}
+      {:ok, socket} -> apply_command(socket, operation, success_message, kind)
     end
+  end
+
+  defp apply_command(socket, operation, success_message, kind \\ :success) do
+    case operation.(socket.assigns.current_scope.scope) do
+      :ok ->
+        {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
+
+      {:ok, _result} ->
+        {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, error_message(reason))}
+    end
+  end
+
+  defp authorize(socket, capability) do
+    case LiveAuthorization.authorize_event(socket, capability) do
+      {:ok, socket} -> {:ok, socket}
+      {:denied, socket} -> {:denied, present_capabilities(socket)}
+    end
+  end
+
+  defp present_capabilities(socket) do
+    scope = socket.assigns.current_scope
+
+    socket
+    |> assign(:can_execute, allowed?(scope, @execute))
+    |> assign(:can_manage, allowed?(scope, @manage))
   end
 
   defp invalid_retention(socket),
     do: {:noreply, put_flash(socket, :error, "Retention must be a whole number from 0 to 3650.")}
-
-  defp write_forbidden(socket),
-    do:
-      {:noreply, put_flash(socket, :error, "You do not have permission to perform that action.")}
-
-  defp authorized?(socket, capability) do
-    case Authz.can(socket.assigns.current_scope.actor, capability) do
-      %Decision{allowed: true} -> true
-      %Decision{} -> false
-    end
-  rescue
-    _error -> false
-  catch
-    :exit, _reason -> false
-  end
 
   defp load(socket, state) do
     socket =
@@ -337,8 +345,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:state, state)
       |> assign(:task_form, task_form(state))
       |> assign(:run_form, run_form(state))
-      |> assign(:can_execute, allowed?(socket.assigns.current_scope, @execute))
-      |> assign(:can_manage, allowed?(socket.assigns.current_scope, @manage))
+      |> present_capabilities()
       |> assign(:diagnostics, Schedule.diagnostics())
 
     case state.tab do
@@ -568,6 +575,8 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp task_dom_id(task), do: "schedule-task-#{dom_key(task.key)}"
   defp run_dom_id(run), do: "schedule-run-#{run.id}"
   defp dom_key(key), do: String.replace(key, ~r/[^a-zA-Z0-9_-]/, "-")
+
+  defp error_message(:forbidden), do: LiveAuthorization.denied_message()
 
   defp error_message(:audit_unavailable),
     do: "The action was not applied because audit evidence could not be recorded."
