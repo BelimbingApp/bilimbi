@@ -96,6 +96,12 @@ defmodule BilimbiWeb.DashboardLive do
      |> schedule_refresh(visible)}
   end
 
+  # Live navigation always invokes this callback. The dashboard has no
+  # query-param state; the callback exists so a patch does not crash and the
+  # session-activity hook attached to `handle_params` can run.
+  @impl true
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
   # The count backs a widget gated by `admin.system.session.list`; skip the
   # query entirely when the viewer cannot see it.
   defp session_count(visible_widgets) do

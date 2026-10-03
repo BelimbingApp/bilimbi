@@ -95,10 +95,20 @@ defmodule BilimbiWeb.SessionActivityTest do
 
   test "activity does not recreate a terminated session", %{view: view, session_id: session_id} do
     assert :ok = Session.delete_session(session_id)
-    render_click(view, "toggle-layout-edit")
+
+    assert {:error, {:redirect, %{to: "/"}}} = render_click(view, "toggle-layout-edit")
     assert {:error, :not_found} = Session.fetch_session(session_id)
-    view |> element("#app-notifications-bell") |> render_click()
-    _ = :sys.get_state(view.pid)
+  end
+
+  test "component activity does not recreate a terminated session", %{
+    view: view,
+    session_id: session_id
+  } do
+    assert :ok = Session.delete_session(session_id)
+
+    assert {:error, {:redirect, %{to: "/"}}} =
+             view |> element("#app-notifications-bell") |> render_click()
+
     assert {:error, :not_found} = Session.fetch_session(session_id)
   end
 
