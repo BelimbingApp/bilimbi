@@ -5,6 +5,11 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   Verification is deliberately strict for tables owned by a contract: columns,
   indexes, and foreign keys must match exactly. Tables owned by other modules
   are ignored.
+
+  Index specs use `:order` as a boolean list aligned with `:columns`: `true`
+  means descending and `false` ascending. An omitted or `nil` order means all
+  columns ascend. Optional indexes may be absent, but their structure and
+  ordering must match when present.
   """
 
   alias Ecto.Adapters.SQL
@@ -536,4 +541,3 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     end
   end
 end
-

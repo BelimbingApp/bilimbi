@@ -11,6 +11,11 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
   The `system_principal` column and its partial index are the Bilimbi-only
   system principal contribution (migration `20260927090000`, ADR 0017),
   declared the same way as a second optional group.
+
+  The tenant timeline indexes on both tables are individually optional, not
+  another group. Migration `20261003120000` adds `tenant_id`, then
+  `occurred_at` and `id` descending. An adopted Belimbing database verifies
+  without them. A present index must match those columns and that order.
   """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
@@ -166,4 +171,3 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
     %{columns: columns, unique: unique, where: where, order: order}
   end
 end
-

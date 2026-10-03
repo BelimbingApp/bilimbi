@@ -112,4 +112,3 @@ defmodule BilimbiWeb.SessionActivityTest do
              })
   end
 end
-
