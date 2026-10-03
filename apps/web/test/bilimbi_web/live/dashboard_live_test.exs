@@ -65,6 +65,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
   test "scheduled expiry rereads the lifetime and preserves active sessions" do
     now = System.system_time(:second)
+
     execution = %Bilimbi.Base.Queue.Execution{
       job_id: 1,
       attempt: 1,

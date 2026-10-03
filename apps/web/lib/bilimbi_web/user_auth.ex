@@ -12,11 +12,12 @@ defmodule BilimbiWeb.UserAuth do
 
   The Phoenix cookie stores only stable IDs under `"current_user"`:
   `session_id`, `user_id`, and `company_id`. Display fields and tenant
-  identity are never taken from the cookie. Every HTTP and LiveView
-  boundary rehydrates from live data:
+  identity are never taken from the cookie. HTTP requests, LiveView mounts,
+  and root LiveView events rehydrate from live data:
 
     1. `Session.fetch_session/1` — a terminated row ends the cookie;
-    2. the durable row's `user_id` must match the cookie;
+    2. the durable row's `user_id` must match the cookie, and its activity
+       must satisfy the idle-expiry policy in `apps/base/session/docs/README.md`;
     3. `Company.fetch_tenant_id_for_company/1` then `Tenancy.scope/1`;
     4. `User.get_user/3` must return that user in that company.
 
