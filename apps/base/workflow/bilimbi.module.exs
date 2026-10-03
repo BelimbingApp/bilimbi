@@ -10,7 +10,8 @@
     "base/authz",
     "base/database",
     "base/module_registry",
-    "base/tenancy"
+    "base/tenancy",
+    "base/ui"
   ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{
