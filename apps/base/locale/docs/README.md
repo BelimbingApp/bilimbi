@@ -27,10 +27,11 @@ currency, and future date/time formatting can preserve the selected region.
 `Bilimbi.Base.Locale.language/1` returns only the language part for a Gettext
 adapter.
 
-The current Web Gettext tree contains only the English source/error catalogue;
-there are no translated product-copy catalogues. The wider locale catalogue is
-formatting support and product policy, not a claim that Bilimbi copy has been
-translated into those languages.
+The host and shared UI render through `Bilimbi.Base.UI.Gettext`. Its English
+catalogues are source strings: product copy in the default domain and
+validation messages in the errors domain. There are no translated catalogues.
+The wider locale catalogue is formatting support and product policy, not a
+claim that Bilimbi copy has been translated into those languages.
 
 No function changes process-global locale state. A Web adapter must apply the
 resolved language/region within the lifecycle of its request or LiveView and

@@ -62,10 +62,10 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
-  alias BilimbiWeb.Impersonation
-  alias BilimbiWeb.RequestContext
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
+  alias BilimbiWeb.Impersonation
+  alias BilimbiWeb.RequestContext
 
   @session_key "current_user"
   @impersonation_key "impersonation"

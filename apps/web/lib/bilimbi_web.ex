@@ -10,8 +10,8 @@ defmodule BilimbiWeb do
 
       use BilimbiWeb, :controller
 
-  The definitions below will be executed for every controller,
-  component, etc, so keep them short and clean, focused
+  The definitions below will be executed for every controller
+  and the router, so keep them short and clean, focused
   on imports, uses and aliases.
 
   Do NOT define functions inside the quoted expressions
