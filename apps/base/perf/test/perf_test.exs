@@ -157,8 +157,8 @@ defmodule Bilimbi.Base.PerfTest do
   end
 
   test "classifies a real exhausted Oban job as discarded" do
-    :ok = Perf.attach_handlers()
-    on_exit(&Perf.detach_handlers/0)
+    :ok = Reporter.attach_handlers()
+    on_exit(&Reporter.detach_handlers/0)
 
     assert {:ok, _job} =
              %{"worker" => "missing"}

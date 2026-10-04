@@ -21,7 +21,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   """
 
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Settings.Scope
+  # Settings scope, not `Bilimbi.Base.Tenancy.Scope`. A bare `Scope` in this
+  # facade would read as the tenancy scope root AGENTS.md §13 requires.
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tiling.Layout
 
   @layouts_key "ui.workspace.layouts"
@@ -34,8 +36,8 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
         }
 
   @doc "Every saved layout, in the order they were saved."
-  @spec list(Scope.t()) :: [entry()]
-  def list(%Scope{type: :user} = scope) do
+  @spec list(SettingsScope.t()) :: [entry()]
+  def list(%SettingsScope{type: :user} = scope) do
     case Settings.get(@layouts_key, scope) do
       entries when is_list(entries) -> Enum.filter(entries, &entry?/1)
       _other -> []
@@ -43,8 +45,8 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "The saved layout with this slug."
-  @spec fetch(Scope.t(), String.t()) :: {:ok, entry()} | :error
-  def fetch(%Scope{} = scope, slug) when is_binary(slug) do
+  @spec fetch(SettingsScope.t(), String.t()) :: {:ok, entry()} | :error
+  def fetch(%SettingsScope{} = scope, slug) when is_binary(slug) do
     case Enum.find(list(scope), &(&1["slug"] == slug)) do
       nil -> :error
       entry -> {:ok, entry}
@@ -52,8 +54,8 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "The slug `/workspace` opens, or nil when none is saved as the default."
-  @spec default_slug(Scope.t()) :: String.t() | nil
-  def default_slug(%Scope{} = scope) do
+  @spec default_slug(SettingsScope.t()) :: String.t() | nil
+  def default_slug(%SettingsScope{} = scope) do
     case Settings.get(@default_key, scope) do
       "" -> nil
       slug when is_binary(slug) -> if match?({:ok, _}, fetch(scope, slug)), do: slug
@@ -67,9 +69,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   saves that mode with the tree. Without one, a replacement keeps its mode
   and a new layout starts in dwindle mode.
   """
-  @spec save(Scope.t(), String.t(), String.t(), String.t() | nil) ::
+  @spec save(SettingsScope.t(), String.t(), String.t(), String.t() | nil) ::
           {:ok, entry()} | {:error, :label | :tree | :layout | Ecto.Changeset.t()}
-  def save(%Scope{type: :user} = scope, label, tree, mode \\ nil)
+  def save(%SettingsScope{type: :user} = scope, label, tree, mode \\ nil)
       when is_binary(label) and is_binary(tree) do
     with true <- mode in [nil, "dwindle", "master"],
          {:ok, label} <- clean_label(label),
@@ -103,9 +105,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "Gives the layout with `slug` a new label; the slug stays."
-  @spec rename(Scope.t(), String.t(), String.t()) ::
+  @spec rename(SettingsScope.t(), String.t(), String.t()) ::
           {:ok, entry()} | {:error, :label | :not_found | Ecto.Changeset.t()}
-  def rename(%Scope{type: :user} = scope, slug, label)
+  def rename(%SettingsScope{type: :user} = scope, slug, label)
       when is_binary(slug) and is_binary(label) do
     with {:ok, label} <- clean_label(label),
          {:ok, entry} <- fetch(scope, slug) do
@@ -120,9 +122,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "Sets the tiling mode and its converted tree for one saved layout."
-  @spec set_layout(Scope.t(), String.t(), String.t(), String.t()) ::
+  @spec set_layout(SettingsScope.t(), String.t(), String.t(), String.t()) ::
           {:ok, entry()} | {:error, :layout | :tree | :not_found | Ecto.Changeset.t()}
-  def set_layout(%Scope{type: :user} = scope, slug, mode, tree)
+  def set_layout(%SettingsScope{type: :user} = scope, slug, mode, tree)
       when is_binary(slug) and is_binary(mode) and is_binary(tree) do
     with true <- mode in ["dwindle", "master"],
          {:ok, tree} <- clean_tree(tree),
@@ -138,8 +140,8 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "Forgets the layout with `slug`, and the default if it named it."
-  @spec delete(Scope.t(), String.t()) :: :ok | {:error, Ecto.Changeset.t()}
-  def delete(%Scope{type: :user} = scope, slug) when is_binary(slug) do
+  @spec delete(SettingsScope.t(), String.t()) :: :ok | {:error, Ecto.Changeset.t()}
+  def delete(%SettingsScope{type: :user} = scope, slug) when is_binary(slug) do
     entries = Enum.reject(list(scope), &(&1["slug"] == slug))
 
     with {:ok, _} <- Settings.put(@layouts_key, entries, scope) do
@@ -148,13 +150,14 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   end
 
   @doc "Makes the layout with `slug` the one `/workspace` opens; `nil` clears it."
-  @spec set_default(Scope.t(), String.t() | nil) ::
+  @spec set_default(SettingsScope.t(), String.t() | nil) ::
           :ok | {:error, :not_found | Ecto.Changeset.t()}
   # Clearing removes the override: the settings column cannot hold an empty
   # string, and an absent row already reads as the definition's default.
-  def set_default(%Scope{type: :user} = scope, nil), do: Settings.delete(@default_key, scope)
+  def set_default(%SettingsScope{type: :user} = scope, nil),
+    do: Settings.delete(@default_key, scope)
 
-  def set_default(%Scope{type: :user} = scope, slug) when is_binary(slug) do
+  def set_default(%SettingsScope{type: :user} = scope, slug) when is_binary(slug) do
     with {:ok, _} <- fetch(scope, slug),
          {:ok, _} <- Settings.put(@default_key, slug, scope) do
       :ok

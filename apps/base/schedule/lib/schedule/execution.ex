@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
   alias Bilimbi.Base.Schedule.Occurrence
   alias Bilimbi.Base.Schedule.Run
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Definition
 
   @terminal_statuses ["failed", "skipped", "succeeded"]
 
@@ -138,30 +139,42 @@ defmodule Bilimbi.Base.Schedule.Execution do
   end
 
   defp best_effort_prune do
-    case Settings.get("schedule.history.keep_days") do
-      days when is_integer(days) and days in 1..3650 ->
-        cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days, :day)
+    definition = Settings.definition!("schedule.history.keep_days")
 
-        Repo.delete_all(
-          from(run in Run,
-            where:
-              (run.status in ^@terminal_statuses and run.finished_at < ^cutoff) or
-                (run.status == "running" and run.started_at < ^cutoff)
-          )
-        )
+    case Settings.get(definition.key) do
+      days when is_integer(days) ->
+        cond do
+          not Definition.accepts?(definition, days) ->
+            retention_unavailable()
 
-      0 ->
-        :ok
+          days == 0 ->
+            :ok
+
+          true ->
+            cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-days, :day)
+
+            Repo.delete_all(
+              from(run in Run,
+                where:
+                  (run.status in ^@terminal_statuses and run.finished_at < ^cutoff) or
+                    (run.status == "running" and run.started_at < ^cutoff)
+              )
+            )
+        end
 
       _invalid ->
-        Logger.warning(
-          "schedule history retention is unavailable or outside 0..3650; pruning skipped"
-        )
+        retention_unavailable()
     end
   rescue
     _error -> Logger.warning("schedule history pruning unavailable")
   catch
     :exit, _reason -> Logger.warning("schedule history pruning unavailable")
+  end
+
+  defp retention_unavailable do
+    Logger.warning(
+      "schedule history retention is unavailable or outside its declared bounds; pruning skipped"
+    )
   end
 
   defp naive_now, do: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
