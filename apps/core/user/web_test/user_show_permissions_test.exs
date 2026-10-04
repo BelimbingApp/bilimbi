@@ -349,6 +349,42 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
                "Every installed capability is already in effect or denied for this user."
              )
     end
+
+    @tag timeout: 120_000
+    test "a grant-all role past the first assignment page still withholds the picker", %{
+      conn: conn,
+      scope: scope
+    } do
+      {:ok, _} = Authz.reconcile_system_roles()
+
+      core_admin =
+        scope
+        |> Authz.list_roles()
+        |> Enum.find(&(&1.code == "core_admin" and &1.grant_all))
+
+      insert_target!()
+
+      for n <- 1..100 do
+        code = "a#{String.pad_leading(Integer.to_string(n), 3, "0")}"
+        role = create_role!(scope, "Filler #{n}", code, [])
+        {:ok, _} = Authz.assign_role(scope, 73, :user, 92, role.id)
+      end
+
+      {:ok, _} = Authz.assign_role(scope, 73, :user, 92, core_admin.id)
+      grant_capabilities!(["admin.user.view", @manage])
+
+      view = open_page(conn)
+
+      refute has_element?(view, "#toggle-assign-roles-btn")
+      refute has_element?(view, "#assigned-roles-list", "Core Administrator")
+      assert has_element?(view, "#assign-roles-unavailable", "A role would add nothing")
+
+      assert has_element?(
+               view,
+               "#assign-roles-unavailable",
+               "An assigned role already grants every capability, so this user holds everything a role could add."
+             )
+    end
   end
 
   describe "why the capability picker is absent" do

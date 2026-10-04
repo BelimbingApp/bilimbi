@@ -667,7 +667,9 @@ defmodule BilimbiWeb.UserShowTest do
 
     # Writes that report through the flash say the same thing and open no
     # dialog or modal.
-    render_hook(view, "assign_selected_roles", %{"role_ids" => ["1"]})
+    view
+    |> with_target("#user-access-panel")
+    |> render_hook("assign_selected_roles", %{"role_ids" => ["1"]})
 
     assert has_element?(
              view,
@@ -1217,7 +1219,7 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # A confirm with nothing held is a stale click and changes nothing.
-    render_click(view, "remove_role", %{})
+    view |> with_target("#user-access-panel") |> render_click("remove_role", %{})
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # Confirming removes it and reports the completed write as a success.
