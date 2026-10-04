@@ -44,8 +44,9 @@ defmodule BilimbiWeb.RouteAccess do
 
   Server-triggered callbacks (`handle_info`, `handle_async`) are not
   reauthorized here. The dashboard's `:refresh_widgets` timer is the
-  exception: it rehydrates the scope the same way a client event does,
-  keeping the frame flag and pin list, and then continues into the page.
+  exception: it rehydrates the scope, keeping the frame flag and pin list,
+  without writing session activity, and then continues into the page. A
+  click or a preference save still writes that activity.
   That rehydration does not call `allowed_now?/2`, so a still-permitted tick
   writes no decision-log row. A LiveComponent's `handle_event/3` reaches the
   same authorization through the Base UI event wrapper and its process-local
@@ -131,9 +132,10 @@ defmodule BilimbiWeb.RouteAccess do
   end
 
   # The dashboard timer is `handle_info`, so the event hook does not run.
-  # Rehydrate capabilities before the page reads, and leave the route
-  # decision alone: a still-permitted tick must not write a decision-log row.
-  defp refresh_widgets(:refresh_widgets, socket), do: refresh(socket)
+  # Rehydrate capabilities before the page reads, without extending the idle
+  # clock, and leave the route decision alone: a still-permitted tick must
+  # not write a decision-log row.
+  defp refresh_widgets(:refresh_widgets, socket), do: refresh(socket, false)
   defp refresh_widgets(_message, socket), do: {:cont, socket}
 
   defp authorize_event(capability, socket) do
@@ -151,9 +153,16 @@ defmodule BilimbiWeb.RouteAccess do
   # The same four reads the HTTP plug pays per request. A refreshed scope
   # cannot rebuild the frame flag (`BilimbiWeb.FramedRender`) or the shell
   # pin list loaded at mount, so both are copied from the open page. A
-  # session group without a scope (public routes) has nothing to refresh.
-  defp refresh(%{assigns: %{current_scope: %{session_identity: _} = current_scope}} = socket) do
-    case BilimbiWeb.UserAuth.refresh_scope(current_scope) do
+  # client event writes session activity. The dashboard timer passes `false`
+  # so an open page can still expire. A session group without a scope
+  # (public routes) has nothing to refresh.
+  defp refresh(socket, activity? \\ true)
+
+  defp refresh(
+         %{assigns: %{current_scope: %{session_identity: _} = current_scope}} = socket,
+         activity?
+       ) do
+    case BilimbiWeb.UserAuth.refresh_scope(current_scope, activity?) do
       {:ok, refreshed} ->
         {:cont,
          assign(
@@ -170,7 +179,7 @@ defmodule BilimbiWeb.RouteAccess do
     end
   end
 
-  defp refresh(socket), do: {:cont, socket}
+  defp refresh(socket, _activity?), do: {:cont, socket}
 
   defp put_route(socket, action, checked?) do
     socket

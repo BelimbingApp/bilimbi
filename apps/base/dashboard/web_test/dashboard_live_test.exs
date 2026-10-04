@@ -71,7 +71,10 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
 
   test "shell pins load with the page and stay across a refresh", %{conn: conn, scope: scope} do
     scope = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73)
-    {:ok, :pinned, _} = User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
+
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
+
     conn = log_in_as(conn)
     owner = self()
     handler = {__MODULE__, make_ref()}
@@ -881,6 +884,48 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
       {:ok, view, _html} = live(conn, ~p"/dashboard")
 
       :ok = Session.delete_session(session_id)
+      send(view.pid, :refresh_widgets)
+
+      assert assert_redirect(view, "/")["session_expired"] == "expired"
+    end
+
+    test "the widget timer leaves the idle clock, and a click or preference save moves it", %{
+      conn: conn
+    } do
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+      stale = System.system_time(:second) - 120
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: stale)
+
+      send(view.pid, :refresh_widgets)
+      assert has_element?(view, "#dashboard-current-company")
+      assert {:ok, %{last_activity: ^stale}} = Session.fetch_session(session_id)
+
+      view |> element("#customize-layout") |> render_click()
+      assert {:ok, %{last_activity: clicked}} = Session.fetch_session(session_id)
+      assert clicked > stale
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: stale)
+
+      render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+      assert {:ok, %{last_activity: saved}} = Session.fetch_session(session_id)
+      assert saved > stale
+    end
+
+    test "an idle session past its lifetime ends on the widget timer", %{conn: conn} do
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+
+      expired = System.system_time(:second) - 120 * 60 - 1
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: expired)
+
       send(view.pid, :refresh_widgets)
 
       assert assert_redirect(view, "/")["session_expired"] == "expired"

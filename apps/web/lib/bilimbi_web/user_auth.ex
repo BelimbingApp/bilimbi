@@ -554,12 +554,15 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc false
-  def refresh_scope(%{session_identity: identity, impersonator: impersonator}) do
+  def refresh_scope(current), do: refresh_scope(current, true)
+
+  def refresh_scope(%{session_identity: identity, impersonator: impersonator}, activity?)
+      when is_boolean(activity?) do
     impersonation =
       if impersonator,
         do: %{"original_user_id" => impersonator.id, "original_user_name" => impersonator.name}
 
-    case current_scope_from(identity, impersonation, nil) do
+    case current_scope_from(identity, impersonation, nil, activity?) do
       nil -> {:error, :unauthenticated}
       scope -> {:ok, scope}
     end
@@ -580,6 +583,8 @@ defmodule BilimbiWeb.UserAuth do
       end
   end
 
+  defp current_scope_from(session_user, impersonation, bootstrap_mode, activity? \\ true)
+
   defp current_scope_from(
          %{
            "session_id" => session_id,
@@ -587,17 +592,21 @@ defmodule BilimbiWeb.UserAuth do
            "company_id" => company_id
          },
          impersonation,
-         bootstrap_mode
+         bootstrap_mode,
+         activity?
        )
        when is_binary(session_id) and session_id != "" and is_integer(user_id) and user_id > 0 and
-              is_integer(company_id) and company_id > 0 do
+              is_integer(company_id) and company_id > 0 and is_boolean(activity?) do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
          true <- entry.user_id == user_id,
          true <- session_active?(entry),
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
-      :ok = Session.refresh_activity(session_id, System.system_time(:second))
+      if activity? do
+        :ok = Session.refresh_activity(session_id, System.system_time(:second))
+      end
+
       impersonator = Impersonation.extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
@@ -642,7 +651,7 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  defp current_scope_from(_session_user, _impersonation, _bootstrap_mode), do: nil
+  defp current_scope_from(_session_user, _impersonation, _bootstrap_mode, _activity?), do: nil
 
   defp put_shell_pins(socket, %{"bilimbi_framed" => true}), do: socket
 
