@@ -39,6 +39,13 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Geonames.get_country("missing") == nil
   end
 
+  test "offers every country as a labelled select option in list order" do
+    assert Geonames.country_options() ==
+             Enum.map(Geonames.list_countries(), &{"#{&1.country} (#{&1.iso})", &1.iso})
+
+    assert {"Malaysia (MY)", "MY"} in Geonames.country_options()
+  end
+
   test "returns a source-faithful bounded Countries index page" do
     assert %{page_size: 25} = Geonames.page_countries()
 

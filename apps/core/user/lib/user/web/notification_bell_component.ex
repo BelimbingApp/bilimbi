@@ -30,15 +30,12 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
 
   @impl true
   def update(%{current_scope: current_scope} = assigns, socket) do
-    user_id = current_user_id(current_scope)
     scope = current_scope.scope
-
-    {unread_count, items} = load_data(scope, user_id)
+    {unread_count, items} = load_data(scope)
 
     socket =
       socket
       |> assign(assigns)
-      |> assign(:user_id, user_id)
       |> assign(:unread_count, unread_count)
       |> assign(:items, items)
 
@@ -48,11 +45,10 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
   def update(assigns, socket) do
     socket = assign(socket, assigns)
     current_scope = socket.assigns[:current_scope]
-    user_id = socket.assigns[:user_id] || (current_scope && current_user_id(current_scope))
     scope = current_scope && current_scope.scope
 
-    if scope && user_id && user_id > 0 do
-      {unread_count, items} = load_data(scope, user_id)
+    if scope do
+      {unread_count, items} = load_data(scope)
 
       {:ok,
        socket
@@ -70,8 +66,7 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
     socket =
       if open? do
         scope = socket.assigns.current_scope.scope
-        user_id = socket.assigns.user_id
-        {unread_count, items} = load_data(scope, user_id)
+        {unread_count, items} = load_data(scope)
 
         socket
         |> assign(:open, true)
@@ -92,10 +87,9 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
   @impl true
   def handle_event("mark_all_read", _params, socket) do
     scope = socket.assigns.current_scope.scope
-    user_id = socket.assigns.user_id
 
-    if scope && user_id > 0 do
-      User.mark_all_notifications_as_read(scope, user_id)
+    if scope do
+      User.mark_all_notifications_as_read(scope)
     end
 
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
@@ -114,25 +108,24 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
   @impl true
   def handle_event("visit", %{"id" => id}, socket) do
     scope = socket.assigns.current_scope.scope
-    user_id = socket.assigns.user_id
 
     notification =
       Enum.find(socket.assigns.items, fn item -> item.id == id end)
 
     url = if notification, do: Notification.url(notification), else: nil
 
-    if scope && user_id > 0 do
-      User.mark_notification_as_read(scope, user_id, id)
+    if scope do
+      User.mark_notification_as_read(scope, id)
     end
 
     unread_count =
-      case User.unread_notification_count(scope, user_id) do
+      case User.unread_notification_count(scope) do
         {:ok, count} -> count
         _ -> 0
       end
 
     recent =
-      case User.list_notifications(scope, user_id, limit: @recent_limit) do
+      case User.list_notifications(scope, limit: @recent_limit) do
         {:ok, list} -> list
         _ -> []
       end
@@ -150,16 +143,16 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
     end
   end
 
-  defp load_data(scope, user_id) do
-    if user_id > 0 and scope do
+  defp load_data(scope) do
+    if scope do
       unread =
-        case User.unread_notification_count(scope, user_id) do
+        case User.unread_notification_count(scope) do
           {:ok, count} -> count
           _ -> 0
         end
 
       recent =
-        case User.list_notifications(scope, user_id, limit: @recent_limit) do
+        case User.list_notifications(scope, limit: @recent_limit) do
           {:ok, list} -> list
           _ -> []
         end

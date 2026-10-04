@@ -1555,22 +1555,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   defp current_actor(socket, company_id) do
     current_scope = socket.assigns.current_scope
-
-    target_company_id =
-      company_id || current_scope[:active_company_id] ||
-        (current_scope[:actor] && current_scope.actor.company_id) ||
-        (is_map(current_scope[:user]) && current_scope.user["company_id"])
-
-    if is_nil(company_id) and current_scope[:actor] do
-      current_scope.actor
-    else
-      user_id =
-        (current_scope[:actor] && current_scope.actor.id) ||
-          (is_map(current_scope[:user]) &&
-             (current_scope.user["user_id"] || current_scope.user["id"]))
-
-      Authz.actor(:user, user_id, current_scope.scope, target_company_id)
-    end
+    Authz.actor(:user, current_scope.actor.id, current_scope.scope, company_id)
   end
 
   defp validate_password_params(password, confirmation) do

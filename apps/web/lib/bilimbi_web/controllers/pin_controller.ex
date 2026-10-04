@@ -5,39 +5,39 @@ defmodule BilimbiWeb.PinController do
 
   use BilimbiWeb, :controller
 
-  alias Bilimbi.Base.UI
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Core.User
 
   def index(conn, _params) do
-    scope = conn.assigns[:current_scope]
+    case tenancy_scope(conn) do
+      %Scope{} = scope ->
+        case User.list_user_pins(scope) do
+          {:ok, pins} ->
+            json(conn, %{pins: format_pins(Enum.filter(pins, &served_pin?/1))})
 
-    case authenticated_user_id(scope) do
-      {:ok, user_id} ->
-        pins =
-          user_id
-          |> User.list_user_pins()
-          |> Enum.filter(&served_pin?/1)
+          {:error, reason} ->
+            respond_to_actor_error(conn, reason)
+        end
 
-        json(conn, %{pins: format_pins(pins)})
-
-      {:error, reason} ->
-        respond_to_actor_error(conn, reason)
+      nil ->
+        respond_to_actor_error(conn, :unauthorized)
     end
   end
 
   def toggle(conn, %{"label" => label, "url" => url} = params)
       when is_binary(label) and is_binary(url) do
-    scope = conn.assigns[:current_scope]
-
-    case self_service_user_id(scope) do
-      {:ok, user_id} ->
-        case User.toggle_user_pin(user_id, params) do
+    case tenancy_scope(conn) do
+      %Scope{} = scope ->
+        case User.toggle_user_pin(scope, params) do
           {:ok, action, pins} ->
             json(conn, %{
               pinned: action == :pinned,
               pins: format_pins(pins)
             })
+
+          {:error, reason} when reason in [:unauthorized, :impersonating] ->
+            respond_to_actor_error(conn, reason)
 
           {:error, _changeset} ->
             conn
@@ -45,8 +45,8 @@ defmodule BilimbiWeb.PinController do
             |> json(%{error: "invalid_pin"})
         end
 
-      {:error, reason} ->
-        respond_to_actor_error(conn, reason)
+      nil ->
+        respond_to_actor_error(conn, :unauthorized)
     end
   end
 
@@ -57,14 +57,17 @@ defmodule BilimbiWeb.PinController do
   end
 
   def reorder(conn, %{"pins" => pin_list}) when is_list(pin_list) do
-    scope = conn.assigns[:current_scope]
-
-    case self_service_user_id(scope) do
-      {:ok, user_id} ->
+    case tenancy_scope(conn) do
+      %Scope{} = scope ->
         case pin_ids(pin_list) do
           {:ok, pin_ids} ->
-            {:ok, pins} = User.reorder_user_pins(user_id, pin_ids)
-            json(conn, %{pins: format_pins(pins)})
+            case User.reorder_user_pins(scope, pin_ids) do
+              {:ok, pins} ->
+                json(conn, %{pins: format_pins(pins)})
+
+              {:error, reason} ->
+                respond_to_actor_error(conn, reason)
+            end
 
           :error ->
             conn
@@ -72,8 +75,8 @@ defmodule BilimbiWeb.PinController do
             |> json(%{error: "invalid_parameters"})
         end
 
-      {:error, reason} ->
-        respond_to_actor_error(conn, reason)
+      nil ->
+        respond_to_actor_error(conn, :unauthorized)
     end
   end
 
@@ -83,15 +86,12 @@ defmodule BilimbiWeb.PinController do
     |> json(%{error: "invalid_parameters"})
   end
 
-  defp self_service_user_id(%{impersonator: impersonator}) when not is_nil(impersonator),
-    do: {:error, :impersonating}
-
-  defp self_service_user_id(scope), do: authenticated_user_id(scope)
-
-  defp authenticated_user_id(%{user: user} = scope) when not is_nil(user),
-    do: {:ok, UI.current_user_id(scope)}
-
-  defp authenticated_user_id(_scope), do: {:error, :unauthorized}
+  defp tenancy_scope(conn) do
+    case conn.assigns[:current_scope] do
+      %{scope: %Scope{} = scope} -> scope
+      _ -> nil
+    end
+  end
 
   defp respond_to_actor_error(conn, :impersonating) do
     conn

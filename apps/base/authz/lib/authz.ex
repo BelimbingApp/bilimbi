@@ -87,9 +87,6 @@ defmodule Bilimbi.Base.Authz do
     String.downcase(capability) in capabilities()
   end
 
-  @spec system_role_definitions() :: %{required(String.t()) => map()}
-  def system_role_definitions, do: registry!().roles
-
   @doc """
   Decides whether a principal holds `capability`.
 
@@ -161,15 +158,6 @@ defmodule Bilimbi.Base.Authz do
       %Decision{allowed: true} -> :ok
       %Decision{} = decision -> raise AuthorizationDeniedError, decision: decision
     end
-  end
-
-  @spec filter_allowed(Actor.t(), String.t(), Enumerable.t(), map()) :: list()
-  def filter_allowed(%Actor{} = actor, capability, resources, context \\ %{}) do
-    resources
-    |> Enum.filter(fn
-      %Resource{} = resource -> can(actor, capability, resource, context).allowed
-      other -> raise ArgumentError, "expected an Authz resource, got: #{inspect(other)}"
-    end)
   end
 
   @doc """

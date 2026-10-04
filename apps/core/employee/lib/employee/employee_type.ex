@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.Employee.EmployeeType do
   use Ecto.Schema
 
   import Ecto.Changeset
+  import Ecto.Query
 
   @primary_key {:id, :id, autogenerate: true}
 
@@ -30,6 +31,26 @@ defmodule Bilimbi.Core.Employee.EmployeeType do
     |> unique_constraint(:code, name: :employee_types_company_code_unique)
     |> unique_constraint(:code, name: :employee_types_code_unique)
     |> check_constraint(:company_id, name: :employee_types_system_company_check)
+  end
+
+  @doc """
+  Joins the one type row an employee displays.
+
+  The company's own row wins. Otherwise the single `company_id IS NULL` row
+  matches, including a preserved global custom type. The two joins are
+  separate, so a company that copies a global code still yields one employee.
+  """
+  @spec with_resolved_type(Ecto.Queryable.t()) :: Ecto.Query.t()
+  def with_resolved_type(query) do
+    from [employee] in query,
+      left_join: company_type in __MODULE__,
+      on:
+        company_type.code == employee.employee_type and
+          company_type.company_id == employee.company_id,
+      left_join: global_type in __MODULE__,
+      on:
+        global_type.code == employee.employee_type and
+          is_nil(global_type.company_id)
   end
 
   @spec update_changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()

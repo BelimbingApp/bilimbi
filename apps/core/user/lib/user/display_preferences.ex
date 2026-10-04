@@ -29,15 +29,8 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   appearance form offer the canonical set without restating it.
   """
   def presentation(current_scope) do
-    user = current_scope.user
-
     theme =
-      case User.get_user_preference(
-             current_scope.scope,
-             user["company_id"],
-             user["user_id"],
-             @theme_key
-           ) do
+      case User.get_user_preference(current_scope.scope, @theme_key) do
         {:ok, theme} when theme in @themes -> theme
         _other -> "system"
       end
@@ -80,24 +73,11 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   end
 
   defp write(current_scope, "theme", theme) when theme in @themes do
-    user = current_scope.user
-
     result =
       if theme == "system" do
-        User.delete_user_preference(
-          current_scope.scope,
-          user["company_id"],
-          user["user_id"],
-          @theme_key
-        )
+        User.delete_user_preference(current_scope.scope, @theme_key)
       else
-        User.put_user_preference(
-          current_scope.scope,
-          user["company_id"],
-          user["user_id"],
-          @theme_key,
-          theme
-        )
+        User.put_user_preference(current_scope.scope, @theme_key, theme)
       end
 
     case result do

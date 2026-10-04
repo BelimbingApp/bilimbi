@@ -107,7 +107,7 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   end
 
   def dispatch(:change_employee_type, scope, company_id, employee_id, type) do
-    User.change_employee_type(scope, company_id, employee_id, type)
+    User.update_employee_type(scope, company_id, employee_id, type)
   end
 
   defp account_state(scope, company_id, current_employee_id) do

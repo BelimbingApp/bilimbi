@@ -1025,6 +1025,71 @@ defmodule BilimbiWeb.UserShowTest do
     assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
   end
 
+  test "a grant on the account's current company allows a later password reset and move back",
+       %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 75,
+      tenant_id: 41,
+      name: "Beta Industries",
+      code: "beta"
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+    grant_capabilities!(["admin.user.update"], company_id: 75)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "75"})
+
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
+
+    view |> element("#toggle-change-password-btn") |> render_click()
+
+    view
+    |> form("#user-password-form")
+    |> render_submit(%{
+      "password" => "newpassword123",
+      "password_confirmation" => "newpassword123"
+    })
+
+    assert has_element?(view, "#flash-group", "Password updated successfully")
+    refute has_element?(view, "#flash-group", "Failed to update password")
+
+    stored_hash = UserFixtures.stored_password(92)
+    assert Bilimbi.Core.User.Password.valid?("newpassword123", stored_hash)
+
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "73"})
+
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+
+    refute has_element?(
+             view,
+             "#user-company-status",
+             "you may not manage users of Beta Industries"
+           )
+
+    assert {:ok, %{company_id: 73}} = User.get_user(scope, 73, 92)
+  end
+
   test "a refused company choice keeps the stored company and reports the reason on the fact",
        %{conn: conn} do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})

@@ -91,7 +91,6 @@ apps/core/employee/
 │   │   ├── queries.ex
 │   │   └── ...
 │   └── employee/web/            # web adapters (Bilimbi.Core.Employee.Web)
-│       ├── router.ex            # route contribution
 │       ├── live/
 │       │   ├── index_live.ex    # Bilimbi.Core.Employee.Web.IndexLive
 │       │   ├── show_live.ex
@@ -139,10 +138,8 @@ LiveView or controller module atom, capability requirement (string or
 pipeline data. The module atoms are data, not compiled modules — they resolve
 at runtime when Phoenix dispatches the route.
 
-A `Web.Router` module implementing a `Router` callback (`routes/0`) remains
-for runtime introspection and tests, but the compile-time path reads the data
-file, not the function. §8 records why this split is necessary and how the
-compile DAG works.
+The host and tests read that data file. There is no per-module `Web.Router`.
+§8 records why the compile path reads the file rather than a callback.
 
 The host `apps/web/lib/bilimbi_web/router.ex` becomes a shell:
 
@@ -398,9 +395,8 @@ LiveView module names as atoms, capabilities as strings:
 ```
 
 The module atoms are data, not compiled modules. They resolve at runtime when
-Phoenix dispatches the route. The `Web.Router` module and `routes/0` callback
-remain for runtime introspection and tests, but the compile-time path reads
-the data file, not the function.
+Phoenix dispatches the route. The host and tests read this file; §2 records
+why there is no per-module `Web.Router`.
 
 #### Route manifest: one generated file
 
@@ -627,8 +623,8 @@ This ADR records the decision. The migration is separate work, sequenced as:
 3. **Route manifest + RouteContract** — extend `:bilimbi_graph` to read route
    data files and write a consolidated route manifest. Implement
    `Bilimbi.Base.UI.RouteContract` (`@behaviour Phoenix.VerifiedRoutes`) in
-   `base/ui` reading the manifest. Define the `Router` callback in Base
-   ModuleRegistry for runtime introspection. See §8 for the full compile DAG.
+   `base/ui` reading the manifest. See §8 for the full compile DAG. §2 records
+   that tests read the route file; there is no Router callback.
 4. **Host router macro** — implement the discovered-route expansion macro in
    `apps/web/lib/bilimbi_web/router.ex`. Reads the same route manifest and
    splices routes via macros. Declares `@external_resource` on the manifest
@@ -639,8 +635,8 @@ This ADR records the decision. The migration is separate work, sequenced as:
 6. **Move existing LiveViews** — relocate each LiveView from
    `apps/web/lib/bilimbi_web/live/` to its owning module's
    `lib/<module>/web/live/`. Add `phoenix_live_view` and `base/ui` to each
-   owning module's `deps/`. Implement each module's `Web.Router` with its
-   route contributions.
+   owning module's `deps/`. Route contributions are the module's
+   `priv/web_routes.exs`, which the host and tests read directly.
 7. **Update tests** — Web integration tests continue to use public module
    APIs for setup. Module-owned LiveView integration tests move to the owning
    module's `web_test/` directory and are discovered by the Web Mix project;

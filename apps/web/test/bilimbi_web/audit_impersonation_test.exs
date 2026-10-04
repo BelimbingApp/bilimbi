@@ -108,7 +108,7 @@ defmodule BilimbiWeb.AuditImpersonationTest do
     grant_capabilities!(["admin.system.database-table.list"], user_id: @target_id)
 
     {:ok, query} =
-      User.create_database_query(scope, @target_id, %{
+      User.create_database_query(as(scope, @target_id), %{
         name: "Count users",
         description: "Borrowed session query",
         sql_query: "SELECT count(*) FROM users;"
@@ -197,5 +197,9 @@ defmodule BilimbiWeb.AuditImpersonationTest do
     assert [row] = employee_update_rows()
     assert row.actor_id == @operator_id
     assert row.impersonator_id == nil
+  end
+
+  defp as(scope, user_id) do
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, 73)
   end
 end

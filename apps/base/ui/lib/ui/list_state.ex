@@ -36,6 +36,15 @@ defmodule Bilimbi.Base.UI.ListState do
       Inspector treats `source=all`). A missing form key keeps the current
       value; a missing query key uses `default`. The spec is plain data so a
       page can hold it in a module attribute.
+    * `param_prefix` is written before every query key, inbound and
+      outbound, so two lists share one URL (`"users_"` gives
+      `users_search`, `users_page`, `users_per_page`). `param_names` renames
+      the four fixed keys (`:search`, `:page`, `:sort_by`, `:sort_dir`)
+      before the prefix, for a page whose links already use another name.
+    * `omit_defaults: true` leaves out of `to_params/1` a value the URL
+      would parse back to the same thing (page 1, the default sort and
+      direction, the default page size, a default filter, a blank search),
+      so a second list's defaults do not clutter the first's URL.
     * `omit_blank` lists keys (`:search` or a filter name) left out of the
       query when the value is `""`. Every other page writes the empty value
       so a shared link round-trips.
@@ -45,6 +54,10 @@ defmodule Bilimbi.Base.UI.ListState do
   the corrected URL. Pass `empty: :reset` when an empty result on a page
   after the first should return to page 1; the default leaves that page
   number where the URL put it.
+
+  `paginate/2` pages rows a panel already holds in memory, for a list the
+  page does not query by page. The panel filters and sorts; this owns the
+  slice, the last-page clamp, and the counts `<.pagination>` reads.
 
   `Bilimbi.Base.UI.Params` is the integer and blank coercion underneath.
   """
@@ -67,6 +80,8 @@ defmodule Bilimbi.Base.UI.ListState do
           spec: map()
         }
 
+  @param_names %{search: "search", page: "page", sort_by: "sort_by", sort_dir: "sort_dir"}
+
   @spec_keys ~w(
     sortable
     default_sort
@@ -77,6 +92,9 @@ defmodule Bilimbi.Base.UI.ListState do
     invalid_page_size
     filters
     omit_blank
+    param_prefix
+    param_names
+    omit_defaults
   )a
 
   @doc """
@@ -107,7 +125,11 @@ defmodule Bilimbi.Base.UI.ListState do
     invalid_page_size = Keyword.get(opts, :invalid_page_size, :keep)
     filters = normalize_filters(Keyword.get(opts, :filters, []))
     omit_blank = Keyword.get(opts, :omit_blank, [])
+    param_prefix = Keyword.get(opts, :param_prefix, "")
+    param_names = Keyword.get(opts, :param_names, %{})
+    omit_defaults = Keyword.get(opts, :omit_defaults, false)
 
+    validate_param_keys!(param_prefix, param_names, omit_defaults)
     validate_sort!(sortable, default_sort)
     validate_page_sizes!(page_sizes, default_page_size)
     validate_page_size_param!(page_size_param, page_size_aliases, invalid_page_size)
@@ -122,7 +144,10 @@ defmodule Bilimbi.Base.UI.ListState do
       page_size_aliases: page_size_aliases,
       invalid_page_size: invalid_page_size,
       filters: filters,
-      omit_blank: omit_blank
+      omit_blank: omit_blank,
+      param_prefix: param_prefix,
+      param_names: Map.merge(@param_names, param_names),
+      omit_defaults: omit_defaults
     }
   end
 
@@ -132,12 +157,12 @@ defmodule Bilimbi.Base.UI.ListState do
   """
   @spec parse(map(), map()) :: t()
   def parse(params, spec) when is_map(params) and is_map(spec) do
-    sort_by = sort_by_from(Map.get(params, "sort_by"), spec)
-    sort_dir = sort_dir_from(Map.get(params, "sort_dir"), sort_by, spec)
+    sort_by = sort_by_from(Map.get(params, key(spec, :sort_by)), spec)
+    sort_dir = sort_dir_from(Map.get(params, key(spec, :sort_dir)), sort_by, spec)
 
     %__MODULE__{
-      search: string_or(Map.get(params, "search", ""), ""),
-      page: Params.positive_integer(Map.get(params, "page"), 1),
+      search: string_or(Map.get(params, key(spec, :search), ""), ""),
+      page: Params.positive_integer(Map.get(params, key(spec, :page)), 1),
       page_size: page_size_from_url(params, spec),
       sort_by: sort_by,
       sort_dir: sort_dir,
@@ -150,16 +175,26 @@ defmodule Bilimbi.Base.UI.ListState do
   Query params for `state`, using the keys recorded in its spec.
 
   Values are strings and integers. Blank keys named in `omit_blank` are left
-  out; every other key is written, including `""`.
+  out, and so is a value `omit_defaults` says the URL parses back to the same
+  thing; every other key is written, including `""`.
   """
   @spec to_params(t()) :: %{optional(String.t()) => String.t() | pos_integer()}
   def to_params(%__MODULE__{} = state) do
     spec = state.spec
 
-    %{"page" => state.page}
-    |> Map.put(spec.page_size_param, state.page_size)
+    %{}
+    |> maybe_put(key(spec, :page), state.page, spec.omit_defaults and state.page == 1)
+    |> maybe_put(
+      prefixed(spec, spec.page_size_param),
+      state.page_size,
+      spec.omit_defaults and state.page_size == spec.default_page_size
+    )
     |> maybe_put_sort(state)
-    |> maybe_put("search", state.search, :search in spec.omit_blank)
+    |> maybe_put(
+      key(spec, :search),
+      state.search,
+      state.search in [nil, ""] and (spec.omit_defaults or :search in spec.omit_blank)
+    )
     |> put_filters(state)
   end
 
@@ -224,8 +259,8 @@ defmodule Bilimbi.Base.UI.ListState do
 
   `<.pagination>` reads `perPage`. Filter atoms become string field names.
   """
-  @spec filters_form(t()) :: Phoenix.HTML.Form.t()
-  def filters_form(%__MODULE__{} = state) do
+  @spec filters_form(t(), keyword()) :: Phoenix.HTML.Form.t()
+  def filters_form(%__MODULE__{} = state, opts \\ []) do
     fields =
       Map.new(state.filters, fn {key, value} -> {Atom.to_string(key), value} end)
 
@@ -234,7 +269,7 @@ defmodule Bilimbi.Base.UI.ListState do
         "search" => state.search,
         "perPage" => Integer.to_string(state.page_size)
       }),
-      as: :filters
+      as: Keyword.get(opts, :as, :filters)
     )
   end
 
@@ -263,6 +298,36 @@ defmodule Bilimbi.Base.UI.ListState do
   end
 
   def clamp_to_last_page(%__MODULE__{} = state, _page_result, _opts), do: state
+
+  @doc """
+  One page of `rows` the caller already filtered and sorted, in the shape
+  `<.pagination>` reads. A page past the end is clamped to the last real
+  page; no rows is page 1 of zero pages.
+  """
+  @spec paginate([term()], t()) :: %{
+          entries: [term()],
+          page: pos_integer(),
+          page_size: pos_integer(),
+          total_entries: non_neg_integer(),
+          total_pages: non_neg_integer(),
+          has_prev?: boolean(),
+          has_next?: boolean()
+        }
+  def paginate(rows, %__MODULE__{page_size: page_size} = state) when is_list(rows) do
+    total_entries = length(rows)
+    total_pages = ceil(total_entries / page_size)
+    page = if total_pages == 0, do: 1, else: min(max(state.page, 1), total_pages)
+
+    %{
+      entries: Enum.slice(rows, (page - 1) * page_size, page_size),
+      page: page,
+      page_size: page_size,
+      total_entries: total_entries,
+      total_pages: total_pages,
+      has_prev?: total_pages > 0 and page > 1,
+      has_next?: total_pages > 0 and page < total_pages
+    }
+  end
 
   defp normalize_sortable(nil), do: nil
 
@@ -325,6 +390,22 @@ defmodule Bilimbi.Base.UI.ListState do
     raise ArgumentError,
           "page_size_param, page_size_aliases, or invalid_page_size is wrong: " <>
             "#{inspect({param, aliases, invalid})}"
+  end
+
+  defp validate_param_keys!(prefix, names, omit_defaults)
+       when is_binary(prefix) and is_map(names) and is_boolean(omit_defaults) do
+    unless Enum.all?(names, fn {key, name} ->
+             key in Map.keys(@param_names) and is_binary(name)
+           end) do
+      raise ArgumentError,
+            "param_names renames #{inspect(Map.keys(@param_names))} to strings, got: #{inspect(names)}"
+    end
+  end
+
+  defp validate_param_keys!(prefix, names, omit_defaults) do
+    raise ArgumentError,
+          "param_prefix is a string, param_names a map, omit_defaults a boolean, got: " <>
+            inspect({prefix, names, omit_defaults})
   end
 
   defp validate_omit_blank!(keys, filters) when is_list(keys) do
@@ -428,8 +509,8 @@ defmodule Bilimbi.Base.UI.ListState do
 
   defp page_size_from_url(params, spec) do
     raw =
-      case Map.get(params, spec.page_size_param) do
-        nil -> alias_page_size(params, spec.page_size_aliases)
+      case Map.get(params, prefixed(spec, spec.page_size_param)) do
+        nil -> alias_page_size(params, Enum.map(spec.page_size_aliases, &prefixed(spec, &1)))
         value -> value
       end
 
@@ -464,7 +545,7 @@ defmodule Bilimbi.Base.UI.ListState do
 
   defp filters_from_url(params, spec) do
     Map.new(spec.filters, fn {name, filter} ->
-      {name, parse_filter(filter, Map.get(params, Atom.to_string(name)))}
+      {name, parse_filter(filter, Map.get(params, prefixed(spec, Atom.to_string(name))))}
     end)
   end
 
@@ -497,20 +578,38 @@ defmodule Bilimbi.Base.UI.ListState do
 
   defp maybe_put_sort(params, %{spec: %{sortable: nil}}), do: params
 
-  defp maybe_put_sort(params, state) do
+  defp maybe_put_sort(params, %{spec: spec} = state) do
+    omit = spec.omit_defaults
+
     params
-    |> Map.put("sort_by", Atom.to_string(state.sort_by))
-    |> Map.put("sort_dir", Atom.to_string(state.sort_dir))
+    |> maybe_put(
+      key(spec, :sort_by),
+      Atom.to_string(state.sort_by),
+      omit and state.sort_by == spec.default_sort
+    )
+    |> maybe_put(
+      key(spec, :sort_dir),
+      Atom.to_string(state.sort_dir),
+      omit and state.sort_dir == Map.fetch!(spec.sortable, state.sort_by)
+    )
   end
 
-  defp maybe_put(params, _key, value, true) when value in [nil, ""], do: params
+  defp key(spec, name), do: prefixed(spec, Map.fetch!(spec.param_names, name))
+  defp prefixed(spec, name), do: spec.param_prefix <> name
+
+  defp maybe_put(params, _key, _value, true), do: params
   defp maybe_put(params, key, value, _omit), do: Map.put(params, key, value)
 
   defp put_filters(params, state) do
     Enum.reduce(state.filters, params, fn {name, value}, acc ->
       filter = Map.fetch!(state.spec.filters, name)
-      omit = name in state.spec.omit_blank or filter.omit_blank
-      maybe_put(acc, Atom.to_string(name), value, omit)
+      spec = state.spec
+
+      omit =
+        (value == "" and (name in spec.omit_blank or filter.omit_blank)) or
+          (spec.omit_defaults and value == filter.default)
+
+      maybe_put(acc, prefixed(spec, Atom.to_string(name)), value, omit)
     end)
   end
 end

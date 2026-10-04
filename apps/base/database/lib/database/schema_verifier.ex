@@ -16,6 +16,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           | {:json, String.t()}
           | {:sequence, String.t()}
           | {:string, String.t()}
+          | :current_timestamp
 
   @type column_spec :: %{
           required(:type) =>
@@ -476,6 +477,10 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
 
   defp default_matches?({:string, value}, actual) when is_binary(actual),
     do: String.starts_with?(actual, "'#{value}'")
+
+  # `timestamp ... default CURRENT_TIMESTAMP` is reported as that token.
+  # The production-seed ledger's inserted_at and updated_at use it.
+  defp default_matches?(:current_timestamp, "CURRENT_TIMESTAMP"), do: true
 
   defp default_matches?(_expected, _actual), do: false
 
