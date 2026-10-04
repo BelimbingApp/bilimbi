@@ -124,48 +124,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     {"Archived", "archived"}
   ]
 
-  @common_timezones [
-    "UTC",
-    "Africa/Cairo",
-    "Africa/Johannesburg",
-    "Africa/Lagos",
-    "America/Argentina/Buenos_Aires",
-    "America/Bogota",
-    "America/Chicago",
-    "America/Denver",
-    "America/Los_Angeles",
-    "America/Mexico_City",
-    "America/New_York",
-    "America/Sao_Paulo",
-    "America/Toronto",
-    "America/Vancouver",
-    "Asia/Bangkok",
-    "Asia/Dubai",
-    "Asia/Hong_Kong",
-    "Asia/Jakarta",
-    "Asia/Kolkata",
-    "Asia/Kuala_Lumpur",
-    "Asia/Manila",
-    "Asia/Seoul",
-    "Asia/Shanghai",
-    "Asia/Singapore",
-    "Asia/Taipei",
-    "Asia/Tokyo",
-    "Australia/Melbourne",
-    "Australia/Perth",
-    "Australia/Sydney",
-    "Europe/Amsterdam",
-    "Europe/Berlin",
-    "Europe/Dublin",
-    "Europe/London",
-    "Europe/Madrid",
-    "Europe/Paris",
-    "Europe/Rome",
-    "Europe/Zurich",
-    "Pacific/Auckland",
-    "Pacific/Honolulu"
-  ]
-
   @page_sizes [25, 50, 100, 300]
   @default_page 1
   @default_page_size 25
@@ -368,7 +326,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # One gate ahead of every persisting event, in the shape `DepartmentsLive`,
-  # `RelationshipsLive` and `DepartmentTypesLive` share: `:if={@can_update?}`
+  # `RelationshipsLive` and `ReferenceTypesLive` share: `:if={@can_update?}`
   # in the template hides the controls, but a hidden control is not a guard --
   # this route is gated on `admin.company.view`, a read capability, so each
   # of these is reachable by forging the event. The gate re-asks Authz on
@@ -1232,7 +1190,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 id="company-timezone"
                 name="timezone"
                 value={@company_timezone}
-                options={timezone_options(@company_timezone)}
+                options={
+                  if(@editing_field == "timezone",
+                    do: timezone_options(@company_timezone),
+                    else: []
+                  )
+                }
                 prompt={"Not configured (#{@resolved_timezone})"}
                 save_event="save_timezone"
                 editing?={@editing_field == "timezone"}
@@ -1606,7 +1569,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       <:editor>
         <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
         <.combobox
-          :if={@name == "jurisdiction"}
+          :if={@name in ["jurisdiction", "timezone"]}
           id={"#{@id}-select"}
           name={@name}
           value={@value}
@@ -1618,7 +1581,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           wrapper_class="mb-0 inline-block min-w-56"
         />
         <select
-          :if={@name != "jurisdiction"}
+          :if={@name not in ["jurisdiction", "timezone"]}
           id={"#{@id}-select"}
           name={@name}
           aria-label={@label}
@@ -1665,11 +1628,18 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp status_badge_kind("pending"), do: :warning
   defp status_badge_kind(_status), do: :neutral
 
-  # The stored timezone stays choosable even when it is not one of the common
-  # options this page offers.
-  defp timezone_options(""), do: Enum.map(@common_timezones, &{&1, &1})
-
+  # Every convertible IANA id, including links, from `Bilimbi.Base.DateTime.timezones/0`.
+  # A stored value the database no longer lists stays choosable so it can be seen and replaced.
   defp timezone_options(current) do
-    [current | @common_timezones] |> Enum.uniq() |> Enum.map(&{&1, &1})
+    zones = Bilimbi.Base.DateTime.timezones()
+
+    zones =
+      if current not in [nil, ""] and current not in zones do
+        [current | zones]
+      else
+        zones
+      end
+
+    Enum.map(zones, &{&1, &1})
   end
 end

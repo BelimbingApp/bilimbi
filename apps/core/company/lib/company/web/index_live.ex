@@ -12,74 +12,70 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.AdministrationPage
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
-  @sorts %{
-    "name" => :name,
-    "status" => :status,
-    "jurisdiction" => :jurisdiction
-  }
-  @status_filters ["active", "suspended", "pending", "archived"]
-  @default_sort_by :name
-  @default_sort_dir :asc
-  @default_page 1
+  @default_sort "name"
+  @default_dir "asc"
+  @statuses ["active", "suspended", "pending", "archived"]
 
-  defmodule State do
-    @moduledoc false
-    defstruct search: nil,
-              status_filter: :all,
-              sort_by: :name,
-              sort_dir: :asc,
-              page: 1,
-              per_page: 25
-  end
+  # The query string stays `sort`, `dir`, `status`, and `per_page`, and omits
+  # a value that is already the default. `ListState` speaks `sort_by` /
+  # `sort_dir`; `companies_path/1` translates. A key rename would break links
+  # this page already shares.
+  @list ListState.spec!(
+          sortable: %{name: :asc, status: :asc, jurisdiction: :asc},
+          default_sort: :name,
+          page_sizes: @page_sizes,
+          default_page_size: @default_page_size,
+          page_size_param: "per_page",
+          invalid_page_size: :default,
+          filters: [status_filter: {:one_of, ["all" | @statuses], "all"}],
+          omit_blank: [:search]
+        )
 
   @impl true
   def mount(_params, _session, socket) do
+    state = ListState.parse(%{}, @list)
+
     {:ok,
      socket
      |> assign(:page_title, "Companies")
      |> assign(:active_nav, "admin.company")
      |> assign(:page_sizes, @page_sizes)
-     |> assign(:index_state, %State{})
+     |> assign(:index_state, state)
      |> assign(:companies_page, empty_page())
-     |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
+     |> assign(:filters_form, ListState.filters_form(state))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    state = state_from_params(params)
-    {:noreply, load_page(socket, state)}
+    {:noreply, load_page(socket, ListState.parse(list_params(params), @list))}
   end
 
   @impl true
   def handle_event("filters", %{"filters" => filters}, socket) do
-    state =
-      socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(:status_filter, normalize_status_filter(Map.get(filters, "status_filter")))
-      |> Map.put(:per_page, normalize_page_size(Map.get(filters, "perPage")))
-      |> Map.put(:page, 1)
+    posted =
+      filters
+      |> normalize_posted("search", &inbound_search/1)
+      |> normalize_posted("status_filter", &inbound_status/1)
 
+    state = ListState.apply_filters(socket.assigns.index_state, posted)
     {:noreply, push_patch(socket, to: companies_path(state))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: companies_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = ListState.next_sort(socket.assigns.index_state, inbound_sort(sort_by))
+    {:noreply, push_patch(socket, to: companies_path(state))}
   end
 
-  def handle_event("page", %{"page" => page}, socket) do
-    target_page =
-      case positive_integer(page) do
-        nil -> @default_page
-        value -> value
-      end
+  def handle_event("sort", _params, socket), do: {:noreply, socket}
 
-    state = Map.put(socket.assigns.index_state, :page, target_page)
+  def handle_event("page", %{"page" => page}, socket) do
+    state = ListState.put_page(socket.assigns.index_state, page)
     {:noreply, push_patch(socket, to: companies_path(state))}
   end
 
@@ -88,29 +84,26 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
     options = [
       page: state.page,
-      page_size: state.per_page,
-      search: state.search || "",
-      status_filter: state.status_filter,
+      page_size: state.page_size,
+      search: state.search,
+      status_filter: query_status(state.filters.status_filter),
       sort_by: state.sort_by,
       sort_dir: state.sort_dir
     ]
 
     case Company.list_administration_page(scope, options) do
-      {:ok, %AdministrationPage{total_pages: total_pages}}
-      when total_pages > 0 and state.page > total_pages ->
-        clamped_state = %{state | page: total_pages}
-        push_patch(socket, to: companies_path(clamped_state))
-
-      {:ok, %AdministrationPage{total_pages: 0}} when state.page > 1 ->
-        clamped_state = %{state | page: 1}
-        push_patch(socket, to: companies_path(clamped_state))
-
       {:ok, %AdministrationPage{} = page} ->
-        socket
-        |> assign(:index_state, state)
-        |> assign(:companies_page, page)
-        |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
-        |> stream(:companies, page.entries, reset: true)
+        corrected = ListState.clamp_to_last_page(state, page, empty: :reset)
+
+        if corrected.page != state.page do
+          push_patch(socket, to: companies_path(corrected))
+        else
+          socket
+          |> assign(:index_state, state)
+          |> assign(:companies_page, page)
+          |> assign(:filters_form, ListState.filters_form(state))
+          |> stream(:companies, page.entries, reset: true)
+        end
 
       {:error, _reason} ->
         socket
@@ -133,134 +126,98 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
     }
   end
 
-  defp state_from_params(params) do
-    %State{
-      search: normalize_search(params["search"] || params["q"]),
-      status_filter: normalize_status_filter(params["status"] || params["status_filter"]),
-      sort_by: normalize_sort_by(params["sort"]),
-      sort_dir: normalize_sort_dir(params["dir"]),
-      page: normalize_page(params["page"]),
-      per_page: normalize_page_size(params["per_page"] || params["perPage"])
+  defp list_params(params) do
+    %{
+      "search" => inbound_search(params["search"] || params["q"]),
+      "page" => params["page"],
+      "per_page" => params["per_page"] || params["perPage"],
+      "sort_by" => inbound_sort(params["sort"]),
+      "sort_dir" => params["dir"],
+      "status_filter" => inbound_status(params["status"] || params["status_filter"])
     }
   end
 
-  defp normalize_search(nil), do: nil
-
-  defp normalize_search(value) when is_binary(value) do
+  defp inbound_search(value) when is_binary(value) do
     case String.trim(value) do
-      "" -> nil
+      "" -> ""
       trimmed -> String.slice(trimmed, 0, 255)
     end
   end
 
-  defp normalize_search(_value), do: nil
+  defp inbound_search(_value), do: ""
 
-  defp normalize_status_filter(value) when is_binary(value) do
+  defp inbound_status(value) when is_binary(value) do
     trimmed = value |> String.trim() |> String.downcase()
-    if trimmed in @status_filters, do: trimmed, else: :all
+    if trimmed in @statuses, do: trimmed, else: "all"
   end
 
-  defp normalize_status_filter(value) when value in [:all | @status_filters], do: value
-  defp normalize_status_filter(_value), do: :all
+  defp inbound_status(_value), do: "all"
 
-  defp normalize_sort_by(value) when is_binary(value),
-    do: Map.get(@sorts, String.downcase(String.trim(value)), @default_sort_by)
+  defp inbound_sort(value) when is_binary(value), do: value |> String.trim() |> String.downcase()
+  defp inbound_sort(_value), do: nil
 
-  defp normalize_sort_by(_value), do: @default_sort_by
-
-  defp normalize_sort_dir("desc"), do: :desc
-  defp normalize_sort_dir(:desc), do: :desc
-  defp normalize_sort_dir(_value), do: @default_sort_dir
-
-  defp normalize_page(value) do
-    case positive_integer(value) do
-      nil -> @default_page
-      page -> page
-    end
+  defp normalize_posted(filters, key, fun) do
+    if Map.has_key?(filters, key), do: Map.update!(filters, key, fun), else: filters
   end
 
-  defp normalize_page_size(value) do
-    case positive_integer(value) do
-      size when size in @page_sizes -> size
-      _ -> @default_page_size
-    end
-  end
+  defp query_status("all"), do: :all
+  defp query_status(status), do: status
 
-  defp positive_integer(value) when is_integer(value) and value > 0, do: value
+  defp companies_path(%ListState{} = state) do
+    params = ListState.to_params(state)
 
-  defp positive_integer(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
-    end
-  end
-
-  defp positive_integer(_value), do: nil
-
-  defp next_sort(state, sort_key) do
-    field = Map.get(@sorts, sort_key, @default_sort_by)
-
-    if state.sort_by == field do
-      %{state | sort_dir: toggle_sort_dir(state.sort_dir), page: 1}
-    else
-      %{state | sort_by: field, sort_dir: :asc, page: 1}
-    end
-  end
-
-  defp toggle_sort_dir(:asc), do: :desc
-  defp toggle_sort_dir(:desc), do: :asc
-
-  defp filters_form_params(state) do
-    %{
-      "search" => state.search || "",
-      "status_filter" => to_string(state.status_filter),
-      "perPage" => to_string(state.per_page)
-    }
-  end
-
-  defp companies_path(state) do
-    search_val = if state.search not in [nil, ""], do: state.search
-    status_val = if state.status_filter != :all, do: to_string(state.status_filter)
-    sort_val = if state.sort_by != @default_sort_by, do: to_string(state.sort_by)
-    dir_val = if state.sort_dir != @default_sort_dir, do: to_string(state.sort_dir)
-    page_val = if state.page != @default_page, do: state.page
-    per_page_val = if state.per_page != @default_page_size, do: state.per_page
-
-    params =
+    query =
       []
-      |> maybe_put(:search, search_val)
-      |> maybe_put(:status, status_val)
-      |> maybe_put(:sort, sort_val)
-      |> maybe_put(:dir, dir_val)
-      |> maybe_put(:page, page_val)
-      |> maybe_put(:per_page, per_page_val)
+      |> maybe_put(:search, Map.get(params, "search"))
+      |> maybe_put(:status, status_param(Map.get(params, "status_filter")))
+      |> maybe_put(:sort, sort_param(Map.get(params, "sort_by")))
+      |> maybe_put(:dir, dir_param(Map.get(params, "sort_dir")))
+      |> maybe_put(:page, page_param(Map.get(params, "page")))
+      |> maybe_put(:per_page, per_page_param(Map.get(params, "per_page")))
 
-    case params do
+    case query do
       [] -> ~p"/companies"
-      _ -> ~p"/companies?#{params}"
+      _ -> ~p"/companies?#{query}"
     end
   end
 
-  defp maybe_put(params, _key, nil), do: params
-  defp maybe_put(params, key, value), do: params ++ [{key, value}]
+  defp maybe_put(query, _key, nil), do: query
+  defp maybe_put(query, key, value), do: query ++ [{key, value}]
+
+  defp status_param("all"), do: nil
+  defp status_param(status), do: status
+
+  defp sort_param(@default_sort), do: nil
+  defp sort_param(sort), do: sort
+
+  defp dir_param(@default_dir), do: nil
+  defp dir_param(dir), do: dir
+
+  defp page_param(1), do: nil
+  defp page_param(page), do: page
+
+  defp per_page_param(size) when size == @default_page_size, do: nil
+  defp per_page_param(size), do: size
 
   # The empty row's copy. A search and a status filter are the two ways the
   # person narrowed the list, so the sentence names whichever applies and the
   # recovery undoes exactly that, keeping sort and page size.
-  defp filtered?(%State{search: search, status_filter: status_filter}) do
-    search not in [nil, ""] or status_filter != :all
+  defp filtered?(%ListState{search: search, filters: %{status_filter: status}}) do
+    search != "" or status != "all"
   end
 
-  defp cleared(%State{} = state), do: %{state | search: nil, status_filter: :all, page: 1}
-
-  defp filtered_empty_title(%State{search: search, status_filter: status_filter}) do
-    status = if status_filter == :all, do: "", else: "#{status_filter} "
-    match = if search in [nil, ""], do: "", else: " match \u201C#{search}\u201D"
-    "No #{status}companies#{match}"
+  defp cleared(%ListState{} = state) do
+    %{state | search: "", page: 1, filters: %{state.filters | status_filter: "all"}}
   end
 
-  defp filtered_empty_reason(%State{search: search, status_filter: status_filter}) do
-    case {search in [nil, ""], status_filter == :all} do
+  defp filtered_empty_title(%ListState{search: search, filters: %{status_filter: status}}) do
+    label = if status == "all", do: "", else: "#{status} "
+    match = if search == "", do: "", else: " match \u201C#{search}\u201D"
+    "No #{label}companies#{match}"
+  end
+
+  defp filtered_empty_reason(%ListState{search: search, filters: %{status_filter: status}}) do
+    case {search == "", status == "all"} do
       {false, true} ->
         "Check the spelling, or clear the search to see every company in this tenant."
 
@@ -272,8 +229,8 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
     end
   end
 
-  defp clear_label(%State{search: search, status_filter: status_filter}) do
-    case {search in [nil, ""], status_filter == :all} do
+  defp clear_label(%ListState{search: search, filters: %{status_filter: status}}) do
+    case {search == "", status == "all"} do
       {false, true} -> "Clear search"
       {true, false} -> "Show all statuses"
       {false, false} -> "Clear search and filter"
