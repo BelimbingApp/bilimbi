@@ -68,10 +68,8 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     role_page = Authz.list_principal_role_assignments(scope, :user, user.id, page_size: 100)
     assigned_roles = role_page.entries
     assigned_role_ids = Enum.map(assigned_roles, & &1.role_id)
-    has_grant_all? = Enum.any?(assigned_roles, & &1.role_grant_all)
 
-    acting_grant_all? = acting_grant_all?(current_scope)
-    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    {acting_grant_all?, acting_allowed_caps} = acting_permissions(current_scope)
     acting_allowed_set = MapSet.new(acting_allowed_caps)
 
     all_roles = Authz.list_roles(scope)
@@ -101,7 +99,11 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     # `get_tenant_user/2` mounts no account without a company, so the actor
     # always has one to evaluate in.
     actor = Authz.actor(:user, user.id, scope, user.company_id)
-    effective_keys = Enum.sort(Authz.effective_capabilities(actor).allowed)
+
+    %{allowed: allowed, grant_all: has_grant_all?} =
+      Authz.effective_capabilities(actor)
+
+    effective_keys = Enum.sort(allowed)
     grouped_effective_permissions = group_by_domain(effective_keys)
 
     denied_keys = Map.keys(direct_deny_ids) |> Enum.sort()
@@ -146,6 +148,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     |> assign(:assigned_roles, assigned_roles)
     |> assign(:assigned_role_ids, assigned_role_ids)
     |> assign(:has_grant_all?, has_grant_all?)
+    |> assign(:grant_all_subject, grant_all_subject(assigned_roles, all_roles))
     |> assign(:available_roles, available_roles)
     |> assign(
       :filtered_available_roles,
@@ -406,8 +409,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         role_id
       end
 
-    acting_grant_all? = acting_grant_all?(current_scope)
-    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    {acting_grant_all?, acting_allowed_caps} = acting_permissions(current_scope)
     acting_allowed_set = MapSet.new(acting_allowed_caps)
 
     unauthorized_roles =
@@ -450,8 +452,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         _ -> socket.assigns.selected_capability_keys
       end
 
-    acting_grant_all? = acting_grant_all?(current_scope)
-    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    {acting_grant_all?, acting_allowed_caps} = acting_permissions(current_scope)
     acting_allowed_set = MapSet.new(acting_allowed_caps)
 
     unauthorized_caps =
@@ -588,25 +589,17 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     end
   end
 
-  # `grant_all` is already on the acting administrator's effective
-  # permissions. Paging their role assignments only to read that boolean
-  # repeated a query `effective_capabilities/1` had answered.
-  defp acting_grant_all?(%{actor: %Authz.Actor{} = actor}) do
-    Authz.effective_capabilities(actor).grant_all
+  defp acting_permissions(%{grant_all: grant_all, capabilities: caps})
+       when is_boolean(grant_all) and is_list(caps) do
+    {grant_all, caps}
   end
 
-  defp acting_grant_all?(_current_scope), do: false
-
-  # The signed-in scope already carries this list. Recomputing
-  # `effective_capabilities/1` here repeats the authorization reads on every
-  # load of the page, including after each write.
-  defp acting_allowed_capabilities(%{capabilities: caps}) when is_list(caps), do: caps
-
-  defp acting_allowed_capabilities(%{actor: %Authz.Actor{} = actor}) do
-    Authz.effective_capabilities(actor).allowed
+  defp acting_permissions(%{actor: %Authz.Actor{} = actor}) do
+    %{grant_all: grant_all, allowed: allowed} = Authz.effective_capabilities(actor)
+    {grant_all, allowed}
   end
 
-  defp acting_allowed_capabilities(_current_scope), do: []
+  defp acting_permissions(_current_scope), do: {false, []}
 
   defp grantable_roles(roles, scope, acting_grant_all?, %MapSet{} = acting_allowed_set) do
     grantable =
@@ -687,10 +680,25 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     end
   end
 
-  defp grant_all_role_names(assigned_roles) do
-    assigned_roles
-    |> Enum.filter(& &1.role_grant_all)
-    |> Enum.map_join(" and ", & &1.role_name)
+  defp grant_all_subject(assigned_roles, all_roles) do
+    on_page = for row <- assigned_roles, row.role_grant_all, do: row.role_name
+
+    names =
+      case on_page do
+        [] ->
+          case for role <- all_roles, role.grant_all, do: role.name do
+            [name] -> [name]
+            _ -> []
+          end
+
+        names ->
+          names
+      end
+
+    case names do
+      [] -> "An assigned role"
+      names -> Enum.join(names, " and ")
+    end
   end
 
   defp no_roles_reason(true),
@@ -896,7 +904,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
                   <% :grant_all -> %>
                     <.empty_state
                       title="A role would add nothing"
-                      reason={"#{grant_all_role_names(@assigned_roles)} already grants every capability, so this user holds everything a role could add."}
+                      reason={"#{@grant_all_subject} already grants every capability, so this user holds everything a role could add."}
                     />
                   <% :no_roles -> %>
                     <.empty_state
