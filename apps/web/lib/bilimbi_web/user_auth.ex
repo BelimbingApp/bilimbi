@@ -282,8 +282,10 @@ defmodule BilimbiWeb.UserAuth do
   @doc """
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
   `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()],
-  impersonator: map | nil, session_identity: map, shell_preferences: map,
-  operator_company_missing: boolean()}` or `nil`. Templates read
+  grant_all: boolean(), impersonator: map | nil, session_identity: map,
+  shell_preferences: map, operator_company_missing: boolean()}` or `nil`.
+  `capabilities` and `grant_all` are one `effective_capabilities/1` result.
+  Templates read
   `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
   `shell_preferences` is the single resolved theme and timestamp display
   snapshot for the request or LiveView process.
@@ -615,13 +617,14 @@ defmodule BilimbiWeb.UserAuth do
         )
 
       {:ok, actor} = Authz.scope_actor(scope)
-      %{allowed: allowed} = Authz.effective_capabilities(actor)
+      %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)
 
       %{
         user: presentation_user(user, scope),
         scope: scope,
         actor: actor,
         capabilities: allowed,
+        grant_all: grant_all,
         impersonator: impersonator,
         session_identity: %{
           "session_id" => session_id,

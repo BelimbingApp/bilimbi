@@ -26,13 +26,20 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     # (ADR 0016). Safe for the same reason: the Oban runtime migration declares
     # no foreign key into any other module's table, and entries still execute
     # in version order below.
+    #
+    # base/settings then took a base/tenancy dependency so a global write can
+    # take a sealed Scope. Discovery is dependency-first, so settings follows
+    # tenancy. Audit becomes ready in that same step and sorts first; queue
+    # depends on audit and then sorts ahead of settings. Safe for the same
+    # reason: the settings baseline declares no foreign key, and entries still
+    # execute in version order below.
     assert Enum.map(migration_modules, & &1.id) == [
-             "base/settings",
              "base/tenancy",
              "base/audit",
+             "base/queue",
+             "base/settings",
              "base/artifacts",
              "base/authz",
-             "base/queue",
              "base/schedule",
              "base/perf",
              "base/session",

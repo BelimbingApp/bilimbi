@@ -359,6 +359,84 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
   end
 
+  test "the API refuses a country or admin1 rename without admin.geonames.update" do
+    {:ok, scope} = Tenancy.scope(41)
+    user = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73)
+
+    assert {:error, :forbidden} = Geonames.update_country_name(user, "MY", "Renamed")
+    assert {:error, :forbidden} = Geonames.update_admin1_name(user, 1, "Renamed")
+    assert Geonames.get_country("MY").country == "Malaysia"
+
+    grant_capabilities!("admin.geonames.update")
+    assert {:ok, %{country: "Renamed"}} = Geonames.update_country_name(user, "MY", "Renamed")
+  end
+
+  test "refuses a country rename after the capability is revoked", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+    assert has_element?(countries, "#country-1-name")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.geonames.update"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    countries
+    |> element("#country-1-name")
+    |> render_hook("save-country-name", %{"id" => 1, "country" => "After revocation"})
+
+    assert render(countries) =~ "You do not have permission to update countries."
+    assert Geonames.get_country("MY").country == "Malaysia"
+  end
+
+  test "refuses a country catalog update after the capability is revoked", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+    assert has_element?(countries, "#countries-update")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.geonames.update"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    countries |> element("#countries-update") |> render_click()
+
+    assert render(countries) =~ "You do not have permission to update countries."
+    assert Geonames.get_country("MY").country == "Malaysia"
+  end
+
+  test "refuses an admin1 rename after the capability is revoked", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+    {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.geonames.update"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    admin1
+    |> element("#admin1-1-name")
+    |> render_hook("save-admin1-name", %{"id" => 1, "name" => "After revocation"})
+
+    assert render(admin1) =~ "You do not have permission to update Admin1 divisions."
+    assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
+  end
+
   test "creates and edits operator postcodes through stable controls", %{conn: conn} do
     grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
 
@@ -665,26 +743,18 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     end
   end
 
-  test "a crafted country id is refused rather than crashing the LiveView" do
-    socket = %Phoenix.LiveView.Socket{
-      endpoint: BilimbiWeb.Endpoint,
-      router: BilimbiWeb.Router,
-      assigns: %{__changed__: %{}, flash: %{}}
-    }
+  test "a crafted country id is refused rather than crashing the LiveView", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
 
     # `id` comes from the browser via the inline-edit hook's data-id. The
     # handler used to call String.to_integer/1 on it, which raised
     # ArgumentError and took the process down. Geonames already answers
     # :not_found for garbage, so the value is passed straight through (#302).
     for bad <- ["abc", "", "1; DROP TABLE countries"] do
-      assert {:noreply, socket} =
-               CountriesLive.handle_event(
-                 "save-country-name",
-                 %{"id" => bad, "country" => "Nowhere"},
-                 socket
-               )
+      html = render_hook(view, "save-country-name", %{"id" => bad, "country" => "Nowhere"})
 
-      assert socket.assigns.flash["error"] =~ "Failed to save",
+      assert html =~ "Failed to save country name.",
              "expected a refusal flash for id #{inspect(bad)}"
     end
   end

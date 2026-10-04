@@ -4,6 +4,8 @@ defmodule BilimbiWeb.UserShowTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -466,6 +468,40 @@ defmodule BilimbiWeb.UserShowTest do
     refute has_element?(view, "#users td", "Grace Hopper")
   end
 
+  test "refuses deletion when admin.user.delete is revoked after the dialog opens", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.list", "admin.user.view", "admin.user.delete"])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    view |> element("#user-delete") |> render_click()
+    assert has_element?(view, "#delete-user-confirm-confirm")
+
+    {:ok, scope} = Tenancy.scope(41)
+    revoke_user_delete!(scope)
+
+    view |> element("#delete-user-confirm-confirm") |> render_click()
+
+    assert has_element?(view, "#flash-error", "You do not have permission to delete users.")
+    assert {:ok, %{name: "Grace Hopper"}} = User.get_user(scope, 73, 92)
+  end
+
+  defp revoke_user_delete!(scope) do
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.user.delete"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+  end
+
   test "shows a user whose company is archived, matching index visibility", %{conn: conn} do
     CompanyFixtures.insert_company!(%{
       id: 76,
@@ -631,7 +667,9 @@ defmodule BilimbiWeb.UserShowTest do
 
     # Writes that report through the flash say the same thing and open no
     # dialog or modal.
-    render_hook(view, "assign_selected_roles", %{"role_ids" => ["1"]})
+    view
+    |> with_target("#user-access-panel")
+    |> render_hook("assign_selected_roles", %{"role_ids" => ["1"]})
 
     assert has_element?(
              view,
@@ -1181,7 +1219,7 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # A confirm with nothing held is a stale click and changes nothing.
-    render_click(view, "remove_role", %{})
+    view |> with_target("#user-access-panel") |> render_click("remove_role", %{})
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # Confirming removes it and reports the completed write as a success.

@@ -9,7 +9,10 @@ defmodule Bilimbi.Core.Geonames do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Geonames.Admin1
   alias Bilimbi.Core.Geonames.Admin1Index
   alias Bilimbi.Core.Geonames.Admin1Summary
@@ -26,6 +29,8 @@ defmodule Bilimbi.Core.Geonames do
   alias Bilimbi.Core.Geonames.PostcodeOverrides
   alias Bilimbi.Core.Geonames.PostcodeSummary
   alias Bilimbi.Core.Geonames.ReferenceData
+
+  @update_capability "admin.geonames.update"
 
   @type import_error ::
           {:invalid_dataset, term()}
@@ -76,7 +81,17 @@ defmodule Bilimbi.Core.Geonames do
   payload that yields no valid rows is rejected with
   `{:error, {:import, dataset, :no_valid_rows}}`; a failed import restores
   the previously known-good download cache.
+
+  `import_reference_data/2` is the countries-screen write and requires
+  `admin.geonames.update` on the sealed scope now. `import_reference_data/1`
+  is the operator mix task, which has no signed-in scope.
   """
+  @spec import_reference_data(Scope.t(), keyword()) ::
+          {:ok, map()} | {:error, :forbidden | import_error()}
+  def import_reference_data(%Scope{} = scope, opts) when is_list(opts) do
+    with :ok <- authorize(scope), do: import_reference_data(opts)
+  end
+
   @spec import_reference_data(keyword()) :: {:ok, map()} | {:error, import_error()}
   def import_reference_data(opts \\ []) do
     ReferenceData.run(
@@ -127,10 +142,17 @@ defmodule Bilimbi.Core.Geonames do
 
   @doc """
   Updates a country's display name by its ID or ISO code.
+
+  Requires `admin.geonames.update` on the sealed scope now. The countries
+  screen's `can_update?` assign only shows the control.
   """
-  @spec update_country_name(pos_integer() | String.t(), String.t()) ::
-          {:ok, CountryIndex.t()} | {:error, :not_found | Ecto.Changeset.t()}
-  def update_country_name(id_or_iso, name) when is_binary(name) do
+  @spec update_country_name(Scope.t(), pos_integer() | String.t(), String.t()) ::
+          {:ok, CountryIndex.t()} | {:error, :forbidden | :not_found | Ecto.Changeset.t()}
+  def update_country_name(%Scope{} = scope, id_or_iso, name) when is_binary(name) do
+    with :ok <- authorize(scope), do: update_country_name_record(id_or_iso, name)
+  end
+
+  defp update_country_name_record(id_or_iso, name) when is_binary(name) do
     trimmed_name = String.trim(name)
 
     query =
@@ -242,10 +264,16 @@ defmodule Bilimbi.Core.Geonames do
 
   @doc """
   Updates an admin1 division's display name by its ID.
+
+  Requires `admin.geonames.update` on the sealed scope now.
   """
-  @spec update_admin1_name(term(), term()) ::
-          {:ok, Admin1Index.t()} | {:error, :not_found | Ecto.Changeset.t()}
-  def update_admin1_name(id, name) when is_binary(name) do
+  @spec update_admin1_name(Scope.t(), term(), term()) ::
+          {:ok, Admin1Index.t()} | {:error, :forbidden | :not_found | Ecto.Changeset.t()}
+  def update_admin1_name(%Scope{} = scope, id, name) do
+    with :ok <- authorize(scope), do: update_admin1_name_record(id, name)
+  end
+
+  defp update_admin1_name_record(id, name) when is_binary(name) do
     trimmed_name = String.trim(name)
 
     query =
@@ -289,7 +317,23 @@ defmodule Bilimbi.Core.Geonames do
     end
   end
 
-  def update_admin1_name(_id, _name), do: {:error, :not_found}
+  defp update_admin1_name_record(_id, _name), do: {:error, :not_found}
+
+  # Anonymous system work (the import mix task's callers in tests, and
+  # `Tenancy.scope/1`) holds no grants. A person is decided by Authz, which
+  # also keeps this platform capability on the operator tenant.
+  defp authorize(%Scope{} = scope) do
+    actor = Scope.actor(scope)
+
+    if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
+      :ok
+    else
+      case Authz.can(scope, @update_capability) do
+        %{allowed: true} -> :ok
+        %{allowed: false} -> {:error, :forbidden}
+      end
+    end
+  end
 
   @doc """
   Returns a bounded, searchable, sortable page for the read-only Postcodes index.

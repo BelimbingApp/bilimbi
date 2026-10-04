@@ -34,9 +34,14 @@ config :bilimbi_base_session,
 
 # Web owns reauthentication, request throttling, and company authorization.
 # Base Settings calls host seams without depending on Core implementations.
+# Global writes ask this module whether the sealed scope holds
+# base.settings.global.manage. Base Authz answers, and that capability stays
+# bound to the platform-operator tenant. Settings does not depend on Authz:
+# Authz already depends on Settings, and discovery rejects that cycle.
 config :bilimbi_base_settings,
   secret_reveal_service: BilimbiWeb.SecretReveal,
-  company_scope_service: BilimbiWeb.SettingsCompanyScope
+  company_scope_service: BilimbiWeb.SettingsCompanyScope,
+  authorization: Bilimbi.Base.Authz.SettingsAuthorization
 
 # The follow channel between workspace tiles (Bilimbi.Base.UI.Workspace)
 # rides the host's PubSub, as user notifications do.

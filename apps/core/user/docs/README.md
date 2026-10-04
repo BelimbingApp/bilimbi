@@ -25,7 +25,7 @@ and reset-token hashes never leave the module; account reads return
 | `register_user(scope, company_id, attributes)` | Create an unverified account from plaintext `:password` |
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
-| `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete |
+| `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete. A person must hold `admin.user.delete` when the call runs; `delete_user/3` owns that check |
 | `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
 | `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |

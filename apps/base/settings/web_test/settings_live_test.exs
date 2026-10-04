@@ -13,10 +13,13 @@ defmodule BilimbiWeb.SettingsLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -41,6 +44,16 @@ defmodule BilimbiWeb.SettingsLiveTest do
     conn |> log_in_as() |> live(~p"/system/settings")
   end
 
+  defp revoke_global_manage!(scope) do
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "base.settings.global.manage"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+  end
+
   test "a non-operator tenant cannot change platform-global settings", %{conn: conn} do
     CompanyFixtures.insert_tenant!(%{id: 42, is_platform_operator: false})
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
@@ -63,6 +76,38 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
     assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/system/settings")
     assert Settings.get("webhooks.rate_limit") == 120
+  end
+
+  test "global save and restore refuse a scope that lost base.settings.global.manage", %{
+    conn: conn
+  } do
+    {:ok, scope} = Tenancy.scope(41)
+    user = Authentication.sign_in(scope, 91, 73)
+    fields = Settings.Form.fields(["operator"], nil)
+
+    assert {:error, :forbidden} = Settings.Form.save(%{@retention => "30"}, fields, nil, user)
+    assert Settings.get(@retention) == 90
+
+    grant_capabilities!("base.settings.global.manage")
+
+    assert {:ok, %{written: [@retention]}} =
+             Settings.Form.save(%{@retention => "30"}, fields, nil, user)
+
+    assert Settings.get(@retention) == 30
+
+    revoke_global_manage!(scope)
+
+    assert {:error, :forbidden} = Settings.Form.restore_defaults(fields, nil, user)
+    assert Settings.get(@retention) == 30
+
+    grant_capabilities!("base.settings.global.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+    revoke_global_manage!(scope)
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             render_submit(view, "save", %{"settings" => %{@retention => "12"}})
+
+    assert Settings.get(@retention) == 30
   end
 
   test "stored secret starts masked and grant_all confers no reveal action", %{
