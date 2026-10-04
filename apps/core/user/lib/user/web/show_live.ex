@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     not, because `User.get_tenant_user/2` resolves a user through its
     company and no screen could reopen a detached account. A blank value
     that still arrives is refused on the fact and writes nothing.
-    `reassign_user_company/6` ends every session the account holds, so the
+    `reassign_user_company/5` ends every session the account holds, so the
     open editor says so before the operator chooses; the warning is a note
     beside the select, not a second click, because the change is reversible
     by choosing the previous company again.
@@ -547,13 +547,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         {:noreply, commit_company(socket, {:ok, user}, socket.assigns.company_name)}
 
       target_company_id ->
-        actor = current_actor(socket, user.company_id)
-
         {:noreply,
          commit_company(
            socket,
            User.reassign_user_company(
-             actor,
              scope,
              user.company_id,
              user.id,
@@ -573,9 +570,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     if errors == %{} do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
-      actor = current_actor(socket, user.company_id)
 
-      case User.admin_change_password(actor, scope, user.company_id, user.id, password) do
+      case User.admin_change_password(scope, user.company_id, user.id, password) do
         {:ok, updated_user} ->
           {:noreply,
            socket
@@ -1552,11 +1548,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     do: CommitStatus.write_forbidden(socket, "You do not have permission to edit users.")
 
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
-
-  defp current_actor(socket, company_id) do
-    current_scope = socket.assigns.current_scope
-    Authz.actor(:user, current_scope.actor.id, current_scope.scope, company_id)
-  end
 
   defp validate_password_params(password, confirmation) do
     errors = %{}

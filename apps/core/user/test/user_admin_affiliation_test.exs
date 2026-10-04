@@ -2,7 +2,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.Audit.MutationSchema
-  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -61,14 +61,15 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
     UserFixtures.grant_role!(20, 2, "user_admin", true)
 
-    tenant_actor = Authz.actor(:user, 2, tenant_scope, 20)
+    # The administrator holds the grant in company 20 and is signed in at 21.
+    admin = Authentication.sign_in(tenant_scope, 2, 21)
 
-    {:ok, tenant_scope: tenant_scope, tenant_actor: tenant_actor, emp_20: emp_20, emp_21: emp_21}
+    {:ok, tenant_scope: tenant_scope, admin: admin, emp_20: emp_20, emp_21: emp_21}
   end
 
-  describe "reassign_user_company/6" do
+  describe "reassign_user_company/5" do
     test "reassigns company, resets or updates employee, terminates sessions and audits",
-         %{tenant_scope: tenant_scope, tenant_actor: tenant_actor, emp_20: emp_20} do
+         %{admin: admin, emp_20: emp_20} do
       UserFixtures.insert_user!(%{
         id: 701,
         company_id: 20,
@@ -87,7 +88,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       # Reassigning from company 20 to 21 without employee_id clears previous employee link
       assert {:ok, %Summary{} = updated} =
-               User.reassign_user_company(tenant_actor, tenant_scope, 20, 701, 21)
+               User.reassign_user_company(admin, 20, 701, 21)
 
       assert updated.company_id == 21
       assert is_nil(updated.employee_id)
@@ -107,7 +108,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     end
 
     test "reassigns company with valid employee for target company",
-         %{tenant_scope: tenant_scope, tenant_actor: tenant_actor, emp_20: emp_20, emp_21: emp_21} do
+         %{admin: admin, emp_20: emp_20, emp_21: emp_21} do
       UserFixtures.insert_user!(%{
         id: 702,
         company_id: 20,
@@ -116,16 +117,14 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       })
 
       assert {:ok, %Summary{} = updated} =
-               User.reassign_user_company(tenant_actor, tenant_scope, 20, 702, 21,
-                 employee_id: emp_21.id
-               )
+               User.reassign_user_company(admin, 20, 702, 21, employee_id: emp_21.id)
 
       assert updated.company_id == 21
       assert updated.employee_id == emp_21.id
     end
 
     test "fails and rolls back if new employee belongs to wrong company",
-         %{tenant_scope: tenant_scope, tenant_actor: tenant_actor, emp_20: emp_20} do
+         %{tenant_scope: tenant_scope, admin: admin, emp_20: emp_20} do
       UserFixtures.insert_user!(%{
         id: 703,
         company_id: 20,
@@ -135,9 +134,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       # Employee emp_20 belongs to company 20, not target company 21
       assert {:error, :employee_not_found} =
-               User.reassign_user_company(tenant_actor, tenant_scope, 20, 703, 21,
-                 employee_id: emp_20.id
-               )
+               User.reassign_user_company(admin, 20, 703, 21, employee_id: emp_20.id)
 
       # User remains on company 20 with employee emp_20.id
       assert {:ok, %Summary{company_id: 20, employee_id: emp_id}} =
@@ -147,9 +144,9 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     end
   end
 
-  describe "admin_change_password/6" do
+  describe "admin_change_password/5" do
     test "admin resets affiliated user password, updates hash to Argon2id, rotates token, terminates sessions",
-         %{tenant_scope: tenant_scope, tenant_actor: tenant_actor} do
+         %{admin: admin} do
       UserFixtures.insert_user!(%{
         id: 901,
         company_id: 20,
@@ -169,8 +166,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       assert {:ok, %Summary{id: 901}} =
                User.admin_change_password(
-                 tenant_actor,
-                 tenant_scope,
+                 admin,
                  20,
                  901,
                  "brandnewsecurepassword123"
@@ -201,7 +197,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     end
 
     test "rejects short password (< 8 chars)",
-         %{tenant_scope: tenant_scope, tenant_actor: tenant_actor} do
+         %{admin: admin} do
       UserFixtures.insert_user!(%{
         id: 903,
         company_id: 20,
@@ -210,8 +206,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       assert {:error, %Ecto.Changeset{errors: errors}} =
                User.admin_change_password(
-                 tenant_actor,
-                 tenant_scope,
+                 admin,
                  20,
                  903,
                  "short"
@@ -223,27 +218,24 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
   describe "malformed lifecycle identifiers" do
     test "reassign_user_company fails closed for malformed current, user, and target ids", %{
-      tenant_scope: tenant_scope,
-      tenant_actor: tenant_actor
+      admin: admin
     } do
       assert {:error, :company_not_found} =
-               User.reassign_user_company(tenant_actor, tenant_scope, "not-a-company", 701, 21)
+               User.reassign_user_company(admin, "not-a-company", 701, 21)
 
       assert {:error, :user_not_found} =
-               User.reassign_user_company(tenant_actor, tenant_scope, 20, "not-a-user", 21)
+               User.reassign_user_company(admin, 20, "not-a-user", 21)
 
       assert {:error, :company_not_found} =
-               User.reassign_user_company(tenant_actor, tenant_scope, 20, 701, "not-a-company")
+               User.reassign_user_company(admin, 20, 701, "not-a-company")
     end
 
     test "admin_change_password fails closed before querying malformed company and user ids", %{
-      tenant_scope: tenant_scope,
-      tenant_actor: tenant_actor
+      admin: admin
     } do
       assert {:error, :company_not_found} =
                User.admin_change_password(
-                 tenant_actor,
-                 tenant_scope,
+                 admin,
                  "not-a-company",
                  901,
                  "brandnewsecurepassword123"
@@ -251,8 +243,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       assert {:error, :user_not_found} =
                User.admin_change_password(
-                 tenant_actor,
-                 tenant_scope,
+                 admin,
                  20,
                  "not-a-user",
                  "brandnewsecurepassword123"
@@ -260,10 +251,85 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     end
   end
 
+  describe "the grant is judged in the account's company" do
+    setup do
+      UserFixtures.insert_user!(%{id: 801, company_id: 20, email: "subject@example.com"})
+      :ok
+    end
+
+    test "the audit row names the signed-in administrator", %{admin: admin} do
+      assert {:ok, %Summary{id: 801}} =
+               User.admin_change_password(admin, 20, 801, "brandnewsecurepassword123")
+
+      assert %{actor_type: "user", actor_id: 2, company_id: 20} =
+               Repo.get_by(MutationSchema, auditable_id: "801", event: "password_reset")
+    end
+
+    test "a grant only in the company signed in at does not reach the account's company", %{
+      tenant_scope: tenant_scope
+    } do
+      UserFixtures.grant_role!(21, 3, "user_admin_21", true)
+      elsewhere = Authentication.sign_in(tenant_scope, 3, 21)
+      before = UserFixtures.stored_password(801)
+
+      assert {:error, :unauthorized} =
+               User.admin_change_password(elsewhere, 20, 801, "brandnewsecurepassword123")
+
+      assert {:error, :unauthorized} = User.reassign_user_company(elsewhere, 20, 801, 21)
+      assert UserFixtures.stored_password(801) == before
+    end
+
+    test "an archived company's grant allows nothing", %{tenant_scope: tenant_scope} do
+      CompanyFixtures.insert_company!(%{
+        id: 22,
+        tenant_id: 2,
+        name: "Acme Archived",
+        code: "ACM-3",
+        deleted_at: ~N[2026-01-01 00:00:00]
+      })
+
+      UserFixtures.insert_user!(%{id: 802, company_id: 22, email: "archived@example.com"})
+      UserFixtures.grant_role!(22, 2, "user_admin_22", true)
+      admin = Authentication.sign_in(tenant_scope, 2, 21)
+
+      assert {:error, :unauthorized} =
+               User.admin_change_password(admin, 22, 802, "brandnewsecurepassword123")
+
+      assert {:error, :unauthorized} = User.reassign_user_company(admin, 22, 802, 21)
+    end
+
+    test "an administrator of another tenant is refused whatever they hold" do
+      CompanyFixtures.insert_tenant!(%{id: 3, name: "Other", is_platform_operator: false})
+
+      CompanyFixtures.insert_company!(%{
+        id: 30,
+        tenant_id: 3,
+        name: "Other Primary",
+        code: "OTH-1"
+      })
+
+      UserFixtures.grant_role!(30, 9, "user_admin_30", true)
+      UserFixtures.grant_role!(20, 9, "user_admin_stray", true)
+      outsider = Authentication.sign_in(UserFixtures.tenant_scope(3), 9, 30)
+
+      assert {:error, :unauthorized} =
+               User.admin_change_password(outsider, 20, 801, "brandnewsecurepassword123")
+
+      assert {:error, :unauthorized} = User.reassign_user_company(outsider, 20, 801, 21)
+    end
+
+    test "a system scope names nobody and is refused", %{tenant_scope: tenant_scope} do
+      assert {:error, :unauthorized} =
+               User.admin_change_password(tenant_scope, 20, 801, "brandnewsecurepassword123")
+
+      assert {:error, :unauthorized} = User.reassign_user_company(tenant_scope, 20, 801, 21)
+    end
+  end
+
   describe "lifecycle rejection and atomicity" do
     test "a post-update session failure rolls back password, sessions, and audit", %{
       tenant_scope: tenant_scope,
-      tenant_actor: tenant_actor
+      admin: admin
     } do
       old_hash = UserFixtures.legacy_password_hash("oldpassword")
 
@@ -285,8 +351,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       # Core User's transaction, so this failure exercises the transaction tail.
       assert_raise FunctionClauseError, fn ->
         User.admin_change_password(
-          tenant_actor,
-          tenant_scope,
+          admin,
           20,
           912,
           "brandnewsecurepassword123",
@@ -312,7 +377,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
 
   use ExUnit.Case, async: false
 
-  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.User
@@ -337,15 +402,12 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
     end)
 
     scope = UserFixtures.tenant_scope(2)
-    actor = Authz.actor(:user, 2, scope, 20)
-
-    %{schema: schema, scope: scope, actor: actor}
+    %{schema: schema, scope: Authentication.sign_in(scope, 2, 20)}
   end
 
   test "a waiting lifecycle mutation rereads the user after a concurrent reassign", %{
     schema: schema,
-    scope: scope,
-    actor: actor
+    scope: scope
   } do
     parent = self()
 
@@ -369,9 +431,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
         checkout_and_on_schema!(schema, fn ->
           send(parent, {:winner_backend, backend_pid!()})
 
-          User.reassign_user_company(actor, scope, 20, 950, 21,
-            current_session_id: "keep-race-session"
-          )
+          User.reassign_user_company(scope, 20, 950, 21, current_session_id: "keep-race-session")
         end)
       end)
 
@@ -383,7 +443,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
         checkout_and_on_schema!(schema, fn ->
           send(parent, {:loser_backend, backend_pid!()})
 
-          User.reassign_user_company(actor, scope, 20, 950, 21,
+          User.reassign_user_company(scope, 20, 950, 21,
             current_session_id: "loser-current-session"
           )
         end)
