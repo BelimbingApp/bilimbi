@@ -12,6 +12,7 @@ defmodule Bilimbi.Core.UserTest do
   alias Bilimbi.Core.User.Summary
   alias Bilimbi.Core.User.Web.EmployeeAccountPanel
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.User.TestFixtures
 
   setup_all do
@@ -744,14 +745,6 @@ defmodule Bilimbi.Core.UserTest do
 
   defp valid_attributes do
     %{name: "Ada Lovelace", email: " ADA@example.com ", password: "correct horse"}
-  end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, options} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        options |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 
   defp stored_employee_id(user_id) do

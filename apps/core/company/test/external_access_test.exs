@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.ExternalAccessSummary
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Company.TestFixtures
 
   setup do
@@ -218,6 +219,4 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
       end
     end
   end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

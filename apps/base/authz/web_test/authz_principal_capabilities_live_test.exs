@@ -409,8 +409,4 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
       refute has_element?(view, "#principal-capabilities-reach-caution")
     end
   end
-
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-  end
 end

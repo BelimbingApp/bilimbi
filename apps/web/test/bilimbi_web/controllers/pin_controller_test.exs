@@ -146,9 +146,7 @@ defmodule BilimbiWeb.PinControllerTest do
     impersonating =
       conn
       |> log_in_as()
-      |> Plug.Test.init_test_session(%{
-        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-      })
+      |> impersonating_as(92, "Grace Hopper")
 
     response = impersonating |> get(~p"/api/pins") |> json_response(200)
     assert Enum.map(response["pins"], & &1["url"]) == ["/companies"]
@@ -252,9 +250,7 @@ defmodule BilimbiWeb.PinControllerTest do
 
   defp impersonating_json do
     signed_in_json()
-    |> Plug.Test.init_test_session(%{
-      "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-    })
+    |> impersonating_as(92, "Grace Hopper")
   end
 
   defp post_json(conn, path, payload) do

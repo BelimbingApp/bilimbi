@@ -111,9 +111,7 @@ defmodule BilimbiWeb.ThemeControllerTest do
     conn =
       conn
       |> log_in_as()
-      |> Plug.Test.init_test_session(%{
-        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-      })
+      |> impersonating_as(92, "Grace Hopper")
       |> post(~p"/api/theme", %{"theme" => "dark"})
 
     assert json_response(conn, 403) == %{"error" => "impersonating"}

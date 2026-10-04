@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.CompanyTest do
   alias Bilimbi.Core.Company.Summary
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Company.TestFixtures
 
   setup do
@@ -679,6 +680,4 @@ defmodule Bilimbi.Core.CompanyTest do
       assert {:error, :invalid_options} = Company.list_administration_page(owner, sort_by: :code)
     end
   end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

@@ -140,8 +140,4 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
       ~p"/authz/capabilities?domain=&page=1&per_page=25&search=&sort_by=module&sort_dir=desc"
     )
   end
-
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-  end
 end

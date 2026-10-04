@@ -16,10 +16,6 @@ defmodule BilimbiWeb.SessionsLiveTest do
     :ok
   end
 
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-  end
-
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/system/sessions")
   end

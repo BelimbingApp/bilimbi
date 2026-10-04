@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.TenancyTest do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tenancy.TestFixtures.ScopedRecord
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Base.Tenancy.TestFixtures
 
   setup do
@@ -155,6 +156,4 @@ defmodule Bilimbi.Base.TenancyTest do
       assert [%{label: "owned"}] = Repo.all(query)
     end
   end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

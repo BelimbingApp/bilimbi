@@ -118,6 +118,29 @@ defmodule BilimbiWeb.ConnCase do
   end
 
   @doc """
+  Marks a signed-in conn as an operator impersonating the signed-in user, with
+  the session shape `BilimbiWeb.UserAuth` reads. Call it after `log_in_as/2`.
+  """
+  def impersonating_as(conn, original_user_id, original_user_name) do
+    Phoenix.ConnTest.init_test_session(conn, %{
+      BilimbiWeb.UserAuth.impersonation_key() => %{
+        "original_user_id" => original_user_id,
+        "original_user_name" => original_user_name
+      }
+    })
+  end
+
+  @doc """
+  The query parameters of the URL the view just patched to.
+  """
+  def patched_params(view) do
+    Phoenix.LiveViewTest.assert_patch(view)
+    |> URI.parse()
+    |> Map.fetch!(:query)
+    |> URI.decode_query()
+  end
+
+  @doc """
   Asserts that a shared `<.modal>` with this DOM id is open and carries the
   dialog semantics assistive technology relies on: a modal `<dialog>` named
   by its visible title and driven by the `Modal` hook.

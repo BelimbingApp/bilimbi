@@ -286,9 +286,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     {:ok, view, _html} =
       conn
       |> log_in_as()
-      |> Plug.Test.init_test_session(%{
-        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-      })
+      |> impersonating_as(92, "Grace Hopper")
       |> live(~p"/settings/appearance")
 
     view

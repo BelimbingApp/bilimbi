@@ -132,9 +132,7 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     conn =
       conn
       |> log_in_as()
-      |> Plug.Test.init_test_session(%{
-        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-      })
+      |> impersonating_as(92, "Grace Hopper")
 
     {:ok, view, _} = live(conn, ~p"/dashboard")
 

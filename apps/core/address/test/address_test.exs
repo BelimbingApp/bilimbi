@@ -17,6 +17,7 @@ defmodule Bilimbi.Core.AddressTest do
   alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Address.TestFixtures
 
   setup do
@@ -826,6 +827,4 @@ defmodule Bilimbi.Core.AddressTest do
 
     assert Enum.map(detail.linked_owners, &{&1.owner_type, &1.owner_id}) == expected
   end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

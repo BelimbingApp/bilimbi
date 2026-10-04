@@ -355,8 +355,4 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
       put_in(installed, [:consumers, :system_principals], principals)
     )
   end
-
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-  end
 end
