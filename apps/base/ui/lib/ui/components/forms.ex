@@ -346,9 +346,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         name={@name}
         aria-invalid={@errors != [] && "true"}
         aria-describedby={described_by(@id, @hint, @errors)}
-        class={
-          field_class(@class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
-        }
+        class={field_class(@class, @errors, extra: "min-h-24", readonly: @rest[:readonly])}
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
       <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
