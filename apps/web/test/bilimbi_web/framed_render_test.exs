@@ -51,7 +51,9 @@ defmodule BilimbiWeb.FramedRenderTest do
     UserFixtures.create_user_pins_table!()
     {:ok, scope} = Tenancy.scope(41)
     scope = Tenancy.Authentication.sign_in(scope, 91, 73)
-    {:ok, :pinned, _} = User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
+
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
 
     owner = self()
     handler = {__MODULE__, make_ref()}
