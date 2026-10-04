@@ -27,6 +27,8 @@ defmodule Bilimbi.Base.Schedule do
   alias Bilimbi.Base.Tenancy.Scope
 
   @source "scheduler"
+  @active_job_states [:available, :executing, :retryable, :scheduled]
+  @reconcile_batch_size 300
   @retention_key "schedule.history.keep_days"
   @execute "admin.system.schedule.execute"
   @manage "admin.system.schedule.manage"
@@ -355,6 +357,41 @@ defmodule Bilimbi.Base.Schedule do
 
         count
     end
+  end
+
+  defp reconcile_occurrences(occurrences) do
+    job_ids = occurrences |> Enum.map(&elem(&1, 1)) |> Enum.uniq()
+
+    with {:ok, job_states} <- Queue.job_states(job_ids) do
+      Enum.reduce_while(occurrences, :ok, fn {occurrence_id, job_id}, :ok ->
+        case Map.fetch(job_states, job_id) do
+          {:ok, state} when state in @active_job_states ->
+            {:cont, :ok}
+
+          {:ok, :completed} ->
+            reconcile_occurrence(occurrence_id, "succeeded")
+            {:cont, :ok}
+
+          {:ok, state} when state in [:cancelled, :discarded] ->
+            reconcile_occurrence(occurrence_id, "failed")
+            {:cont, :ok}
+
+          :error ->
+            reconcile_occurrence(occurrence_id, "failed")
+            {:cont, :ok}
+
+          _unknown ->
+            {:halt, {:error, :unavailable}}
+        end
+      end)
+    end
+  end
+
+  defp reconcile_occurrence(occurrence_id, state) do
+    Repo.update_all(
+      from(item in Occurrence, where: item.id == ^occurrence_id and is_nil(item.finished_at)),
+      set: [state: state, finished_at: DateTime.utc_now(), overlap_key: nil]
+    )
   end
 
   defp recorder_availability do
