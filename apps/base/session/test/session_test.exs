@@ -298,11 +298,27 @@ defmodule Bilimbi.Base.SessionTest do
     assert {:ok, _} = Bilimbi.Base.Settings.put("session.last_activity_touch_minutes", 5)
     put_session!("short-lived", 100)
 
-    assert :ok = Session.touch_session("short-lived", 159)
+    assert :ok = Session.touch_session("short-lived", 190)
     assert {:ok, %Entry{last_activity: 100}} = Session.fetch_session("short-lived")
 
-    assert :ok = Session.touch_session("short-lived", 161)
-    assert {:ok, %Entry{last_activity: 161}} = Session.fetch_session("short-lived")
+    assert :ok = Session.touch_session("short-lived", 191)
+    assert {:ok, %Entry{last_activity: 191}} = Session.fetch_session("short-lived")
+  end
+
+  test "continuous use keeps a one-minute session active" do
+    assert {:ok, _} = Bilimbi.Base.Settings.put("session.lifetime_minutes", 1)
+    put_session!("one-minute", 100)
+
+    for now <- 120..400//20 do
+      assert {:ok, %Entry{last_activity: last_activity}} = Session.fetch_session("one-minute")
+      assert last_activity >= now - 60
+      assert :ok = Session.touch_session("one-minute", now)
+    end
+  end
+
+  test "touching a missing session does not recreate it" do
+    assert :ok = Session.touch_session("missing", 400)
+    assert {:error, :not_found} = Session.fetch_session("missing")
   end
 
   test "validates canonical column limits and activity metadata" do

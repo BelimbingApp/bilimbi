@@ -57,31 +57,30 @@ defmodule Bilimbi.Base.Session do
 
   @doc """
   Advances session activity when the configured throttle interval elapsed.
-  The interval never exceeds half the session lifetime, so an active session
-  is refreshed before it can expire.
+  The interval never exceeds half the session lifetime, so continuous use
+  refreshes the session before it can expire.
 
   Activity updates to `sessions` bypass audit capture: they are machine
   housekeeping, not changes to the user's identity or opaque payload.
   A missing session is never recreated.
   """
-  @spec touch_session(String.t(), non_neg_integer()) :: :ok | {:error, :not_found}
+  @spec touch_session(String.t(), non_neg_integer()) :: :ok
   def touch_session(id, now \\ System.system_time(:second))
       when is_binary(id) and is_integer(now) and now >= 0 do
     touch_minutes = Bilimbi.Base.Settings.get(@touch_interval_key)
     lifetime_minutes = Bilimbi.Base.Settings.get(@lifetime_key)
-    cutoff = now - min(touch_minutes, max(1, div(lifetime_minutes, 2))) * 60
+    cutoff = now - min(touch_minutes * 60, div(lifetime_minutes * 60, 2))
 
-    {count, _rows} =
-      WriteCapture.without_capture(fn ->
-        Repo.update_all(
-          from(session in Schema,
-            where: session.id == ^id and session.last_activity < ^cutoff
-          ),
-          set: [last_activity: now]
-        )
-      end)
+    WriteCapture.without_capture(fn ->
+      Repo.update_all(
+        from(session in Schema,
+          where: session.id == ^id and session.last_activity < ^cutoff
+        ),
+        set: [last_activity: now]
+      )
+    end)
 
-    if count == 0 and is_nil(Repo.get(Schema, id)), do: {:error, :not_found}, else: :ok
+    :ok
   end
 
   @spec list_sessions(keyword()) :: [Summary.t()]
