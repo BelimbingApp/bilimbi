@@ -65,6 +65,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.UI.CommitStatus
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Workspace
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Geonames
@@ -125,17 +126,37 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   ]
 
   @page_sizes [25, 50, 100, 300]
-  @default_page 1
-  @default_page_size 25
 
-  @table_defaults %{
-    users: %{search: nil, sort_by: "name", sort_dir: :asc, page: 1, per_page: 25},
-    employees: %{search: nil, sort_by: "full_name", sort_dir: :asc, page: 1, per_page: 25}
-  }
-
-  @table_sorts %{
-    users: ~w(name email email_verified),
-    employees: ~w(full_name employee_number employee_type status)
+  # The embedded Users and Employees tables each keep their state in this
+  # page's URL under a prefix (`users_search`, `employees_page`, ...). The
+  # panels receive the parsed `ListState` and do not parse it again.
+  @table_specs %{
+    users:
+      ListState.spec!(
+        sortable: %{name: :asc, email: :asc, email_verified: :asc},
+        default_sort: :name,
+        page_sizes: @page_sizes,
+        default_page_size: 25,
+        page_size_param: "per_page",
+        page_size_aliases: ["perPage"],
+        invalid_page_size: :default,
+        param_prefix: "users_",
+        param_names: %{sort_by: "sort", sort_dir: "dir"},
+        omit_defaults: true
+      ),
+    employees:
+      ListState.spec!(
+        sortable: %{full_name: :asc, employee_number: :asc, employee_type: :asc, status: :asc},
+        default_sort: :full_name,
+        page_sizes: @page_sizes,
+        default_page_size: 25,
+        page_size_param: "per_page",
+        page_size_aliases: ["perPage"],
+        invalid_page_size: :default,
+        param_prefix: "employees_",
+        param_names: %{sort_by: "sort", sort_dir: "dir"},
+        omit_defaults: true
+      )
   }
 
   @impl true
@@ -165,7 +186,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       {:ok, company} ->
         is_primary = Company.primary_company?(scope, company_id)
         legal_entity_types = Company.list_legal_entity_types() |> elem(1)
-        countries = list_geonames_countries()
         parent_companies = load_parent_companies(scope, company_id)
         children = Company.list_child_companies(scope, company_id) |> elem(1)
         departments = Company.list_departments(scope, company_id) |> elem(1)
@@ -183,7 +203,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:is_primary, is_primary)
          |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
          |> assign(:legal_entity_types, legal_entity_types)
-         |> assign(:countries, countries)
+         |> assign(:country_options, Geonames.country_options())
          |> assign(:parent_companies, parent_companies)
          |> assign(:children, children)
          |> assign(:departments, departments)
@@ -258,7 +278,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   #
   # This file reaches no sibling Core module by runtime probe (#595, #669).
   # Geonames is a declared dependency, called directly for the jurisdiction
-  # label. Employees, addresses and users render through their owners' discovered
+  # options. Employees, addresses and users render through their owners' discovered
   # embeds ("company.employees" / "company.addresses" / "company.users"). The one
   # remaining cross-boundary need — naming the user an external-access grant
   # points at — goes through base/principal_directory, the same seam the
@@ -286,10 +306,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       _ -> %{}
     end
   end
-
-  # Geonames is a declared company dependency (bilimbi.module.exs). Call it
-  # directly — the same pattern create_live.ex already uses. Do not probe.
-  defp list_geonames_countries, do: Geonames.list_countries()
 
   defp company_auditable_types do
     ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", Company.addressable_identity()]
@@ -633,7 +649,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     do: option_label(legal_entity_type_options(socket.assigns.legal_entity_types), value)
 
   defp choice_label(socket, "jurisdiction", value),
-    do: option_label(country_options(socket.assigns.countries), value)
+    do: option_label(socket.assigns.country_options, value)
 
   defp choice_label(socket, "parent_id", value),
     do: option_label(parent_company_options(socket.assigns.parent_companies), value)
@@ -652,169 +668,50 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   defp apply_table_filters(socket, kind, params) do
-    current = current_table_state(socket, kind)
-    filters = Map.get(params, "#{table_param_prefix(kind)}_filters", params)
+    posted = Map.get(params, "#{kind}_filters", params)
+    state = ListState.apply_filters(current_table_state(socket, kind), posted)
+    state = %{state | search: String.trim(state.search)}
 
-    search =
-      if Map.has_key?(filters, "search"),
-        do: normalize_search(filters["search"]),
-        else: current.search
-
-    per_page =
-      cond do
-        Map.has_key?(filters, "perPage") -> normalize_page_size(filters["perPage"])
-        Map.has_key?(filters, "per_page") -> normalize_page_size(filters["per_page"])
-        true -> current.per_page
-      end
-
-    state =
-      put_table_state(socket.assigns.table_state, kind, %{
-        current
-        | search: search,
-          per_page: per_page,
-          page: @default_page
-      })
-
-    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+    patch_table(socket, kind, state)
   end
 
   defp apply_table_sort(socket, kind, sort_key) do
-    state =
-      socket.assigns.table_state
-      |> put_table_state(kind, next_table_sort(current_table_state(socket, kind), kind, sort_key))
+    sort_key = if is_binary(sort_key), do: sort_key |> String.trim() |> String.downcase()
 
-    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+    patch_table(socket, kind, ListState.next_sort(current_table_state(socket, kind), sort_key))
   end
 
-  defp apply_table_page(socket, kind, page) do
-    current = current_table_state(socket, kind)
-    target_page = normalize_page(page)
-    state = put_table_state(socket.assigns.table_state, kind, %{current | page: target_page})
+  defp apply_table_page(socket, kind, page),
+    do: patch_table(socket, kind, ListState.put_page(current_table_state(socket, kind), page))
 
-    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+  defp patch_table(socket, kind, state) do
+    table_state = Map.put(socket.assigns.table_state, kind, state)
+    {:noreply, push_patch(socket, to: company_show_path(socket, table_state))}
   end
 
   defp refresh_show_table_pages(socket) do
-    table_state = socket.assigns.table_state || default_table_state()
-
-    # Users and Employees are both core-owned discovered embeds now; the page
-    # only tracks their URL table-state and hands it to the panels, which do
-    # their own listing (#595).
+    # Users and Employees are both core-owned discovered embeds; the page only
+    # tracks their URL table-state and hands the parsed state to the panels,
+    # which do their own listing (#595).
     socket
-    |> assign(:users_table_state, table_state.users)
-    |> assign(:employees_table_state, table_state.employees)
+    |> assign(:users_table_state, socket.assigns.table_state.users)
+    |> assign(:employees_table_state, socket.assigns.table_state.employees)
   end
 
-  defp default_table_state, do: @table_defaults
+  defp default_table_state, do: table_state_from_params(%{})
 
-  defp table_state_from_params(params) do
-    [:users, :employees]
-    |> Map.new(fn kind ->
-      prefix = table_param_prefix(kind)
-      default = Map.fetch!(@table_defaults, kind)
+  defp table_state_from_params(params),
+    do: Map.new(@table_specs, fn {kind, spec} -> {kind, ListState.parse(params, spec)} end)
 
-      {kind,
-       %{
-         search: normalize_search(params["#{prefix}_search"]),
-         sort_by: normalize_sort_by(kind, params["#{prefix}_sort"]),
-         sort_dir: normalize_sort_dir(params["#{prefix}_dir"], default.sort_dir),
-         page: normalize_page(params["#{prefix}_page"]),
-         per_page:
-           normalize_page_size(params["#{prefix}_per_page"] || params["#{prefix}_perPage"])
-       }}
-    end)
-  end
-
-  defp current_table_state(socket, kind),
-    do:
-      Map.get(
-        socket.assigns.table_state || default_table_state(),
-        kind,
-        Map.fetch!(@table_defaults, kind)
-      )
-
-  defp put_table_state(table_state, kind, state), do: Map.put(table_state, kind, state)
-
-  defp next_table_sort(current, kind, sort_key) do
-    sort_by = normalize_sort_by(kind, sort_key)
-
-    if current.sort_by == sort_by do
-      %{current | sort_dir: toggle_sort_dir(current.sort_dir), page: @default_page}
-    else
-      %{current | sort_by: sort_by, sort_dir: :asc, page: @default_page}
-    end
-  end
-
-  defp toggle_sort_dir(:asc), do: :desc
-  defp toggle_sort_dir(:desc), do: :asc
-  defp toggle_sort_dir(_dir), do: :asc
-
-  defp normalize_search(nil), do: nil
-
-  defp normalize_search(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp normalize_search(_value), do: nil
-
-  defp normalize_sort_by(kind, nil), do: Map.fetch!(@table_defaults, kind).sort_by
-
-  defp normalize_sort_by(kind, value) when is_binary(value) do
-    sort = value |> String.trim() |> String.downcase()
-
-    if sort in Map.fetch!(@table_sorts, kind),
-      do: sort,
-      else: Map.fetch!(@table_defaults, kind).sort_by
-  end
-
-  defp normalize_sort_by(kind, _value), do: Map.fetch!(@table_defaults, kind).sort_by
-
-  defp normalize_sort_dir(nil, default), do: default
-
-  defp normalize_sort_dir(value, default) when is_binary(value) do
-    case value |> String.trim() |> String.downcase() do
-      "desc" -> :desc
-      "asc" -> :asc
-      _ -> default
-    end
-  end
-
-  defp normalize_sort_dir(_value, default), do: default
-
-  defp normalize_page(value) do
-    case positive_integer(value) do
-      page when is_integer(page) -> page
-      _ -> @default_page
-    end
-  end
-
-  defp normalize_page_size(value) do
-    case positive_integer(value) do
-      size when size in @page_sizes -> size
-      _ -> @default_page_size
-    end
-  end
-
-  defp positive_integer(value) when is_integer(value) and value > 0, do: value
-
-  defp positive_integer(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
-    end
-  end
-
-  defp positive_integer(_value), do: nil
+  defp current_table_state(socket, kind), do: Map.fetch!(socket.assigns.table_state, kind)
 
   defp company_show_path(socket, table_state) do
     company = socket.assigns.company
 
     params =
-      [:users, :employees]
-      |> Enum.reduce([], fn kind, acc -> acc ++ table_query_params(kind, table_state[kind]) end)
+      Enum.flat_map(table_state, fn {_kind, state} ->
+        state |> ListState.to_params() |> Map.to_list()
+      end)
 
     case params do
       [] -> ~p"/companies/#{company.id}"
@@ -822,34 +719,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  defp table_query_params(kind, state) do
-    default = Map.fetch!(@table_defaults, kind)
-    prefix = table_param_prefix(kind)
-
-    []
-    |> maybe_put_param("#{prefix}_search", state.search)
-    |> maybe_put_param("#{prefix}_sort", state.sort_by != default.sort_by && state.sort_by)
-    |> maybe_put_param("#{prefix}_dir", state.sort_dir != default.sort_dir && state.sort_dir)
-    |> maybe_put_param("#{prefix}_page", state.page != @default_page && state.page)
-    |> maybe_put_param(
-      "#{prefix}_per_page",
-      state.per_page != @default_page_size && state.per_page
-    )
-  end
-
-  defp maybe_put_param(params, _key, nil), do: params
-  defp maybe_put_param(params, _key, false), do: params
-  defp maybe_put_param(params, key, value), do: params ++ [{key, value}]
-
-  defp table_param_prefix(:users), do: "users"
-  defp table_param_prefix(:employees), do: "employees"
-
   # ============================================================================
   # Helpers: Options and names
   # ============================================================================
-
-  defp country_options(countries),
-    do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
 
   defp legal_entity_type_options(types), do: Enum.map(types, &{&1.name, &1.id})
 
@@ -866,12 +738,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   defp country_name(nil, _countries), do: nil
 
-  defp country_name(iso, countries) do
-    case Enum.find(countries, &(&1.iso == iso)) do
-      nil -> iso
-      country -> "#{country.country} (#{country.iso})"
-    end
-  end
+  defp country_name(iso, country_options), do: option_label(country_options, iso)
 
   defp parent_name(nil, _parents), do: nil
 
@@ -1035,13 +902,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 id="company-jurisdiction"
                 name="jurisdiction"
                 value={@company.jurisdiction}
-                options={country_options(@countries)}
+                options={@country_options}
                 prompt="None"
                 editing?={@editing_field == "jurisdiction"}
                 can_update?={@can_update?}
                 status={@field_status["jurisdiction"]}
               >
-                <.read_value value={country_name(@company.jurisdiction, @countries)} />
+                <.read_value value={country_name(@company.jurisdiction, @country_options)} />
               </.choice_fact>
             </:item>
             <:item title={fact_label("email")} id="detail-email">

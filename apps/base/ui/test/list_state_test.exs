@@ -192,4 +192,84 @@ defmodule Bilimbi.Base.UI.ListStateTest do
       ListState.spec!([])
     end
   end
+
+  describe "a list that shares its URL with another" do
+    setup do
+      spec =
+        ListState.spec!(
+          sortable: %{name: :asc, email: :asc},
+          default_sort: :name,
+          page_sizes: [25, 50],
+          default_page_size: 25,
+          page_size_param: "per_page",
+          page_size_aliases: ["perPage"],
+          invalid_page_size: :default,
+          param_prefix: "users_",
+          param_names: %{sort_by: "sort", sort_dir: "dir"},
+          omit_defaults: true
+        )
+
+      {:ok, prefixed: spec}
+    end
+
+    test "parses and writes prefixed keys, leaving other lists' keys alone", %{prefixed: spec} do
+      params = %{
+        "users_search" => "ada",
+        "users_sort" => "email",
+        "users_dir" => "desc",
+        "users_page" => "3",
+        "users_perPage" => "50",
+        "page" => "9",
+        "sort" => "name"
+      }
+
+      state = ListState.parse(params, spec)
+
+      assert %{search: "ada", sort_by: :email, sort_dir: :desc, page: 3, page_size: 50} = state
+
+      assert ListState.to_params(state) == %{
+               "users_search" => "ada",
+               "users_sort" => "email",
+               "users_dir" => "desc",
+               "users_page" => 3,
+               "users_per_page" => 50
+             }
+    end
+
+    test "omits every default so the URL stays short", %{prefixed: spec} do
+      assert ListState.to_params(ListState.parse(%{}, spec)) == %{}
+
+      state = ListState.parse(%{"users_sort" => "email"}, spec)
+      assert ListState.to_params(state) == %{"users_sort" => "email"}
+    end
+
+    test "names the toolbar form", %{prefixed: spec} do
+      form = ListState.filters_form(ListState.parse(%{}, spec), as: :users_filters)
+      assert form.name == "users_filters"
+    end
+  end
+
+  describe "paginate/2" do
+    test "slices the rows and clamps a page past the end", %{spec: spec} do
+      rows = Enum.to_list(1..60)
+      state = ListState.parse(%{"page" => "2", "per_page" => "25"}, spec)
+
+      page = ListState.paginate(rows, state)
+      assert page.entries == Enum.to_list(26..50)
+      assert %{total_entries: 60, total_pages: 3, has_prev?: true, has_next?: true} = page
+
+      clamped = ListState.paginate(rows, %{state | page: 99})
+      assert clamped.page == 3
+      assert clamped.entries == Enum.to_list(51..60)
+      refute clamped.has_next?
+    end
+
+    test "no rows is page 1 of zero pages", %{spec: spec} do
+      page = ListState.paginate([], ListState.parse(%{"page" => "4"}, spec))
+
+      assert %{entries: [], page: 1, total_entries: 0, total_pages: 0} = page
+      refute page.has_prev?
+      refute page.has_next?
+    end
+  end
 end
