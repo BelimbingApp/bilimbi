@@ -1,6 +1,6 @@
 defmodule Bilimbi.Core.User.DisplayPreferences do
   @moduledoc """
-  The signed-in account's theme, timestamp display and language preferences.
+  The signed-in account's theme, timestamp display, locale, and language.
 
   One resolved snapshot and one durable write serve every surface that shows
   them: the shell's top-bar controls, the appearance screen and the HTTP

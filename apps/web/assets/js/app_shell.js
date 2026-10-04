@@ -289,6 +289,9 @@ const AppShell = {
       pins = this.acceptServerPins((await imported.json()).pins)
     }
 
+    // Remove the legacy key only after every import has succeeded. A rejected
+    // toggle, a non-OK status, or a body that is not JSON leaves the key so
+    // the next mount can retry. Pins already drawn from data-pins stay.
     window.localStorage.removeItem?.(PINNED_STORAGE)
 
     const urls = legacyUrls.map(({url}) => url)
