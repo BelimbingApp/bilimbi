@@ -20,6 +20,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   import Ecto.Changeset
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.FormErrors
   alias Ecto.Changeset
 
   @field_types %{name: :string, code: :string, description: :string, company_id: :integer}
@@ -95,7 +96,15 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
          )}
 
       {:error, %Changeset{} = domain} ->
-        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
+        {:noreply,
+         assign_form(
+           socket,
+           FormErrors.copy(changeset, domain,
+             only: @field_types,
+             fallback: :code,
+             action: :validate
+           )
+         )}
     end
   end
 
@@ -134,17 +143,6 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   # The database owns uniqueness of (company_id, code); the form cannot know it
   # without racing. Domain errors are copied back onto the form changeset so the
   # message lands on the field the user can actually edit.
-  defp copy_domain_errors(form_changeset, %Changeset{} = domain) do
-    Enum.reduce(domain.errors, form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@field_types, field) do
-        add_error(acc, field, message, opts)
-      else
-        add_error(acc, :code, message, opts)
-      end
-    end)
-    |> Map.put(:action, :validate)
-  end
-
   # Membership rather than a positivity check: Belimbing validates
   # `Rule::exists(Company::class, 'id')->where('tenant_id', $tenantId)`, which
   # is membership in the tenant's companies -- the same list the picker was

@@ -61,6 +61,8 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     "source_ref" => :source_ref
   }
 
+  @forbidden "You do not have permission to update addresses."
+
   @fact_labels %{
     "label" => "Label",
     "phone" => "Phone",
@@ -71,6 +73,13 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     "source_ref" => "Source Reference",
     "verification_status" => "Verification Status",
     "location" => "Location"
+  }
+
+  # The page's own sentences for a refused write; any other reason falls
+  # through to `CommitStatus.failure_message/0`.
+  @failures %{
+    address_not_found:
+      "This address no longer exists. Return to the list to find its replacement."
   }
 
   @impl true
@@ -162,17 +171,14 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
   @impl true
   def handle_event("save_field", params, socket) do
-    if can_update?(socket) do
-      case CommitStatus.inline_field(params, @inline_fields) do
-        {:ok, name, field, value} ->
-          {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
-
-        :error ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
-    end
+    {:noreply,
+     CommitStatus.save_field(socket, params, @inline_fields,
+       can?: can_update?(socket),
+       forbidden: @forbidden,
+       write: fn socket, name, field, value ->
+         save_fact(socket, name, %{field => normalize_param(value)}, value)
+       end
+     )}
   end
 
   # ============================================================================
@@ -290,7 +296,12 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
            |> assign(:location_form, to_form(changeset, as: :location))}
 
         {:error, reason} ->
-          {:noreply, CommitStatus.put(socket, "location", {:error, failure_message(reason)})}
+          {:noreply,
+           CommitStatus.put(
+             socket,
+             "location",
+             {:error, CommitStatus.failure_message(@failures, reason)}
+           )}
       end
     else
       {:noreply, write_forbidden(socket)}
@@ -339,18 +350,17 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   defp save_fact(socket, name, attrs, submitted) do
     scope = socket.assigns.current_scope.scope
 
-    case Address.update_address(scope, socket.assigns.address_id, attrs) do
-      {:ok, _summary} ->
-        socket
-        |> refresh_address()
-        |> CommitStatus.put(name, :saved)
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
-
-      {:error, reason} ->
-        CommitStatus.put(socket, name, {:error, failure_message(reason)})
-    end
+    CommitStatus.commit(
+      socket,
+      name,
+      Address.update_address(scope, socket.assigns.address_id, attrs),
+      submitted: submitted,
+      label: fact_label(name),
+      # The choice fact reports on the schema field it writes.
+      field: Map.get(@inline_fields, name, :verification_status),
+      on_ok: fn socket, _summary -> refresh_address(socket) end,
+      failures: @failures
+    )
   end
 
   defp refresh_address(socket) do
@@ -365,20 +375,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     |> assign(:page_title, page_title(refreshed))
   end
 
-  # The choice fact reports on the schema field it writes; the shared wording
-  # names the rejected value and the label.
-  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
-    field = Map.get(@inline_fields, name, :verification_status)
-    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
-  end
-
-  defp failure_message(:address_not_found),
-    do: "This address no longer exists. Return to the list to find its replacement."
-
-  defp failure_message(_reason), do: CommitStatus.failure_message()
-
-  defp write_forbidden(socket),
-    do: CommitStatus.write_forbidden(socket, "You do not have permission to update addresses.")
+  defp write_forbidden(socket), do: CommitStatus.write_forbidden(socket, @forbidden)
 
   # Every write re-asks Authz: the `can_update?` assign decides what the page
   # shows, and a grant revoked while the page is open must still be refused.

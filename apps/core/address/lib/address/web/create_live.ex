@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
@@ -99,7 +100,9 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
            socket
            |> assign(:form_params, params)
            |> assign(:auto_location, auto_location)
-           |> assign_form(copy_domain_errors(changeset, domain_changeset))
+           |> assign_form(
+             FormErrors.copy(changeset, domain_changeset, only: @field_types, action: :insert)
+           )
            |> assign_location_options(params)}
       end
     else
@@ -232,14 +235,6 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
       less_than_or_equal_to: Decimal.new(1)
     )
     |> Map.put(:action, :validate)
-  end
-
-  defp copy_domain_errors(form_changeset, %Changeset{} = domain_changeset) do
-    domain_changeset.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@field_types, field), do: add_error(acc, field, message, opts), else: acc
-    end)
-    |> Map.put(:action, :insert)
   end
 
   defp assign_form(socket, %Changeset{} = changeset),

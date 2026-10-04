@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   import Ecto.Changeset
 
   alias Bilimbi.Base.UI.DiscoveredPanels
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.TypeSummary
@@ -265,7 +266,11 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
         {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
 
       {:error, %Changeset{} = domain_changeset} ->
-        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+        {:noreply,
+         assign_form(
+           socket,
+           FormErrors.copy(changeset, domain_changeset, only: @field_types, action: :insert)
+         )}
     end
   end
 
@@ -281,7 +286,11 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
          |> push_navigate(to: ~p"/employees/#{updated.id}")}
 
       {:error, %Changeset{} = domain_changeset} ->
-        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+        {:noreply,
+         assign_form(
+           socket,
+           FormErrors.copy(changeset, domain_changeset, only: @field_types, action: :insert)
+         )}
 
       {:error, :invariant_violation} ->
         {:noreply,
@@ -481,18 +490,6 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     else
       changeset
     end
-  end
-
-  defp copy_domain_errors(form_changeset, %Changeset{} = domain_changeset) do
-    domain_changeset.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@field_types, field) do
-        add_error(acc, field, message, opts)
-      else
-        acc
-      end
-    end)
-    |> Map.put(:action, :insert)
   end
 
   defp assign_form(socket, %Changeset{} = changeset) do

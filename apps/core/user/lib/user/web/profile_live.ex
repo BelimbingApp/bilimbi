@@ -36,6 +36,7 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   import Bilimbi.Core.User.Web.SettingsComponents
 
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.User
   alias Ecto.Changeset
 
@@ -102,7 +103,15 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
          )}
 
       {:error, %Changeset{} = domain} ->
-        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
+        {:noreply,
+         assign_form(
+           socket,
+           FormErrors.copy(changeset, domain,
+             only: @field_types,
+             fallback: :name,
+             action: :update
+           )
+         )}
 
       {:error, reason} ->
         {:noreply,
@@ -232,16 +241,6 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
         do: [],
         else: [landing_menu_id: "is not a page you can open"]
     end)
-  end
-
-  defp copy_domain_errors(form_changeset, %Changeset{} = domain) do
-    domain.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@field_types, field),
-        do: add_error(acc, field, message, opts),
-        else: add_error(acc, :name, "#{field} #{message}", opts)
-    end)
-    |> Map.put(:action, :update)
   end
 
   defp assign_form(socket, %Changeset{} = changeset),

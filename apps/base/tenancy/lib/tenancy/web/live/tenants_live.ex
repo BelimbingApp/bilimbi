@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.UI.FormErrors
   alias Ecto.Changeset
 
   @sortable ~w(id name status)
@@ -82,7 +83,8 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
          |> refresh_tenants()}
 
       {:error, %Changeset{} = domain_changeset} ->
-        {:noreply, assign_form(socket, copy_errors(form_changeset, domain_changeset))}
+        {:noreply,
+         assign_form(socket, FormErrors.copy(form_changeset, domain_changeset, action: :insert))}
     end
   end
 
@@ -156,14 +158,6 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :tenant))
-  end
-
-  defp copy_errors(form_changeset, domain_changeset) do
-    domain_changeset.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      Changeset.add_error(acc, field, message, opts)
-    end)
-    |> Map.put(:action, :insert)
   end
 
   defp status_kind("active"), do: :success

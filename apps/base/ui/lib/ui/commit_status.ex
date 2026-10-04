@@ -37,13 +37,15 @@ defmodule Bilimbi.Base.UI.CommitStatus do
 
   1. `alias Bilimbi.Base.UI.CommitStatus` and call `init/1` in `mount/3`.
   2. Declare the facts an inline text edit may write as a map from the form
-     name the hook pushes to the schema field, and resolve the pushed params
-     through `inline_field/2`; a name outside the map is ignored and user
-     input never becomes an atom.
-  3. After the page's own write, record the outcome with `put/3`: `:saved`
-     on success, `{:error, refusal_message(...)}` on a changeset refusal, and
-     `{:error, message}` with the page's own noun for any other reason,
-     falling through to `failure_message/0` for the generic sentence.
+     name the hook pushes to the schema field. Handle `"save_field"` with
+     `save_field/4`, which re-asks the capability, resolves the pushed params
+     through `inline_field/2` (a name outside the map is ignored and user
+     input never becomes an atom) and hands the page its own write.
+  3. Perform that write and pass its result to `commit/4`, which records the
+     outcome with `put/3`: `:saved` after the page's `:on_ok`, a refusal
+     worded by `refusal_message/4` for a changeset, and the page's own noun
+     from `:failures` for any other reason, falling through to
+     `failure_message/0` for the generic sentence.
   4. Refuse a write from an actor without the capability through
      `write_forbidden/2` with the page's own flash wording.
   5. Read `@field_status[name]` in the template as the `status` of
@@ -104,6 +106,92 @@ defmodule Bilimbi.Base.UI.CommitStatus do
     |> assign(@assign, statuses)
     |> put_flash(:error, message)
   end
+
+  @doc """
+  Handles the `"save_field"` event of an `<.inline_edit>` text fact.
+
+  Re-asks the capability first: `:can?` is the page's live Authz answer, and
+  when it is `false` the write is refused through `write_forbidden/2` with the
+  page's `:forbidden` flash, whatever the params say. Otherwise the pushed
+  `params` are resolved against `fields` (see `inline_field/2`) and `:write`
+  is called with `(socket, name, field, value)`; it performs the page's own
+  write, usually through `commit/4`, and returns the socket. Params that name
+  no declared fact leave the socket as it is.
+
+  Returns the socket, so a handler is `{:noreply, CommitStatus.save_field(...)}`.
+  """
+  @spec save_field(Socket.t(), term(), %{name() => atom()},
+          can?: boolean(),
+          forbidden: String.t(),
+          write: (Socket.t(), name(), atom(), String.t() -> Socket.t())
+        ) :: Socket.t()
+  def save_field(%Socket{} = socket, params, fields, opts) do
+    if Keyword.fetch!(opts, :can?) do
+      case inline_field(params, fields) do
+        {:ok, name, field, value} -> Keyword.fetch!(opts, :write).(socket, name, field, value)
+        :error -> socket
+      end
+    else
+      write_forbidden(socket, Keyword.fetch!(opts, :forbidden))
+    end
+  end
+
+  @doc """
+  Records the outcome of the page's own write on the fact `name`.
+
+  `result` is what the write returned. `{:ok, record}` runs `:on_ok` with
+  `(socket, record)` so the page can refresh what it shows from the server's
+  row, then records `:saved`. `{:error, %Ecto.Changeset{}}` records
+  `refusal_message/4` for the schema `:field` the fact writes, named by its
+  `:label` and the `:submitted` value. Any other `{:error, reason}` records the
+  page's own sentence for that reason from `:failures`, or `failure_message/0`
+  when the page has none. Every outcome goes through `put/3`, so "Saved"
+  still belongs to the most recent commit only.
+
+  `:failures` is a map from reason to sentence, or a function from reason to
+  a sentence or `nil` for a page whose sentence depends on its own state.
+  """
+  @spec commit(Socket.t(), name(), {:ok, term()} | {:error, term()},
+          submitted: term(),
+          label: String.t(),
+          field: atom(),
+          on_ok: (Socket.t(), term() -> Socket.t()),
+          failures: %{optional(term()) => String.t()} | (term() -> String.t() | nil)
+        ) :: Socket.t()
+  def commit(%Socket{} = socket, name, result, opts) do
+    case result do
+      {:ok, record} ->
+        put(Keyword.fetch!(opts, :on_ok).(socket, record), name, :saved)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        message =
+          refusal_message(
+            Keyword.fetch!(opts, :label),
+            Keyword.fetch!(opts, :field),
+            Keyword.fetch!(opts, :submitted),
+            changeset.errors
+          )
+
+        put(socket, name, {:error, message})
+
+      {:error, reason} ->
+        put(socket, name, {:error, failure_message(Keyword.get(opts, :failures, %{}), reason)})
+    end
+  end
+
+  @doc """
+  The sentence for a write refused for `reason`, looked up in the page's
+  `:failures` (see `commit/4`) and falling through to `failure_message/0`.
+
+  For an outcome a page records itself rather than through `commit/4`.
+  """
+  @spec failure_message(%{optional(term()) => String.t()} | (term() -> String.t() | nil), term()) ::
+          String.t()
+  def failure_message(failures, reason) when is_function(failures, 1),
+    do: failures.(reason) || failure_message()
+
+  def failure_message(failures, reason) when is_map(failures),
+    do: Map.get(failures, reason, failure_message())
 
   @doc """
   Resolves the inline text fact an `InlineEdit` hook committed.
