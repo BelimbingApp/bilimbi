@@ -148,6 +148,70 @@ defmodule Bilimbi.Base.Authz do
     decision
   end
 
+  @doc """
+  Decides whether the scope's signed-in user holds `capability` in `company_id`.
+
+  Grants are per company, and `can/4` judges only the company the user is
+  signed in at. Use this when the record being acted on belongs to another
+  company of the same tenant, such as an administrator resetting the password
+  of a user whose current company is not the one they signed in at. The user
+  comes from the sealed scope, exactly as in `can/4`; only the company whose
+  grants decide is named, and it must be a live company of the scope's tenant.
+  A company that is archived, missing, or in another tenant is denied with
+  `:denied_company_scope`, as is a `resource` naming a different company.
+
+  The decision is logged against `company_id`. When that is not the company
+  the user signed in at, the logged context carries `signed_in_company_id`.
+
+  A system scope is never widened. An anonymous one is denied as in `can/4`,
+  and a named system principal is judged by `can/4` when `company_id` is its
+  own company and denied with `:denied_company_scope` otherwise.
+  """
+  @spec can_in_company(Scope.t(), pos_integer(), String.t(), Resource.t() | nil, map()) ::
+          Decision.t()
+  def can_in_company(scope, company_id, capability, resource \\ nil, context \\ %{})
+
+  def can_in_company(%Scope{} = scope, company_id, capability, resource, context)
+      when is_integer(company_id) and company_id > 0 and is_binary(capability) and
+             is_map(context) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user, company_id: ^company_id} ->
+        can(scope, capability, resource, context)
+
+      %TenancyActor{type: :user, user_id: user_id, company_id: signed_in_company_id} ->
+        actor = Actor.new!(:user, user_id, scope, company_id)
+
+        decision =
+          case Evaluator.can(actor, capability, resource, context, registry!()) do
+            # The user is proven by the scope; what failed is the named company.
+            %Decision{reason: :denied_invalid_actor_context} -> company_scope_denial()
+            %Decision{} = decision -> decision
+          end
+
+        context =
+          context
+          |> Map.drop([:signed_in_company_id])
+          |> Map.put("signed_in_company_id", signed_in_company_id)
+
+        :ok = DatabaseDecisionLogger.log(actor, capability, resource, decision, context)
+        decision
+
+      %TenancyActor{type: :system, system_principal: name, company_id: ^company_id}
+      when is_binary(name) ->
+        can(scope, capability, resource, context)
+
+      %TenancyActor{type: :system, system_principal: name} when is_binary(name) ->
+        company_scope_denial()
+
+      %TenancyActor{type: :system} ->
+        Decision.deny(:denied_no_authenticated_actor)
+    end
+  end
+
+  defp company_scope_denial do
+    Decision.deny(:denied_company_scope, ["actor_context", "tenant_scope", "company_scope"])
+  end
+
   @doc "Like `can/4`, but raises `AuthorizationDeniedError` unless allowed."
   @spec authorize!(Actor.t() | Scope.t(), String.t(), Resource.t() | nil, map()) :: :ok
   def authorize!(principal, capability, resource \\ nil, context \\ %{})

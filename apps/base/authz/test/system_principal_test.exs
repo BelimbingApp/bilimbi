@@ -125,6 +125,15 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
       assert decision.reason == :denied_company_scope
     end
 
+    test "naming another company never widens a principal", %{tenant: tenant, admin: admin} do
+      {:ok, :granted} = Authz.grant_system_capability(admin, 10, @principal, @import)
+      {:ok, :granted} = Authz.grant_system_capability(admin, 11, @principal, @import)
+      job = principal(tenant, 10)
+
+      assert Authz.can_in_company(job, 10, @import).allowed
+      assert Authz.can_in_company(job, 11, @import).reason == :denied_company_scope
+    end
+
     test "revocation denies at the next decision", %{tenant: tenant, admin: admin} do
       {:ok, :granted} = Authz.grant_system_capability(admin, 10, @principal, @import)
       job = principal(tenant, 10)
