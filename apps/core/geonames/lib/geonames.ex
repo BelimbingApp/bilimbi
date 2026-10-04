@@ -118,6 +118,9 @@ defmodule Bilimbi.Core.Geonames do
   Every country as a `{"Name (ISO)", iso}` select option, ordered like
   `list_countries/0`. A form that only fills a country select uses this
   rather than loading each summary and labelling it itself.
+
+  `country_options/1` labels a list the caller already loaded, including
+  the Admin1 filter's subset.
   """
   @spec country_options() :: [{String.t(), String.t()}]
   def country_options do
@@ -278,15 +281,8 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
-  Country select options, labelled `Name (ISO)`.
-
-  `country_options/1` maps a list the caller already loaded, including the
-  Admin1 filter's subset. `country_options/0` loads every country. A private
-  `"\#{country} (\#{iso})"` mapping is the copy this replaced.
+  Labels an already loaded country list as `{"Name (ISO)", iso}`.
   """
-  @spec country_options() :: [{String.t(), String.t()}]
-  def country_options, do: country_options(list_countries())
-
   @spec country_options([%{country: String.t(), iso: String.t()}]) :: [{String.t(), String.t()}]
   def country_options(countries) when is_list(countries) do
     Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
