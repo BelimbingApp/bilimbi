@@ -148,7 +148,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     |> assign(:assigned_roles, assigned_roles)
     |> assign(:assigned_role_ids, assigned_role_ids)
     |> assign(:has_grant_all?, has_grant_all?)
-    |> assign(:grant_all_subject, grant_all_subject(assigned_roles, all_roles))
+    |> assign(:grant_all_subject, grant_all_subject(assigned_roles))
     |> assign(:available_roles, available_roles)
     |> assign(
       :filtered_available_roles,
@@ -680,22 +680,8 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     end
   end
 
-  defp grant_all_subject(assigned_roles, all_roles) do
-    on_page = for row <- assigned_roles, row.role_grant_all, do: row.role_name
-
-    names =
-      case on_page do
-        [] ->
-          case for role <- all_roles, role.grant_all, do: role.name do
-            [name] -> [name]
-            _ -> []
-          end
-
-        names ->
-          names
-      end
-
-    case names do
+  defp grant_all_subject(assigned_roles) do
+    case for row <- assigned_roles, row.role_grant_all, do: row.role_name do
       [] -> "An assigned role"
       names -> Enum.join(names, " and ")
     end

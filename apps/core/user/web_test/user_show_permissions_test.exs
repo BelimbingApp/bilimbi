@@ -382,7 +382,7 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
       assert has_element?(
                view,
                "#assign-roles-unavailable",
-               "Core Administrator already grants every capability, so this user holds everything a role could add."
+               "An assigned role already grants every capability, so this user holds everything a role could add."
              )
     end
   end
