@@ -283,7 +283,7 @@ defmodule Bilimbi.Base.SessionTest do
     assert Enum.map(Session.list_sessions(), & &1.id) == ["active", "boundary"]
   end
 
-test "touches activity only after the throttle boundary and does not audit housekeeping" do
+  test "touches activity only after the throttle boundary and does not audit housekeeping" do
     put_session!("activity", 100)
 
     assert :ok = Session.touch_session("activity", 400)
