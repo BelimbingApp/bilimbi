@@ -113,14 +113,14 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
     assert address_reads() > 0
-    assert process_gettext_locale(view.pid, BilimbiWeb.Gettext) == "de"
+    assert process_gettext_locale(view.pid, Bilimbi.Base.UI.Gettext) == "de"
     refute Locale.overridden?(nil)
 
     view |> element("#customize-layout") |> render_click()
     render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
 
     assert address_reads() == 0
-    assert process_gettext_locale(view.pid, BilimbiWeb.Gettext) == "de"
+    assert process_gettext_locale(view.pid, Bilimbi.Base.UI.Gettext) == "de"
     refute Locale.overridden?(nil)
   end
 
