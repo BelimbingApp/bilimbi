@@ -13,7 +13,6 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
 
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})

@@ -29,7 +29,6 @@ defmodule BilimbiWeb.ScheduleLiveTest do
   alias Bilimbi.Base.Schedule.TestWorker
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
-  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -645,8 +644,6 @@ defmodule BilimbiWeb.ScheduleLiveTest do
   # The company clock is what the product shows by default; the settings table
   # holds both the company zone and the account's clock mode.
   defp display_company_in!(timezone) do
-    SettingsFixtures.create_settings_table!()
-
     {:ok, _value} =
       Settings.put("localization.timezone", timezone, SettingsScope.company(73, 41))
 

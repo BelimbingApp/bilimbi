@@ -19,7 +19,6 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    UserFixtures.create_notifications_table!()
     CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant 41"})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Company 73"})
 

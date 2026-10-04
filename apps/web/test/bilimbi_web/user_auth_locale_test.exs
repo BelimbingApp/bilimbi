@@ -50,8 +50,6 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
   test "anonymous requests infer the global locale from the platform-operator primary address",
        %{conn: conn} do
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     AddressFixtures.insert_country!(%{iso: "FR"})
     AddressFixtures.assign_primary_company!(41, 73)
 

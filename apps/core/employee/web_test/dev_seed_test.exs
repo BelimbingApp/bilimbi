@@ -24,8 +24,6 @@ defmodule BilimbiWeb.DevSeedTest do
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_department_types_table!()
     # core/address ships a dev seed too, so its tables must exist for the run.
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     AddressFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.insert_tenant!(%{id: 41, is_platform_operator: true})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Bilimbi", code: "bilimbi"})

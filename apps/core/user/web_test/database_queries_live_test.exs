@@ -4,7 +4,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -14,7 +13,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
   setup do
     UserFixtures.create_user_tables!()
     UserFixtures.create_user_database_queries_table!()
-    AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
 

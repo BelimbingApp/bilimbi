@@ -12,12 +12,10 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
 

@@ -1,18 +1,21 @@
 defmodule BilimbiWeb.ConnCase do
   @moduledoc """
-  This module defines the test case to be used by
-  tests that require setting up a connection.
+  The case template for every web test (host tests and module `web_test/`).
 
-  Such tests rely on `Phoenix.ConnTest` and also
-  import other functionality to make it easier
-  to build common data structures and query the data layer.
+  Every test gets, without asking:
 
-  Finally, if the test case interacts with the database,
-  we enable the SQL sandbox, so changes done to the database
-  are reverted at the end of every test. If you are using
-  PostgreSQL, you can even run database tests asynchronously
-  by setting `use BilimbiWeb.ConnCase, async: true`, although
-  this option is not recommended for other databases.
+  - a sandbox owner (shared unless the test is `async: true`) and a fresh
+    `conn`;
+  - the temporary tables the shell reads on every page: sessions, authz,
+    settings, audit, perf, notifications, GeoNames and addresses. Do not
+    create them again in a test; a missing table is a `42P01` that a
+    caller's fallback would otherwise swallow.
+
+  The default signed-in identity is tenant 41, company 73, user 91
+  ("Ada Lovelace"), which are the defaults of the owner fixtures
+  (`Tenancy`, `Company` and `User` `TestFixtures`). A test inserts those rows
+  itself. `log_in_as/2` needs user 91 (or the one it is given) to exist,
+  because request rehydration loads the user.
   """
 
   use ExUnit.CaseTemplate

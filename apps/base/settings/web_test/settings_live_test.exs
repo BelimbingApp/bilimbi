@@ -18,7 +18,6 @@ defmodule BilimbiWeb.SettingsLiveTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
-  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -33,7 +32,6 @@ defmodule BilimbiWeb.SettingsLiveTest do
   setup do
     BilimbiWeb.RateLimit.reset({:stored_secret_reveal, 41, 91})
     UserFixtures.create_user_tables!()
-    SettingsFixtures.create_settings_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})

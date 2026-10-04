@@ -8,7 +8,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
@@ -16,8 +15,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     GeonamesFixtures.insert_country!()
     GeonamesFixtures.insert_admin1!()
     CompanyFixtures.insert_tenant!(%{id: 41})

@@ -4,11 +4,9 @@ defmodule BilimbiWeb.AddressLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
@@ -16,8 +14,6 @@ defmodule BilimbiWeb.AddressLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
 
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
@@ -515,8 +511,6 @@ defmodule BilimbiWeb.AddressLiveTest do
         priority: 1
       })
 
-    AuditFixtures.create_audit_tables!()
-
     {:ok, mutation} =
       Audit.record_mutation(scope, %{
         company_id: 73,
@@ -709,8 +703,6 @@ defmodule BilimbiWeb.AddressLiveTest do
 
   test "shows an in-place save in the record history panel", %{conn: conn, scope: scope} do
     {:ok, address} = Address.create_address(scope, %{label: "Head Office"})
-
-    AuditFixtures.create_audit_tables!()
 
     grant_capabilities!([
       "admin.address.view",

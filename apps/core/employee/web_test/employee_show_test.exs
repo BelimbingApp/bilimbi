@@ -4,12 +4,10 @@ defmodule BilimbiWeb.EmployeeShowTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -541,7 +539,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
     conn: conn,
     employee: employee
   } do
-    AuditFixtures.create_audit_tables!()
     grant_capabilities!(["admin.employee.view", "admin.employee.update", "admin.audit.log.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
@@ -561,7 +558,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
     conn: conn,
     employee: employee
   } do
-    AuditFixtures.create_audit_tables!()
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, impersonated} =
@@ -624,8 +620,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
     conn: conn,
     employee: employee
   } do
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, home} =
@@ -730,8 +724,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
     conn: conn,
     employee: employee
   } do
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     {:ok, scope} = Tenancy.scope(41)
     {:ok, home} = Address.create_address(scope, %{label: "Home", line1: "12 Jalan Damai"})
     {:ok, flat} = Address.create_address(scope, %{label: "Flat", line1: "4 Jalan Seri"})

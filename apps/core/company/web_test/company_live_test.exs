@@ -5,7 +5,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
@@ -23,12 +22,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
     GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     AddressFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
 
     AddressFixtures.insert_country!(%{
@@ -526,7 +522,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
     test "shows record history only with audit permission and filters to this company", %{
       conn: conn
     } do
-      AuditFixtures.create_audit_tables!()
       {:ok, scope} = Tenancy.scope(41)
 
       {:ok, _visible} =

@@ -11,7 +11,6 @@ defmodule BilimbiWeb.UserProfileLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Settings
-  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -20,7 +19,6 @@ defmodule BilimbiWeb.UserProfileLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    SettingsFixtures.create_settings_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     # Verified on purpose: the flash tests below are about *losing* that
