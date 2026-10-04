@@ -4,7 +4,8 @@ defmodule Bilimbi.Base.Schedule.Administration do
   # Operator read model for the schedule board. `Schedule.list_tasks/1` and
   # `Schedule.list_runs/1` delegate here, the same split as
   # `Bilimbi.Base.Authz.Administration`. Paging and filtering stay in this
-  # module; the facade keeps operator actions and the occurrence engine.
+  # module; the facade keeps operator actions. The scheduler owns occurrence
+  # claiming.
 
   import Ecto.Query
 
@@ -114,15 +115,6 @@ defmodule Bilimbi.Base.Schedule.Administration do
   end
 
   def list_runs(_options), do: {:error, :invalid_options}
-
-  @doc false
-  def latest_scheduled_occurrence(%Definition{} = definition) do
-    latest_scheduled_occurrences([definition.key]) |> Map.get(definition.key)
-  rescue
-    _error -> nil
-  catch
-    :exit, _reason -> nil
-  end
 
   @doc false
   def latest_scheduled_occurrences([]), do: %{}

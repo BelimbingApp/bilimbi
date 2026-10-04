@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.Definition
+  alias Bilimbi.Base.Schedule.Scheduler
   alias Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline, as: CreateScheduleBaseline
   alias Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime
   alias Bilimbi.Base.Schedule.Occurrence
@@ -147,7 +148,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
     tasks =
       for repo <- [repos.node_a, repos.node_b] do
         Task.async(fn ->
-          with_repo(repo, fn -> Schedule.enqueue_due(definition, intended_at) end)
+          with_repo(repo, fn -> Scheduler.enqueue_due(definition, intended_at) end)
         end)
       end
 

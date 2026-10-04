@@ -77,7 +77,7 @@ them, and changes retention. Those operator functions take the sealed scope
 and check that same capability; the board's `can_*` assigns only choose which
 controls to show, and `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`
 re-asks before the event. A system actor is refused. The scheduler enqueues
-through `enqueue_due/2`, not the operator functions. Successful operator
+through `Scheduler.enqueue_due/2`, not the operator functions. Successful operator
 commands and their actor are recorded through Base Audit in the same
 transaction as the controlled state change; operational run rows remain
 separate best-effort evidence.
