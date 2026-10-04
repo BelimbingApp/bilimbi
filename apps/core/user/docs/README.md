@@ -26,10 +26,10 @@ and reset-token hashes never leave the module; account reads return
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete. A person must hold `admin.user.delete` when the call runs; `delete_user/3` owns that check |
-| `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
-| `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
+| `reassign_user_company(scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering. The person is `Scope.actor/1` |
+| `admin_change_password(scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation. The person is `Scope.actor/1` |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
-| `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
+| `confirm_password(...)` / `update_password(...)` | Current-password confirmation and replacement |
 | `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
 | `reset_password(email, token, password)` | Consume a 60-minute token and rotate `remember_token` |
 | `issue_email_verification_token(...)` / `verify_email(...)` | Signed 60-minute verification bound to the current email |
@@ -108,7 +108,7 @@ companies and nothing else. A user always belongs to a company and is the
 same person operating under a different one, so the page never detaches an
 account: Belimbing's select offers "None" and Bilimbi's does not, and a
 blank value that still arrives is refused on the fact without a write. The
-reassignment ends the account's sessions — `reassign_user_company/6` calls
+reassignment ends the account's sessions — `reassign_user_company/5` calls
 `Session.terminate_user_sessions/2` with a sentinel that spares none — so the
 open editor carries a warning saying so beside the select, before the
 operator chooses; it is a note, not a confirmation, because choosing the
@@ -150,7 +150,7 @@ pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 
 Phoenix routes, forms, mail delivery, login throttling, and the authenticated
 Session adapter remain a Web slice. `user_pins` is served through
-`list_user_pins/1`, `toggle_user_pin/2` and `reorder_user_pins/2`, which the
-Web shell's pin API uses. `user_database_queries` has schema but no public API:
-it is a UI feature owned by the Base Database query surface in S3.
+`list_user_pins/1`, `toggle_user_pin/2` and `reorder_user_pins/2`. Each takes
+the signed-in scope, and the Web shell's pin API uses them. Saved database
+queries use the same scope: it names the owner.
 `User::getLastUsedModel()` is Core AI's, in S4.

@@ -27,8 +27,11 @@ defmodule BilimbiWeb.PinControllerTest do
   end
 
   test "GET /api/pins returns only pins whose routes are served", %{conn: conn} do
-    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
-    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Gone", "url" => "/gone"})
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Companies", "url" => "/companies"})
+
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Gone", "url" => "/gone"})
 
     response =
       conn
@@ -70,10 +73,11 @@ defmodule BilimbiWeb.PinControllerTest do
   end
 
   test "POST /api/pins/reorder updates pin sort order", %{conn: conn} do
-    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Pin 1", "url" => "/page1"})
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 1", "url" => "/page1"})
 
     {:ok, :pinned, [pin1, pin2]} =
-      User.toggle_user_pin(91, %{"label" => "Pin 2", "url" => "/page2"})
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 2", "url" => "/page2"})
 
     conn =
       conn
@@ -91,7 +95,8 @@ defmodule BilimbiWeb.PinControllerTest do
   # had no catch-all, so a logged-in client could turn a typo into a 500. This
   # is the crash #302 fixed on the Countries screen, in new code.
   test "POST /api/pins/reorder rejects malformed ids instead of crashing", %{conn: conn} do
-    {:ok, :pinned, [pin]} = User.toggle_user_pin(91, %{"label" => "Pin 1", "url" => "/page1"})
+    {:ok, :pinned, [pin]} =
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 1", "url" => "/page1"})
 
     signed_in = log_in_as(conn)
 
@@ -122,10 +127,11 @@ defmodule BilimbiWeb.PinControllerTest do
   end
 
   test "pins remain readable but cannot be changed while impersonating", %{conn: conn} do
-    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Companies", "url" => "/companies"})
 
     {:ok, :pinned, pins} =
-      User.toggle_user_pin(91, %{"label" => "Gone", "url" => "/gone"})
+      User.toggle_user_pin(pin_scope(91), %{"label" => "Gone", "url" => "/gone"})
 
     impersonating =
       conn
@@ -151,6 +157,11 @@ defmodule BilimbiWeb.PinControllerTest do
              403
            ) == %{"error" => "impersonating"}
 
-    assert User.list_user_pins(91) == pins
+    assert {:ok, ^pins} = User.list_user_pins(pin_scope(91))
+  end
+
+  defp pin_scope(user_id) do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, 73)
   end
 end

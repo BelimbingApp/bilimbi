@@ -79,10 +79,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
     if operator?(socket) and
          allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket.assigns.current_scope)
       query_id = to_integer(id_str, 0)
 
-      case User.duplicate_database_query(scope, user_id, query_id) do
+      case User.duplicate_database_query(scope, query_id) do
         {:ok, duplicate} ->
           {:noreply,
            socket
@@ -131,9 +130,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
         query = socket.assigns.pending_delete
         socket = assign(socket, :pending_delete, nil)
         scope = socket.assigns.current_scope.scope
-        user_id = current_user_id(socket.assigns.current_scope)
 
-        case User.delete_database_query(scope, user_id, query.id) do
+        case User.delete_database_query(scope, query.id) do
           {:ok, _deleted} ->
             previous_page = socket.assigns.state.page
 
@@ -197,7 +195,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   defp load_queries(socket) do
     state = socket.assigns.state
     scope = socket.assigns.current_scope.scope
-    user_id = current_user_id(socket.assigns.current_scope)
 
     opts = [
       search: state.search,
@@ -206,7 +203,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
     ]
 
     all_queries =
-      case User.list_database_queries(scope, user_id, opts) do
+      case User.list_database_queries(scope, opts) do
         {:ok, queries} -> queries
         {:error, _} -> []
       end

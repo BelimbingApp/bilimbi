@@ -37,8 +37,19 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     conn = log_in_as(conn)
     {:ok, view, _} = live(conn, ~p"/dashboard")
     render_hook(view, "shell:preference", %{kind: "theme", value: "dark", user_id: 92})
-    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 92, "ui.theme")
+
+    assert {:ok, "dark"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73),
+               "ui.theme"
+             )
+
     assert has_element?(view, "#app-display-dark[aria-pressed='true']")
 
     render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
@@ -51,17 +62,34 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(remounted, "#app-display-utc[aria-pressed='true']")
 
     render_hook(remounted, "shell:preference", %{kind: "theme", value: "system"})
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "invalid values retain the previous preference", %{conn: conn, scope: scope} do
-    {:ok, _} = User.put_user_preference(scope, 73, 91, "ui.theme", "light")
+    {:ok, _} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "light"
+      )
+
     {:ok, view, _} = conn |> log_in_as() |> live(~p"/dashboard")
     render_hook(view, "shell:preference", %{kind: "theme", value: "sepia"})
     render_hook(view, "shell:preference", %{kind: "timezone", value: "Moon/Base"})
     render_hook(view, "shell:preference", %{value: "dark"})
     assert has_element?(view, "#app-display-light[aria-pressed='true']")
-    assert {:ok, "light"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "light"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
+
     assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :company
   end
 
@@ -71,7 +99,13 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     {:ok, view, _} = live(conn, ~p"/dashboard")
     :ok = Session.delete_session(session_id)
     render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
+
     assert_redirect(view, "/")
   end
 
@@ -112,7 +146,12 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
     render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
 
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
+
     assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :company
   end
 

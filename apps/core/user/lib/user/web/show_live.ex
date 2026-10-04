@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     not, because `User.get_tenant_user/2` resolves a user through its
     company and no screen could reopen a detached account. A blank value
     that still arrives is refused on the fact and writes nothing.
-    `reassign_user_company/6` ends every session the account holds, so the
+    `reassign_user_company/5` ends every session the account holds, so the
     open editor says so before the operator chooses; the warning is a note
     beside the select, not a second click, because the change is reversible
     by choosing the previous company again.
@@ -878,13 +878,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         {:noreply, commit_company(socket, {:ok, user}, socket.assigns.company_name)}
 
       target_company_id ->
-        actor = current_actor(socket, user.company_id)
-
         {:noreply,
          commit_company(
            socket,
            User.reassign_user_company(
-             actor,
              scope,
              user.company_id,
              user.id,
@@ -999,9 +996,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     if errors == %{} do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
-      actor = current_actor(socket, user.company_id)
 
-      case User.admin_change_password(actor, scope, user.company_id, user.id, password) do
+      case User.admin_change_password(scope, user.company_id, user.id, password) do
         {:ok, updated_user} ->
           {:noreply,
            socket
@@ -2478,26 +2474,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     do: CommitStatus.write_forbidden(socket, "You do not have permission to edit users.")
 
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
-
-  defp current_actor(socket, company_id) do
-    current_scope = socket.assigns.current_scope
-
-    target_company_id =
-      company_id || current_scope[:active_company_id] ||
-        (current_scope[:actor] && current_scope.actor.company_id) ||
-        (is_map(current_scope[:user]) && current_scope.user["company_id"])
-
-    if is_nil(company_id) and current_scope[:actor] do
-      current_scope.actor
-    else
-      user_id =
-        (current_scope[:actor] && current_scope.actor.id) ||
-          (is_map(current_scope[:user]) &&
-             (current_scope.user["user_id"] || current_scope.user["id"]))
-
-      Authz.actor(:user, user_id, current_scope.scope, target_company_id)
-    end
-  end
 
   defp group_by_domain(caps) do
     caps

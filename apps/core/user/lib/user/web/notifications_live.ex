@@ -21,11 +21,10 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    user_id = current_user_id(socket.assigns.current_scope)
-    scope = socket.assigns.current_scope.scope
+    scope = tenancy_scope(socket.assigns.current_scope)
 
     unread_count =
-      case User.unread_notification_count(scope, user_id) do
+      case User.unread_notification_count(scope) do
         {:ok, count} -> count
         _ -> 0
       end
@@ -40,7 +39,6 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
      |> assign(:total_count, 0)
      |> assign(:total_pages, 1)
      |> assign(:notification_count, 0)
-     |> assign(:user_id, user_id)
      |> assign(:unread_count, unread_count)}
   end
 
@@ -77,10 +75,9 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def handle_event("mark_read", %{"id" => id}, socket) do
-    user_id = socket.assigns.user_id
     scope = socket.assigns.current_scope.scope
 
-    case User.mark_notification_as_read(scope, user_id, id) do
+    case User.mark_notification_as_read(scope, id) do
       {:ok, notification} ->
         if socket.assigns.current_filter == :unread do
           # Reload unread filter to accurately update count, pagination, and empty transitions
@@ -94,7 +91,7 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
            )}
         else
           unread_count =
-            case User.unread_notification_count(scope, user_id) do
+            case User.unread_notification_count(scope) do
               {:ok, c} -> c
               _ -> 0
             end
@@ -112,10 +109,9 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def handle_event("mark_all_read", _params, socket) do
-    user_id = socket.assigns.user_id
     scope = socket.assigns.current_scope.scope
 
-    User.mark_all_notifications_as_read(scope, user_id)
+    User.mark_all_notifications_as_read(scope)
 
     {:noreply,
      socket
@@ -131,10 +127,9 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def handle_event("visit", %{"id" => id}, socket) do
-    user_id = socket.assigns.user_id
     scope = socket.assigns.current_scope.scope
 
-    case User.mark_notification_as_read(scope, user_id, id) do
+    case User.mark_notification_as_read(scope, id) do
       {:ok, notification} ->
         url = Notification.url(notification)
 
@@ -142,7 +137,7 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
           {:noreply, push_navigate(socket, to: url)}
         else
           unread_count =
-            case User.unread_notification_count(scope, user_id) do
+            case User.unread_notification_count(scope) do
               {:ok, c} -> c
               _ -> 0
             end
@@ -184,24 +179,32 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
      )}
   end
 
+  # Identity is the sealed tenancy scope. A current_scope that does not carry
+  # one used to fall through to user 0 and render as an empty list (#545).
+  defp tenancy_scope(%{scope: %Bilimbi.Base.Tenancy.Scope{} = scope}), do: scope
+
+  defp tenancy_scope(current_scope) do
+    raise ArgumentError,
+          "notifications require a tenancy scope, got: #{inspect(current_scope[:scope])}"
+  end
+
   defp load_notifications(socket, filter, page, per_page, opts) do
-    user_id = socket.assigns.user_id
     scope = socket.assigns.current_scope.scope
 
     total_count =
-      case User.count_notifications(scope, user_id, status: filter) do
+      case User.count_notifications(scope, status: filter) do
         {:ok, count} -> count
         _ -> 0
       end
 
     unread_count =
-      case User.unread_notification_count(scope, user_id) do
+      case User.unread_notification_count(scope) do
         {:ok, count} -> count
         _ -> 0
       end
 
     notifications =
-      case User.list_notifications(scope, user_id,
+      case User.list_notifications(scope,
              status: filter,
              page: page,
              per_page: per_page

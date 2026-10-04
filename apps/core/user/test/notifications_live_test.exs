@@ -6,9 +6,10 @@ defmodule Bilimbi.Core.User.Web.NotificationsLiveTest do
   # Regression for #545. This LiveView used to resolve its own user id with
   # `user["user_id"] || user["id"] || user[:id] || 0`. The `|| 0` did not fail
   # on a malformed scope — it scoped every read to user 0, which does not
-  # exist, so the page rendered as a legitimately empty notifications list. A
-  # signed-in account with unread notifications saw silence. Mounting must
-  # raise instead, so the broken route is reported rather than absorbed.
+  # exist, so the page rendered as a legitimately empty notifications list.
+  # The subject is now the sealed tenancy scope. A current_scope that does not
+  # carry one, including one that still names a user id on the map, must raise
+  # rather than render that empty list.
 
   defp socket(current_scope) do
     %Phoenix.LiveView.Socket{
@@ -18,31 +19,23 @@ defmodule Bilimbi.Core.User.Web.NotificationsLiveTest do
   end
 
   defp assert_refuses(current_scope) do
-    assert_raise ArgumentError, ~r/carries no "user_id"/, fn ->
+    assert_raise ArgumentError, ~r/tenancy scope/, fn ->
       NotificationsLive.mount(%{}, %{}, socket(current_scope))
     end
   end
 
   describe "mount/3 with a malformed scope" do
-    test "refuses a scope whose user carries no id at all" do
-      assert_refuses(%{user: %{}, scope: :unreachable})
-    end
-
-    test "refuses a scope carrying only a name" do
-      assert_refuses(%{user: %{"name" => "Ada"}, scope: :unreachable})
-    end
-
-    test "refuses a nil user" do
-      assert_refuses(%{user: nil, scope: :unreachable})
-    end
-
-    # The three keys the old fallback chain accepted. `presentation_user/2` is
-    # the sole builder of this map and only ever writes "user_id", so a scope
-    # arriving with "id" or :id is malformed, not an alternative spelling —
-    # accepting it would silently resume the behaviour this test pins.
-    test "refuses the alternate id spellings the old fallback chain accepted" do
-      assert_refuses(%{user: %{"id" => 7}, scope: :unreachable})
-      assert_refuses(%{user: %{id: 7}, scope: :unreachable})
+    test "refuses a current_scope that is not a tenancy scope" do
+      for current_scope <- [
+            %{user: %{}, scope: :unreachable},
+            %{user: %{"name" => "Ada"}, scope: :unreachable},
+            %{user: nil, scope: :unreachable},
+            %{user: %{"id" => 7}, scope: :unreachable},
+            %{user: %{id: 7}, scope: :unreachable},
+            %{user: %{"user_id" => 91}, scope: :unreachable}
+          ] do
+        assert_refuses(current_scope)
+      end
     end
   end
 end
