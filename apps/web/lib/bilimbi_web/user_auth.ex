@@ -33,9 +33,11 @@ defmodule BilimbiWeb.UserAuth do
   For connected-page reauthorization, see `BilimbiWeb.RouteAccess`. Session
   termination transport handling belongs to `BilimbiWeb.SessionDisconnect`.
 
-  Once identity is rehydrated, `BilimbiWeb.RequestContext` applies Base Locale
-  and the audit context for this process. Anonymous requests use the global
-  locale. HTTP requests and LiveViews each apply it in their own process
+  Once identity is rehydrated, display preferences already carry the resolved
+  locale and language. `BilimbiWeb.RequestContext` applies that language to the
+  shared UI Gettext backend and the audit context for this process, and does
+  not resolve the locale again. Anonymous requests still resolve the global
+  locale once. HTTP requests and LiveViews each apply it in their own process
   lifecycle, so no user's language remains in another request or LiveView
   process. Impersonation lives in `BilimbiWeb.Impersonation`.
 
@@ -54,13 +56,16 @@ defmodule BilimbiWeb.UserAuth do
   use BilimbiWeb, :verified_routes
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
+  alias Bilimbi.Core.User.DisplayPreferences
   alias Bilimbi.Core.User.Summary
   alias BilimbiWeb.Impersonation
   alias BilimbiWeb.RequestContext
@@ -285,8 +290,11 @@ defmodule BilimbiWeb.UserAuth do
   `capabilities` and `grant_all` are one `effective_capabilities/1` result.
   Templates read
   `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
-  `shell_preferences` is the single resolved theme and timestamp display
-  snapshot for the request or LiveView process.
+  `shell_preferences` is the single resolved theme, timestamp display, locale,
+  and language snapshot for the request or LiveView process. The shell pin
+  list is not part of this assign: the full shell attaches it once at mount.
+  A framed LiveView, and a controller that never renders the shell, do not
+  query it.
 
   A cookie whose session, user, company, or tenant no longer proves out is
   dropped: the request falls through as unauthenticated.
@@ -294,7 +302,7 @@ defmodule BilimbiWeb.UserAuth do
   def fetch_current_scope(conn, _opts) do
     session_user = get_session(conn, @session_key)
     impersonation = get_session(conn, @impersonation_key)
-    current_scope = current_scope_from(session_user, impersonation)
+    current_scope = current_scope_from(session_user, impersonation, :bootstrap)
 
     RequestContext.apply(current_scope, conn)
 
@@ -397,22 +405,25 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc """
-  Requires a live Authz allow for a string capability or at least one key in
-  `{:any_of, keys}`. Denied requests redirect to
-  the dashboard; UI hiding is not this plug's job.
+  Requires a string capability, or at least one key in `{:any_of, keys}`,
+  from the scope's in-memory allowed list.
+
+  A key already on that list is allowed without another `Authz.can/2`, so an
+  allowed page does not write a decision-log row. A key that is absent is
+  still evaluated and logged. Denied requests redirect to the dashboard; UI
+  hiding is not this plug's job. An open page's later events do not use this
+  shortcut: `BilimbiWeb.RouteAccess` re-checks those live.
   """
   def require_capability(conn, capability) do
     case conn.assigns[:current_scope] do
-      %{actor: actor} ->
-        case capability_allowed?(actor, capability) do
-          true ->
-            conn
-
-          false ->
-            conn
-            |> put_flash(:error, @denied_message)
-            |> redirect(to: ~p"/dashboard")
-            |> halt()
+      %{actor: _actor} = current_scope ->
+        if gate_allowed?(current_scope, capability) do
+          conn
+        else
+          conn
+          |> put_flash(:error, @denied_message)
+          |> redirect(to: ~p"/dashboard")
+          |> halt()
         end
 
       _ ->
@@ -445,7 +456,7 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   def on_mount(:require_authenticated, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
+    socket = socket |> mount_current_scope(session) |> put_shell_pins(session)
 
     if socket.assigns.current_scope do
       current_scope = socket.assigns.current_scope
@@ -488,17 +499,13 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   def on_mount({:require_capability, capability}, _params, _session, socket) do
-    actor = socket.assigns.current_scope.actor
-
-    case capability_allowed?(actor, capability) do
-      true ->
-        {:cont, socket}
-
-      false ->
-        {:halt,
-         socket
-         |> Phoenix.LiveView.put_flash(:error, @denied_message)
-         |> Phoenix.LiveView.redirect(to: ~p"/dashboard")}
+    if gate_allowed?(socket.assigns.current_scope, capability) do
+      {:cont, socket}
+    else
+      {:halt,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, @denied_message)
+       |> Phoenix.LiveView.redirect(to: ~p"/dashboard")}
     end
   end
 
@@ -513,9 +520,15 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  # The same live decision `BilimbiWeb.RouteAccess` repeats before every
-  # event and navigation of an open page, and the one a module re-asks for an
-  # operation capability of its own.
+  # The route gate trusts the allowed list just stored on the scope. A key
+  # that is not on it still goes through `Authz.can/2` (via `allowed_now?/2`)
+  # so the denial is evaluated and logged. Events on an open page do not use
+  # this function; `RouteAccess` re-checks those live.
+  defp gate_allowed?(current_scope, requirement) do
+    allowed?(current_scope, requirement) or
+      capability_allowed?(current_scope[:actor], requirement)
+  end
+
   defp capability_allowed?(_actor, nil), do: false
 
   defp capability_allowed?(actor, requirement),
@@ -534,23 +547,43 @@ defmodule BilimbiWeb.UserAuth do
     # conn assigns and must resolve the durable session and permissions anew.
     socket =
       Phoenix.Component.assign_new(socket, :current_scope, fn ->
-        current_scope_from(session[@session_key], session[@impersonation_key])
+        current_scope_from(session[@session_key], session[@impersonation_key], :bootstrap)
       end)
 
     RequestContext.apply(socket.assigns.current_scope, socket)
   end
 
   @doc false
-  def refresh_scope(%{session_identity: identity, impersonator: impersonator}) do
+  def refresh_scope(current), do: refresh_scope(current, true)
+
+  def refresh_scope(%{session_identity: identity, impersonator: impersonator}, activity?)
+      when is_boolean(activity?) do
     impersonation =
       if impersonator,
         do: %{"original_user_id" => impersonator.id, "original_user_name" => impersonator.name}
 
-    case current_scope_from(identity, impersonation) do
+    case current_scope_from(identity, impersonation, nil, activity?) do
       nil -> {:error, :unauthenticated}
       scope -> {:ok, scope}
     end
   end
+
+  # Platform-operator address facts feed one-time locale inference. The
+  # resolver touches Company/Address/Geonames, so it runs only while no
+  # supported global locale row exists; once inference persists, this stays
+  # a single Settings read per request.
+  defp locale_bootstrap do
+    if Locale.overridden?(nil), do: nil, else: Address.platform_operator_locale_bootstrap()
+  rescue
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        nil
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp current_scope_from(session_user, impersonation, bootstrap_mode, activity? \\ true)
 
   defp current_scope_from(
          %{
@@ -558,17 +591,22 @@ defmodule BilimbiWeb.UserAuth do
            "user_id" => user_id,
            "company_id" => company_id
          },
-         impersonation
+         impersonation,
+         bootstrap_mode,
+         activity?
        )
        when is_binary(session_id) and session_id != "" and is_integer(user_id) and user_id > 0 and
-              is_integer(company_id) and company_id > 0 do
+              is_integer(company_id) and company_id > 0 and is_boolean(activity?) do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
          true <- entry.user_id == user_id,
          true <- session_active?(entry),
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
-      :ok = Session.refresh_activity(session_id, System.system_time(:second))
+      if activity? do
+        :ok = Session.refresh_activity(session_id, System.system_time(:second))
+      end
+
       impersonator = Impersonation.extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
@@ -585,7 +623,7 @@ defmodule BilimbiWeb.UserAuth do
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)
 
-      %{
+      current_scope = %{
         user: presentation_user(user, scope),
         scope: scope,
         actor: actor,
@@ -599,15 +637,47 @@ defmodule BilimbiWeb.UserAuth do
         },
         operator_company_missing: operator_company_missing?(scope)
       }
-      |> then(
-        &Map.put(&1, :shell_preferences, Bilimbi.Core.User.DisplayPreferences.presentation(&1))
+
+      Map.put(
+        current_scope,
+        :shell_preferences,
+        DisplayPreferences.presentation(
+          current_scope,
+          if(bootstrap_mode == :bootstrap, do: locale_bootstrap(), else: nil)
+        )
       )
     else
       _ -> nil
     end
   end
 
-  defp current_scope_from(_session_user, _impersonation), do: nil
+  defp current_scope_from(_session_user, _impersonation, _bootstrap_mode, _activity?), do: nil
+
+  defp put_shell_pins(socket, %{"bilimbi_framed" => true}), do: socket
+
+  defp put_shell_pins(%{assigns: %{current_scope: %{pins: pins}}} = socket, _session)
+       when is_list(pins),
+       do: socket
+
+  defp put_shell_pins(%{assigns: %{current_scope: current_scope}} = socket, _session)
+       when is_map(current_scope) do
+    Phoenix.Component.assign(
+      socket,
+      :current_scope,
+      Map.put(current_scope, :pins, shell_pins(current_scope))
+    )
+  end
+
+  defp put_shell_pins(socket, _session), do: socket
+
+  defp shell_pins(%{scope: %Scope{} = scope}) do
+    case BilimbiWeb.PinController.shell_pins(scope) do
+      {:ok, pins} -> pins
+      {:error, _reason} -> []
+    end
+  end
+
+  defp shell_pins(_current_scope), do: []
 
   defp guard_session(socket, activity?) do
     if durable_session_valid?(socket.assigns.current_scope, activity?) do

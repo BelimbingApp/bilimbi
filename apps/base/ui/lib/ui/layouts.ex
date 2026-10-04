@@ -154,6 +154,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       data-theme-choice={@preferences.theme}
       data-display-mode={@preferences.mode}
       data-impersonating={to_string(not is_nil(@current_scope[:impersonator]))}
+      data-pins={shell_pins(@current_scope)}
       data-served-routes={Jason.encode!(Bilimbi.Base.UI.RouteContract.navigable_paths())}
       data-sidebar-mode="desktop"
       data-sidebar-rail="false"
@@ -689,6 +690,12 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp operator_company_missing?(%{operator_company_missing: true}), do: true
   defp operator_company_missing?(_current_scope), do: false
+
+  # The attribute is the list loaded onto the shell scope, including an empty
+  # one. A scope that has no list omits the attribute: encoding [] would
+  # replace pins the page already rendered.
+  defp shell_pins(%{pins: pins}) when is_list(pins), do: Jason.encode!(pins)
+  defp shell_pins(_current_scope), do: nil
 
   @doc """
   The one production outlet for flash messages.

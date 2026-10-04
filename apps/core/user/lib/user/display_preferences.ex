@@ -1,6 +1,6 @@
 defmodule Bilimbi.Core.User.DisplayPreferences do
   @moduledoc """
-  The signed-in account's theme, timestamp display and language preferences.
+  The signed-in account's theme, timestamp display, locale, and language.
 
   One resolved snapshot and one durable write serve every surface that shows
   them: the shell's top-bar controls, the appearance screen and the HTTP
@@ -11,6 +11,8 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   `presentation/1` is resolved once per request or LiveView process and
   carried on `current_scope.shell_preferences`; `refresh/1` re-resolves it
   after a confirmed write and re-arms the per-process timestamp context.
+  The snapshot includes the resolved `locale` and `language`, so the web
+  edge applies Gettext from it instead of resolving the locale again.
   """
 
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
@@ -23,26 +25,37 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   @themes ["light", "dark", "system"]
 
   @doc """
-  The account's resolved theme and timestamp display metadata.
+  The account's resolved theme, timestamp display, locale, and language.
 
   `modes` is `Bilimbi.Base.DateTime.modes/0`, carried so the shell and the
   appearance form offer the canonical set without restating it.
+
+  `bootstrap` is the platform-operator address fact used once, when no
+  global locale row exists. Pass `nil` when that fact is not available.
+  The locale is resolved here and handed to timestamp display, so display
+  does not resolve it a second time.
   """
-  def presentation(current_scope) do
+  def presentation(current_scope, bootstrap \\ nil) do
     theme =
       case User.get_user_preference(current_scope.scope, @theme_key) do
         {:ok, theme} when theme in @themes -> theme
         _other -> "system"
       end
 
-    display = DateTimePolicy.display(settings_scope(current_scope), company_scope(current_scope))
+    settings_scope = settings_scope(current_scope)
+    resolved = Locale.resolve(settings_scope, bootstrap)
+
+    display =
+      DateTimePolicy.display(settings_scope, company_scope(current_scope), resolved.locale)
 
     %{
       theme: theme,
       mode: display.mode,
       modes: DateTimePolicy.modes(),
       timezone: display.timezone,
-      tz_db: display.tz_db
+      tz_db: display.tz_db,
+      locale: resolved.locale,
+      language: resolved.language
     }
   end
 

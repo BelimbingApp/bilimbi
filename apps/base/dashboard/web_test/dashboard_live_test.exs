@@ -1,16 +1,21 @@
 defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   use BilimbiWeb.ConnCase, async: false
 
+  import Ecto.Query, only: [from: 2]
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Dashboard
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
@@ -64,6 +69,46 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
     assert has_element?(view, "#dashboard-user-91 td", "Ada Lovelace")
   end
 
+  test "shell pins load with the page and stay across a refresh", %{conn: conn, scope: scope} do
+    scope = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73)
+
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
+
+    conn = log_in_as(conn)
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, owner ->
+        if metadata.source == "user_pins" and match?({:ok, %{command: :select}}, metadata.result) do
+          send(owner, :pin_read)
+        end
+      end,
+      owner
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    {:ok, view, _html} = live(conn, ~p"/dashboard")
+    assert pin_reads() == 2
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+
+    view |> element("#customize-layout") |> render_click()
+    assert pin_reads() == 0
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+
+    send(view.pid, :refresh_widgets)
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+    assert pin_reads() == 0
+
+    render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+    assert pin_reads() == 0
+    assert has_element?(view, ~s(#app-shell[data-pins*="/companies"]))
+  end
+
   test "renders the sidebar without gated destinations when capabilities are absent", %{
     conn: conn
   } do
@@ -82,6 +127,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
     assert has_element?(view, "#app-version", "v#{version}")
     assert has_element?(view, "#app-topbar-main")
     assert has_element?(view, "#app-shell[phx-hook='AppShell']")
+    assert has_element?(view, ~s(#app-shell[data-pins="[]"]))
     assert has_element?(view, "#app-sidebar-drag")
     refute has_element?(view, "#nav-dashboard")
     # The workspace needs no capability, so even an account with no role has
@@ -127,7 +173,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   end
 
   describe "module-declared panels" do
-    test "every installed entry names an installed panel gated by the same capability" do
+    test "every installed entry names an installed panel, and a card that stays after revocation is the only embed without its catalogue grant" do
       entries = Dashboard.entries()
 
       assert Enum.map(entries, & &1.id) == [
@@ -140,10 +186,27 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
                "base-perf-health"
              ]
 
+      # Recent activity, sessions, and performance keep the grant on the
+      # catalogue entry. The embed omits it so a card already on the page
+      # stays mounted after the grant is removed; the panel then skips the read.
+      stays_mounted = %{
+        "base-dashboard-recent-audit" => "admin.audit.log.list",
+        "base-dashboard-session-stats" => "admin.system.session.list",
+        "base-perf-health" => "admin.system.perf.view"
+      }
+
       for entry <- entries do
         assert {:ok, panel} = DiscoveredPanels.resolve(entry.embed)
-        assert panel.capability == entry.capability
         assert Code.ensure_loaded?(panel.live_component)
+
+        case Map.fetch(stays_mounted, entry.id) do
+          {:ok, capability} ->
+            assert entry.capability == capability
+            assert panel.capability == nil
+
+          :error ->
+            assert panel.capability == entry.capability
+        end
       end
     end
 
@@ -308,6 +371,43 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
                "#dashboard-widgets-none",
                "No installed module contributes dashboard widgets."
              )
+    end
+
+    test "the first HTML does not report deferred widgets as empty", %{conn: conn, scope: scope} do
+      grant_capabilities!([
+        "admin.audit.log.list",
+        "admin.system.session.list",
+        "admin.system.perf.view"
+      ])
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      conn = conn |> log_in_as() |> get(~p"/dashboard")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s(id="stat-recent-audit-pending")
+      refute html =~ "No recent activity."
+      refute html =~ "audit-entry-#{mutation.id}"
+      assert cell_text(html, "stat-sessions-item-0") == "Open—"
+      assert cell_text(html, "stat-performance-item-0") == "Health—"
+      refute cell_text(html, "stat-performance-item-0") =~ "Unknown"
+
+      {:ok, view, _html} = live(conn)
+
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+      refute has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      assert has_element?(view, "#stat-sessions", "1")
+      refute render(view) =~ "Unknown"
     end
 
     test "shows gated widgets when corresponding capabilities are granted", %{conn: conn} do
@@ -668,6 +768,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
           occurred_at: NaiveDateTime.utc_now()
         })
 
+      decisions = Repo.aggregate(DecisionLog, :count)
       send(view.pid, :refresh_widgets)
 
       assert has_element?(view, "#stat-companies")
@@ -676,6 +777,92 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
       assert has_element?(view, "#audit-entry-#{mutation.id}")
       assert render(view) =~ "updated"
       assert render(view) =~ "User"
+      assert Repo.aggregate(DecisionLog, :count) == decisions
+    end
+
+    test "a revoked session or performance grant leaves the visible widget unmarked", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!(["admin.system.session.list", "admin.system.perf.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open1"
+      refute cell_text(render(view), "stat-performance-item-0") == "Health—"
+      refute render(view) =~ "Unknown"
+
+      for capability <- ["admin.system.session.list", "admin.system.perf.view"] do
+        assert {:ok, :stored} =
+                 Authz.put_principal_capability(scope, 73, :user, 91, capability, false)
+      end
+
+      Session.put_session("dash-revoked", "opaque", %{
+        user_id: 91,
+        ip_address: "127.0.0.4",
+        user_agent: "Bilimbi test",
+        last_activity: 400
+      })
+
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-sessions")
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open—"
+      assert cell_text(render(view), "stat-performance-item-0") == "Health—"
+      assert cell_text(render(view), "stat-performance-item-1") == "Samples—"
+      refute render(view) =~ "Unknown"
+
+      view |> element("#customize-layout") |> render_click()
+      view |> element("#remove-base-dashboard-session-stats") |> render_click()
+      view |> element("#add-widget-base-dashboard-session-stats") |> render_click()
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open—"
+
+      view |> element("#remove-base-perf-health") |> render_click()
+      view |> element("#add-widget-base-perf-health") |> render_click()
+      assert cell_text(render(view), "stat-performance-item-0") == "Health—"
+      refute render(view) =~ "Unknown"
+    end
+
+    test "a revoked audit grant leaves the visible widget unmarked", %{conn: conn, scope: scope} do
+      grant_capabilities!(["admin.audit.log.list"])
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+
+      assert {:ok, :stored} =
+               Authz.put_principal_capability(
+                 scope,
+                 73,
+                 :user,
+                 91,
+                 "admin.audit.log.list",
+                 false
+               )
+
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#audit-entry-#{mutation.id}")
+
+      view |> element("#customize-layout") |> render_click()
+      view |> element("#remove-base-dashboard-recent-audit") |> render_click()
+      view |> element("#add-widget-base-dashboard-recent-audit") |> render_click()
+
+      assert has_element?(view, "#stat-recent-audit-pending")
+      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#audit-entry-#{mutation.id}")
     end
 
     test "refresh recomputes the session count", %{conn: conn} do
@@ -692,10 +879,87 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
         last_activity: 300
       })
 
+      decisions =
+        Repo.aggregate(
+          from(log in DecisionLog, where: log.capability == "admin.system.session.list"),
+          :count
+        )
+
       send(view.pid, :refresh_widgets)
 
       assert has_element?(view, "#stat-sessions", "2")
+
+      assert Repo.aggregate(
+               from(log in DecisionLog, where: log.capability == "admin.system.session.list"),
+               :count
+             ) == decisions
     end
+
+    test "a terminated session ends the page on the widget timer", %{conn: conn} do
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+
+      :ok = Session.delete_session(session_id)
+      send(view.pid, :refresh_widgets)
+
+      assert assert_redirect(view, "/")["session_expired"] == "expired"
+    end
+
+    test "the widget timer leaves the idle clock, and a click or preference save moves it", %{
+      conn: conn
+    } do
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+      stale = System.system_time(:second) - 120
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: stale)
+
+      send(view.pid, :refresh_widgets)
+      assert has_element?(view, "#dashboard-current-company")
+      assert {:ok, %{last_activity: ^stale}} = Session.fetch_session(session_id)
+
+      view |> element("#customize-layout") |> render_click()
+      assert {:ok, %{last_activity: clicked}} = Session.fetch_session(session_id)
+      assert clicked > stale
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: stale)
+
+      render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+      assert {:ok, %{last_activity: saved}} = Session.fetch_session(session_id)
+      assert saved > stale
+    end
+
+    test "an idle session past its lifetime ends on the widget timer", %{conn: conn} do
+      conn = log_in_as(conn)
+      session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+
+      expired = System.system_time(:second) - 120 * 60 - 1
+
+      assert {:ok, _} =
+               Session.put_session(session_id, "{}", user_id: 91, last_activity: expired)
+
+      send(view.pid, :refresh_widgets)
+
+      assert assert_redirect(view, "/")["session_expired"] == "expired"
+    end
+  end
+
+  defp pin_reads(count \\ 0) do
+    receive do
+      :pin_read -> pin_reads(count + 1)
+    after
+      0 -> count
+    end
+  end
+
+  defp cell_text(html, id) do
+    [_, inner] = Regex.run(~r/id="#{id}"[^>]*>(.*?)<\/div>/s, html)
+    inner |> String.replace(~r/<[^>]+>/, "") |> String.replace(~r/\s+/, "")
   end
 
   # The drag hook pushes DOM order, so order is what the test must observe:

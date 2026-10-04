@@ -5,18 +5,36 @@ defmodule Bilimbi.Base.Session.Web.DashboardStatsPanel do
   Contributed as the `"dashboard.sessions"` embed; the dashboard renders it by
   that key and never names this module (ADR 0009). The count is platform-wide,
   as `Session.count_sessions/0` documents, and is read again each time the
-  dashboard counts a refresh.
+  dashboard counts a refresh, only after the socket is connected, and only
+  while `admin.system.session.list` is on the in-memory capability list.
+  Otherwise the strip shows an em dash and does not query.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Session
 
+  @capability "admin.system.session.list"
+
   @impl true
   def update(assigns, socket) do
     stale? = socket.assigns[:refresh] != assigns.refresh
     socket = assign(socket, assigns)
-    {:ok, if(stale?, do: assign(socket, :count, Session.count_sessions()), else: socket)}
+
+    {:ok,
+     cond do
+       not socket.assigns.connected ->
+         assign(socket, :count, :not_loaded)
+
+       not allowed?(socket.assigns.current_scope, @capability) ->
+         assign(socket, :count, :not_loaded)
+
+       stale? ->
+         assign(socket, :count, Session.count_sessions())
+
+       true ->
+         socket
+     end}
   end
 
   @impl true
@@ -31,11 +49,14 @@ defmodule Bilimbi.Base.Session.Web.DashboardStatsPanel do
             do: ~p"/system/sessions"
         }
       >
-        <:item label="Open" value={@count} />
+        <:item label="Open" value={shown(@count)} />
         <:item label="Store" kind={:text} value="Durable" />
         <:item label="Scope" kind={:text} value="Platform" />
       </.stat_strip>
     </div>
     """
   end
+
+  defp shown(:not_loaded), do: "—"
+  defp shown(value), do: value
 end

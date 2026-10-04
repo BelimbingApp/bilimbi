@@ -60,9 +60,7 @@ defmodule BilimbiWeb.RouteAccessTest do
     end
   end
 
-  test "no matching grant refuses both guards even with stale UI allows", %{conn: conn} do
-    grant_capabilities!("admin.user.view")
-
+  test "the route gate trusts an in-memory allow and the next event does not", %{conn: conn} do
     conn =
       assign(
         conn,
@@ -70,9 +68,43 @@ defmodule BilimbiWeb.RouteAccessTest do
         Map.put(conn.assigns.current_scope, :capabilities, ["admin.company.list"])
       )
 
-    assert {:halt, denied} = RouteAccess.on_mount(%{@action => @policy}, %{}, %{}, socket(conn))
+    before =
+      Repo.aggregate(
+        from(log in DecisionLog, where: log.capability == "admin.company.list"),
+        :count
+      )
+
+    assert {:cont, mounted} = RouteAccess.on_mount(%{@action => @policy}, %{}, %{}, socket(conn))
+    refute UserAuth.require_capability(conn, @policy).halted
+
+    assert Repo.aggregate(
+             from(log in DecisionLog, where: log.capability == "admin.company.list"),
+             :count
+           ) ==
+             before
+
+    assert {:halt, denied} = Lifecycle.handle_event("save", %{}, mounted)
     assert {:redirect, %{to: "/dashboard"}} = denied.redirected
-    assert redirected_to(UserAuth.require_capability(conn, @policy)) == "/dashboard"
+    assert denied.assigns.flash["error"] == RouteAccess.revoked_message()
+  end
+
+  test "a key absent from the in-memory list is evaluated and the denial is logged", %{
+    conn: conn
+  } do
+    before =
+      Repo.aggregate(from(log in DecisionLog, where: log.capability == "admin.user.list"), :count)
+
+    assert {:halt, denied} =
+             RouteAccess.on_mount(%{@action => "admin.user.list"}, %{}, %{}, socket(conn))
+
+    assert {:redirect, %{to: "/dashboard"}} = denied.redirected
+    assert redirected_to(UserAuth.require_capability(conn, "admin.user.list")) == "/dashboard"
+
+    assert Repo.aggregate(
+             from(log in DecisionLog, where: log.capability == "admin.user.list"),
+             :count
+           ) ==
+             before + 2
   end
 
   test "the single-capability form still asks Authz live", %{conn: conn} do

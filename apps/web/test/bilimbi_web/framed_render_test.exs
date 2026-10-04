@@ -9,7 +9,9 @@ defmodule BilimbiWeb.FramedRenderTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias BilimbiWeb.FramedRender
 
@@ -23,15 +25,60 @@ defmodule BilimbiWeb.FramedRenderTest do
 
   defp framed(conn), do: put_req_header(conn, "sec-fetch-dest", "iframe")
 
+  defp pin_reads(count \\ 0) do
+    receive do
+      :pin_read -> pin_reads(count + 1)
+    after
+      0 -> count
+    end
+  end
+
   test "a framed request renders the page without top bar, sidebar or status bar", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> framed() |> live(~p"/dashboard")
 
     assert has_element?(view, "#app-shell[data-framed='true'][data-display-mode]")
     assert has_element?(view, "#app-content")
+
+    send(view.pid, :refresh_widgets)
+    assert has_element?(view, "#app-shell[data-framed='true'][data-display-mode]")
     refute has_element?(view, "#app-topbar")
     refute has_element?(view, "#app-sidebar")
     refute has_element?(view, "#app-statusbar")
     refute has_element?(view, "#app-mode")
+  end
+
+  test "a framed page does not query shell pins", %{conn: conn} do
+    UserFixtures.create_user_pins_table!()
+    {:ok, scope} = Tenancy.scope(41)
+    scope = Tenancy.Authentication.sign_in(scope, 91, 73)
+
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
+
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, owner ->
+        if metadata.source == "user_pins" and match?({:ok, %{command: :select}}, metadata.result) do
+          send(owner, :pin_read)
+        end
+      end,
+      owner
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    {:ok, view, _html} = conn |> log_in_as() |> framed() |> live(~p"/dashboard")
+    assert pin_reads() == 0
+    refute has_element?(view, "#app-shell[data-pins]")
+    refute has_element?(view, "#app-sidebar")
+
+    view |> element("#customize-layout") |> render_click()
+    assert pin_reads() == 0
+    refute has_element?(view, "#app-shell[data-pins]")
   end
 
   test "an ordinary request keeps the whole shell", %{conn: conn} do

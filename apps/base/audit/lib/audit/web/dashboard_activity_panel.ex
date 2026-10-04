@@ -4,18 +4,36 @@ defmodule Bilimbi.Base.Audit.Web.DashboardActivityPanel do
 
   Contributed as the `"dashboard.activity"` embed; the dashboard renders it by
   that key and never names this module (ADR 0009). The feed is read again each
-  time the dashboard counts a refresh.
+  time the dashboard counts a refresh, only after the socket is connected, and
+  only while `admin.audit.log.list` is on the in-memory capability list.
+  Otherwise the card shows an em dash and does not query.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Audit
 
+  @capability "admin.audit.log.list"
+
   @impl true
   def update(assigns, socket) do
     stale? = socket.assigns[:refresh] != assigns.refresh
     socket = assign(socket, assigns)
-    {:ok, if(stale?, do: load(socket), else: socket)}
+
+    {:ok,
+     cond do
+       not socket.assigns.connected ->
+         assign(socket, :entries, :not_loaded)
+
+       not allowed?(socket.assigns.current_scope, @capability) ->
+         assign(socket, :entries, :not_loaded)
+
+       stale? ->
+         load(socket)
+
+       true ->
+         socket
+     end}
   end
 
   defp load(socket) do
@@ -46,12 +64,19 @@ defmodule Bilimbi.Base.Audit.Web.DashboardActivityPanel do
             />
           </:actions>
         </.section_heading>
+        <div
+          :if={@entries == :not_loaded}
+          id="stat-recent-audit-pending"
+          class="text-sm text-ink-subtle"
+        >
+          —
+        </div>
         <.empty_state
-          :if={Enum.empty?(@entries)}
+          :if={is_list(@entries) and Enum.empty?(@entries)}
           id="stat-recent-audit-empty"
           title="No recent activity."
         />
-        <div :if={Enum.any?(@entries)} class="divide-y divide-line">
+        <div :if={is_list(@entries) and Enum.any?(@entries)} class="divide-y divide-line">
           <div
             :for={entry <- @entries}
             class="flex items-start gap-3 py-2.5 text-sm"

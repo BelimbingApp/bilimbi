@@ -212,10 +212,17 @@ and the round trip is the cost already accepted for theme and time display in #7
 **NAV-01 amendment (2026-09-24) — the controller is the one write path.** The
 `ShellPins` hook, the scope's `:pins` snapshot and the deletion of `PinController`
 above are superseded. Pins are written only through the existing authenticated
-`PinController` (`/api/pins/toggle|reorder`) over `user_pins`, and the shell syncs
-from `GET /api/pins`; there is no `ShellPins` hook and no second write path. The
-controller refuses writes from an impersonated session. `user_pins` remaining the sole
+`PinController` (`/api/pins/toggle|reorder`) over `user_pins`. The mount read
+that synced from `GET /api/pins` is the 2026-10-04 read path below. There is
+no `ShellPins` hook and no second write path. The controller refuses
+writes from an impersonated session. `user_pins` remaining the sole
 store, and rail, width and branch expansion staying browser-local, still stand.
+
+**NAV-01 read path (2026-10-04).** The mount no longer syncs from
+`GET /api/pins`. The full shell renders `current_scope.pins` as `data-pins`;
+the hook reads that attribute and requests `/api/pins` only after a toggle
+that did not return the list. Writes stay on `PinController`. The operative
+rule is `apps/base/ui/AGENTS.md`.
 
 **CMP-03 — one detail assembly.** Bilimbi has five section-heading treatments, four
 `dt` label treatments, three grid rules, two card paddings and three editing models
@@ -336,9 +343,9 @@ lost inside a design ledger:
   `/api/pins/toggle|reorder`, `User.toggle_user_pin/reorder_user_pins` and the
   `user_pins` table exist, and `app_shell.js` calls that API zero times while using
   `localStorage` ten times. Pins do not follow the account.
-  Resolved: the shell loads pins from `GET /api/pins` and writes through
-  `/api/pins/toggle|reorder`. It imports legacy browser navigation pins once and
-  drops legacy record pins.
+  Resolved: the shell writes through `/api/pins/toggle|reorder`. It imports
+  legacy browser navigation pins once and drops legacy record pins. The mount
+  read later moved off `GET /api/pins`; see the 2026-10-04 NAV-01 read path.
 - Pinned reordering is mouse-only. `app_shell.js` wires HTML5 drag events on
   `[data-pinned-item]` with no keyboard or pointer-free equivalent, and the grip
   advertising it is `aria-hidden`, so keyboard and assistive-technology users cannot
@@ -711,7 +718,7 @@ Validation: Bilimbi matches or exceeds the useful design capability of Belimbing
 
 These shipped on `main` and were absent as checklist rows. The reduced-motion page-loading bar is the ticked FND-05 follow-up in Phase 3 (#806), not a second row. Each line records the observable result; the catalog and the contradiction notes above carry the design detail.
 
-- [x] Durable account-backed pins. The shell loads pins from `GET /api/pins` and writes through `/api/pins/toggle|reorder` (#791). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Durable account-backed pins. Writes go through `/api/pins/toggle|reorder` (#791). `{fm/parity-plan-bookkeeping/composer}` The mount read is the 2026-10-04 NAV-01 read path, not a `GET /api/pins` on shell mount.
 - [x] Country and jurisdiction combobox. `/companies/create`, the Company jurisdiction fact and Address country fields use `<.combobox>` (#793). `{fm/parity-plan-bookkeeping/composer}`
 - [x] Users filter toolbar. `/users` renders its filters through `<.filter_toolbar>` (#792). `{fm/parity-plan-bookkeeping/composer}`
 - [x] Shared notification and User datetime. `/notifications` and the Users Created column render through `<.datetime>` (#795). `{fm/parity-plan-bookkeeping/composer}`
@@ -740,7 +747,7 @@ Affected pages: `/dashboard`, `/companies`, all four `/system/design-library` ro
 
 Initial evidence: Bilimbi's authenticated dashboard repeats tenant name and ID in the top strip and presents platform-operator access as ordinary text; timezone/theme controls are absent. The footer exposes loose identity and logout. Belimbing's dashboard provides clock, sun, moon and computer-desktop utilities; its top-bar source resolves Company/Local/UTC display modes and per-user theme settings. Its account circle links to profile rather than fulfilling Bilimbi's accepted disclosure contract.
 
-Scope-switching disposition: deferred. Current identity resolves exactly one company through `User.get_user/3` and `UserAuth.current_scope_from/2`, so no scope switching is presented and no permitted-scope list is carried on the scope; no new authorization policy or tenant provisioning belongs to this slice. The captain clarified that whether a user should hold more than one company or tenant is undecided; if a need arises, “just have a selector to switch AFTER login”. This is deferred, not declined: the future selector belongs inside the authenticated account menu, as tracked in #710, and lands with the membership policy that defines a scope choice. Presentation must never infer permission from the existence of other companies.
+Scope-switching disposition: deferred. Current identity resolves exactly one company through `User.get_user/3` and `UserAuth` scope rehydration, so no scope switching is presented and no permitted-scope list is carried on the scope; no new authorization policy or tenant provisioning belongs to this slice. The captain clarified that whether a user should hold more than one company or tenant is undecided; if a need arises, “just have a selector to switch AFTER login”. This is deferred, not declined: the future selector belongs inside the authenticated account menu, as tracked in #710, and lands with the membership policy that defines a scope choice. Presentation must never infer permission from the existence of other companies.
 
 
 Accepted dispositions (2026-09-14):
@@ -755,7 +762,7 @@ Accepted dispositions (2026-09-14):
 | FND-06 shell icons | Equivalent | Clock, sun, moon, computer desktop, navigation bars and password key use familiar meanings through `IconRegistry.shell/1`. The existing Bilimbi navigation registry and impersonation icon remain in use. The wider searchable icon catalog is outside this slice. |
 | FND-06 logout exception | Keep Bilimbi | Keep the existing rightward sign-out arrow meaning and label it “Sign out”; no Belimbing icon asset is copied. |
 
-Implementation and adoption: `Bilimbi.Base.UI.ShellComponents` supplies the account disclosure, access warning and display controls to `Layouts.app`. The authenticated Web hook resolves fresh session identity before preference writes and uses the existing User and DateTime APIs; no schema or preference-key migration was needed. `Bilimbi.Core.User.DisplayPreferences` owns the account's theme, time display and language: one resolved snapshot and one durable write, used by the shell hook, the `/api/theme` adapter and the appearance screen alike. The impersonation refusal is stated once there, so an impersonated session writes none of them from any of the three surfaces — the appearance form names the fields it refused and leaves the viewed account's rows untouched, and the shell replaces its controls with the active time display and says why. The authenticated scope carries that one snapshot, which stamps the root layout, fills the timestamp display context and renders both the top-bar controls and the appearance form's theme and time-display fields; every confirmed write refreshes it, so no surface keeps a second copy. Every timestamp `<.datetime>` has already rendered follows a saved mode at once, including stream rows the server never re-renders: the element carries the server's own text for both server-decided modes and the `DateTime` hook swaps to the one the shell publishes. An instant given an explicit `display` stays pinned to that context instead. Every authenticated route adopts the shell, with direct browser checks on `/dashboard`, `/companies`, `/settings/password` and all four Design Library routes. `/system/design-library/components#component-shell` demonstrates a live timestamp and points at the page's own top-bar display controls and bottom-left account circle rather than duplicating either. `/system/design-library/design-spec#spec-shell` records the accepted user behavior.
+Implementation and adoption: `Bilimbi.Base.UI.ShellComponents` supplies the account disclosure, access warning and display controls to `Layouts.app`. The authenticated Web hook resolves fresh session identity before preference writes and uses the existing User and DateTime APIs; no schema or preference-key migration was needed. `Bilimbi.Core.User.DisplayPreferences` owns the account snapshot: one resolved snapshot and one durable write, used by the shell hook, the `/api/theme` adapter and the appearance screen alike. The impersonation refusal is stated once there, so an impersonated session writes none of them from any of the three surfaces — the appearance form names the fields it refused and leaves the viewed account's rows untouched, and the shell replaces its controls with the active time display and says why. The authenticated scope carries that one snapshot, which stamps the root layout, fills the timestamp display context and renders both the top-bar controls and the appearance form's theme and time-display fields; every confirmed write refreshes it, so no surface keeps a second copy. Every timestamp `<.datetime>` has already rendered follows a saved mode at once, including stream rows the server never re-renders: the element carries the server's own text for both server-decided modes and the `DateTime` hook swaps to the one the shell publishes. An instant given an explicit `display` stays pinned to that context instead. Every authenticated route adopts the shell, with direct browser checks on `/dashboard`, `/companies`, `/settings/password` and all four Design Library routes. `/system/design-library/components#component-shell` demonstrates a live timestamp and points at the page's own top-bar display controls and bottom-left account circle rather than duplicating either. `/system/design-library/design-spec#spec-shell` records the accepted user behavior.
 
 Validation evidence:
 

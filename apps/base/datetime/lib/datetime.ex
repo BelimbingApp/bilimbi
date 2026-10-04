@@ -136,8 +136,13 @@ defmodule Bilimbi.Base.DateTime do
   `company_scope` supplies the company time zone for `:company` mode.
   Before the canonical Settings table exists, resolution returns defaults;
   every other database error stays visible.
+
+  Pass an already resolved locale as the third argument so this function
+  does not call `Locale.resolve/1` again. Callers that have not resolved
+  one use `display/2`, which resolves it.
   """
   @spec display(SettingsScope.t() | nil, SettingsScope.t() | nil) :: Display.t()
+  @spec display(SettingsScope.t(), SettingsScope.t() | nil, String.t()) :: Display.t()
   def display(user_scope, company_scope \\ nil)
 
   def display(nil, _company_scope) do
@@ -145,10 +150,23 @@ defmodule Bilimbi.Base.DateTime do
   end
 
   def display(%SettingsScope{type: :user} = user_scope, company_scope) do
+    user_display(user_scope, company_scope, nil)
+  end
+
+  def display(%SettingsScope{type: :user} = user_scope, company_scope, locale)
+      when is_binary(locale) do
+    user_display(user_scope, company_scope, locale)
+  end
+
+  # `locale` nil means resolve it here, inside the same rescue as the settings
+  # reads: a missing Settings table still returns the defaults.
+  defp user_display(user_scope, company_scope, locale) do
+    locale = locale || Locale.resolve(user_scope).locale
+
     %Display{
       mode: mode(user_scope),
       timezone: company_timezone(company_scope),
-      locale: Locale.resolve(user_scope).locale,
+      locale: locale,
       tz_db: @tz_db
     }
   rescue

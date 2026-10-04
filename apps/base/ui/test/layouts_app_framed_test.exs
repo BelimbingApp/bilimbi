@@ -36,4 +36,42 @@ defmodule Bilimbi.Base.UI.LayoutsAppFramedTest do
     refute html =~ ~s(id="app-sidebar")
     refute html =~ ~s(id="app-statusbar")
   end
+
+  test "a shell scope renders its pin list, and a missing list is omitted" do
+    loaded =
+      render_component(&page/1, %{
+        current_scope:
+          shell_scope(%{pins: [%{id: 1, label: "Companies", url: "/companies", sort_order: 0}]})
+      })
+
+    assert loaded =~ ~s(data-pins=)
+    assert loaded =~ "/companies"
+
+    empty = render_component(&page/1, %{current_scope: shell_scope(%{pins: []})})
+    assert empty =~ ~s(data-pins="[]")
+
+    missing = render_component(&page/1, %{current_scope: shell_scope(%{})})
+    refute missing =~ "data-pins"
+  end
+
+  defp shell_scope(extra) do
+    Map.merge(
+      %{
+        user: %{
+          "name" => "Ada Lovelace",
+          "email" => "ada@example.com",
+          "company_name" => "Bilimbi Industries"
+        },
+        scope: %{tenant: %{name: "Bilimbi", id: 41, is_platform_operator: false}},
+        shell_preferences: %{
+          mode: :local,
+          modes: [:company, :local, :utc],
+          theme: "system",
+          timezone: "Etc/UTC"
+        },
+        impersonator: nil
+      },
+      extra
+    )
+  end
 end

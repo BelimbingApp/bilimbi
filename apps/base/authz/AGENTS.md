@@ -8,6 +8,12 @@ row. A directory that implements `live_company_ids_query/1` selects live ids
 only. `list_tenant_company_ids/1` includes archived companies and is the wrong
 set here.
 
+The route gate reads `current_scope.capabilities`. Do not call `Authz.can/2`
+for a key already on that list; a missing key still goes through `can/2` so
+the denial is logged. Events on an open page still use
+`LiveAuthorization.allowed_now?/2`. See
+[`docs/README.md`](docs/README.md#route-gate).
+
 Declare operator-tenant-only authority through the contribution's
 `platform_capabilities` list, which the shared evaluator enforces for direct,
 role, `grant_all`, and named system-principal grants. Use route `operator:

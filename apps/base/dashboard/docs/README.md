@@ -37,14 +37,15 @@ def contributions do
 end
 ```
 
-`priv/web_routes.exs` declares the panel under the same key and the same
-capability:
+`priv/web_routes.exs` declares the panel under the same key. The catalogue
+entry's capability is what offers the widget. The embed leaves capability
+unset, so a card the page is already showing stays mounted after that grant
+is removed and the panel skips the read:
 
 ```elixir
 %{
   embed: "dashboard.open-orders",
-  live_component: MyModule.Web.DashboardOrdersPanel,
-  capability: "admin.order.list"
+  live_component: MyModule.Web.DashboardOrdersPanel
 }
 ```
 
@@ -64,6 +65,8 @@ a LiveComponent that gets:
 - `editing` — `true` while the account is customizing the layout. Withhold
   navigation while it is `true`: the page lays its move and remove controls
   over the panel's top-right corner.
+- `connected` — false while the first HTML is rendered. A panel with live
+  data waits until this is true before its first read.
 - `refresh` — a count that grows by one each time the page refreshes. A panel
   with live data reads again when the count changes; a panel that reads once
   ignores it. `update/2` also runs when only `editing` changes, so do not

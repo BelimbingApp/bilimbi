@@ -310,7 +310,7 @@ defmodule Bilimbi.Core.User.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE user_pins (
+      CREATE TEMPORARY TABLE IF NOT EXISTS user_pins (
         id bigserial PRIMARY KEY,
         user_id bigint NOT NULL,
         label varchar(150) NOT NULL,
@@ -327,13 +327,13 @@ defmodule Bilimbi.Core.User.TestFixtures do
 
     SQL.query!(
       Repo,
-      "CREATE UNIQUE INDEX user_pins_user_id_url_hash_unique ON user_pins (user_id, url_hash)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS user_pins_user_id_url_hash_unique ON user_pins (user_id, url_hash)",
       []
     )
 
     SQL.query!(
       Repo,
-      "CREATE INDEX user_pins_user_id_sort_order_index ON user_pins (user_id, sort_order)",
+      "CREATE INDEX IF NOT EXISTS user_pins_user_id_sort_order_index ON user_pins (user_id, sort_order)",
       []
     )
   end

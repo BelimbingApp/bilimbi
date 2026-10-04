@@ -23,11 +23,13 @@ and deadline semantics, and canonical storage stays UTC.
 
 `Bilimbi.Base.DateTime.display/2` takes the account's explicit Settings scope
 and the company scope and returns a `%Display{}` — mode, company time zone,
-resolved locale, and the time zone database module as a value. The web edge
-resolves it once per request/LiveView process and stores it in
-`Bilimbi.Base.UI.DateTimeDisplay` (the `Gettext.put_locale/2` pattern), so
-every `<.datetime>` on a screen renders in the same mode and no user's
-context leaks into another process.
+resolved locale, and the time zone database module as a value. `display/3`
+takes a locale the caller already resolved and does not call
+`Locale.resolve/1` again. The signed-in shell resolves locale once on the
+shell-preferences snapshot and passes that locale here. The web edge stores
+the display context in `Bilimbi.Base.UI.DateTimeDisplay` (the
+`Gettext.put_locale/2` pattern), so every `<.datetime>` on a screen renders
+in the same mode and no user's context leaks into another process.
 
 Rendering semantics, preserved from the source:
 

@@ -1,7 +1,7 @@
 import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
-// rail choice (localStorage), durable pin hydration/migration, the mobile
+// rail choice (localStorage), pin hydration from `data-pins` (and migration), the mobile
 // drawer, Escape/backdrop close, returning focus to the toggle, and pointing
 // each row's "Open in a tile" link at the workspace from wherever the
 // browser is. The top-bar display controls and account disclosure belong to
@@ -236,26 +236,42 @@ const AppShell = {
   },
 
   async loadPinnedItems() {
-    let pins = []
+    const rendered = this.readRenderedPins()
+    let pins = rendered
 
-    try {
-      const response = await this.pinRequest("/api/pins")
-      if (!response.ok) throw new Error(`Pin load failed with status ${response.status}`)
-
-      pins = this.acceptServerPins((await response.json()).pins)
-      if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
-    } catch (_error) {
-      // Keep the durable API as the only source of truth. A transient outage
-      // keeps the pins already read; a failed first read leaves legacy data for retry.
+    if (!this.impersonating) {
+      try {
+        pins = await this.migrateLegacyPins(rendered)
+      } catch (_error) {
+        pins = rendered
+      }
     }
 
     this.pinnedEntries = pins
     this.renderPinnedItems()
   },
 
+  readRenderedPins() {
+    try {
+      const parsed = JSON.parse(this.el.dataset.pins || "[]")
+      return this.acceptServerPins(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      return []
+    }
+  },
+
+  async fetchServerPins() {
+    try {
+      const response = await this.pinRequest("/api/pins")
+      if (!response.ok) return null
+      return this.acceptServerPins((await response.json()).pins)
+    } catch (_error) {
+      return null
+    }
+  },
+
   async migrateLegacyPins(pins) {
     const legacy = this.readLegacyPinnedItems()
-    window.localStorage.removeItem?.(PINNED_STORAGE)
 
     const legacyUrls = legacy
       .filter((item) => item.navId)
@@ -269,8 +285,14 @@ const AppShell = {
         method: "POST",
         body: JSON.stringify({label: item.label, url, icon: null}),
       })
-      if (imported.ok) pins = this.acceptServerPins((await imported.json()).pins)
+      if (!imported.ok) return pins
+      pins = this.acceptServerPins((await imported.json()).pins)
     }
+
+    // Remove the legacy key only after every import has succeeded. A rejected
+    // toggle, a non-OK status, or a body that is not JSON leaves the key so
+    // the next mount can retry. Pins already drawn from data-pins stay.
+    window.localStorage.removeItem?.(PINNED_STORAGE)
 
     const urls = legacyUrls.map(({url}) => url)
     const ordered = [
@@ -535,7 +557,7 @@ const AppShell = {
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
-      this.setPinAnnouncement("Unable to update pinned pages.")
+      await this.fallbackPinsAfterToggle()
     }
   },
 
@@ -554,6 +576,17 @@ const AppShell = {
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
+      await this.fallbackPinsAfterToggle()
+    }
+  },
+
+  async fallbackPinsAfterToggle() {
+    const pins = await this.fetchServerPins()
+
+    if (pins) {
+      this.pinnedEntries = pins
+      this.renderPinnedItems()
+    } else {
       this.setPinAnnouncement("Unable to update pinned pages.")
     }
   },

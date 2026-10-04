@@ -72,8 +72,9 @@ any-of requirement on its menu leaf and in its owning module's route file:
 Declare each key through the module's Authz contribution as usual. At least
 one live allow opens the route; holders of neither are refused. This applies
 to LiveView mounts, navigation to another guarded route, and controller routes.
-Menu visibility and workspace tile previews use the account's effective allows;
-route guards always ask Authz again. Operator-only restrictions still apply.
+Menu visibility and workspace tile previews use the account's effective allows.
+The route gate is [Route gate](../../authz/docs/README.md#route-gate).
+Operator-only restrictions still apply.
 
 The list must be non-empty, with distinct, non-blank strings. Menu contribution
 validation rejects malformed declarations at boot; route discovery rejects

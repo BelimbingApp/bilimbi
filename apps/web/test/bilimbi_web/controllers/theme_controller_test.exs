@@ -27,6 +27,31 @@ defmodule BilimbiWeb.ThemeControllerTest do
     assert redirected_to(conn) == ~p"/"
   end
 
+  test "POST /api/theme does not load shell pins", %{conn: conn} do
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, owner ->
+        if metadata.source == "user_pins" and match?({:ok, %{command: :select}}, metadata.result) do
+          send(owner, :pin_read)
+        end
+      end,
+      owner
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    conn
+    |> log_in_as()
+    |> post(~p"/api/theme", %{"theme" => "dark"})
+    |> json_response(200)
+
+    refute_receive :pin_read
+  end
+
   test "POST /api/theme updates user theme preference", %{conn: conn} do
     conn =
       conn

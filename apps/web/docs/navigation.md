@@ -11,8 +11,10 @@ event or URL patch, including events handled by Base UI LiveComponents.
 A terminated session or removed login sends the page to sign-in with the
 expired-session message. Revoking its page permission sends it to the
 dashboard with a refusal message before the action runs. Server-triggered
-callbacks are outside this boundary. The host refreshes `current_scope` for
-the handler; cached presentation flags are not authorization.
+callbacks stay outside the page-permission check. The dashboard widget timer
+still rehydrates the scope; RouteAccess owns that exception. The host
+refreshes `current_scope` for the handler; cached presentation flags are not
+authorization.
 
 [RouteAccess](../lib/bilimbi_web/route_access.ex) owns the hook, route-policy,
 and component callback contract. Additional operation permissions use

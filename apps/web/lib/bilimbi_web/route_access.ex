@@ -9,6 +9,11 @@ defmodule BilimbiWeb.RouteAccess do
   session hooks. A missing policy fails closed; routes sharing a LiveView
   still carry distinct policies.
 
+  The mount gate answers from `current_scope.capabilities`, the allowed list
+  stored when the scope was rehydrated. A key on that list is allowed without
+  another `Bilimbi.Base.Authz.can/2`, so an allowed page view writes no
+  decision-log row. A key absent from the list is still evaluated and logged.
+
   ## After mount
 
   A LiveView process outlives its mount. Its session can be terminated, its
@@ -20,10 +25,14 @@ defmodule BilimbiWeb.RouteAccess do
        (`BilimbiWeb.UserAuth.refresh_scope/1`: durable session row, company,
        tenant, user, effective capabilities). A miss ends the page: it is sent
        to the login screen with the expired-session flash;
-    2. the route's capability (including an `{:any_of, keys}` guard) is
-       re-evaluated against the refreshed actor, one `Bilimbi.Base.Authz.can/2`
-       decision per key. A page whose capability no longer holds is sent to
-       the dashboard with a flash saying why.
+    2. the route's capability (including an `{:any_of, keys}` guard) is judged
+       again. An event, or a patch that stays on the same route, calls
+       `Bilimbi.Base.Authz.LiveAuthorization.allowed_now?/2`: one
+       `Bilimbi.Base.Authz.can/2` decision per key, so a grant removed since
+       the page opened is refused and logged. Entering a different route uses
+       the list just refreshed onto the scope, the same rule as the mount
+       gate. A page whose capability no longer holds is sent to the dashboard
+       with a flash saying why.
 
   Both run before every `handle_event/3`, through a `:handle_event` hook, and
   before every `handle_params/3` that live navigation triggers, whether the
@@ -33,9 +42,15 @@ defmodule BilimbiWeb.RouteAccess do
   `current_scope` is assigned, so `allowed?/2` inside the callback reads the
   current capability list rather than the mount's.
 
-  Server-triggered callbacks (`handle_info`, `handle_async`) are not checked
-  here. A LiveComponent's `handle_event/3` reaches the same authorization
-  through the Base UI event wrapper and its process-local host callback.
+  Server-triggered callbacks (`handle_info`, `handle_async`) are not
+  reauthorized here. The dashboard's `:refresh_widgets` timer is the
+  exception: it rehydrates the scope, keeping the frame flag and pin list,
+  without writing session activity, and then continues into the page. A
+  click or a preference save still writes that activity.
+  That rehydration does not call `allowed_now?/2`, so a still-permitted tick
+  writes no decision-log row. A LiveComponent's `handle_event/3` reaches the
+  same authorization through the Base UI event wrapper and its process-local
+  host callback.
   The callback is replaced on live navigation and refreshes the owning page's
   identity before checking its requirement. An operation needing another
   capability also uses `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
@@ -76,6 +91,7 @@ defmodule BilimbiWeb.RouteAccess do
             &handle_params(policies, session, &1, &2, &3)
           )
           |> attach_hook(:route_access_event, :handle_event, &handle_event(policies, &1, &2, &3))
+          |> attach_hook(:route_access_widget_refresh, :handle_info, &refresh_widgets/2)
 
         {:cont, socket}
     end
@@ -115,6 +131,13 @@ defmodule BilimbiWeb.RouteAccess do
     authorize_event(Map.fetch!(policies, socket.private.bilimbi_route_action), socket)
   end
 
+  # The dashboard timer is `handle_info`, so the event hook does not run.
+  # Rehydrate capabilities before the page reads, without extending the idle
+  # clock, and leave the route decision alone: a still-permitted tick must
+  # not write a decision-log row.
+  defp refresh_widgets(:refresh_widgets, socket), do: refresh(socket, false)
+  defp refresh_widgets(_message, socket), do: {:cont, socket}
+
   defp authorize_event(capability, socket) do
     with {:cont, socket} <- refresh(socket), do: reauthorize(capability, socket)
   end
@@ -127,15 +150,26 @@ defmodule BilimbiWeb.RouteAccess do
     end)
   end
 
-  # The same four reads the HTTP plug pays per request. The frame flag is the
-  # one fact a refreshed scope cannot rebuild: it came from the LiveView
-  # session at mount (`BilimbiWeb.FramedRender`). A session group without a
-  # scope (public routes) has nothing to refresh.
-  defp refresh(%{assigns: %{current_scope: %{session_identity: _} = current_scope}} = socket) do
-    case BilimbiWeb.UserAuth.refresh_scope(current_scope) do
+  # The same four reads the HTTP plug pays per request. A refreshed scope
+  # cannot rebuild the frame flag (`BilimbiWeb.FramedRender`) or the shell
+  # pin list loaded at mount, so both are copied from the open page. A
+  # client event writes session activity. The dashboard timer passes `false`
+  # so an open page can still expire. A session group without a scope
+  # (public routes) has nothing to refresh.
+  defp refresh(socket, activity? \\ true)
+
+  defp refresh(
+         %{assigns: %{current_scope: %{session_identity: _} = current_scope}} = socket,
+         activity?
+       ) do
+    case BilimbiWeb.UserAuth.refresh_scope(current_scope, activity?) do
       {:ok, refreshed} ->
         {:cont,
-         assign(socket, :current_scope, Map.merge(refreshed, Map.take(current_scope, [:framed])))}
+         assign(
+           socket,
+           :current_scope,
+           Map.merge(refreshed, Map.take(current_scope, [:framed, :pins]))
+         )}
 
       {:error, :unauthenticated} ->
         {:halt,
@@ -145,7 +179,7 @@ defmodule BilimbiWeb.RouteAccess do
     end
   end
 
-  defp refresh(socket), do: {:cont, socket}
+  defp refresh(socket, _activity?), do: {:cont, socket}
 
   defp put_route(socket, action, checked?) do
     socket

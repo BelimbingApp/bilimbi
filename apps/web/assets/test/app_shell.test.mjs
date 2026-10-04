@@ -121,8 +121,11 @@ const flush = async () => {
   for (let i = 0; i < 4; i++) await settle()
 }
 
-function mount() {
-  shell = mountHook(AppShell, render(SHELL, "app-shell"))
+function mount(root = render(SHELL, "app-shell")) {
+  if (!Object.hasOwn(root.dataset, "pins")) {
+    root.dataset.pins = JSON.stringify(serverPins)
+  }
+  shell = mountHook(AppShell, root)
   return shell
 }
 
@@ -306,7 +309,6 @@ test("pinning and unpinning a navigation item uses the durable API", async () =>
   assert.equal($("nav-pin-companies").getAttribute("aria-pressed"), "true")
   assert.equal($("nav-pin-companies").title, "Unpin Companies to sidebar")
   assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), [
-    "GET /api/pins",
     "POST /api/pins/toggle",
   ])
 
@@ -314,6 +316,41 @@ test("pinning and unpinning a navigation item uses the durable API", async () =>
   await flush()
   assert.equal($("app-pinned").hidden, true)
   assert.equal(serverPins.length, 0)
+})
+
+test("a shell without rendered pins does not request /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests, [])
+  assert.equal($("app-pinned").hidden, true)
+})
+
+test("rendered pins hydrate without requesting /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.deepEqual(requests, [])
+})
+
+test("a failed toggle falls back to GET /api/pins", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = "[]"
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  failToggle = reply({}, 500)
+  click("nav-pin-companies")
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), [
+    "POST /api/pins/toggle",
+    "GET /api/pins",
+  ])
 })
 
 test("pins survive reload through the authenticated API", async () => {
@@ -496,6 +533,92 @@ test("keyboard move controls reorder durably, announce, and restore focus", asyn
   assert.equal(document.activeElement.className.includes("app-pinned-link"), true)
 })
 
+test("a failed legacy migration keeps the pins already on the page", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-users"}]))
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    throw new Error("offline")
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.equal(calls, 1)
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(shell.hook.pinnedEntries.length, 1)
+  assert.equal(
+    localStorage.getItem("sidebarPinnedItems"),
+    JSON.stringify([{id: "nav-users"}]),
+  )
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a legacy migration response that is not JSON keeps the pins already on the page", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-users"}]))
+  failToggle = {
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError("not json")
+    },
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["POST /api/pins/toggle"])
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(shell.hook.pinnedEntries.length, 1)
+  assert.equal(
+    localStorage.getItem("sidebarPinnedItems"),
+    JSON.stringify([{id: "nav-users"}]),
+  )
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a non-OK legacy migration leaves the browser key for a later retry", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  const stored = JSON.stringify([{id: "nav-users"}])
+  localStorage.setItem("sidebarPinnedItems", stored)
+  failToggle = reply({error: "invalid_pin"}, 422)
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["POST /api/pins/toggle"])
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(localStorage.getItem("sidebarPinnedItems"), stored)
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a later failed legacy import keeps the browser key after an earlier import landed", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = "[]"
+  const stored = JSON.stringify([{id: "nav-companies"}, {id: "nav-users"}])
+  localStorage.setItem("sidebarPinnedItems", stored)
+  let calls = 0
+  globalThis.fetch = async (_path, options = {}) => {
+    calls += 1
+    if (calls === 1) {
+      const body = JSON.parse(options.body)
+      return reply({pins: [{id: 1, label: body.label, url: body.url}]})
+    }
+    return reply({error: "invalid_pin"}, 422)
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.equal(calls, 2)
+  assert.equal(localStorage.getItem("sidebarPinnedItems"), stored)
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
 test("legacy migration imports navigation pins only and clears the browser key", async () => {
   localStorage.setItem("sidebarPinnedItems", JSON.stringify([
     {id: "nav-companies"},
@@ -514,6 +637,7 @@ test("impersonated shells read pins but refuse pin writes and migration", async 
   localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}]))
   const root = render(SHELL, "app-shell")
   root.dataset.impersonating = "true"
+  root.dataset.pins = JSON.stringify(serverPins)
   shell = mountHook(AppShell, root)
   await flush()
 
@@ -522,7 +646,7 @@ test("impersonated shells read pins but refuse pin writes and migration", async 
   moveDown?.click()
   await flush()
 
-  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["GET /api/pins"])
+  assert.deepEqual(requests, [])
   assert.equal(localStorage.getItem("sidebarPinnedItems") !== null, true)
   assert.equal($("nav-pin-companies").disabled, true)
   assert.equal($("app-pinned-items").querySelector('[data-nav-unpin]').disabled, true)
