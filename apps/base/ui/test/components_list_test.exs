@@ -10,7 +10,7 @@ defmodule Bilimbi.Base.UI.ComponentsListTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders one definition row per fact with the label beside the value" do
     assigns = %{}

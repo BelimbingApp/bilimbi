@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp preview(assigns) do
     assigns =
@@ -174,7 +174,7 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
 
   test "a multiple select is sized in rows, so no row is painted in half" do
     html =
-      render_component(&Bilimbi.Base.UI.Components.input/1,
+      render_component(&Bilimbi.Base.UI.Components.Forms.input/1,
         id: "roles",
         name: "roles[]",
         value: [],
@@ -200,7 +200,7 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
 
   test "a single select keeps its padding" do
     html =
-      render_component(&Bilimbi.Base.UI.Components.input/1,
+      render_component(&Bilimbi.Base.UI.Components.Forms.input/1,
         id: "one",
         name: "one",
         value: nil,

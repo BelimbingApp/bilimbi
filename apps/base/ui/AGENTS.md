@@ -2,9 +2,13 @@
 
 Read the component comment before fighting a default. `DESIGN.md` is the design source. This note is the mistakes, plus the asset rules.
 
+## Component modules
+
+Shared components live in four modules: `lib/ui/components.ex`, and `icon.ex`, `forms.ex` and `lists.ex` under `lib/ui/components/`. Take them with `use Bilimbi.Base.UI.Components`, not `import`: a plain import brings only what `components.ex` still defines, so `<.icon>`, `<.input>` and `<.table>` are undefined. A new group joins `Components.modules/0` and the `__using__` there, or the Design Library guards never measure it. The moduledoc of `Bilimbi.Base.UI.Components` owns the import order.
+
 ## Defaults the component owns
 
-Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
+Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components/forms.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
 The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value. If that audit write cannot land, refuse the reveal and send nothing — see the `:audit_unavailable` path in `BilimbiWeb.SecretReveal` and its LiveView coverage in `apps/base/settings/web_test/settings_live_test.exs`.
 
 Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
@@ -67,7 +71,7 @@ Opening a page in a tile from anywhere is a link to `/workspace` with `open=<the
 
 ## Lists
 
-Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced. The moduledocs own the contract; `<.filter_toolbar>` and `<.pagination>` still own the framing.
+Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced. The moduledocs own the contract; `<.filter_toolbar>` and `<.pagination>` in `lib/ui/components/lists.ex` still own the framing.
 
 ## Summaries
 

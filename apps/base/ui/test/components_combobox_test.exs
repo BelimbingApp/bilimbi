@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.UI.ComponentsComboboxTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp combobox_field(assigns) do
     ~H"""

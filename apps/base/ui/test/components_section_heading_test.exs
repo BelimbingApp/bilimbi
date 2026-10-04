@@ -9,7 +9,7 @@ defmodule Bilimbi.Base.UI.ComponentsSectionHeadingTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders the title as a level-two heading in the small-caps treatment" do
     assigns = %{}

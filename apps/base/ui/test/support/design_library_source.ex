@@ -106,10 +106,21 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
 
   @doc "Public components, the vocabulary every guard measures the library against."
   def public_components do
-    Components.__components__()
-    |> Map.keys()
-    |> Enum.filter(&function_exported?(Components, &1, 1))
+    for module <- Components.modules(),
+        name <- Map.keys(module.__components__()),
+        function_exported?(module, name, 1) do
+      name
+    end
     |> Enum.sort()
+  end
+
+  @doc """
+  The declared attrs and slots of a public component, from whichever module
+  in `Components.modules/0` defines it.
+  """
+  def component!(name) do
+    Enum.find_value(Components.modules(), fn module -> module.__components__()[name] end) ||
+      raise ArgumentError, "no shared component named #{inspect(name)}"
   end
 
   @doc """

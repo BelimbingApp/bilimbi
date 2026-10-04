@@ -31,9 +31,9 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   use Phoenix.Component
   use Gettext, backend: Bilimbi.Base.UI.Gettext
+  use Bilimbi.Base.UI.Components
 
   import Phoenix.Controller, only: [get_csrf_token: 0]
-  import Bilimbi.Base.UI.Components
   import Bilimbi.Base.UI.DiscoveredPanels, only: [discovered_panel: 1]
   alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Base.UI.ShellComponents

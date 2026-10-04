@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.UI.ComponentsSelectTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp select_field(assigns) do
     ~H"""

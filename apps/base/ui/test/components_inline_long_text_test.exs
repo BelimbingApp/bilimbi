@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.UI.ComponentsInlineLongTextTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders the read state and editor with the owner contract" do
     assigns = %{metadata_json: ~s({"tier": "gold"})}
