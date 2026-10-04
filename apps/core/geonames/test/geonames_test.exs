@@ -392,59 +392,67 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Enum.all?(names, &is_binary/1)
   end
 
-  describe "update_country_name/2 with untrusted input" do
-    test "a non-numeric id is refused, not raised on" do
+  describe "update_country_name/3 with untrusted input" do
+    setup :system_scope
+
+    test "a non-numeric id is refused, not raised on", %{scope: scope} do
       # The id reaches this from the browser via the inline-edit hook's
       # data-id. The LiveView used to call String.to_integer/1 on it first,
       # which raised ArgumentError and took the process down; this function
       # already answers :not_found for garbage, so the guard was removed (#302).
-      assert {:error, :not_found} = Geonames.update_country_name("abc", "Nowhere")
-      assert {:error, :not_found} = Geonames.update_country_name("", "Nowhere")
-      assert {:error, :not_found} = Geonames.update_country_name("1; DROP TABLE", "Nowhere")
+      assert {:error, :not_found} = Geonames.update_country_name(scope, "abc", "Nowhere")
+      assert {:error, :not_found} = Geonames.update_country_name(scope, "", "Nowhere")
+
+      assert {:error, :not_found} =
+               Geonames.update_country_name(scope, "1; DROP TABLE", "Nowhere")
     end
 
-    test "a numeric string id still resolves" do
-      {:ok, %{id: id}} = Geonames.update_country_name("US", "United States of America")
+    test "a numeric string id still resolves", %{scope: scope} do
+      {:ok, %{id: id}} = Geonames.update_country_name(scope, "US", "United States of America")
 
       assert {:ok, %{country: "Renamed"}} =
-               Geonames.update_country_name(Integer.to_string(id), "Renamed")
+               Geonames.update_country_name(scope, Integer.to_string(id), "Renamed")
     end
   end
 
-  describe "update_admin1_name/2 with untrusted input" do
-    test "a non-numeric or non-integer id is refused" do
-      assert {:error, :not_found} = Geonames.update_admin1_name("abc", "Somewhere")
-      assert {:error, :not_found} = Geonames.update_admin1_name("", "Somewhere")
-      assert {:error, :not_found} = Geonames.update_admin1_name(nil, "Somewhere")
-      assert {:error, :not_found} = Geonames.update_admin1_name(:invalid, "Somewhere")
-      assert {:error, :not_found} = Geonames.update_admin1_name(999_999, "Somewhere")
+  describe "update_admin1_name/3 with untrusted input" do
+    setup :system_scope
+
+    test "a non-numeric or non-integer id is refused", %{scope: scope} do
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, "abc", "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, "", "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, nil, "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, :invalid, "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, 999_999, "Somewhere")
     end
 
-    test "an empty or invalid name fails validation" do
+    test "an empty or invalid name fails validation", %{scope: scope} do
       admin1 = hd(Geonames.page_admin1().entries)
-      assert {:error, changeset} = Geonames.update_admin1_name(admin1.id, "")
+      assert {:error, changeset} = Geonames.update_admin1_name(scope, admin1.id, "")
       assert "can't be blank" in errors_on(changeset).name
-      assert {:error, :not_found} = Geonames.update_admin1_name(admin1.id, nil)
+      assert {:error, :not_found} = Geonames.update_admin1_name(scope, admin1.id, nil)
     end
 
-    test "a numeric string or integer id updates successfully" do
+    test "a numeric string or integer id updates successfully", %{scope: scope} do
       admin1 = hd(Geonames.page_admin1().entries)
 
       assert {:ok, %{name: "New Division Name", country_name: country_name}} =
-               Geonames.update_admin1_name(admin1.id, "  New Division Name  ")
+               Geonames.update_admin1_name(scope, admin1.id, "  New Division Name  ")
 
       assert is_binary(country_name)
 
       assert {:ok, %{name: "Second Name"}} =
-               Geonames.update_admin1_name(to_string(admin1.id), "Second Name")
+               Geonames.update_admin1_name(scope, to_string(admin1.id), "Second Name")
     end
 
-    test "admin1 with code lacking country dot resolves country_name as nil gracefully" do
+    test "admin1 with code lacking country dot resolves country_name as nil gracefully", %{
+      scope: scope
+    } do
       insert_admin1!(%{code: "NODOT", name: "No Country Dot", geoname_id: 9_999_998})
       unlinked = hd(Geonames.page_admin1(%{"search" => "NODOT"}).entries)
 
       assert {:ok, %{name: "Renamed No Dot", country_name: nil}} =
-               Geonames.update_admin1_name(unlinked.id, "Renamed No Dot")
+               Geonames.update_admin1_name(scope, unlinked.id, "Renamed No Dot")
     end
   end
 
@@ -527,6 +535,15 @@ defmodule Bilimbi.Core.GeonamesTest do
       assert [%{place_name: "Kuala Lumpur City"}] =
                Geonames.lookup_postcode("MY", "50000")
     end
+  end
+
+  defp system_scope(_context) do
+    alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
+
+    TenancyFixtures.create_tenants_table!()
+    TenancyFixtures.insert_tenant!()
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    %{scope: scope}
   end
 
   defp errors_on(changeset) do

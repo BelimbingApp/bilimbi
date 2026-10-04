@@ -6,3 +6,10 @@ snapshot. Single-row reads outside transactions use `Settings.Cache`; write
 through `Settings.put/3` and `Settings.delete/2` so `Repo.after_commit/1`
 invalidates the matching cache entry after the outer transaction commits.
 See `docs/README.md` for the TTL and multi-node invalidation contract.
+
+A platform-global save or restore goes through `Form.save/4` and
+`Form.restore_defaults/3` with the sealed tenancy scope. Those check
+`base.settings.global.manage` at call time (`Settings.Authorization`). Do not
+write a global override from the page with `Form.save/3`: that arity does not
+see the actor. The capability stays limited to the operator tenant through
+Authz; do not add a bypass.

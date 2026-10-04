@@ -67,7 +67,7 @@ Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerc
 
 ## Summaries
 
-A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip and keeps its own markup, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
+A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip: the section uses `<.card>`, `<.section_heading>` and `<.empty_state>`, and the entry rows stay local, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
 
 ## Maintaining this file
 

@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Geonames
 
   import Bilimbi.Core.Geonames.Web.Components
@@ -32,21 +33,15 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   def handle_event("save-country-name", %{"id" => id, "country" => name}, socket) do
     # `id` arrives from the client. `String.to_integer/1` raised on anything
-    # non-numeric and took the LiveView down with it; `update_country_name/2`
-    # already parses binaries safely and answers `:not_found` for garbage
-    # (`geonames.ex:141-150`), so passing it straight through is both shorter
-    # and harder to break (#302).
-    case Geonames.update_country_name(id, name) do
-      {:ok, updated_country} ->
-        {:noreply,
-         socket
-         |> stream_insert(:countries, updated_country)
-         |> put_flash(:success, "Country #{updated_country.iso} name updated.")}
-
-      {:error, _reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Failed to save country name.")}
+    # non-numeric and took the LiveView down with it; `update_country_name/3`
+    # already parses binaries safely and answers `:not_found` for garbage,
+    # so passing it straight through is both shorter and harder to break (#302).
+    # `can_update?` only shows the control. This asks again, and the API asks
+    # with the sealed scope, so a grant revoked after mount does not rename.
+    if country_update_allowed?(socket) do
+      save_country_name(socket, id, name)
+    else
+      {:noreply, put_flash(socket, :error, "You do not have permission to update countries.")}
     end
   end
 
@@ -85,12 +80,38 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   def handle_event("update-countries", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:updating_countries?, true)
-     |> start_async(:update_countries, fn ->
-       Geonames.import_reference_data(datasets: [:countries])
-     end)}
+    if country_update_allowed?(socket) do
+      scope = socket.assigns.current_scope.scope
+
+      {:noreply,
+       socket
+       |> assign(:updating_countries?, true)
+       |> start_async(:update_countries, fn ->
+         Geonames.import_reference_data(scope, datasets: [:countries])
+       end)}
+    else
+      {:noreply, put_flash(socket, :error, "You do not have permission to update countries.")}
+    end
+  end
+
+  defp save_country_name(socket, id, name) do
+    case Geonames.update_country_name(socket.assigns.current_scope.scope, id, name) do
+      {:ok, updated_country} ->
+        {:noreply,
+         socket
+         |> stream_insert(:countries, updated_country)
+         |> put_flash(:success, "Country #{updated_country.iso} name updated.")}
+
+      {:error, :forbidden} ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to update countries.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to save country name.")}
+    end
+  end
+
+  defp country_update_allowed?(socket) do
+    Authz.can(socket.assigns.current_scope.scope, "admin.geonames.update").allowed
   end
 
   @impl true

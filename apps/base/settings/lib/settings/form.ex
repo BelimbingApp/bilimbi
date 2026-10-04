@@ -33,8 +33,12 @@ defmodule Bilimbi.Base.Settings.Form do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Authorization
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Scope
+  alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
+
+  @global_capability "base.settings.global.manage"
 
   @typedoc """
   One rendered field.
@@ -131,6 +135,24 @@ defmodule Bilimbi.Base.Settings.Form do
     end
   end
 
+  @doc """
+  Applies one submission for an actor.
+
+  A global settings scope (`nil`) requires `base.settings.global.manage` on
+  the sealed tenancy scope now. Company and user settings scopes keep their
+  own checks; this clause does not treat them as platform-global.
+  """
+  @spec save(map(), [field()], Scope.t() | nil, TenancyScope.t()) ::
+          {:ok, %{written: [String.t()], cleared: [String.t()], unchanged: [String.t()]}}
+          | {:error, :forbidden}
+          | {:error, String.t(), String.t()}
+  def save(params, fields, settings_scope, %TenancyScope{} = actor_scope)
+      when is_map(params) and is_list(fields) do
+    with :ok <- authorize_global(actor_scope, settings_scope) do
+      save(params, fields, settings_scope)
+    end
+  end
+
   # Every field is decided before any of them is written. Deciding as we go
   # would let a later field's bad input abort a loop that has already committed
   # the earlier ones, leaving a save that reported failure and changed data
@@ -224,6 +246,21 @@ defmodule Bilimbi.Base.Settings.Form do
   end
 
   @doc """
+  Drops every override these fields hold at `settings_scope`, for an actor.
+
+  A global settings scope requires `base.settings.global.manage` now, the
+  same check as `save/4`.
+  """
+  @spec restore_defaults([field()], Scope.t() | nil, TenancyScope.t()) ::
+          {:ok, [String.t()]} | {:error, :forbidden}
+  def restore_defaults(fields, settings_scope, %TenancyScope{} = actor_scope)
+      when is_list(fields) do
+    with :ok <- authorize_global(actor_scope, settings_scope) do
+      restore_defaults(fields, settings_scope)
+    end
+  end
+
+  @doc """
   Drops every override these fields hold at `scope`.
 
   Belimbing's `restoreDefaults`: each value then resolves from the next scope
@@ -251,6 +288,15 @@ defmodule Bilimbi.Base.Settings.Form do
 
     {:ok, cleared}
   end
+
+  # Only the platform-global scope is judged here. A company or user scope is
+  # a different write, and folding it into this capability would let a global
+  # grant decide a company override — or the reverse.
+  defp authorize_global(%TenancyScope{} = actor_scope, nil) do
+    if Authorization.can?(actor_scope, @global_capability), do: :ok, else: {:error, :forbidden}
+  end
+
+  defp authorize_global(%TenancyScope{}, _settings_scope), do: :ok
 
   defp build_field(key, definition, values) do
     %{value: stored, overridden?: overridden?, source_scope: source_scope} =

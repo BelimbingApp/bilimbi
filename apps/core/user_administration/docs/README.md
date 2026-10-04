@@ -18,9 +18,9 @@ authorization; the web adapter enforces `admin.user.list` before it calls the
 facade.
 
 The adapter keeps `active_nav` at `admin.user`, so Core User's existing menu
-contribution remains the navigation owner. Create, view, and impersonate
-controls are available on the index, while account editing and deletion
-remain owned by Core User's ShowLive adapter. Archived-company accounts
+contribution remains the navigation owner. Create, view, impersonate, and
+delete controls are available on the index. Account editing stays on Core
+User's ShowLive. Delete calls `User.delete_user/3`. Archived-company accounts
 are presented as read-only.
 
 Options accept only a keyword list containing the following normalized values:

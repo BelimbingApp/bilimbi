@@ -94,7 +94,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     actor_id = socket.assigns.current_scope.user["user_id"]
 
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+      not delete_allowed?(socket) ->
         delete_forbidden(socket)
 
       match?({id, ""} when id == actor_id, Integer.parse(to_string(raw_id))) ->
@@ -119,7 +119,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     scope = socket.assigns.current_scope.scope
 
     cond do
-      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+      not delete_allowed?(socket) ->
         delete_forbidden(socket)
 
       is_nil(socket.assigns.pending_delete) ->
@@ -136,6 +136,9 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
              |> put_flash(:success, "#{entry.name}'s account was deleted.")
              |> load_page(socket.assigns.index_state)}
 
+          {:error, :forbidden} ->
+            delete_forbidden(socket)
+
           {:error, :company_not_found} ->
             {:noreply,
              put_flash(
@@ -151,6 +154,10 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
              |> load_page(socket.assigns.index_state)}
         end
     end
+  end
+
+  defp delete_allowed?(socket) do
+    Authz.can(socket.assigns.current_scope.scope, "admin.user.delete").allowed
   end
 
   defp delete_forbidden(socket) do

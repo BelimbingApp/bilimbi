@@ -91,7 +91,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     grant_capabilities!("admin.employee.list")
 
     {:ok, dept_type} =
-      Bilimbi.Core.Company.create_department_type(%{
+      Bilimbi.Core.Company.create_department_type(scope, %{
         code: "engineering",
         name: "Engineering",
         category: "operational"

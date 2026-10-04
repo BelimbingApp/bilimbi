@@ -74,6 +74,12 @@ record editing under `admin.geonames.update`. Every persistence event evaluates
 the actor's current grants again; the capability shown when the LiveView
 mounted is presentation state, not an authorization decision.
 
+Country and Admin1 name edits, and the countries-screen reference import, take
+the sealed scope and check `admin.geonames.update` inside
+`Bilimbi.Core.Geonames` (`update_country_name/3`, `update_admin1_name/3`,
+`import_reference_data/2`). Pass the scope. The mix task keeps
+`import_reference_data/1`.
+
 `geonames_postcodes` remains the Belimbing-compatible source and lookup table.
 Bilimbi does not add provenance columns to it. Instead, the Bilimbi-only
 `geonames_postcode_overrides` sidecar stores the desired operator record, its

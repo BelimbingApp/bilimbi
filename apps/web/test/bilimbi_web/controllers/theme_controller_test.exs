@@ -86,7 +86,8 @@ defmodule BilimbiWeb.ThemeControllerTest do
   test "a failed user preference write does not report success", %{conn: conn} do
     authenticated = conn |> log_in_as() |> get(~p"/settings/appearance")
     current_scope = authenticated.assigns.current_scope
-    :ok = User.delete_user(current_scope.scope, 73, 91)
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    :ok = User.delete_user(scope, 73, 91)
 
     response =
       build_conn()

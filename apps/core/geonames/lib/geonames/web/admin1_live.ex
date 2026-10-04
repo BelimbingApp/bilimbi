@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Geonames
 
   @page_sizes [25, 50, 100, 300]
@@ -55,12 +56,26 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   end
 
   def handle_event("save-admin1-name", %{"id" => id, "name" => name}, socket) do
-    case Geonames.update_admin1_name(id, name) do
+    # `can_update?` only shows the control. The API checks the sealed scope.
+    if Authz.can(socket.assigns.current_scope.scope, "admin.geonames.update").allowed do
+      save_admin1_name(socket, id, name)
+    else
+      {:noreply,
+       put_flash(socket, :error, "You do not have permission to update Admin1 divisions.")}
+    end
+  end
+
+  defp save_admin1_name(socket, id, name) do
+    case Geonames.update_admin1_name(socket.assigns.current_scope.scope, id, name) do
       {:ok, updated_admin1} ->
         {:noreply,
          socket
          |> stream_insert(:admin1, updated_admin1)
          |> put_flash(:success, "Admin1 division #{updated_admin1.code} updated.")}
+
+      {:error, :forbidden} ->
+        {:noreply,
+         put_flash(socket, :error, "You do not have permission to update Admin1 divisions.")}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to save division name.")}
