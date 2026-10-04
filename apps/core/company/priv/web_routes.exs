@@ -1,14 +1,14 @@
 [
   %{
     path: "/companies/legal-entity-types",
-    live: Bilimbi.Core.Company.Web.LegalEntityTypesLive,
+    live: Bilimbi.Core.Company.Web.ReferenceTypesLive,
     session: :auth,
     capability: "admin.company.list",
     operator: true
   },
   %{
     path: "/companies/department-types",
-    live: Bilimbi.Core.Company.Web.DepartmentTypesLive,
+    live: Bilimbi.Core.Company.Web.ReferenceTypesLive,
     session: :auth,
     capability: "admin.company.list",
     operator: true
