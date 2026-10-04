@@ -2,6 +2,11 @@ defmodule Bilimbi.Core.User do
   @moduledoc """
   Public API for user accounts, credentials, and user-owned preferences.
 
+  Sidebar pins, in-app notifications, and saved database queries are implemented
+  in `Bilimbi.Core.User.Pins`, `Bilimbi.Core.User.Notifications`, and
+  `Bilimbi.Core.User.DatabaseQueries`. This module delegates those public
+  functions and keeps the names callers already use.
+
   Tenant-owned operations run under a `Bilimbi.Base.Tenancy.Scope`, so the
   tenant is proven once at the edge. Login and password-reset lookup are the
   deliberate exceptions: before authentication there is no tenant scope, and
@@ -45,12 +50,15 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.User.DatabaseQueries
   alias Bilimbi.Core.User.DatabaseQuery
   alias Bilimbi.Core.User.EmailVerification
   alias Bilimbi.Core.User.Notification
+  alias Bilimbi.Core.User.Notifications
   alias Bilimbi.Core.User.Password
   alias Bilimbi.Core.User.PasswordResetToken
   alias Bilimbi.Core.User.Pin
+  alias Bilimbi.Core.User.Pins
   alias Bilimbi.Core.User.Schema
   alias Bilimbi.Core.User.Summary
   alias Ecto.Changeset
@@ -72,7 +80,6 @@ defmodule Bilimbi.Core.User do
 
   @password_reset_max_age 3_600
   @password_reset_throttle 60
-  @notification_delivery_failure_event [:bilimbi, :core, :user, :notification_delivery, :failed]
 
   @doc """
   Lists the users affiliated with one company inside the scope's tenant.
@@ -298,9 +305,9 @@ defmodule Bilimbi.Core.User do
   end
 
   @doc "Replaces a password only after verifying the current credential."
-  @spec change_password(Scope.t(), pos_integer(), pos_integer(), String.t(), String.t()) ::
+  @spec update_password(Scope.t(), pos_integer(), pos_integer(), String.t(), String.t()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | :invalid_password | Changeset.t()}
-  def change_password(%Scope{} = scope, company_id, user_id, current_password, new_password)
+  def update_password(%Scope{} = scope, company_id, user_id, current_password, new_password)
       when is_binary(current_password) and is_binary(new_password) do
     with {:ok, user} <- scoped_user(scope, company_id, user_id),
          true <- Password.valid?(current_password, user.password_hash) do
@@ -421,33 +428,35 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Returns the module-owned preferences resolved at user scope."
-  @spec user_preferences(Scope.t(), pos_integer(), pos_integer()) ::
+  @doc "Returns the module-owned preferences of the signed-in user."
+  @spec user_preferences(Scope.t()) ::
           {:ok, %{required(String.t()) => term()}} | {:error, lookup_error()}
-  def user_preferences(%Scope{} = scope, company_id, user_id) do
-    with {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
+  def user_preferences(%Scope{} = scope) do
+    with {:ok, user_id, company_id} <- acting_user(scope),
+         {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
       {:ok, Settings.get_many(@preference_keys, settings_scope)}
     end
   end
 
-  @doc "Reads one module-owned preference at user scope."
-  @spec get_user_preference(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
+  @doc "Reads one module-owned preference of the signed-in user."
+  @spec get_user_preference(Scope.t(), String.t()) ::
           {:ok, term()} | {:error, lookup_error() | :unsupported_preference}
-  def get_user_preference(%Scope{} = scope, company_id, user_id, key) when is_binary(key) do
-    with :ok <- supported_preference(key),
+  def get_user_preference(%Scope{} = scope, key) when is_binary(key) do
+    with {:ok, user_id, company_id} <- acting_user(scope),
+         :ok <- supported_preference(key),
          {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
       {:ok, Settings.get(key, settings_scope)}
     end
   end
 
-  @doc "Stores one validated module-owned preference at user scope."
-  @spec put_user_preference(Scope.t(), pos_integer(), pos_integer(), String.t(), term()) ::
+  @doc "Stores one validated module-owned preference of the signed-in user."
+  @spec put_user_preference(Scope.t(), String.t(), term()) ::
           {:ok, term()}
           | {:error,
              lookup_error() | :unsupported_preference | :invalid_preference | Changeset.t()}
-  def put_user_preference(%Scope{} = scope, company_id, user_id, key, value)
-      when is_binary(key) do
-    with :ok <- supported_preference(key),
+  def put_user_preference(%Scope{} = scope, key, value) when is_binary(key) do
+    with {:ok, user_id, company_id} <- acting_user(scope),
+         :ok <- supported_preference(key),
          :ok <- valid_preference(key, value),
          {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
       Settings.put(key, value, settings_scope)
@@ -455,133 +464,50 @@ defmodule Bilimbi.Core.User do
   end
 
   @doc "Deletes one user override so the module-owned default resolves again."
-  @spec delete_user_preference(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
+  @spec delete_user_preference(Scope.t(), String.t()) ::
           :ok | {:error, lookup_error() | :unsupported_preference}
-  def delete_user_preference(%Scope{} = scope, company_id, user_id, key)
-      when is_binary(key) do
-    with :ok <- supported_preference(key),
+  def delete_user_preference(%Scope{} = scope, key) when is_binary(key) do
+    with {:ok, user_id, company_id} <- acting_user(scope),
+         :ok <- supported_preference(key),
          {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
       Settings.delete(key, settings_scope)
     end
   end
 
-  @doc "Lists all pinned items for a user ordered by sort_order."
-  @spec list_user_pins(pos_integer()) :: [Pin.t()]
-  def list_user_pins(user_id) when is_integer(user_id) and user_id > 0 do
-    from(p in Pin,
-      where: p.user_id == ^user_id,
-      order_by: [asc: p.sort_order, asc: p.id]
-    )
-    |> Repo.all()
-  end
+  @doc "Lists pinned items for the signed-in user, ordered by sort_order."
+  @spec list_user_pins(Scope.t()) :: {:ok, [Pin.t()]} | {:error, :unauthorized}
+  defdelegate list_user_pins(scope), to: Pins
 
   @doc """
-  Toggles a pinned item for a user.
+  Toggles a pinned item for the signed-in user.
 
   If a pin with the same normalized URL already exists, it is deleted.
   Otherwise, a new pin is appended with the next sort_order value.
-  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or `{:error, Changeset.t()}`.
+  Impersonation and a system actor are refused.
+  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or
+  `{:error, Changeset.t() | :unauthorized | :impersonating}`.
   """
-  @spec toggle_user_pin(pos_integer(), map()) ::
-          {:ok, :pinned | :unpinned, [Pin.t()]} | {:error, Changeset.t()}
-  def toggle_user_pin(user_id, attrs)
-      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
-    url = Map.get(attrs, "url") || Map.get(attrs, :url) || ""
-    url_hash = Pin.hash_url(to_string(url))
-
-    existing =
-      from(p in Pin,
-        where: p.user_id == ^user_id and p.url_hash == ^url_hash
-      )
-      |> Repo.one()
-
-    case existing do
-      %Pin{} = pin ->
-        with {:ok, _deleted} <- Repo.delete(pin) do
-          {:ok, :unpinned, list_user_pins(user_id)}
-        end
-
-      nil ->
-        max_order =
-          from(p in Pin,
-            where: p.user_id == ^user_id,
-            select: max(p.sort_order)
-          )
-          |> Repo.one() || -1
-
-        attrs_with_defaults =
-          attrs
-          |> Map.put("user_id", user_id)
-          |> Map.put_new("sort_order", max_order + 1)
-
-        %Pin{}
-        |> Pin.changeset(attrs_with_defaults)
-        |> Repo.insert()
-        |> case do
-          {:ok, _pin} -> {:ok, :pinned, list_user_pins(user_id)}
-          {:error, changeset} -> {:error, changeset}
-        end
-    end
-  end
+  @spec toggle_user_pin(Scope.t(), map()) ::
+          {:ok, :pinned | :unpinned, [Pin.t()]}
+          | {:error, Changeset.t() | :unauthorized | :impersonating}
+  defdelegate toggle_user_pin(scope, attrs), to: Pins
 
   @doc """
-  Reorders a user's pinned items according to a list of ordered pin IDs.
-  Returns `{:ok, [Pin.t()]}`.
+  Reorders the signed-in user's pinned items to match `ordered_pin_ids`.
+  Impersonation and a system actor are refused.
+  Returns `{:ok, [Pin.t()]}` or `{:error, :unauthorized | :impersonating}`.
   """
-  @spec reorder_user_pins(pos_integer(), [pos_integer()]) :: {:ok, [Pin.t()]}
-  def reorder_user_pins(user_id, ordered_pin_ids)
-      when is_integer(user_id) and user_id > 0 and is_list(ordered_pin_ids) do
-    # The order pins appear in is a display preference of the signed-in
-    # user's own, not a business fact; pinning and unpinning are ordinary
-    # writes and stay captured.
-    Audit.without_auditing(fn ->
-      Repo.transaction(fn ->
-        Enum.each(Enum.with_index(ordered_pin_ids), fn {pin_id, index} ->
-          from(p in Pin,
-            where: p.user_id == ^user_id and p.id == ^pin_id
-          )
-          |> Repo.update_all(set: [sort_order: index])
-        end)
-
-        list_user_pins(user_id)
-      end)
-    end)
-  end
-
-  # =========================================================================
-  # In-App Notifications
-  # =========================================================================
-
-  defp pubsub_server do
-    Application.get_env(:bilimbi_core_user, :pubsub_server)
-  end
+  @spec reorder_user_pins(Scope.t(), [pos_integer()]) ::
+          {:ok, [Pin.t()]} | {:error, :unauthorized | :impersonating}
+  defdelegate reorder_user_pins(scope, ordered_pin_ids), to: Pins
 
   @doc "Topic name for PubSub notification events per tenant and user."
   @spec notification_topic(pos_integer(), pos_integer()) :: String.t()
-  def notification_topic(tenant_id, user_id)
-      when is_integer(tenant_id) and is_integer(user_id) do
-    "user_notifications:#{tenant_id}:#{user_id}"
-  end
+  defdelegate notification_topic(tenant_id, user_id), to: Notifications
 
   @doc "Subscribes the calling process to notifications for the given user in tenant scope."
   @spec subscribe_notifications(Scope.t(), pos_integer()) :: :ok | {:error, :pubsub_unavailable}
-  def subscribe_notifications(%Scope{tenant: %{id: tenant_id}}, user_id)
-      when is_integer(user_id) do
-    if server = pubsub_server() do
-      # No special case for a second subscribe from the same process.
-      # `Phoenix.PubSub.subscribe/3` is `Registry.register/3` against a registry
-      # declared `keys: :duplicate` (phoenix_pubsub supervisor.ex:31), which is
-      # how many processes share one topic — it never answers
-      # `{:already_registered, _}`. A process that subscribes twice is
-      # registered twice and receives every event twice, which is what #425
-      # guards against at the mount path where it can actually happen.
-      notification_pubsub(:subscribe, fn ->
-        Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
-      end)
-    else
-      :ok
-    end
-  end
+  defdelegate subscribe_notifications(scope, user_id), to: Notifications
 
   @doc """
   Broadcasts a notification change event to subscribers.
@@ -592,20 +518,7 @@ defmodule Bilimbi.Core.User do
   """
   @spec broadcast_notification(Scope.t(), pos_integer(), term()) ::
           :ok | {:error, :pubsub_unavailable}
-  def broadcast_notification(%Scope{tenant: %{id: tenant_id}}, user_id, event)
-      when is_integer(user_id) do
-    if server = pubsub_server() do
-      notification_pubsub(:broadcast, fn ->
-        Phoenix.PubSub.broadcast(
-          server,
-          notification_topic(tenant_id, user_id),
-          {:notification_event, event}
-        )
-      end)
-    else
-      :ok
-    end
-  end
+  defdelegate broadcast_notification(scope, user_id, event), to: Notifications
 
   @doc """
   Sends an in-app database notification to a user within tenant scope.
@@ -613,44 +526,10 @@ defmodule Bilimbi.Core.User do
   """
   @spec send_notification(Scope.t(), pos_integer(), map()) ::
           {:ok, Notification.t()} | {:error, :user_not_found | Changeset.t()}
-  def send_notification(%Scope{} = scope, user_id, attrs)
-      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      type = Map.get(attrs, "type") || Map.get(attrs, :type) || "generic"
-
-      data =
-        cond do
-          is_map(attrs["data"]) ->
-            attrs["data"]
-
-          is_map(attrs[:data]) ->
-            attrs[:data]
-
-          true ->
-            attrs
-            |> Map.drop(["type", :type, "id", :id, "read_at", :read_at])
-        end
-
-      params = %{
-        "type" => to_string(type),
-        "notifiable_type" => notifiable_identity(),
-        "notifiable_id" => user_id,
-        "data" => data
-      }
-
-      case %Notification{} |> Notification.changeset(params) |> Repo.insert() do
-        {:ok, notification} ->
-          broadcast_notification(scope, user_id, {:created, notification})
-          {:ok, notification}
-
-        {:error, changeset} ->
-          {:error, changeset}
-      end
-    end
-  end
+  defdelegate send_notification(scope, user_id, attrs), to: Notifications
 
   @doc """
-  Lists notifications for a user within tenant scope, ordered by creation descending.
+  Lists notifications for the signed-in user, ordered by creation descending.
   Options:
     - `:status` - `:all` (default), `:unread`, or `:read`
     - `:page` - positive integer (default nil)
@@ -658,180 +537,47 @@ defmodule Bilimbi.Core.User do
     - `:limit` - positive integer or nil (default nil)
     - `:offset` - non-negative integer (default 0)
   """
-  @spec list_notifications(Scope.t(), pos_integer(), keyword()) ::
-          {:ok, [Notification.t()]} | {:error, :user_not_found}
-  def list_notifications(%Scope{} = scope, user_id, opts \\ [])
-      when is_integer(user_id) and user_id > 0 and is_list(opts) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      status = Keyword.get(opts, :status, :all)
-      page = Keyword.get(opts, :page)
-      per_page = Keyword.get(opts, :per_page, 25)
-      limit = Keyword.get(opts, :limit)
-      offset = Keyword.get(opts, :offset, 0)
-      morph = notifiable_identity()
+  @spec list_notifications(Scope.t(), keyword()) ::
+          {:ok, [Notification.t()]} | {:error, :user_not_found | :unauthorized}
+  defdelegate list_notifications(scope, opts), to: Notifications
 
-      query =
-        from(n in Notification,
-          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id,
-          order_by: [desc: n.created_at, desc: n.id]
-        )
-
-      query =
-        case status do
-          :unread -> from(n in query, where: is_nil(n.read_at))
-          :read -> from(n in query, where: not is_nil(n.read_at))
-          _ -> query
-        end
-
-      query =
-        cond do
-          is_integer(page) and page > 0 ->
-            from(n in query, limit: ^per_page, offset: ^((page - 1) * per_page))
-
-          is_integer(limit) and limit > 0 ->
-            from(n in query, limit: ^limit, offset: ^offset)
-
-          true ->
-            query
-        end
-
-      {:ok, Repo.all(query)}
-    end
-  end
+  def list_notifications(scope), do: list_notifications(scope, [])
 
   @doc """
-  Counts total notifications for a user under given status within tenant scope.
+  Counts notifications for the signed-in user under the given status.
   """
-  @spec count_notifications(Scope.t(), pos_integer(), keyword()) ::
-          {:ok, non_neg_integer()} | {:error, :user_not_found}
-  def count_notifications(%Scope{} = scope, user_id, opts \\ [])
-      when is_integer(user_id) and user_id > 0 and is_list(opts) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      status = Keyword.get(opts, :status, :all)
-      morph = notifiable_identity()
+  @spec count_notifications(Scope.t(), keyword()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
+  defdelegate count_notifications(scope, opts), to: Notifications
 
-      query =
-        from(n in Notification,
-          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id
-        )
+  def count_notifications(scope), do: count_notifications(scope, [])
 
-      query =
-        case status do
-          :unread -> from(n in query, where: is_nil(n.read_at))
-          :read -> from(n in query, where: not is_nil(n.read_at))
-          _ -> query
-        end
+  @doc "Returns the count of unread notifications for the signed-in user."
+  @spec unread_notification_count(Scope.t()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
+  defdelegate unread_notification_count(scope), to: Notifications
 
-      {:ok, Repo.aggregate(query, :count, :id)}
-    end
-  end
+  @doc "Gets a notification by UUID for the signed-in user."
+  @spec get_notification(Scope.t(), binary()) ::
+          {:ok, Notification.t()} | {:error, :user_not_found | :not_found | :unauthorized}
+  defdelegate get_notification(scope, notification_id), to: Notifications
 
-  @doc "Returns the count of unread notifications for a user within tenant scope."
-  @spec unread_notification_count(Scope.t(), pos_integer()) ::
-          {:ok, non_neg_integer()} | {:error, :user_not_found}
-  def unread_notification_count(%Scope{} = scope, user_id)
-      when is_integer(user_id) and user_id > 0 do
-    count_notifications(scope, user_id, status: :unread)
-  end
+  @doc "Marks a specific notification as read for the signed-in user."
+  @spec mark_notification_as_read(Scope.t(), binary()) ::
+          {:ok, Notification.t()}
+          | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
+  defdelegate mark_notification_as_read(scope, notification_id), to: Notifications
 
-  @doc "Gets a notification by UUID for a specific user within tenant scope."
-  @spec get_notification(Scope.t(), pos_integer(), binary()) ::
-          {:ok, Notification.t()} | {:error, :user_not_found | :not_found}
-  def get_notification(%Scope{} = scope, user_id, notification_id)
-      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      morph = notifiable_identity()
+  @doc "Marks all unread notifications as read for the signed-in user."
+  @spec mark_all_notifications_as_read(Scope.t()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
+  defdelegate mark_all_notifications_as_read(scope), to: Notifications
 
-      query =
-        from(n in Notification,
-          where:
-            n.notifiable_type == ^morph and n.notifiable_id == ^user_id and
-              n.id == ^notification_id
-        )
-
-      case Repo.one(query) do
-        nil -> {:error, :not_found}
-        notification -> {:ok, notification}
-      end
-    end
-  end
-
-  @doc "Marks a specific notification as read for a user within tenant scope."
-  @spec mark_notification_as_read(Scope.t(), pos_integer(), binary()) ::
-          {:ok, Notification.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
-  def mark_notification_as_read(%Scope{} = scope, user_id, notification_id)
-      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
-    with {:ok, notification} <- get_notification(scope, user_id, notification_id) do
-      if Notification.read?(notification) do
-        {:ok, notification}
-      else
-        case notification |> Notification.mark_read_changeset() |> Repo.update() do
-          {:ok, updated} ->
-            broadcast_notification(scope, user_id, {:read, updated})
-            {:ok, updated}
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
-      end
-    end
-  end
-
-  @doc "Marks all unread notifications as read for a user within tenant scope."
-  @spec mark_all_notifications_as_read(Scope.t(), pos_integer()) ::
-          {:ok, non_neg_integer()} | {:error, :user_not_found}
-  def mark_all_notifications_as_read(%Scope{} = scope, user_id)
-      when is_integer(user_id) and user_id > 0 do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      morph = notifiable_identity()
-      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-
-      # A read receipt on the actor's own notifications: high volume, and
-      # it records nothing about the business the notifications are about.
-      {count, _} =
-        Audit.without_auditing(fn ->
-          from(n in Notification,
-            where:
-              n.notifiable_type == ^morph and n.notifiable_id == ^user_id and is_nil(n.read_at)
-          )
-          |> Repo.update_all(set: [read_at: now, updated_at: now])
-        end)
-
-      broadcast_notification(scope, user_id, {:all_read, count})
-      {:ok, count}
-    end
-  end
-
-  @doc "Deletes a notification for a user within tenant scope."
-  @spec delete_notification(Scope.t(), pos_integer(), binary()) ::
-          {:ok, Notification.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
-  def delete_notification(%Scope{} = scope, user_id, notification_id)
-      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
-    with {:ok, notification} <- get_notification(scope, user_id, notification_id) do
-      case Repo.delete(notification) do
-        {:ok, deleted} ->
-          broadcast_notification(scope, user_id, {:deleted, deleted})
-          {:ok, deleted}
-
-        {:error, changeset} ->
-          {:error, changeset}
-      end
-    end
-  end
-
-  defp notification_pubsub(operation, delivery) do
-    case delivery.() do
-      :ok -> :ok
-      {:error, _reason} -> notification_delivery_failed(operation)
-    end
-  rescue
-    _exception in ArgumentError -> notification_delivery_failed(operation)
-  end
-
-  defp notification_delivery_failed(operation) do
-    :telemetry.execute(@notification_delivery_failure_event, %{count: 1}, %{operation: operation})
-    {:error, :pubsub_unavailable}
-  end
+  @doc "Deletes a notification for the signed-in user."
+  @spec delete_notification(Scope.t(), binary()) ::
+          {:ok, Notification.t()}
+          | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
+  defdelegate delete_notification(scope, notification_id), to: Notifications
 
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
@@ -884,10 +630,10 @@ defmodule Bilimbi.Core.User do
   cross-module account mutation.  Both writes run in the one shared Repo
   transaction, so an invalid or refused employee update rolls the unlink back.
   """
-  @spec change_employee_type(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
+  @spec update_employee_type(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
           {:ok, Bilimbi.Core.Employee.Summary.t()}
           | {:error, lookup_error() | :employee_not_found | :invariant_violation | Changeset.t()}
-  def change_employee_type(%Scope{} = scope, company_id, employee_id, type)
+  def update_employee_type(%Scope{} = scope, company_id, employee_id, type)
       when is_integer(company_id) and is_integer(employee_id) and is_binary(type) do
     Repo.transaction(fn ->
       with {:ok, _company} <- lock_target_company(scope, company_id),
@@ -1232,6 +978,17 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  defp acting_user(%Scope{} = scope) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user, user_id: user_id, company_id: company_id}
+      when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0 ->
+        {:ok, user_id, company_id}
+
+      %TenancyActor{} ->
+        {:error, :unauthorized}
+    end
+  end
+
   defp preference_scope(scope, company_id, user_id) do
     with {:ok, _user} <- scoped_user(scope, company_id, user_id) do
       {:ok, SettingsScope.user(user_id, company_id, Scope.tenant_id(scope))}
@@ -1468,182 +1225,56 @@ defmodule Bilimbi.Core.User do
   defp normalize_company({:ok, company}), do: {:ok, company}
   defp normalize_company({:error, :not_found}), do: {:error, :company_not_found}
 
-  # --- User Database Queries ---
-
   @doc """
-  Lists saved database queries owned by the given user ID within the tenant scope.
+  Lists saved database queries owned by the signed-in user.
   """
-  @spec list_database_queries(Scope.t(), pos_integer(), keyword()) ::
-          {:ok, [DatabaseQuery.t()]} | {:error, :user_not_found}
-  def list_database_queries(%Scope{} = scope, user_id, opts \\ [])
-      when is_integer(user_id) and user_id > 0 and is_list(opts) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      search = Keyword.get(opts, :search)
-      sort_by = Keyword.get(opts, :sort_by, :name)
-      sort_dir = Keyword.get(opts, :sort_dir, :asc)
+  @spec list_database_queries(Scope.t(), keyword()) ::
+          {:ok, [DatabaseQuery.t()]} | {:error, :user_not_found | :unauthorized}
+  defdelegate list_database_queries(scope, opts), to: DatabaseQueries
 
-      base_query = from(q in DatabaseQuery, where: q.user_id == ^user_id)
-
-      query =
-        if is_binary(search) and String.trim(search) != "" do
-          pattern = "%#{String.trim(search)}%"
-          from(q in base_query, where: ilike(q.name, ^pattern) or ilike(q.description, ^pattern))
-        else
-          base_query
-        end
-
-      order_field =
-        case sort_by do
-          :name -> :name
-          :description -> :description
-          :created_at -> :created_at
-          :updated_at -> :updated_at
-          "name" -> :name
-          "description" -> :description
-          "created_at" -> :created_at
-          "updated_at" -> :updated_at
-          _ -> :name
-        end
-
-      order_expr =
-        if sort_dir in [:desc, "desc", "DESC"] do
-          [desc: order_field, desc: :id]
-        else
-          [asc: order_field, asc: :id]
-        end
-
-      queries =
-        from(q in query, order_by: ^order_expr)
-        |> Repo.all()
-
-      {:ok, queries}
-    end
-  end
+  def list_database_queries(scope), do: list_database_queries(scope, [])
 
   @doc """
   Fetches a database query owned by the user by integer ID or binary slug within the tenant scope.
   """
-  @spec get_database_query(Scope.t(), pos_integer(), pos_integer() | String.t()) ::
-          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found}
-  def get_database_query(%Scope{} = scope, user_id, id)
-      when is_integer(user_id) and user_id > 0 and is_integer(id) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      case Repo.get_by(DatabaseQuery, id: id, user_id: user_id) do
-        nil -> {:error, :not_found}
-        %DatabaseQuery{} = query -> {:ok, query}
-      end
-    end
-  end
-
-  def get_database_query(%Scope{} = scope, user_id, slug)
-      when is_integer(user_id) and user_id > 0 and is_binary(slug) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      case Repo.get_by(DatabaseQuery, slug: slug, user_id: user_id) do
-        nil -> {:error, :not_found}
-        %DatabaseQuery{} = query -> {:ok, query}
-      end
-    end
-  end
-
-  def get_database_query(%Scope{}, _user_id, _invalid), do: {:error, :not_found}
+  @spec get_database_query(Scope.t(), pos_integer() | String.t()) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | :unauthorized}
+  defdelegate get_database_query(scope, id_or_slug), to: DatabaseQueries
 
   @doc """
-  Creates a new saved database query for the given user ID within the tenant scope.
+  Creates a saved database query for the signed-in user.
   """
-  @spec create_database_query(Scope.t(), pos_integer(), map()) ::
-          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | Changeset.t()}
-  def create_database_query(%Scope{} = scope, user_id, attrs)
-      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      user_id
-      |> DatabaseQuery.creation_changeset(attrs)
-      |> Repo.insert()
-    end
-  end
+  @spec create_database_query(Scope.t(), map()) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :unauthorized | Changeset.t()}
+  defdelegate create_database_query(scope, attrs), to: DatabaseQueries
 
   @doc """
   Updates an existing database query owned by the user within the tenant scope.
   """
-  @spec update_database_query(
-          Scope.t(),
-          pos_integer(),
-          DatabaseQuery.t() | pos_integer() | String.t(),
-          map()
-        ) ::
-          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
-  def update_database_query(
-        %Scope{} = scope,
-        user_id,
-        %DatabaseQuery{user_id: user_id} = query,
-        attrs
-      )
-      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      query
-      |> DatabaseQuery.changeset(attrs)
-      |> Repo.update()
-    end
-  end
-
-  def update_database_query(%Scope{} = scope, user_id, id_or_slug, attrs)
-      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
-    with {:ok, query} <- get_database_query(scope, user_id, id_or_slug) do
-      update_database_query(scope, user_id, query, attrs)
-    end
-  end
+  @spec update_database_query(Scope.t(), DatabaseQuery.t() | pos_integer() | String.t(), map()) ::
+          {:ok, DatabaseQuery.t()}
+          | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
+  defdelegate update_database_query(scope, id_or_slug, attrs), to: DatabaseQueries
 
   @doc """
   Deletes a saved database query owned by the user within the tenant scope.
   """
-  @spec delete_database_query(
-          Scope.t(),
-          pos_integer(),
-          DatabaseQuery.t() | pos_integer() | String.t()
-        ) ::
-          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
-  def delete_database_query(%Scope{} = scope, user_id, %DatabaseQuery{user_id: user_id} = query)
-      when is_integer(user_id) and user_id > 0 do
-    with {:ok, _user} <- get_tenant_user(scope, user_id) do
-      Repo.delete(query)
-    end
-  end
-
-  def delete_database_query(%Scope{} = scope, user_id, id_or_slug)
-      when is_integer(user_id) and user_id > 0 do
-    with {:ok, query} <- get_database_query(scope, user_id, id_or_slug) do
-      delete_database_query(scope, user_id, query)
-    end
-  end
+  @spec delete_database_query(Scope.t(), DatabaseQuery.t() | pos_integer() | String.t()) ::
+          {:ok, DatabaseQuery.t()}
+          | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
+  defdelegate delete_database_query(scope, id_or_slug), to: DatabaseQueries
 
   @doc """
   Duplicates an existing database query for the user, assigning a new unique slug.
   """
-  @spec duplicate_database_query(
-          Scope.t(),
-          pos_integer(),
-          DatabaseQuery.t() | pos_integer() | String.t()
-        ) ::
-          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
-  def duplicate_database_query(%Scope{} = scope, user_id, id_or_slug)
-      when is_integer(user_id) and user_id > 0 do
-    with {:ok, original} <- get_database_query(scope, user_id, id_or_slug) do
-      attrs = %{
-        name: "#{original.name} (Copy)",
-        prompt: original.prompt,
-        sql_query: original.sql_query,
-        description: original.description,
-        icon: original.icon
-      }
-
-      create_database_query(scope, user_id, attrs)
-    end
-  end
+  @spec duplicate_database_query(Scope.t(), DatabaseQuery.t() | pos_integer() | String.t()) ::
+          {:ok, DatabaseQuery.t()}
+          | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
+  defdelegate duplicate_database_query(scope, id_or_slug), to: DatabaseQueries
 
   @doc """
-  Generates a unique slug for a query name scoped to the given user.
+  Generates a unique slug for a query name scoped to the signed-in user.
   """
-  @spec generate_query_slug(pos_integer(), String.t()) :: String.t()
-  def generate_query_slug(user_id, name) when is_integer(user_id) and is_binary(name) do
-    DatabaseQuery.generate_slug(user_id, name)
-  end
+  @spec generate_query_slug(Scope.t(), String.t()) :: {:ok, String.t()} | {:error, :unauthorized}
+  defdelegate generate_query_slug(scope, name), to: DatabaseQueries
 end

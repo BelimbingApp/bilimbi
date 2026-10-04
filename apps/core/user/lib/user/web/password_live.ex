@@ -54,7 +54,7 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
       company_id = extract_company_id(current_scope)
       scope = current_scope.scope
 
-      case User.change_password(scope, company_id, user_id, current_password, new_password) do
+      case User.update_password(scope, company_id, user_id, current_password, new_password) do
         {:ok, _user} ->
           socket =
             socket

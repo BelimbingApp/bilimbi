@@ -284,7 +284,7 @@ defmodule Bilimbi.Core.UserTest do
       assert {:error, :company_not_found} = User.confirm_password(scope_b, 73, 91, "old-password")
 
       assert {:ok, %Summary{id: 91}} =
-               User.change_password(scope_a, 73, 91, "old-password", "new-password")
+               User.update_password(scope_a, 73, 91, "old-password", "new-password")
 
       assert {:ok, %Summary{id: 91}} = User.authenticate("ada@example.com", "new-password")
       assert {:error, :invalid_credentials} = User.authenticate("ada@example.com", "old-password")
@@ -450,7 +450,9 @@ defmodule Bilimbi.Core.UserTest do
     } do
       insert_user!()
 
-      assert {:ok, preferences} = User.user_preferences(scope_a, 73, 91)
+      assert {:ok, preferences} =
+               User.user_preferences(Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73))
+
       assert preferences["ui.theme"] == "system"
       assert preferences["ui.landing_menu_id"] == ""
       assert preferences["ui.dashboard.layout"] == []
@@ -458,19 +460,45 @@ defmodule Bilimbi.Core.UserTest do
       assert preferences["ai.last_used_model_hints"] == []
 
       assert {:ok, "dark"} =
-               User.put_user_preference(scope_a, 73, 91, "ui.theme", "dark")
+               User.put_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "ui.theme",
+                 "dark"
+               )
 
-      assert {:ok, "dark"} = User.get_user_preference(scope_a, 73, 91, "ui.theme")
-      assert :ok = User.delete_user_preference(scope_a, 73, 91, "ui.theme")
-      assert {:ok, "system"} = User.get_user_preference(scope_a, 73, 91, "ui.theme")
+      assert {:ok, "dark"} =
+               User.get_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "ui.theme"
+               )
+
+      assert :ok =
+               User.delete_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "ui.theme"
+               )
+
+      assert {:ok, "system"} =
+               User.get_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "ui.theme"
+               )
 
       assert {:error, :invalid_preference} =
-               User.put_user_preference(scope_a, 73, 91, "ui.theme", "sepia")
+               User.put_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "ui.theme",
+                 "sepia"
+               )
 
       assert {:error, :unsupported_preference} =
-               User.get_user_preference(scope_a, 73, 91, "unknown")
+               User.get_user_preference(
+                 Bilimbi.Base.Tenancy.Authentication.sign_in(scope_a, 91, 73),
+                 "unknown"
+               )
 
-      assert {:error, :company_not_found} = User.user_preferences(scope_b, 73, 91)
+      assert {:error, :company_not_found} =
+               User.user_preferences(Bilimbi.Base.Tenancy.Authentication.sign_in(scope_b, 91, 73))
     end
   end
 

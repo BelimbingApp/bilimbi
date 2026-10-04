@@ -56,14 +56,14 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       # Create queries for Ada (91)
       {:ok, q1} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Active Users",
           description: "List of active users in system",
           sql_query: "SELECT id, name, email FROM users;"
         })
 
       {:ok, q2} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Company Directory",
           description: "All companies",
           sql_query: "SELECT id, name FROM companies;"
@@ -71,7 +71,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       # Create query for Grace (92)
       {:ok, _q3} =
-        User.create_database_query(scope, 92, %{
+        User.create_database_query(as(scope, 92), %{
           name: "Secret Query",
           description: "Not Ada's query",
           sql_query: "SELECT 1;"
@@ -98,7 +98,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert render_click(view, "delete", %{"id" => to_string(q2.id)}) =~
                "You are not authorized to modify queries."
 
-      assert {:ok, _} = User.get_database_query(scope, 91, q2.slug)
+      assert {:ok, _} = User.get_database_query(as(scope, 91), q2.slug)
 
       assert render_click(view, "duplicate", %{"id" => to_string(q1.id)}) =~
                "You are not authorized to modify queries."
@@ -123,7 +123,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       for index <- 1..26 do
         {:ok, _query} =
-          User.create_database_query(scope, 91, %{
+          User.create_database_query(as(scope, 91), %{
             name: "Query #{String.pad_leading(Integer.to_string(index), 2, "0")}",
             sql_query: "SELECT #{index};"
           })
@@ -223,14 +223,14 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       ])
 
       {:ok, q1} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Active Users",
           description: "List of active users in system",
           sql_query: "SELECT id, name, email FROM users;"
         })
 
       {:ok, q2} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Company Directory",
           description: "All companies",
           sql_query: "SELECT id, name FROM companies;"
@@ -246,7 +246,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       dup_slug = "#{q1.slug}-copy"
       render_click(view, "duplicate", %{"id" => to_string(q1.id)})
       assert_redirect(view, ~p"/admin/system/database-queries/#{dup_slug}")
-      assert {:ok, _dup} = User.get_database_query(scope, 91, dup_slug)
+      assert {:ok, _dup} = User.get_database_query(as(scope, 91), dup_slug)
 
       # Deleting confirms through the shared dialog, which names the query and
       # says what is lost; no native confirm remains.
@@ -254,7 +254,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       # A confirm with nothing held is a stale click and deletes nothing.
       render_click(view2, "delete", %{"id" => to_string(q2.id)})
-      assert {:ok, _} = User.get_database_query(scope, 91, q2.slug)
+      assert {:ok, _} = User.get_database_query(as(scope, 91), q2.slug)
 
       refute has_element?(view2, "#delete-query-#{q2.id}[data-confirm]")
       view2 |> element("#delete-query-#{q2.id}") |> render_click()
@@ -291,7 +291,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view2, "#delete-query-confirm")
       assert has_element?(view2, "#flash-success", "Query “Company Directory” was deleted.")
       refute has_element?(view2, "#database-queries-table", "Company Directory")
-      assert {:error, :not_found} = User.get_database_query(scope, 91, q2.slug)
+      assert {:error, :not_found} = User.get_database_query(as(scope, 91), q2.slug)
     end
   end
 
@@ -308,7 +308,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Read Only Query",
           description: "For viewing",
           sql_query: "SELECT id, name FROM users;"
@@ -346,7 +346,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Reach Query",
           sql_query: "SELECT id FROM users;"
         })
@@ -399,7 +399,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert_redirect(view, ~p"/admin/system/database-queries/all-users-query")
 
       # Verify query exists in DB
-      assert {:ok, created} = User.get_database_query(scope, 91, "all-users-query")
+      assert {:ok, created} = User.get_database_query(as(scope, 91), "all-users-query")
       assert created.name == "All Users Query"
       assert created.sql_query == "SELECT id, name FROM users;"
     end
@@ -412,7 +412,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Find User By Name",
           description: "Search user by name parameter",
           sql_query: "SELECT id, name FROM users WHERE name = :user_name;"
@@ -583,7 +583,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Users",
           sql_query: "SELECT id, name FROM users"
         })
@@ -610,7 +610,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Series",
           sql_query: "SELECT * FROM generate_series(1, 30)"
         })
@@ -685,7 +685,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Series",
           sql_query: "SELECT * FROM generate_series(1, 30)"
         })
@@ -729,7 +729,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Header Roles",
           sql_query: "SELECT id, name FROM users;"
         })
@@ -789,7 +789,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Nobody",
           sql_query: "SELECT id FROM users WHERE id = -1;"
         })
@@ -805,7 +805,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "Bad Query",
           description: "Syntax error query",
           sql_query: "SELECT invalid_column_xyz FROM non_existent_table;"
@@ -824,7 +824,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       ])
 
       {:ok, query} =
-        User.create_database_query(scope, 91, %{
+        User.create_database_query(as(scope, 91), %{
           name: "To Delete",
           sql_query: "SELECT 1;"
         })
@@ -849,7 +849,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       view |> element("#delete-query-confirm-cancel", "Cancel") |> render_click()
       refute has_element?(view, "#delete-query-confirm")
-      assert {:ok, _} = User.get_database_query(scope, 91, query.slug)
+      assert {:ok, _} = User.get_database_query(as(scope, 91), query.slug)
 
       view |> element("#btn-delete-query") |> render_click()
 
@@ -862,7 +862,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       view |> element("#delete-query-confirm-confirm") |> render_click()
       assert_redirect(view, ~p"/admin/system/database-queries")
 
-      assert {:error, :not_found} = User.get_database_query(scope, 91, query.slug)
+      assert {:error, :not_found} = User.get_database_query(as(scope, 91), query.slug)
     end
   end
 
@@ -951,5 +951,9 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
     [_, class_attribute] = Regex.run(~r/class="([^"]*)"/, opening_tag)
 
     String.split(class_attribute, ~r/\s+/, trim: true)
+  end
+
+  defp as(scope, user_id) do
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, 73)
   end
 end

@@ -52,7 +52,13 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
   test "the top bar and this form render one theme, so neither reverts the other", %{conn: conn} do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+
+    {:ok, "dark"} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "dark"
+      )
 
     {:ok, view, _html} = open(conn)
     assert has_element?(view, "input[name='appearance[theme]'][value='dark'][checked]")
@@ -66,7 +72,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     |> form("#appearance-form", %{"appearance" => %{"theme" => "light", "locale" => "de-CH"}})
     |> render_change()
 
-    assert {:ok, "light"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert {:ok, "light"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
+
     assert has_element?(view, "input[name='appearance[theme]'][value='light'][checked]")
     assert has_element?(view, "#app-shell[data-theme-choice='light']")
   end
@@ -104,7 +115,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
     # Verify saved to User preference / settings
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "dark"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "the root layout stamps data-theme only for an explicit choice", %{conn: conn} do
@@ -119,16 +135,34 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
            |> LazyHTML.query("html[data-theme]")
            |> Enum.any?()
 
-    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+    {:ok, "dark"} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "dark"
+      )
+
     assert get(conn, ~p"/settings/appearance") |> html_response(200) =~ ~s(data-theme="dark")
 
-    {:ok, "light"} = User.put_user_preference(scope, 73, 91, "ui.theme", "light")
+    {:ok, "light"} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "light"
+      )
+
     assert get(conn, ~p"/settings/appearance") |> html_response(200) =~ ~s(data-theme="light")
   end
 
   test "switching back to system deletes preference override", %{conn: conn} do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+
+    {:ok, "dark"} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "dark"
+      )
 
     {:ok, view, _html} = open(conn)
     assert has_element?(view, "input[name='appearance[theme]'][value='dark'][checked]")
@@ -142,7 +176,11 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert render(view) =~ "Appearance settings saved."
 
     # Verify preference override was cleared back to system default
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "stores and clears the signed-in account's locale override", %{conn: conn} do
@@ -190,7 +228,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
            )
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "dark"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "the form and the top bar select from the same three time displays", %{conn: conn} do
@@ -265,7 +308,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-locale option[value=''][selected]")
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "rejects a forged time zone mode by name without persisting it", %{conn: conn} do

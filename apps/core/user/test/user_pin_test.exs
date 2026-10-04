@@ -55,7 +55,7 @@ defmodule Bilimbi.Core.User.PinTest do
   describe "pin persistence & lifecycle" do
     test "toggle_user_pin creates and deletes pins" do
       assert {:ok, :pinned, pins} =
-               User.toggle_user_pin(91, %{
+               User.toggle_user_pin(pin_scope(91), %{
                  "label" => "Companies",
                  "url" => "/companies",
                  "icon" => "hero-building-office"
@@ -68,7 +68,7 @@ defmodule Bilimbi.Core.User.PinTest do
 
       # Toggling the same URL deletes the pin
       assert {:ok, :unpinned, pins} =
-               User.toggle_user_pin(91, %{
+               User.toggle_user_pin(pin_scope(91), %{
                  "label" => "Companies",
                  "url" => "/companies"
                })
@@ -78,10 +78,10 @@ defmodule Bilimbi.Core.User.PinTest do
 
     test "toggle_user_pin calculates incremental sort orders" do
       assert {:ok, :pinned, _} =
-               User.toggle_user_pin(91, %{"label" => "Pin 1", "url" => "/page1"})
+               User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 1", "url" => "/page1"})
 
       assert {:ok, :pinned, pins} =
-               User.toggle_user_pin(91, %{"label" => "Pin 2", "url" => "/page2"})
+               User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 2", "url" => "/page2"})
 
       assert length(pins) == 2
       [pin1, pin2] = pins
@@ -90,24 +90,33 @@ defmodule Bilimbi.Core.User.PinTest do
     end
 
     test "reorder_user_pins updates sort orders matching list position" do
-      {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Pin 1", "url" => "/page1"})
+      {:ok, :pinned, _} =
+        User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 1", "url" => "/page1"})
 
       {:ok, :pinned, [pin1, pin2]} =
-        User.toggle_user_pin(91, %{"label" => "Pin 2", "url" => "/page2"})
+        User.toggle_user_pin(pin_scope(91), %{"label" => "Pin 2", "url" => "/page2"})
 
-      assert {:ok, reordered} = User.reorder_user_pins(91, [pin2.id, pin1.id])
+      assert {:ok, reordered} = User.reorder_user_pins(pin_scope(91), [pin2.id, pin1.id])
       assert Enum.map(reordered, & &1.id) == [pin2.id, pin1.id]
       assert Enum.map(reordered, & &1.sort_order) == [0, 1]
     end
 
     test "pins are isolated between users" do
-      {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Ada's Page", "url" => "/page"})
-      {:ok, :pinned, _} = User.toggle_user_pin(92, %{"label" => "Grace's Page", "url" => "/page"})
+      {:ok, :pinned, _} =
+        User.toggle_user_pin(pin_scope(91), %{"label" => "Ada's Page", "url" => "/page"})
 
-      assert [ada_pin] = User.list_user_pins(91)
-      assert [grace_pin] = User.list_user_pins(92)
+      {:ok, :pinned, _} =
+        User.toggle_user_pin(pin_scope(92), %{"label" => "Grace's Page", "url" => "/page"})
+
+      assert {:ok, [ada_pin]} = User.list_user_pins(pin_scope(91))
+      assert {:ok, [grace_pin]} = User.list_user_pins(pin_scope(92))
       assert ada_pin.label == "Ada's Page"
       assert grace_pin.label == "Grace's Page"
     end
+  end
+
+  defp pin_scope(user_id) do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, 73)
   end
 end

@@ -26,16 +26,23 @@ and reset-token hashes never leave the module; account reads return
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete. A person must hold `admin.user.delete` when the call runs; `delete_user/3` owns that check |
-| `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
-| `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
+| `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering. The actor is evaluated at the account's current company |
+| `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation. The actor is evaluated at the account's current company |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
-| `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
+| `confirm_password(...)` / `update_password(...)` | Current-password confirmation and replacement |
 | `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
 | `reset_password(email, token, password)` | Consume a 60-minute token and rotate `remember_token` |
 | `issue_email_verification_token(...)` / `verify_email(...)` | Signed 60-minute verification bound to the current email |
-| `user_preferences(...)` and preference get/put/delete | Scoped access to the four module-owned settings |
+| `user_preferences/1` and preference get/put/delete | The signed-in account's module-owned settings. The scope's actor names the user |
 | `DisplayPreferences.presentation/1`, `refresh/1`, `save/3` | The signed-in account's theme, timestamp display and language — one resolved snapshot, one durable write, refused for a session impersonating another account |
 | `notifiable_identity()` | The durable Laravel polymorphic string |
+
+`list_user_pins/1`, `toggle_user_pin/2`, and `reorder_user_pins/2` take the
+signed-in scope. The Web shell's pin API uses them. A list is allowed while
+impersonating; toggle and reorder return `{:error, :impersonating}`. Saved
+database queries use the same scope: it names the owner. Notification list,
+count, read, and delete for the signed-in user do the same.
+`send_notification/3` still names the recipient.
 
 ## Tables
 
@@ -114,7 +121,11 @@ open editor carries a warning saying so beside the select, before the
 operator chooses; it is a note, not a confirmation, because choosing the
 previous company again reverses the change. A reassignment authorizes
 `admin.user.update` against the account's **current** company, so its
-refusal names that company and never the chosen one.
+refusal names that company and never the chosen one. Password reset uses
+the same company. Both still take an authorization actor for that company,
+so a grant there allows the write while the operator is signed in
+elsewhere. Evaluating those grants from the sealed scope instead is an
+Authz change and a separate follow-up.
 
 **An account with no company is reachable from no screen.** Tenancy is
 derived from `company_id`, so `get_tenant_user/2` resolves no user without
@@ -149,8 +160,5 @@ pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 ## Deferred
 
 Phoenix routes, forms, mail delivery, login throttling, and the authenticated
-Session adapter remain a Web slice. `user_pins` is served through
-`list_user_pins/1`, `toggle_user_pin/2` and `reorder_user_pins/2`, which the
-Web shell's pin API uses. `user_database_queries` has schema but no public API:
-it is a UI feature owned by the Base Database query surface in S3.
-`User::getLastUsedModel()` is Core AI's, in S4.
+Session adapter remain a Web slice. `User::getLastUsedModel()` is Core AI's,
+in S4.
