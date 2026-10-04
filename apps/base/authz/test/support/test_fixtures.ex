@@ -3,8 +3,8 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
 
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.Authz.TestCompanyDirectory
-  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Database.TestTables
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 

@@ -1,10 +1,10 @@
 defmodule Bilimbi.Base.Workflow.ReferenceAuthorizationTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
-  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.Workflow.{BindingSchema, ReferenceFlow, RunSchema}
 
   import Bilimbi.Base.Workflow.TestFixtures

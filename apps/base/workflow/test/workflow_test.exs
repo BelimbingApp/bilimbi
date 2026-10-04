@@ -1,9 +1,9 @@
 defmodule Bilimbi.Base.WorkflowTest do
   use Bilimbi.Base.Database.DataCase, async: false
-  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.{Authentication, ForgedActorError}
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.Workflow.{BindingSchema, EdgeSchema, HistorySchema}
   alias Ecto.Adapters.SQL
   import Bilimbi.Base.Workflow.TestFixtures

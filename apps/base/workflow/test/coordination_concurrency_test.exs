@@ -1,9 +1,9 @@
 defmodule Bilimbi.Base.Workflow.CoordinationConcurrencyTest do
   use ExUnit.Case, async: false
-  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Repo, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Ecto.Adapters.SQL
   import Bilimbi.Base.Workflow.TestFixtures
 
