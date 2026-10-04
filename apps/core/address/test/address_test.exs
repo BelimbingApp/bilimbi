@@ -7,28 +7,45 @@ defmodule Bilimbi.Core.AddressTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Address.Page
   alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
 
   import Bilimbi.Core.Address.TestFixtures
 
   setup do
-    create_owner_identity_tables!()
+    EmployeeFixtures.create_employee_tables!()
     AuthzFixtures.create_authz_tables!()
     install_authz_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
-    create_geonames_tables!()
+    GeonamesFixtures.create_geonames_tables!()
     create_address_tables!()
 
-    insert_country!()
-    insert_admin1!()
-    insert_tenant!(%{id: 41, name: "Operator"})
-    insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
-    insert_company!(%{id: 73, tenant_id: 41, name: "Alpha Company", code: "operator"})
-    insert_company!(%{id: 74, tenant_id: 42, name: "Other Company", code: "customer"})
+    GeonamesFixtures.insert_country!()
+    GeonamesFixtures.insert_admin1!()
+    TenancyFixtures.insert_tenant!(%{id: 41, name: "Operator"})
+    TenancyFixtures.insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+
+    CompanyFixtures.insert_company!(%{
+      id: 73,
+      tenant_id: 41,
+      name: "Alpha Company",
+      code: "operator"
+    })
+
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 42,
+      name: "Other Company",
+      code: "customer"
+    })
+
     :ok = Employee.ensure_system_types()
 
     {:ok, operator} = Tenancy.scope(41)
@@ -128,14 +145,14 @@ defmodule Bilimbi.Core.AddressTest do
   end
 
   test "projects and sorts only live same-tenant Company and Employee owners", context do
-    insert_company!(%{
+    CompanyFixtures.insert_company!(%{
       id: 75,
       tenant_id: 41,
       name: "Zulu Company",
       code: "operator-secondary"
     })
 
-    insert_company!(%{
+    CompanyFixtures.insert_company!(%{
       id: 76,
       tenant_id: 41,
       name: "Deleted Company",
@@ -484,7 +501,7 @@ defmodule Bilimbi.Core.AddressTest do
   end
 
   test "lists live same-tenant addresses not already linked to the Company", context do
-    insert_company!(%{id: 75, tenant_id: 41, code: "operator-secondary"})
+    CompanyFixtures.insert_company!(%{id: 75, tenant_id: 41, code: "operator-secondary"})
 
     assert {:ok, linked} = Address.create_address(context.operator, %{label: "Linked"})
     assert {:ok, alpha} = Address.create_address(context.operator, %{label: "Alpha"})
@@ -674,7 +691,7 @@ defmodule Bilimbi.Core.AddressTest do
   test "attachment mutations fail closed outside the scoped live owner", context do
     assert {:ok, address} = Address.create_address(context.operator, %{label: "HQ"})
     assert {:ok, :attached} = Address.attach_to_company(context.operator, address.id, 73)
-    insert_company!(%{id: 75, tenant_id: 41, code: "operator-secondary"})
+    CompanyFixtures.insert_company!(%{id: 75, tenant_id: 41, code: "operator-secondary"})
 
     assert {:error, :address_not_found} =
              Address.update_company_attachment(context.customer, address.id, 74, %{priority: 2})
@@ -750,7 +767,7 @@ defmodule Bilimbi.Core.AddressTest do
         for i <- 1..n do
           company_id = 400 + n * 50 + i
 
-          insert_company!(%{
+          CompanyFixtures.insert_company!(%{
             id: company_id,
             tenant_id: 41,
             name: "Linked #{n}-#{i}",

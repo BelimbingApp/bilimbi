@@ -72,9 +72,8 @@ defmodule BilimbiWeb.ConnCase do
     # 42P01 raised here was caught by a `rescue _ -> []`, so every one of those
     # tests rendered an employee with no addresses and none of them knew.
     # `addresses` has foreign keys into both geonames tables, so those go first.
-    address_fixtures = Module.concat(["Bilimbi.Core.Address.TestFixtures"])
-    apply(address_fixtures, :create_geonames_tables!, [])
-    apply(address_fixtures, :create_address_tables!, [])
+    apply(Module.concat(["Bilimbi.Core.Geonames.TestFixtures"]), :create_geonames_tables!, [])
+    apply(Module.concat(["Bilimbi.Core.Address.TestFixtures"]), :create_address_tables!, [])
   end
 
   @doc """

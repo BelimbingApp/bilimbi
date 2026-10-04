@@ -20,6 +20,7 @@ defmodule BilimbiWeb.HostAuthorityTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias BilimbiWeb.RouteAccess
@@ -96,13 +97,13 @@ defmodule BilimbiWeb.HostAuthorityTest do
 
   test "H6 a same-route patch after the route grant is revoked is refused before it reads", c do
     grant_capabilities!(["admin.geonames.list"])
-    CompanyFixtures.insert_country!(%{iso: "MY"})
+    GeonamesFixtures.insert_country!(%{iso: "MY"})
     {:ok, view, _html} = live(c.conn, ~p"/geonames/countries")
 
     revoke!(c.scope, "admin.geonames.list")
     assert {:error, {:redirect, %{to: "/dashboard"}}} = live(c.conn, ~p"/geonames/countries")
 
-    CompanyFixtures.insert_country!(%{iso: "ZZ", country: "Fresh private fact"})
+    GeonamesFixtures.insert_country!(%{iso: "ZZ", country: "Fresh private fact"})
 
     assert {:error, {:redirect, %{to: "/dashboard"}}} =
              render_hook(view, "filters", %{"filters" => %{"search" => "Fresh"}})

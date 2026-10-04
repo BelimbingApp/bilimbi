@@ -7,8 +7,8 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
@@ -50,8 +50,8 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
   test "anonymous requests infer the global locale from the platform-operator primary address",
        %{conn: conn} do
-    AddressFixtures.insert_country!(%{iso: "FR"})
-    AddressFixtures.assign_primary_company!(41, 73)
+    GeonamesFixtures.insert_country!(%{iso: "FR"})
+    CompanyFixtures.assign_primary_company!(41, 73)
 
     {:ok, operator} = Tenancy.scope(41)
 

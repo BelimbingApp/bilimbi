@@ -12,7 +12,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -25,9 +24,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
     GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
-    AddressFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
+    GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
 
-    AddressFixtures.insert_country!(%{
+    GeonamesFixtures.insert_country!(%{
       iso: "SG",
       iso3: "SGP",
       iso_numeric: "702",
@@ -35,7 +34,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       geoname_id: 1_880_251
     })
 
-    AddressFixtures.insert_admin1!(%{
+    GeonamesFixtures.insert_admin1!(%{
       code: "MY.14",
       name: "Kuala Lumpur",
       country_iso: "MY",
