@@ -90,7 +90,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       end
 
       assert_redirect(view, "/")
-      assert {:ok, 1} = User.unread_notification_count(scope, 91)
+      assert {:ok, 1} = User.unread_notification_count(as(scope, 91))
     end
   end
 
@@ -124,7 +124,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
       assert has_element?(view, "#app-shell[data-framed='true']") == @framed
       render_click(element(view, "#mark-all-read-btn"))
-      assert {:ok, 0} = User.unread_notification_count(scope, 91)
+      assert {:ok, 0} = User.unread_notification_count(as(scope, 91))
       assert has_element?(view, "#app-shell[data-framed='true']") == @framed
       assert has_element?(view, "#app-topbar") == not @framed
 
@@ -220,7 +220,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
   test "filters by all, unread, and read tabs", %{conn: conn, scope: scope} do
     {:ok, n1} = User.send_notification(scope, 91, %{title: "Note 1 Unread"})
     {:ok, n2} = User.send_notification(scope, 91, %{title: "Note 2 Read"})
-    User.mark_notification_as_read(scope, 91, n2.id)
+    User.mark_notification_as_read(as(scope, 91), n2.id)
 
     {:ok, view, _html} = open(conn)
 
@@ -248,7 +248,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     view |> element("#mark-read-#{n1.id}") |> render_click()
 
     refute has_element?(view, "#mark-read-#{n1.id}")
-    assert User.unread_notification_count(scope, 91) == {:ok, 0}
+    assert User.unread_notification_count(as(scope, 91)) == {:ok, 0}
   end
 
   test "in unread filter, marking last unread notification transitions to empty state", %{
@@ -268,7 +268,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     # Now empty state should immediately be displayed
     assert has_element?(view, "#notifications-empty")
     refute has_element?(view, "#notifications-list")
-    assert User.unread_notification_count(scope, 91) == {:ok, 0}
+    assert User.unread_notification_count(as(scope, 91)) == {:ok, 0}
   end
 
   test "marks all notifications as read", %{conn: conn, scope: scope} do
@@ -280,7 +280,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     view |> element("#mark-all-read-btn") |> render_click()
 
-    assert User.unread_notification_count(scope, 91) == {:ok, 0}
+    assert User.unread_notification_count(as(scope, 91)) == {:ok, 0}
     refute has_element?(view, "#mark-all-read-btn")
     assert render(view) =~ "All notifications marked as read."
   end
@@ -382,7 +382,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
       # Mark all as read from dropdown
       view |> element("#bell-mark-all-read") |> render_click()
-      assert User.unread_notification_count(scope, 91) == {:ok, 0}
+      assert User.unread_notification_count(as(scope, 91)) == {:ok, 0}
       refute has_element?(view, "#app-notifications-unread-badge")
     end
 
@@ -557,5 +557,9 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
         Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
       end
     end
+  end
+
+  defp as(scope, user_id) do
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, 73)
   end
 end

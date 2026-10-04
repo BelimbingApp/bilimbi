@@ -40,6 +40,23 @@ defmodule BilimbiWeb.Router do
     plug :fetch_current_scope
   end
 
+  # The shell calls pins and theme with Accept: application/json. The browser
+  # pipeline accepts only html, so that header is refused before the controller.
+  # Session, CSRF, and authentication stay the same as the browser pipeline.
+  pipeline :api do
+    plug :accepts, ["html", "json"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {Bilimbi.Base.UI.Layouts, :root}
+    plug :protect_from_forgery
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" => @content_security_policy
+    }
+
+    plug :fetch_current_scope
+  end
+
   # Signed machine traffic uses only this reserved scope. Browser routes keep
   # their CSRF and session checks, including discovered :none routes.
   scope "/webhooks", BilimbiWeb do
@@ -82,7 +99,7 @@ defmodule BilimbiWeb.Router do
   BilimbiWeb.DiscoveredRoutes.inject()
 
   scope "/api", BilimbiWeb do
-    pipe_through [:browser, :require_authenticated]
+    pipe_through [:api, :require_authenticated]
 
     post "/theme", ThemeController, :update
     get "/pins", PinController, :index

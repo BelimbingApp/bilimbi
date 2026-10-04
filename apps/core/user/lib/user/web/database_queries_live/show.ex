@@ -81,9 +81,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   defp load_saved_query(socket, slug, params) do
     scope = socket.assigns.current_scope.scope
-    user_id = current_user_id(socket.assigns.current_scope)
 
-    case User.get_database_query(scope, user_id, slug) do
+    case User.get_database_query(scope, slug) do
       {:ok, query} ->
         sql = query.sql_query || ""
         detected = Database.extract_named_parameters(sql)
@@ -168,7 +167,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     if operator?(socket) and
          allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket.assigns.current_scope)
 
       attrs = %{
         "name" => socket.assigns.name,
@@ -178,7 +176,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       }
 
       if socket.assigns.is_new do
-        case User.create_database_query(scope, user_id, attrs) do
+        case User.create_database_query(scope, attrs) do
           {:ok, query} ->
             {:noreply,
              socket
@@ -190,7 +188,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
             {:noreply, assign(socket, :error, "Failed to save query: " <> error_msg)}
         end
       else
-        case User.update_database_query(scope, user_id, socket.assigns.query.id, attrs) do
+        case User.update_database_query(scope, socket.assigns.query.id, attrs) do
           {:ok, updated_query} ->
             {:noreply,
              socket
@@ -265,10 +263,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     if operator?(socket) and
          allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket.assigns.current_scope)
 
       if socket.assigns.query do
-        case User.duplicate_database_query(scope, user_id, socket.assigns.query.id) do
+        case User.duplicate_database_query(scope, socket.assigns.query.id) do
           {:ok, duplicate} ->
             {:noreply,
              socket
@@ -309,7 +306,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   def handle_event("delete", _params, socket) do
     scope = socket.assigns.current_scope.scope
-    user_id = current_user_id(socket.assigns.current_scope)
 
     cond do
       not can_modify?(socket) ->
@@ -328,7 +324,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
         query = socket.assigns.query
         socket = assign(socket, :pending_delete?, false)
 
-        case User.delete_database_query(scope, user_id, query.id) do
+        case User.delete_database_query(scope, query.id) do
           {:ok, _deleted} ->
             {:noreply,
              socket

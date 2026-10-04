@@ -36,12 +36,23 @@ defmodule BilimbiWeb.ThemeControllerTest do
     assert json_response(conn, 200) == %{"theme" => "dark"}
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "dark"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "POST /api/theme with system clears override", %{conn: conn} do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+
+    {:ok, "dark"} =
+      User.put_user_preference(
+        Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+        "ui.theme",
+        "dark"
+      )
 
     conn =
       conn
@@ -49,7 +60,12 @@ defmodule BilimbiWeb.ThemeControllerTest do
       |> post(~p"/api/theme", %{"theme" => "system"})
 
     assert json_response(conn, 200) == %{"theme" => "system"}
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "POST /api/theme rejects invalid theme values", %{conn: conn} do
@@ -80,7 +96,12 @@ defmodule BilimbiWeb.ThemeControllerTest do
     assert json_response(conn, 403) == %{"error" => "impersonating"}
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+
+    assert {:ok, "system"} =
+             User.get_user_preference(
+               Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 91, 73),
+               "ui.theme"
+             )
   end
 
   test "a failed user preference write does not report success", %{conn: conn} do

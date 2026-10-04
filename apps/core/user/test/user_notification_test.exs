@@ -167,29 +167,29 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
     end
   end
 
-  describe "unread_notification_count/2 and count_notifications/3" do
+  describe "unread_notification_count/1 and count_notifications/1" do
     test "counts unread and total notifications accurately per user within scope", %{scope: scope} do
-      assert User.unread_notification_count(scope, 42) == {:ok, 0}
-      assert User.count_notifications(scope, 42) == {:ok, 0}
+      assert User.unread_notification_count(as(scope, 42)) == {:ok, 0}
+      assert User.count_notifications(as(scope, 42)) == {:ok, 0}
 
       {:ok, n1} = User.send_notification(scope, 42, %{title: "Note 1"})
       {:ok, _n2} = User.send_notification(scope, 42, %{title: "Note 2"})
       {:ok, _n3} = User.send_notification(scope, 43, %{title: "Carol Note"})
 
-      assert User.unread_notification_count(scope, 42) == {:ok, 2}
-      assert User.count_notifications(scope, 42) == {:ok, 2}
-      assert User.unread_notification_count(scope, 43) == {:ok, 1}
+      assert User.unread_notification_count(as(scope, 42)) == {:ok, 2}
+      assert User.count_notifications(as(scope, 42)) == {:ok, 2}
+      assert User.unread_notification_count(as(scope, 43)) == {:ok, 1}
 
-      User.mark_notification_as_read(scope, 42, n1.id)
-      assert User.unread_notification_count(scope, 42) == {:ok, 1}
-      assert User.count_notifications(scope, 42, status: :unread) == {:ok, 1}
-      assert User.count_notifications(scope, 42, status: :read) == {:ok, 1}
-      assert User.count_notifications(scope, 42, status: :all) == {:ok, 2}
+      User.mark_notification_as_read(as(scope, 42), n1.id)
+      assert User.unread_notification_count(as(scope, 42)) == {:ok, 1}
+      assert User.count_notifications(as(scope, 42), status: :unread) == {:ok, 1}
+      assert User.count_notifications(as(scope, 42), status: :read) == {:ok, 1}
+      assert User.count_notifications(as(scope, 42), status: :all) == {:ok, 2}
     end
 
     test "fails with :user_not_found when user belongs to different tenant", %{scope: scope} do
-      assert User.unread_notification_count(scope, 999) == {:error, :user_not_found}
-      assert User.count_notifications(scope, 999) == {:error, :user_not_found}
+      assert User.unread_notification_count(as(scope, 999)) == {:error, :user_not_found}
+      assert User.count_notifications(as(scope, 999)) == {:error, :user_not_found}
     end
   end
 
@@ -201,18 +201,18 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       {:ok, n2} = User.send_notification(scope, user_id, %{title: "Second"})
       {:ok, n3} = User.send_notification(scope, user_id, %{title: "Third"})
 
-      User.mark_notification_as_read(scope, user_id, n2.id)
+      User.mark_notification_as_read(as(scope, user_id), n2.id)
 
-      assert {:ok, all} = User.list_notifications(scope, user_id, status: :all)
+      assert {:ok, all} = User.list_notifications(as(scope, user_id), status: :all)
       assert length(all) == 3
 
-      assert {:ok, unread} = User.list_notifications(scope, user_id, status: :unread)
+      assert {:ok, unread} = User.list_notifications(as(scope, user_id), status: :unread)
       assert length(unread) == 2
       unread_ids = Enum.map(unread, & &1.id)
       assert n1.id in unread_ids
       assert n3.id in unread_ids
 
-      assert {:ok, read} = User.list_notifications(scope, user_id, status: :read)
+      assert {:ok, read} = User.list_notifications(as(scope, user_id), status: :read)
       assert length(read) == 1
       assert hd(read).id == n2.id
     end
@@ -225,10 +225,10 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       end
 
       assert {:ok, page1} =
-               User.list_notifications(scope, user_id, page: 1, per_page: 25)
+               User.list_notifications(as(scope, user_id), page: 1, per_page: 25)
 
       assert {:ok, page2} =
-               User.list_notifications(scope, user_id, page: 2, per_page: 25)
+               User.list_notifications(as(scope, user_id), page: 2, per_page: 25)
 
       assert length(page1) == 25
       assert length(page2) == 5
@@ -239,7 +239,7 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
     end
 
     test "returns :user_not_found for foreign tenant user", %{scope: scope} do
-      assert User.list_notifications(scope, 999) == {:error, :user_not_found}
+      assert User.list_notifications(as(scope, 999)) == {:error, :user_not_found}
     end
   end
 
@@ -248,12 +248,12 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       user_id = 42
       {:ok, note} = User.send_notification(scope, user_id, %{title: "Single"})
 
-      assert {:ok, updated} = User.mark_notification_as_read(scope, user_id, note.id)
+      assert {:ok, updated} = User.mark_notification_as_read(as(scope, user_id), note.id)
       assert Notification.read?(updated)
       refute is_nil(updated.read_at)
 
       # Attempting to mark for another user returns :not_found
-      assert {:error, :not_found} = User.mark_notification_as_read(scope, 43, note.id)
+      assert {:error, :not_found} = User.mark_notification_as_read(as(scope, 43), note.id)
     end
 
     test "marks all unread notifications as read for a user", %{scope: scope} do
@@ -261,24 +261,24 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       {:ok, _n1} = User.send_notification(scope, user_id, %{title: "One"})
       {:ok, _n2} = User.send_notification(scope, user_id, %{title: "Two"})
 
-      assert User.unread_notification_count(scope, user_id) == {:ok, 2}
-      assert {:ok, 2} = User.mark_all_notifications_as_read(scope, user_id)
-      assert User.unread_notification_count(scope, user_id) == {:ok, 0}
+      assert User.unread_notification_count(as(scope, user_id)) == {:ok, 2}
+      assert {:ok, 2} = User.mark_all_notifications_as_read(as(scope, user_id))
+      assert User.unread_notification_count(as(scope, user_id)) == {:ok, 0}
     end
 
     test "deletes a notification", %{scope: scope} do
       user_id = 42
       {:ok, note} = User.send_notification(scope, user_id, %{title: "To Delete"})
 
-      assert {:ok, deleted} = User.delete_notification(scope, user_id, note.id)
+      assert {:ok, deleted} = User.delete_notification(as(scope, user_id), note.id)
       assert deleted.id == note.id
-      assert {:error, :not_found} = User.get_notification(scope, user_id, note.id)
+      assert {:error, :not_found} = User.get_notification(as(scope, user_id), note.id)
     end
 
     test "returns :user_not_found for foreign tenant user", %{scope: scope} do
-      assert User.mark_notification_as_read(scope, 999, "any-id") == {:error, :user_not_found}
-      assert User.mark_all_notifications_as_read(scope, 999) == {:error, :user_not_found}
-      assert User.delete_notification(scope, 999, "any-id") == {:error, :user_not_found}
+      assert User.mark_notification_as_read(as(scope, 999), "any-id") == {:error, :user_not_found}
+      assert User.mark_all_notifications_as_read(as(scope, 999)) == {:error, :user_not_found}
+      assert User.delete_notification(as(scope, 999), "any-id") == {:error, :user_not_found}
     end
   end
 
@@ -292,13 +292,13 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       {:ok, note} = User.send_notification(scope, user_id, %{title: "Broadcast Note"})
       assert_receive {:notification_event, {:created, %Notification{id: id}}} when id == note.id
 
-      {:ok, _read} = User.mark_notification_as_read(scope, user_id, note.id)
+      {:ok, _read} = User.mark_notification_as_read(as(scope, user_id), note.id)
       assert_receive {:notification_event, {:read, %Notification{id: id}}} when id == note.id
 
-      {:ok, _count} = User.mark_all_notifications_as_read(scope, user_id)
+      {:ok, _count} = User.mark_all_notifications_as_read(as(scope, user_id))
       assert_receive {:notification_event, {:all_read, _count}}
 
-      {:ok, _del} = User.delete_notification(scope, user_id, note.id)
+      {:ok, _del} = User.delete_notification(as(scope, user_id), note.id)
       assert_receive {:notification_event, {:deleted, %Notification{id: id}}} when id == note.id
     end
 
@@ -338,23 +338,23 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       with_delivery_failure_telemetry(fn ->
         with_pubsub_server(__MODULE__, fn ->
           assert {:ok, created} = User.send_notification(scope, 42, %{title: "Created once"})
-          assert {:ok, [persisted]} = User.list_notifications(scope, 42)
+          assert {:ok, [persisted]} = User.list_notifications(as(scope, 42))
           assert persisted.id == created.id
           assert_delivery_failure(:broadcast)
 
-          assert {:ok, read} = User.mark_notification_as_read(scope, 42, created.id)
+          assert {:ok, read} = User.mark_notification_as_read(as(scope, 42), created.id)
           assert Notification.read?(read)
           assert_delivery_failure(:broadcast)
 
           assert {:ok, second} = User.send_notification(scope, 42, %{title: "Read all"})
           assert_delivery_failure(:broadcast)
 
-          assert {:ok, 1} = User.mark_all_notifications_as_read(scope, 42)
+          assert {:ok, 1} = User.mark_all_notifications_as_read(as(scope, 42))
           assert_delivery_failure(:broadcast)
 
-          assert {:ok, deleted} = User.delete_notification(scope, 42, second.id)
+          assert {:ok, deleted} = User.delete_notification(as(scope, 42), second.id)
           assert deleted.id == second.id
-          assert {:error, :not_found} = User.get_notification(scope, 42, second.id)
+          assert {:error, :not_found} = User.get_notification(as(scope, 42), second.id)
           assert_delivery_failure(:broadcast)
         end)
       end)
@@ -399,5 +399,10 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
         :error -> Application.delete_env(:bilimbi_core_user, :pubsub_server)
       end
     end
+  end
+
+  defp as(scope, user_id) do
+    company_id = if user_id == 999, do: 88, else: 73
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, user_id, company_id)
   end
 end
