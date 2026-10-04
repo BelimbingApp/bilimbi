@@ -7,9 +7,9 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                  )
 
   # The router compiles anonymous LiveViews, session posts, and impersonation
-  # posts itself. Every other host path in the manifest — `/dashboard` is the
-  # one today — is injected from that declaration, so the manifest is not a
-  # second copy of a route the router already wrote down.
+  # posts itself. A host path in the manifest outside this list is injected from
+  # that declaration, so the manifest is not a second copy of a route the router
+  # already wrote down.
   @router_owned_host_paths [
     "/",
     "/forgot-password",
