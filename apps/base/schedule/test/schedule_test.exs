@@ -49,7 +49,9 @@ defmodule Bilimbi.Base.ScheduleTest do
                 %{
                   type: :integer,
                   scopes: [:global],
-                  default: 90
+                  default: 90,
+                  minimum: 0,
+                  maximum: 3650
                 }
               )
           },
@@ -512,8 +514,8 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert :ok = Schedule.review_definition(definition.key, true)
     intended = ~U[2026-08-21 01:15:00Z]
 
-    assert {:ok, %JobRef{}} = Schedule.enqueue_due(definition, intended)
-    assert {:error, reason} = Schedule.enqueue_due(definition, intended)
+    assert {:ok, %JobRef{}} = Scheduler.enqueue_due(definition, intended)
+    assert {:error, reason} = Scheduler.enqueue_due(definition, intended)
     assert reason in [:already_claimed, :overlap]
     assert Repo.aggregate(from(row in Occurrence, where: row.key == ^definition.key), :count) == 1
   end
