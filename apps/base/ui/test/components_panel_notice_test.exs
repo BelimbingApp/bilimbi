@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.UI.ComponentsPanelNoticeTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   alias Bilimbi.Base.UI.IconRegistry
   alias Phoenix.LiveView.JS

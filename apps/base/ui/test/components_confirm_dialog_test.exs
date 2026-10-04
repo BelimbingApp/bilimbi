@@ -20,7 +20,7 @@ defmodule Bilimbi.Base.UI.ComponentsConfirmDialogTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   alias Phoenix.LiveView.JS
 

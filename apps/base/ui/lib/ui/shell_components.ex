@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.UI.ShellComponents do
   @moduledoc "Shared account disclosure, safety context and immediate display controls."
   use Phoenix.Component
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.IconRegistry
 
   use Phoenix.VerifiedRoutes,

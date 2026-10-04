@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.UI.ComponentsRecordLinkTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp row(assigns) do
     ~H"""

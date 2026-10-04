@@ -10,7 +10,7 @@ defmodule Bilimbi.Base.UI.ComponentsEmptyStateTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   # The visible words, in order, with markup and whitespace collapsed, so the
   # assertions read the copy a person reads rather than class strings.

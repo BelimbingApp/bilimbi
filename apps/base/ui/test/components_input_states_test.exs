@@ -18,7 +18,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp field(assigns) do
     assigns = assign_new(assigns, :type, fn -> "text" end)

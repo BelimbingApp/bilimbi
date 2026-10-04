@@ -30,7 +30,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
   use ExUnit.Case, async: true
 
-  alias Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.DesignLibrarySource, as: Source
   alias Bilimbi.Base.UI.IconRegistry
 
@@ -128,7 +127,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   #     the icon registry (`registered_icon` vs `hero_icon`), and the library
   #     has to show both sides of that branch.
   defp axes(name) do
-    %{attrs: attrs, slots: slots} = Components.__components__()[name]
+    %{attrs: attrs, slots: slots} = Source.component!(name)
 
     attr_axes =
       for %{name: attr, type: type, opts: opts} <- attrs,
@@ -246,12 +245,12 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   end
 
   defp default_for(name, attr) do
-    %{opts: opts} = Enum.find(Components.__components__()[name].attrs, &(&1.name == attr))
+    %{opts: opts} = Enum.find(Source.component!(name).attrs, &(&1.name == attr))
     default_state(opts)
   end
 
   defp slot_attr_default(name, slot, attr) do
-    %{attrs: attrs} = Enum.find(Components.__components__()[name].slots, &(&1.name == slot))
+    %{attrs: attrs} = Enum.find(Source.component!(name).slots, &(&1.name == slot))
     %{opts: opts} = Enum.find(attrs, &(&1.name == attr))
     default_state(opts)
   end

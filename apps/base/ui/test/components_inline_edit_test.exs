@@ -7,7 +7,7 @@ defmodule Bilimbi.Base.UI.ComponentsInlineEditTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders display element with pencil icon and hook attributes" do
     assigns = %{}
@@ -105,7 +105,7 @@ defmodule Bilimbi.Base.UI.ComponentsInlineChoiceTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders the shared read, edit, and commit-status states" do
     html =

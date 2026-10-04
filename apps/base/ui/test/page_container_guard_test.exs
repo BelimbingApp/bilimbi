@@ -22,12 +22,8 @@ defmodule Bilimbi.Base.UI.PageContainerGuardTest do
   @workspace_root Path.expand("../../../..", __DIR__)
 
   # `Components.page/1` is where the widths live, so it is the one file that
-  # must pair `mx-auto` with a `max-w-*`. The UI reference renders miniature
-  # previews of the variants rather than using them as its own container.
-  @allowed_paths [
-    "apps/base/ui/lib/ui/components.ex",
-    "apps/base/ui/lib/ui/web/reference_live.html.heex"
-  ]
+  # must pair `mx-auto` with a `max-w-*`.
+  @allowed_paths ["apps/base/ui/lib/ui/components.ex"]
 
   test "no screen hand-writes its own page width" do
     offenders =

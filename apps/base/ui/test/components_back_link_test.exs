@@ -7,7 +7,7 @@ defmodule Bilimbi.Base.UI.ComponentsBackLinkTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders a plain navigation link reading Back, never a button" do
     assigns = %{}

@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.UI.ComponentsStatStripTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp preview(assigns) do
     assigns =

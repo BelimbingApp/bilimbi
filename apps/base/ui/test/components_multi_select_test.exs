@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp multi_select_field(assigns) do
     ~H"""

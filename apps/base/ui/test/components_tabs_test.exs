@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.UI.ComponentsTabsTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   defp link_tabs(assigns) do
     ~H"""

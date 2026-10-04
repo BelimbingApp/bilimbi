@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.UI.ComponentsAlertTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   alias Bilimbi.Base.UI.IconRegistry
 

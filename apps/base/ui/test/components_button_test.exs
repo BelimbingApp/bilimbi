@@ -7,7 +7,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
+  use Bilimbi.Base.UI.Components
 
   test "renders default button with bordered surface classes" do
     html =
