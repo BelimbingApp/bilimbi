@@ -9,6 +9,7 @@ defmodule BilimbiWeb.FramedRenderTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -37,6 +38,9 @@ defmodule BilimbiWeb.FramedRenderTest do
 
     assert has_element?(view, "#app-shell[data-framed='true'][data-display-mode]")
     assert has_element?(view, "#app-content")
+
+    send(view.pid, :refresh_widgets)
+    assert has_element?(view, "#app-shell[data-framed='true'][data-display-mode]")
     refute has_element?(view, "#app-topbar")
     refute has_element?(view, "#app-sidebar")
     refute has_element?(view, "#app-statusbar")
@@ -45,7 +49,9 @@ defmodule BilimbiWeb.FramedRenderTest do
 
   test "a framed page does not query shell pins", %{conn: conn} do
     UserFixtures.create_user_pins_table!()
-    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
+    {:ok, scope} = Tenancy.scope(41)
+    scope = Tenancy.Authentication.sign_in(scope, 91, 73)
+    {:ok, :pinned, _} = User.toggle_user_pin(scope, %{"label" => "Companies", "url" => "/companies"})
 
     owner = self()
     handler = {__MODULE__, make_ref()}

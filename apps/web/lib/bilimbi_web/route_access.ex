@@ -42,9 +42,14 @@ defmodule BilimbiWeb.RouteAccess do
   `current_scope` is assigned, so `allowed?/2` inside the callback reads the
   current capability list rather than the mount's.
 
-  Server-triggered callbacks (`handle_info`, `handle_async`) are not checked
-  here. A LiveComponent's `handle_event/3` reaches the same authorization
-  through the Base UI event wrapper and its process-local host callback.
+  Server-triggered callbacks (`handle_info`, `handle_async`) are not
+  reauthorized here. The dashboard's `:refresh_widgets` timer is the
+  exception: it rehydrates the scope the same way a client event does,
+  keeping the frame flag and pin list, and then continues into the page.
+  That rehydration does not call `allowed_now?/2`, so a still-permitted tick
+  writes no decision-log row. A LiveComponent's `handle_event/3` reaches the
+  same authorization through the Base UI event wrapper and its process-local
+  host callback.
   The callback is replaced on live navigation and refreshes the owning page's
   identity before checking its requirement. An operation needing another
   capability also uses `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`.
@@ -85,6 +90,7 @@ defmodule BilimbiWeb.RouteAccess do
             &handle_params(policies, session, &1, &2, &3)
           )
           |> attach_hook(:route_access_event, :handle_event, &handle_event(policies, &1, &2, &3))
+          |> attach_hook(:route_access_widget_refresh, :handle_info, &refresh_widgets/2)
 
         {:cont, socket}
     end
@@ -123,6 +129,12 @@ defmodule BilimbiWeb.RouteAccess do
   defp handle_event(policies, _event, _params, socket) do
     authorize_event(Map.fetch!(policies, socket.private.bilimbi_route_action), socket)
   end
+
+  # The dashboard timer is `handle_info`, so the event hook does not run.
+  # Rehydrate capabilities before the page reads, and leave the route
+  # decision alone: a still-permitted tick must not write a decision-log row.
+  defp refresh_widgets(:refresh_widgets, socket), do: refresh(socket)
+  defp refresh_widgets(_message, socket), do: {:cont, socket}
 
   defp authorize_event(capability, socket) do
     with {:cont, socket} <- refresh(socket), do: reauthorize(capability, socket)
