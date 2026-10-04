@@ -34,8 +34,8 @@ defmodule Bilimbi.Core.EmployeeTest do
       code: "company_b"
     })
 
-    insert_department!(101, 73)
-    insert_department!(102, 74)
+    CompanyFixtures.insert_department_with_type!(101, 73)
+    CompanyFixtures.insert_department_with_type!(102, 74)
     :ok = Employee.ensure_system_types()
 
     {:ok, owner} = Tenancy.scope(41)

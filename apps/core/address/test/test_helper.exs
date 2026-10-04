@@ -1,5 +1,6 @@
 Code.ensure_loaded!(Bilimbi.Base.Database.DataCase)
 Code.ensure_loaded!(Bilimbi.Base.Tenancy.TestFixtures)
+Code.ensure_loaded!(Bilimbi.Base.Settings.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Company.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Employee.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Geonames.TestFixtures)

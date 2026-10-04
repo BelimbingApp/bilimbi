@@ -202,6 +202,25 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     )
   end
 
+  # A department with its own type (same id), for tests that need no more than
+  # "this company has a department".
+  def insert_department_with_type!(id, company_id) do
+    SQL.query!(
+      Repo,
+      "INSERT INTO company_department_types (id, code, name, category) VALUES ($1, $2, $3, $4)",
+      [id, "department_#{id}", "Department #{id}", "operations"]
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO company_departments (id, company_id, department_type_id)
+      VALUES ($1, $2, $1)
+      """,
+      [id, company_id]
+    )
+  end
+
   def create_external_access_tables! do
     SQL.query!(
       Repo,

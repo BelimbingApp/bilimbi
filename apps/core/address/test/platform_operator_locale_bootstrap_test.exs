@@ -6,6 +6,7 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
   alias Bilimbi.Base.Locale.Contributions, as: LocaleContributions
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings.ContributionValidator, as: SettingsValidator
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Employee
@@ -34,7 +35,7 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     create_owner_identity_tables!()
     create_geonames_tables!()
     create_address_tables!()
-    create_settings_table!()
+    SettingsFixtures.create_settings_table!()
     :ok = Employee.ensure_system_types()
     :ok
   end

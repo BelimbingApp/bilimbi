@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Session.TestFixtures, as: SessionFixtures
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
@@ -15,7 +16,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    UserFixtures.create_sessions_table!()
+    SessionFixtures.create_sessions_table!()
     Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
     AuthzFixtures.create_authz_tables!()
     UserFixtures.install_user_authz_registry!()

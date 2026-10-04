@@ -78,31 +78,6 @@ defmodule Bilimbi.Core.User.TestFixtures do
     create_notifications_table!()
   end
 
-  def create_sessions_table! do
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE sessions (
-        id varchar(255) PRIMARY KEY,
-        user_id bigint,
-        ip_address varchar(45),
-        user_agent text,
-        payload text NOT NULL,
-        last_activity integer NOT NULL
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
-
-    SQL.query!(Repo, "CREATE INDEX sessions_user_id_index ON sessions (user_id)", [])
-
-    SQL.query!(
-      Repo,
-      "CREATE INDEX sessions_last_activity_index ON sessions (last_activity)",
-      []
-    )
-  end
-
   def create_user_database_queries_table! do
     SQL.query!(
       Repo,

@@ -32,10 +32,6 @@ defmodule Bilimbi.Core.Address.TestFixtures do
     apply(GeonamesTestFixtures, :create_geonames_tables!, [])
   end
 
-  def create_settings_table! do
-    apply(Bilimbi.Base.Settings.TestFixtures, :create_settings_table!, [])
-  end
-
   def insert_country!(attributes \\ %{}) do
     apply(GeonamesTestFixtures, :insert_country!, [attributes])
   end
