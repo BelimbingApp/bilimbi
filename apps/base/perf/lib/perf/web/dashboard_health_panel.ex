@@ -22,12 +22,17 @@ defmodule Bilimbi.Base.Perf.Web.DashboardHealthPanel do
 
     {:ok,
      cond do
-       not socket.assigns.connected -> assign(socket, :diagnostics, :not_loaded)
+       not socket.assigns.connected ->
+         assign(socket, :diagnostics, :not_loaded)
+
        not allowed?(socket.assigns.current_scope, @capability) ->
          assign(socket, :diagnostics, :not_loaded)
 
-       stale? -> assign(socket, :diagnostics, Perf.diagnostics())
-       true -> socket
+       stale? ->
+         assign(socket, :diagnostics, Perf.diagnostics())
+
+       true ->
+         socket
      end}
   end
 

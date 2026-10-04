@@ -22,12 +22,17 @@ defmodule Bilimbi.Base.Audit.Web.DashboardActivityPanel do
 
     {:ok,
      cond do
-       not socket.assigns.connected -> assign(socket, :entries, :not_loaded)
+       not socket.assigns.connected ->
+         assign(socket, :entries, :not_loaded)
+
        not allowed?(socket.assigns.current_scope, @capability) ->
          assign(socket, :entries, :not_loaded)
 
-       stale? -> load(socket)
-       true -> socket
+       stale? ->
+         load(socket)
+
+       true ->
+         socket
      end}
   end
 

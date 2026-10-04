@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
   While editing, widgets can be reordered by drag (a `DashboardSort` hook
   pushes the new order; the server validates it is a permutation of the
   current ids before persisting) or by the keyboard move buttons Belimbing
-  pairs with its own drag handles.   A visible entry with a non-zero
+  pairs with its own drag handles. A visible entry with a non-zero
   `refresh_interval` makes the page count a refresh once the socket is
   connected. Every panel receives that count and whether the socket is
   connected, and decides for itself whether to read.

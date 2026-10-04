@@ -23,12 +23,17 @@ defmodule Bilimbi.Base.Session.Web.DashboardStatsPanel do
 
     {:ok,
      cond do
-       not socket.assigns.connected -> assign(socket, :count, :not_loaded)
+       not socket.assigns.connected ->
+         assign(socket, :count, :not_loaded)
+
        not allowed?(socket.assigns.current_scope, @capability) ->
          assign(socket, :count, :not_loaded)
 
-       stale? -> assign(socket, :count, Session.count_sessions())
-       true -> socket
+       stale? ->
+         assign(socket, :count, Session.count_sessions())
+
+       true ->
+         socket
      end}
   end
 
