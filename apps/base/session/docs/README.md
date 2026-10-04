@@ -38,9 +38,7 @@ navigation. Component-targeted events reach the authenticated host through
 Base UI's shared component event wrapper. These use the server-held session
 identity, so a continuously used LiveView refreshes activity without requiring
 a remount. The `touch_session/2` documentation in `lib/session.ex` owns the
-update and audit policy. `session.retention_days` and
-`session.last_activity_touch_minutes` are operator settings; the daily
-session worker prunes rows whose stored activity is older than that retention
-window. Its definition must first be reviewed and enabled under the
-[Schedule delivery policy](../../schedule/docs/README.md#time-and-delivery).
-Session keeps this lifecycle independent of Web and Core User.
+update and audit policy. `session.last_activity_touch_minutes` is an operator
+setting, capped at half the session lifetime so an active session is refreshed
+before it can expire. Session keeps this lifecycle independent of Web and Core
+User.

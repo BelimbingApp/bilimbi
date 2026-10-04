@@ -17,7 +17,6 @@ defmodule BilimbiWeb.SessionActivityTest do
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
-    assert {:ok, 1} = Settings.put("session.retention_days", 1)
     assert {:ok, _} = Settings.put("session.lifetime_minutes", 3 * 24 * 60)
     conn = log_in_as(conn)
     session_id = get_session(conn, "current_user")["session_id"]
@@ -25,7 +24,7 @@ defmodule BilimbiWeb.SessionActivityTest do
     %{conn: conn, view: view, session_id: session_id}
   end
 
-  test "ordinary events preserve an active session across retention sweeps", %{
+  test "ordinary events preserve an active session across expiry sweeps", %{
     view: view,
     session_id: session_id
   } do
@@ -39,7 +38,7 @@ defmodule BilimbiWeb.SessionActivityTest do
       assert {:ok, entry} = Session.fetch_session(session_id)
       assert entry.last_activity >= before_event
       assert Repo.aggregate(MutationSchema, :count) == audit_count
-      assert Session.prune_by_retention() == 0
+      assert Session.prune_expired(System.system_time(:second) - 3 * 86_400) == 0
       assert {:ok, _entry} = Session.fetch_session(session_id)
     end
   end
@@ -60,7 +59,7 @@ defmodule BilimbiWeb.SessionActivityTest do
       assert {:ok, entry} = Session.fetch_session(session_id)
       assert entry.last_activity >= before_event
       assert Repo.aggregate(MutationSchema, :count) == audit_count
-      assert Session.prune_by_retention() == 0
+      assert Session.prune_expired(System.system_time(:second) - 3 * 86_400) == 0
       assert {:ok, _entry} = Session.fetch_session(session_id)
     end
   end

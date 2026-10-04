@@ -32,17 +32,6 @@ defmodule Bilimbi.Base.Session.Contributions do
             editable: "operator",
             capability: "base.settings.global.manage"
           },
-          "session.retention_days" => %{
-            type: :integer,
-            scopes: [:global],
-            default: 30,
-            minimum: 1,
-            maximum: 3650,
-            label: "Session retention",
-            help: "Days of inactive session metadata to retain.",
-            editable: "operator",
-            capability: "base.settings.global.manage"
-          },
           "session.lifetime_minutes" => %{
             type: :integer,
             scopes: [:global],
@@ -59,17 +48,6 @@ defmodule Bilimbi.Base.Session.Contributions do
       },
       schedule: %{
         definitions: [
-          %{
-            key: "base/session.retention",
-            name: "Prune expired sessions",
-            expression: "7 3 * * *",
-            timezone: "Etc/UTC",
-            task_name: "Base Session retention",
-            worker: Bilimbi.Base.Session.RetentionWorker,
-            args: %{},
-            overlap: :forbid,
-            misfire: :coalesce
-          },
           %{
             key: "base/session-expiry",
             name: "Prune expired sessions",

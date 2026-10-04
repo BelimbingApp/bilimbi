@@ -23,7 +23,7 @@ defmodule Bilimbi.Base.Session do
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
   @touch_interval_key "session.last_activity_touch_minutes"
-  @retention_key "session.retention_days"
+  @lifetime_key "session.lifetime_minutes"
   @sortable_fields [:user_id, :ip_address, :user_agent, :last_activity]
 
   @spec put_session(String.t(), String.t(), map() | keyword()) ::
@@ -57,6 +57,8 @@ defmodule Bilimbi.Base.Session do
 
   @doc """
   Advances session activity when the configured throttle interval elapsed.
+  The interval never exceeds half the session lifetime, so an active session
+  is refreshed before it can expire.
 
   Activity updates to `sessions` bypass audit capture: they are machine
   housekeeping, not changes to the user's identity or opaque payload.
@@ -65,8 +67,9 @@ defmodule Bilimbi.Base.Session do
   @spec touch_session(String.t(), non_neg_integer()) :: :ok | {:error, :not_found}
   def touch_session(id, now \\ System.system_time(:second))
       when is_binary(id) and is_integer(now) and now >= 0 do
-    interval = Bilimbi.Base.Settings.get(@touch_interval_key) * 60
-    cutoff = now - interval
+    touch_minutes = Bilimbi.Base.Settings.get(@touch_interval_key)
+    lifetime_minutes = Bilimbi.Base.Settings.get(@lifetime_key)
+    cutoff = now - min(touch_minutes, max(1, div(lifetime_minutes, 2))) * 60
 
     {count, _rows} =
       WriteCapture.without_capture(fn ->
@@ -79,13 +82,6 @@ defmodule Bilimbi.Base.Session do
       end)
 
     if count == 0 and is_nil(Repo.get(Schema, id)), do: {:error, :not_found}, else: :ok
-  end
-
-  @doc "Deletes sessions older than the configured operator retention period."
-  @spec prune_by_retention() :: non_neg_integer()
-  def prune_by_retention do
-    days = Bilimbi.Base.Settings.get(@retention_key)
-    prune_expired(System.system_time(:second) - days * 86_400)
   end
 
   @spec list_sessions(keyword()) :: [Summary.t()]

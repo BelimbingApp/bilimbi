@@ -32,11 +32,11 @@ defmodule Bilimbi.Base.SessionTest do
                   default: 5
                 }
               ),
-            "session.retention_days" =>
-              Bilimbi.Base.Settings.Definition.new!("session.retention_days", "base/session", %{
+            "session.lifetime_minutes" =>
+              Bilimbi.Base.Settings.Definition.new!("session.lifetime_minutes", "base/session", %{
                 type: :integer,
                 scopes: [:global],
-                default: 30
+                default: 120
               })
           },
           runtime_claims: []
@@ -291,6 +291,18 @@ defmodule Bilimbi.Base.SessionTest do
 
     assert :ok = Session.touch_session("activity", 401)
     assert {:ok, %Entry{last_activity: 401}} = Session.fetch_session("activity")
+  end
+
+  test "bounds the touch interval by half the session lifetime" do
+    assert {:ok, _} = Bilimbi.Base.Settings.put("session.lifetime_minutes", 3)
+    assert {:ok, _} = Bilimbi.Base.Settings.put("session.last_activity_touch_minutes", 5)
+    put_session!("short-lived", 100)
+
+    assert :ok = Session.touch_session("short-lived", 159)
+    assert {:ok, %Entry{last_activity: 100}} = Session.fetch_session("short-lived")
+
+    assert :ok = Session.touch_session("short-lived", 161)
+    assert {:ok, %Entry{last_activity: 161}} = Session.fetch_session("short-lived")
   end
 
   test "validates canonical column limits and activity metadata" do
