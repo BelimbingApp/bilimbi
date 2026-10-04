@@ -342,13 +342,14 @@ defmodule Bilimbi.Base.UI.Layouts do
   defp nav_item(assigns) do
     ~H"""
     <div class="app-nav-item-row group flex min-w-0 items-center">
-      <.link
-        navigate={@navigate}
+      <.nav_link
+        route={@navigate}
         id={@id}
-        data-nav-item={@id}
-        data-nav-label={@label}
-        aria-current={@active && "page"}
-        title={@label}
+        label={@label}
+        icon={@icon}
+        active={@active}
+        pinnable={@pinnable}
+        impersonating={@impersonating}
         class={[
           "app-nav-item relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal transition",
           @active && "bg-surface text-brand-strong",
@@ -359,25 +360,45 @@ defmodule Bilimbi.Base.UI.Layouts do
           class="app-nav-indent text-[11px] shrink-0 w-3 text-center mr-0.5 select-none"
           aria-hidden="true"
         >&#8199;</span>
-        <.icon
-          name={@icon}
-          class={["app-nav-icon size-[1.125rem] shrink-0", @active && "text-brand-strong"]}
-        />
-        <span class="app-nav-label min-w-0 truncate">{@label}</span>
-      </.link>
-      <.nav_tile
-        :if={@pinnable and tileable?(@navigate)}
-        item_id={@id}
-        route={@navigate}
-        label={@label}
-      />
-      <.nav_pin
-        :if={@pinnable}
-        item_id={@id}
-        label={@label}
-        impersonating={@impersonating}
-      />
+      </.nav_link>
     </div>
+    """
+  end
+
+  # The link of a sidebar row with its tile and pin controls, for a leaf row
+  # and a routed branch alike. `AppShell` finds a row by `data-nav-item` and
+  # reads `data-nav-label` and `aria-current` off it, so they are written
+  # here and nowhere else.
+  attr(:route, :string, required: true)
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:icon, :string, required: true)
+  attr(:active, :boolean, default: false)
+  attr(:pinnable, :boolean, default: true)
+  attr(:impersonating, :boolean, default: false)
+  attr(:class, :any, required: true, doc: "the row's own link class and active state")
+  slot(:inner_block, doc: "what leads the icon inside the link, such as a leaf's indent")
+
+  defp nav_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@route}
+      id={@id}
+      data-nav-item={@id}
+      data-nav-label={@label}
+      aria-current={@active && "page"}
+      title={@label}
+      class={@class}
+    >
+      {render_slot(@inner_block)}
+      <.icon
+        name={@icon}
+        class={["app-nav-icon size-[1.125rem] shrink-0", @active && "text-brand-strong"]}
+      />
+      <span class="app-nav-label min-w-0 truncate">{@label}</span>
+    </.link>
+    <.nav_tile :if={@pinnable and tileable?(@route)} item_id={@id} route={@route} label={@label} />
+    <.nav_pin :if={@pinnable} item_id={@id} label={@label} impersonating={@impersonating} />
     """
   end
 
@@ -527,37 +548,20 @@ defmodule Bilimbi.Base.UI.Layouts do
           <span class="sr-only">Toggle {@node.item.label}</span>
         </button>
 
-        <.link
+        <.nav_link
           :if={@node.item.route}
-          navigate={@node.item.route}
+          route={@node.item.route}
           id={"nav-" <> @dom_id}
-          data-nav-item={"nav-" <> @dom_id}
-          data-nav-label={@node.item.label}
-          aria-current={@active? && "page"}
-          title={@node.item.label}
+          label={@node.item.label}
+          icon={nav_icon(@node.item.icon)}
+          active={@active?}
+          pinnable={@pinnable}
+          impersonating={@impersonating}
           class={[
             "app-nav-parent-link relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px transition",
             @active? && "bg-surface text-brand-strong font-normal",
             !@active? && "text-link hover:text-ink"
           ]}
-        >
-          <.icon
-            name={nav_icon(@node.item.icon)}
-            class={["app-nav-icon size-[1.125rem] shrink-0", @active? && "text-brand-strong"]}
-          />
-          <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
-        </.link>
-        <.nav_tile
-          :if={@pinnable and tileable?(@node.item.route)}
-          item_id={"nav-" <> @dom_id}
-          route={@node.item.route}
-          label={@node.item.label}
-        />
-        <.nav_pin
-          :if={@pinnable and @node.item.route}
-          item_id={"nav-" <> @dom_id}
-          label={@node.item.label}
-          impersonating={@impersonating}
         />
       </div>
 
