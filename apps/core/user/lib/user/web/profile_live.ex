@@ -36,9 +36,9 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   import Bilimbi.Core.User.Web.SettingsComponents
 
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.User
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   @landing_key "ui.landing_menu_id"
   @field_types %{name: :string, email: :string, landing_menu_id: :string}

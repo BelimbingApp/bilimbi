@@ -15,11 +15,11 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   import Ecto.Changeset
 
   alias Bilimbi.Base.UI.DiscoveredPanels
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.TypeSummary
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{
     company_id: :integer,

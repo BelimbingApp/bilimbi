@@ -17,9 +17,9 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
   import Ecto.Changeset
   import Bilimbi.Core.User.Web.SettingsComponents
 
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.User
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{
     current_password: :string,

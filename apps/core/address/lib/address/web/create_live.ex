@@ -5,12 +5,12 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
   alias Bilimbi.Core.Geonames
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   import LocationFields
 

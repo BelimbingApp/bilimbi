@@ -1,8 +1,8 @@
 defmodule BilimbiWeb.ResetPasswordLive do
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Core.User
   alias Bilimbi.Base.UI.FormErrors
+  alias Bilimbi.Core.User
 
   @types %{email: :string, password: :string, password_confirmation: :string}
 

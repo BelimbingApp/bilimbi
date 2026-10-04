@@ -11,9 +11,9 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Employee
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{code: :string, label: :string}
 

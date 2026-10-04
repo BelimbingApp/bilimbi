@@ -20,8 +20,8 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   import Ecto.Changeset
 
   alias Bilimbi.Base.Authz
-  alias Ecto.Changeset
   alias Bilimbi.Base.UI.FormErrors
+  alias Ecto.Changeset
 
   @field_types %{name: :string, code: :string, description: :string, company_id: :integer}
 

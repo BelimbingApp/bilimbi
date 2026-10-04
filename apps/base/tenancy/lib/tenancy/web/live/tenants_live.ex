@@ -9,8 +9,8 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Tenancy
-  alias Ecto.Changeset
   alias Bilimbi.Base.UI.FormErrors
+  alias Ecto.Changeset
 
   @sortable ~w(id name status)
   @create_cap "admin.tenancy.tenant.create"

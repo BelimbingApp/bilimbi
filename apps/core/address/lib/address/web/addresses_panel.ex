@@ -43,11 +43,11 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
   alias Bilimbi.Core.Geonames
-  alias Bilimbi.Base.UI.FormErrors
 
   import Ecto.Changeset, only: [cast: 3, validate_length: 3]
   import LocationFields

@@ -13,9 +13,9 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
   import Ecto.Changeset
 
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
   alias Ecto.Changeset
-  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{
     name: :string,
