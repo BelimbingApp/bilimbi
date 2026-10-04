@@ -122,11 +122,6 @@ defmodule Bilimbi.Core.GeonamesTest do
              {"Negeri Sembilan", "MY.05"}
            ]
 
-    assert Geonames.admin1_options("MY", label: :name) == [
-             {"Kuala Lumpur", "MY.14"},
-             {"Negeri Sembilan", "MY.05"}
-           ]
-
     assert Geonames.admin1_options("MY", label: :name_and_code) == [
              {"Kuala Lumpur (MY.14)", "MY.14"},
              {"Negeri Sembilan (MY.05)", "MY.05"}

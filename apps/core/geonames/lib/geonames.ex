@@ -299,7 +299,7 @@ defmodule Bilimbi.Core.Geonames do
   def admin1_options(_country_iso, opts) when is_list(opts), do: []
 
   defp admin1_option_label(admin1, :name_and_code), do: "#{admin1.name} (#{admin1.code})"
-  defp admin1_option_label(admin1, label) when label in [nil, :name], do: admin1.name
+  defp admin1_option_label(admin1, nil), do: admin1.name
 
   @doc """
   Updates an admin1 division's display name by its ID.
