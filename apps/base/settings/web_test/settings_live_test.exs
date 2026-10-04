@@ -14,6 +14,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
@@ -115,7 +116,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
   } do
     install_secret!()
     assert {:ok, _} = Settings.put(@stored_secret, "private-example")
-    UserFixtures.grant_role!(73, 91, "example_admin", true)
+    AuthzFixtures.grant_role!(73, 91, "example_admin", true)
 
     {:ok, view, html} = open(conn)
 
@@ -127,7 +128,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
   test "a role that names the reveal capability offers the reveal action", %{conn: conn} do
     install_secret!()
     assert {:ok, _} = Settings.put(@stored_secret, "private-example")
-    role_id = UserFixtures.grant_role!(73, 91, "secret_viewer")
+    role_id = AuthzFixtures.grant_role!(73, 91, "secret_viewer")
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
     assert {:ok, 1} =

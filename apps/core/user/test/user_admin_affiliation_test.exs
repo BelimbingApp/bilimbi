@@ -2,6 +2,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.Audit.MutationSchema
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
@@ -16,7 +17,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     UserFixtures.create_user_tables!()
     UserFixtures.create_sessions_table!()
     Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
-    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
+    AuthzFixtures.create_authz_tables!()
     UserFixtures.install_user_authz_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
 
@@ -59,7 +60,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
         employee_type: "full_time"
       })
 
-    UserFixtures.grant_role!(20, 2, "user_admin", true)
+    AuthzFixtures.grant_role!(20, 2, "user_admin", true)
 
     # The administrator holds the grant in company 20 and is signed in at 21.
     admin = Authentication.sign_in(tenant_scope, 2, 21)
@@ -268,7 +269,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
     test "a grant only in the company signed in at does not reach the account's company", %{
       tenant_scope: tenant_scope
     } do
-      UserFixtures.grant_role!(21, 3, "user_admin_21", true)
+      AuthzFixtures.grant_role!(21, 3, "user_admin_21", true)
       elsewhere = Authentication.sign_in(tenant_scope, 3, 21)
       before = UserFixtures.stored_password(801)
 
@@ -289,7 +290,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       })
 
       UserFixtures.insert_user!(%{id: 802, company_id: 22, email: "archived@example.com"})
-      UserFixtures.grant_role!(22, 2, "user_admin_22", true)
+      AuthzFixtures.grant_role!(22, 2, "user_admin_22", true)
       admin = Authentication.sign_in(tenant_scope, 2, 21)
 
       assert {:error, :unauthorized} =
@@ -308,8 +309,8 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
         code: "OTH-1"
       })
 
-      UserFixtures.grant_role!(30, 9, "user_admin_30", true)
-      UserFixtures.grant_role!(20, 9, "user_admin_stray", true)
+      AuthzFixtures.grant_role!(30, 9, "user_admin_30", true)
+      AuthzFixtures.grant_role!(20, 9, "user_admin_stray", true)
       outsider = Authentication.sign_in(UserFixtures.tenant_scope(3), 9, 30)
 
       assert {:error, :unauthorized} =

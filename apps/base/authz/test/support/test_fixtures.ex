@@ -182,4 +182,34 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       is_platform_operator: true
     })
   end
+
+  # Raw SQL on purpose: the public API refuses `grant_all` on a custom role
+  # (`Role` forces it false), so this is the only way a test can make one.
+  def grant_role!(company_id, user_id, role_code, grant_all \\ false) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    %{rows: [[role_id]]} =
+      SQL.query!(
+        Repo,
+        """
+        INSERT INTO base_authz_roles (company_id, name, code, is_system, grant_all, created_at, updated_at)
+        VALUES ($1, $2, $3, false, $4, $5, $6)
+        ON CONFLICT (company_id, code) DO UPDATE SET grant_all = EXCLUDED.grant_all
+        RETURNING id
+        """,
+        [company_id, role_code, role_code, grant_all, now, now]
+      )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_authz_principal_roles (company_id, principal_type, principal_id, role_id, created_at, updated_at)
+      VALUES ($1, 'user', $2, $3, $4, $5)
+      ON CONFLICT (company_id, principal_type, principal_id, role_id) DO NOTHING
+      """,
+      [company_id, user_id, role_id, now, now]
+    )
+
+    role_id
+  end
 end

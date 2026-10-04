@@ -122,12 +122,4 @@ defmodule Bilimbi.Core.Address.TestFixtures do
     |> struct!(attributes)
     |> Repo.insert!()
   end
-
-  def soft_delete_address!(address_id) do
-    SQL.query!(
-      Repo,
-      "UPDATE addresses SET deleted_at = '2026-08-12 12:00:00' WHERE id = $1",
-      [address_id]
-    )
-  end
 end
