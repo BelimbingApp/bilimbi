@@ -9,9 +9,6 @@ defmodule Bilimbi.Core.User.DatabaseQueries do
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.DatabaseQuery
 
-  @doc """
-  Lists saved database queries owned by the given user ID within the tenant scope.
-  """
   @spec list_database_queries(Scope.t(), keyword()) ::
           {:ok, [DatabaseQuery.t()]} | {:error, :user_not_found | :unauthorized}
   def list_database_queries(%Scope{} = scope, opts \\ []) when is_list(opts) do
@@ -91,9 +88,6 @@ defmodule Bilimbi.Core.User.DatabaseQueries do
     end
   end
 
-  @doc """
-  Creates a new saved database query for the given user ID within the tenant scope.
-  """
   @spec create_database_query(Scope.t(), map()) ::
           {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :unauthorized | Changeset.t()}
   def create_database_query(%Scope{} = scope, attrs) when is_map(attrs) do
@@ -168,9 +162,6 @@ defmodule Bilimbi.Core.User.DatabaseQueries do
     end
   end
 
-  @doc """
-  Generates a unique slug for a query name scoped to the signed-in user.
-  """
   @spec generate_query_slug(Scope.t(), String.t()) ::
           {:ok, String.t()} | {:error, :unauthorized}
   def generate_query_slug(%Scope{} = scope, name) when is_binary(name) do

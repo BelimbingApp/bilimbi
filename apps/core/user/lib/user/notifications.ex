@@ -109,15 +109,6 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc """
-  Lists notifications for a user within tenant scope, ordered by creation descending.
-  Options:
-    - `:status` - `:all` (default), `:unread`, or `:read`
-    - `:page` - positive integer (default nil)
-    - `:per_page` - positive integer (default 25)
-    - `:limit` - positive integer or nil (default nil)
-    - `:offset` - non-negative integer (default 0)
-  """
   @spec list_notifications(Scope.t(), keyword()) ::
           {:ok, [Notification.t()]} | {:error, :user_not_found | :unauthorized}
   def list_notifications(%Scope{} = scope, opts \\ []) when is_list(opts) do
@@ -159,9 +150,6 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc """
-  Counts total notifications for a user under given status within tenant scope.
-  """
   @spec count_notifications(Scope.t(), keyword()) ::
           {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
   def count_notifications(%Scope{} = scope, opts \\ []) when is_list(opts) do
@@ -186,14 +174,12 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc "Returns the count of unread notifications for a user within tenant scope."
   @spec unread_notification_count(Scope.t()) ::
           {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
   def unread_notification_count(%Scope{} = scope) do
     count_notifications(scope, status: :unread)
   end
 
-  @doc "Gets a notification by UUID for a specific user within tenant scope."
   @spec get_notification(Scope.t(), binary()) ::
           {:ok, Notification.t()} | {:error, :user_not_found | :not_found | :unauthorized}
   def get_notification(%Scope{} = scope, notification_id)
@@ -216,7 +202,6 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc "Marks a specific notification as read for a user within tenant scope."
   @spec mark_notification_as_read(Scope.t(), binary()) ::
           {:ok, Notification.t()}
           | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}
@@ -238,7 +223,6 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc "Marks all unread notifications as read for a user within tenant scope."
   @spec mark_all_notifications_as_read(Scope.t()) ::
           {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
   def mark_all_notifications_as_read(%Scope{} = scope) do
@@ -263,7 +247,6 @@ defmodule Bilimbi.Core.User.Notifications do
     end
   end
 
-  @doc "Deletes a notification for a user within tenant scope."
   @spec delete_notification(Scope.t(), binary()) ::
           {:ok, Notification.t()}
           | {:error, :user_not_found | :not_found | :unauthorized | Changeset.t()}

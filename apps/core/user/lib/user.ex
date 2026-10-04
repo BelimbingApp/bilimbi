@@ -50,15 +50,15 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.User.DatabaseQueries
   alias Bilimbi.Core.User.DatabaseQuery
   alias Bilimbi.Core.User.EmailVerification
   alias Bilimbi.Core.User.Notification
+  alias Bilimbi.Core.User.Notifications
   alias Bilimbi.Core.User.Password
   alias Bilimbi.Core.User.PasswordResetToken
   alias Bilimbi.Core.User.Pin
   alias Bilimbi.Core.User.Pins
-  alias Bilimbi.Core.User.Notifications
-  alias Bilimbi.Core.User.DatabaseQueries
   alias Bilimbi.Core.User.Schema
   alias Bilimbi.Core.User.Summary
   alias Ecto.Changeset
@@ -479,11 +479,13 @@ defmodule Bilimbi.Core.User do
   defdelegate list_user_pins(scope), to: Pins
 
   @doc """
-  Toggles a pinned item for a user.
+  Toggles a pinned item for the signed-in user.
 
   If a pin with the same normalized URL already exists, it is deleted.
   Otherwise, a new pin is appended with the next sort_order value.
-  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or `{:error, Changeset.t()}`.
+  Impersonation and a system actor are refused.
+  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or
+  `{:error, Changeset.t() | :unauthorized | :impersonating}`.
   """
   @spec toggle_user_pin(Scope.t(), map()) ::
           {:ok, :pinned | :unpinned, [Pin.t()]}
@@ -491,8 +493,9 @@ defmodule Bilimbi.Core.User do
   defdelegate toggle_user_pin(scope, attrs), to: Pins
 
   @doc """
-  Reorders a user's pinned items according to a list of ordered pin IDs.
-  Returns `{:ok, [Pin.t()]}`.
+  Reorders the signed-in user's pinned items to match `ordered_pin_ids`.
+  Impersonation and a system actor are refused.
+  Returns `{:ok, [Pin.t()]}` or `{:error, :unauthorized | :impersonating}`.
   """
   @spec reorder_user_pins(Scope.t(), [pos_integer()]) ::
           {:ok, [Pin.t()]} | {:error, :unauthorized | :impersonating}
@@ -526,7 +529,7 @@ defmodule Bilimbi.Core.User do
   defdelegate send_notification(scope, user_id, attrs), to: Notifications
 
   @doc """
-  Lists notifications for a user within tenant scope, ordered by creation descending.
+  Lists notifications for the signed-in user, ordered by creation descending.
   Options:
     - `:status` - `:all` (default), `:unread`, or `:read`
     - `:page` - positive integer (default nil)
@@ -541,7 +544,7 @@ defmodule Bilimbi.Core.User do
   def list_notifications(scope), do: list_notifications(scope, [])
 
   @doc """
-  Counts total notifications for a user under given status within tenant scope.
+  Counts notifications for the signed-in user under the given status.
   """
   @spec count_notifications(Scope.t(), keyword()) ::
           {:ok, non_neg_integer()} | {:error, :user_not_found | :unauthorized}
@@ -1223,7 +1226,7 @@ defmodule Bilimbi.Core.User do
   defp normalize_company({:error, :not_found}), do: {:error, :company_not_found}
 
   @doc """
-  Lists saved database queries owned by the given user ID within the tenant scope.
+  Lists saved database queries owned by the signed-in user.
   """
   @spec list_database_queries(Scope.t(), keyword()) ::
           {:ok, [DatabaseQuery.t()]} | {:error, :user_not_found | :unauthorized}
@@ -1239,7 +1242,7 @@ defmodule Bilimbi.Core.User do
   defdelegate get_database_query(scope, id_or_slug), to: DatabaseQueries
 
   @doc """
-  Creates a new saved database query for the given user ID within the tenant scope.
+  Creates a saved database query for the signed-in user.
   """
   @spec create_database_query(Scope.t(), map()) ::
           {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :unauthorized | Changeset.t()}
@@ -1270,7 +1273,7 @@ defmodule Bilimbi.Core.User do
   defdelegate duplicate_database_query(scope, id_or_slug), to: DatabaseQueries
 
   @doc """
-  Generates a unique slug for a query name scoped to the given user.
+  Generates a unique slug for a query name scoped to the signed-in user.
   """
   @spec generate_query_slug(Scope.t(), String.t()) :: {:ok, String.t()} | {:error, :unauthorized}
   defdelegate generate_query_slug(scope, name), to: DatabaseQueries

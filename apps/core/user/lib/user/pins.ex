@@ -25,13 +25,6 @@ defmodule Bilimbi.Core.User.Pins do
     |> Repo.all()
   end
 
-  @doc """
-  Toggles a pinned item for a user.
-
-  If a pin with the same normalized URL already exists, it is deleted.
-  Otherwise, a new pin is appended with the next sort_order value.
-  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or `{:error, Changeset.t()}`.
-  """
   @spec toggle_user_pin(Scope.t(), map()) ::
           {:ok, :pinned | :unpinned, [Pin.t()]}
           | {:error, Changeset.t() | :unauthorized | :impersonating}
@@ -80,10 +73,6 @@ defmodule Bilimbi.Core.User.Pins do
     end
   end
 
-  @doc """
-  Reorders a user's pinned items according to a list of ordered pin IDs.
-  Returns `{:ok, [Pin.t()]}`.
-  """
   @spec reorder_user_pins(Scope.t(), [pos_integer()]) ::
           {:ok, [Pin.t()]} | {:error, :unauthorized | :impersonating}
   def reorder_user_pins(%Scope{} = scope, ordered_pin_ids) when is_list(ordered_pin_ids) do

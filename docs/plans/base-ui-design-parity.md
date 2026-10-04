@@ -1250,7 +1250,7 @@ Shipped:
   update changeset trimmed text changes with `String.trim/1`, so writing
   `nil` to a nullable column raised instead of clearing it; the trim lets
   `nil` through and a blanked required column is still refused. Core User's
-  `change_employee_type/4` collapsed the platform orchestrator's
+  `update_employee_type/4` collapsed the platform orchestrator's
   `:invariant_violation` into `:employee_not_found`, so the old page's
   orchestrator branch for that event was unreachable; the coordinator
   preserves the invariant and the fact says the identity is protected.

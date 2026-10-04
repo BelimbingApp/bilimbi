@@ -33,9 +33,16 @@ and reset-token hashes never leave the module; account reads return
 | `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
 | `reset_password(email, token, password)` | Consume a 60-minute token and rotate `remember_token` |
 | `issue_email_verification_token(...)` / `verify_email(...)` | Signed 60-minute verification bound to the current email |
-| `user_preferences(...)` and preference get/put/delete | Scoped access to the four module-owned settings |
+| `user_preferences/1` and preference get/put/delete | The signed-in account's module-owned settings. The scope's actor names the user |
 | `DisplayPreferences.presentation/1`, `refresh/1`, `save/3` | The signed-in account's theme, timestamp display and language — one resolved snapshot, one durable write, refused for a session impersonating another account |
 | `notifiable_identity()` | The durable Laravel polymorphic string |
+
+`list_user_pins/1`, `toggle_user_pin/2`, and `reorder_user_pins/2` take the
+signed-in scope. The Web shell's pin API uses them. A list is allowed while
+impersonating; toggle and reorder return `{:error, :impersonating}`. Saved
+database queries use the same scope: it names the owner. Notification list,
+count, read, and delete for the signed-in user do the same.
+`send_notification/3` still names the recipient.
 
 ## Tables
 
@@ -153,8 +160,5 @@ pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 ## Deferred
 
 Phoenix routes, forms, mail delivery, login throttling, and the authenticated
-Session adapter remain a Web slice. `user_pins` is served through
-`list_user_pins/1`, `toggle_user_pin/2` and `reorder_user_pins/2`. Each takes
-the signed-in scope, and the Web shell's pin API uses them. Saved database
-queries use the same scope: it names the owner.
-`User::getLastUsedModel()` is Core AI's, in S4.
+Session adapter remain a Web slice. `User::getLastUsedModel()` is Core AI's,
+in S4.
