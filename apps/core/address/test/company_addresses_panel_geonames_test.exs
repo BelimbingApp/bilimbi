@@ -28,4 +28,27 @@ defmodule Bilimbi.Core.Address.CompanyAddressesPanelGeonamesTest do
       refute source =~ ~r/function_exported\?\([^,]+,\s*:#{fun}\b/
     end
   end
+
+  test "a country change clears division, postcode, and locality" do
+    previous = %{
+      "country_iso" => "MY",
+      "admin1_code" => "MY.14",
+      "postcode" => "50000",
+      "locality" => "Kuala Lumpur"
+    }
+
+    incoming = %{previous | "country_iso" => "sg", "postcode" => "018989"}
+
+    assert {params, auto} =
+             Bilimbi.Core.Address.LocationSuggestion.suggest(incoming, previous, %{
+               admin1_code: true,
+               locality: true
+             })
+
+    assert params["country_iso"] == "SG"
+    assert params["admin1_code"] == ""
+    assert params["postcode"] == ""
+    assert params["locality"] == ""
+    assert auto == %{admin1_code: false, locality: false}
+  end
 end

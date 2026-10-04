@@ -31,8 +31,8 @@ defmodule Bilimbi.Core.Geonames.Web.CamelList do
 
   defp inbound(params, spec) do
     params
-    |> Map.put("sort_by", first_present(params, ["sortBy", "sort_by"]))
-    |> Map.put("sort_dir", first_present(params, ["sortDir", "sort_dir"]))
+    |> Map.put("sort_by", params["sortBy"])
+    |> Map.put("sort_dir", params["sortDir"])
     |> snap_posted_page_size(spec)
   end
 
@@ -47,9 +47,5 @@ defmodule Bilimbi.Core.Geonames.Web.CamelList do
     parsed = Params.positive_integer(value, hd(spec.page_sizes))
     snapped = Enum.find(spec.page_sizes, List.last(spec.page_sizes), &(&1 >= parsed))
     to_string(snapped)
-  end
-
-  defp first_present(params, keys) do
-    Enum.find_value(keys, fn key -> Map.get(params, key) end)
   end
 end

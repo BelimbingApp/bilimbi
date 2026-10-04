@@ -303,8 +303,8 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   defp camel_params(params) do
     params
-    |> Map.put("sort_by", params["sortBy"] || params["sort_by"])
-    |> Map.put("sort_dir", params["sortDir"] || params["sort_dir"])
+    |> Map.put("sort_by", params["sortBy"])
+    |> Map.put("sort_dir", params["sortDir"])
   end
 
   defp addresses_path(state) do

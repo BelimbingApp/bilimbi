@@ -490,7 +490,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     postcodes |> element("#postcodes-new") |> render_click()
     assert has_element?(postcodes, "#postcode-modal")
     assert has_element?(postcodes, "#postcode-country option[value='MY']")
-    assert has_element?(postcodes, "#postcode-admin1 option[value='MY.14']")
+
+    assert has_element?(
+             postcodes,
+             "#postcode-admin1 option[value='MY.14']",
+             "Kuala Lumpur (MY.14)"
+           )
 
     postcodes
     |> form("#postcode-form",

@@ -93,7 +93,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
      |> assign(:modal_action, :new)
      |> assign(:editing_postcode_id, nil)
      |> assign(:editing_revision, nil)
-     |> assign(:admin1_options, Geonames.admin1_options(default_country))
+     |> assign(:admin1_options, admin1_options(default_country))
      |> assign_postcode_form(Geonames.change_postcode(attrs))}
   end
 
@@ -113,7 +113,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
              |> assign(:modal_action, :edit)
              |> assign(:editing_postcode_id, postcode.id)
              |> assign(:editing_revision, postcode.revision)
-             |> assign(:admin1_options, Geonames.admin1_options(postcode.country_iso))
+             |> assign(:admin1_options, admin1_options(postcode.country_iso))
              |> assign_postcode_form(Geonames.change_postcode(attrs))}
         end
 
@@ -136,7 +136,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
     {:noreply,
      socket
-     |> assign(:admin1_options, Geonames.admin1_options(country_iso))
+     |> assign(:admin1_options, admin1_options(country_iso))
      |> assign_postcode_form(changeset)}
   end
 
@@ -538,6 +538,10 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   defp assign_postcode_form(socket, changeset) do
     assign(socket, :postcode_form, to_form(changeset, as: :postcode))
+  end
+
+  defp admin1_options(country_iso) do
+    Geonames.admin1_options(country_iso, label: :name_and_code)
   end
 
   defp postcode_attrs(postcode) do

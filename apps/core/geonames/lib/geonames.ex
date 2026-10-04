@@ -278,17 +278,28 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
-  First-level division options for one country, labelled by name and valued
-  by the stored code. A blank or unknown country is an empty list.
+  First-level division options for one country, valued by the stored code.
+
+  The label is the division name. `label: :name_and_code` labels
+  `Name (code)`, which the postcode form uses. Address forms keep the
+  default. A blank or unknown country is an empty list.
   """
   @spec admin1_options(term()) :: [{String.t(), String.t()}]
-  def admin1_options(country_iso) when is_binary(country_iso) do
+  @spec admin1_options(term(), keyword()) :: [{String.t(), String.t()}]
+  def admin1_options(country_iso, opts \\ [])
+
+  def admin1_options(country_iso, opts) when is_binary(country_iso) and is_list(opts) do
+    label = Keyword.get(opts, :label)
+
     country_iso
     |> list_admin1()
-    |> Enum.map(&{&1.name, &1.code})
+    |> Enum.map(&{admin1_option_label(&1, label), &1.code})
   end
 
-  def admin1_options(_country_iso), do: []
+  def admin1_options(_country_iso, opts) when is_list(opts), do: []
+
+  defp admin1_option_label(admin1, :name_and_code), do: "#{admin1.name} (#{admin1.code})"
+  defp admin1_option_label(admin1, label) when label in [nil, :name], do: admin1.name
 
   @doc """
   Updates an admin1 division's display name by its ID.

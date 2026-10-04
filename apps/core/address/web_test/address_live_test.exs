@@ -260,6 +260,7 @@ defmodule BilimbiWeb.AddressLiveTest do
     })
 
     assert has_element?(view, "#address-admin1 option[value='MY.14']", "Kuala Lumpur")
+    refute has_element?(view, "#address-admin1 option[value='MY.14']", "Kuala Lumpur (MY.14)")
 
     view
     |> element("#address-form")
@@ -298,6 +299,23 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert address.admin1_code == "MY.14"
     assert address.postcode == "50000"
     assert address.locality == "Kuala Lumpur"
+  end
+
+  test "a snake_case sort query leaves the address list on its default sort", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, _hq} = Address.create_address(scope, %{label: "Head Office"})
+    grant_capabilities!("admin.address.list")
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/addresses?#{%{"sort_by" => "verification_status", "sort_dir" => "desc"}}")
+
+    assert has_element?(view, "th[aria-sort='ascending'] #addresses-sort-label")
+    refute has_element?(view, "th[aria-sort='ascending'] #addresses-sort-status")
+    refute has_element?(view, "th[aria-sort='descending'] #addresses-sort-status")
   end
 
   test "an empty list keeps only the rows-per-page control", %{conn: conn} do

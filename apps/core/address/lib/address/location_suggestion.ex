@@ -8,11 +8,9 @@ defmodule Bilimbi.Core.Address.LocationSuggestion do
   different thresholds than the create page.
 
   `suggest/3` compares the posted params with the previous ones. A country
-  change clears the division, postcode, and locality, then resolves a
-  postcode that arrived in that same change against the new country. A
-  postcode change fills the division and locality when the reference data
-  has one match, and clears a value that was itself suggested once the
-  operator edits it.
+  change clears the division, postcode, and locality. A postcode change
+  fills the division and locality when the reference data has one match,
+  and clears a value that was itself suggested once the operator edits it.
   """
 
   alias Bilimbi.Core.Geonames
@@ -38,12 +36,6 @@ defmodule Bilimbi.Core.Address.LocationSuggestion do
     postcode_changed? = field(params, "postcode") != field(previous, "postcode")
 
     cond do
-      country_changed? and postcode_changed? and field(params, "postcode") != "" ->
-        params
-        |> clear_dependents()
-        |> Map.put("postcode", field(params, "postcode"))
-        |> apply_postcode(%{admin1_code: false, locality: false})
-
       country_changed? ->
         {clear_dependents(params), %{admin1_code: false, locality: false}}
 
