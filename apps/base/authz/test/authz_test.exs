@@ -72,6 +72,7 @@ defmodule Bilimbi.Base.AuthzTest do
     all_access = system_role("all_access")
     assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, all_access.id)
 
+    assert Authz.effective_capabilities(actor).grant_all
     assert Authz.can(actor, "admin.test.record.view").allowed
 
     assert {:ok, :stored} =
@@ -87,6 +88,8 @@ defmodule Bilimbi.Base.AuthzTest do
     decision = Authz.can(actor, "admin.test.record.view")
     refute decision.allowed
     assert decision.reason == :denied_explicitly
+    assert Authz.effective_capabilities(actor).grant_all
+    refute "admin.test.record.view" in Authz.effective_capabilities(actor).allowed
   end
 
   test "platform capabilities require the operator tenant even through direct and grant-all grants" do
