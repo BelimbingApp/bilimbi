@@ -1,24 +1,18 @@
 defmodule BilimbiWeb.ErrorHTML do
   @moduledoc """
-  This module is invoked by your endpoint in case of errors on HTML requests.
+  HTML responses for endpoint errors.
 
-  See config/config.exs.
+  `layout: false` in the endpoint config, so each template is the whole
+  document. The body is the credential card (`Bilimbi.Base.UI.Layouts.auth/1`):
+  brand bar, one sentence, and a way back to the sign-in page.
   """
-  use BilimbiWeb, :html
 
-  # If you want to customize your error pages,
-  # uncomment the embed_templates/1 call below
-  # and add pages to the error directory:
-  #
-  #   * lib/bilimbi_web/controllers/error_html/404.html.heex
-  #   * lib/bilimbi_web/controllers/error_html/500.html.heex
-  #
-  # embed_templates "error_html/*"
+  use Bilimbi.Base.UI, :html
 
-  # The default is to render a plain text page based on
-  # the template name. For example, "404.html" becomes
-  # "Not Found".
-  def render(template, _assigns) do
+  embed_templates "error_html/*"
+
+  # Statuses without their own template keep the plain status word.
+  def render(template, _assigns) when is_binary(template) do
     Phoenix.Controller.status_message_from_template(template)
   end
 end

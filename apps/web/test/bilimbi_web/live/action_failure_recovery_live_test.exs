@@ -64,7 +64,11 @@ defmodule BilimbiWeb.ActionFailureRecoveryLiveTest do
   end
 
   defmodule RecoveryLive do
-    use BilimbiWeb, :live_view
+    # `live_isolated/3` cannot mount `Bilimbi.Base.UI, :live_view`: that
+    # contract prepares the navigation tree with a `handle_params` hook, and
+    # LiveView only allows that hook on a view mounted through the router.
+    use Phoenix.LiveView
+    use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
 
     @impl true
     def mount(_params, _session, socket), do: {:ok, assign(socket, count: 0)}

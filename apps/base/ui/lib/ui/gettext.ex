@@ -1,6 +1,6 @@
 defmodule Bilimbi.Base.UI.Gettext do
   @moduledoc """
-  Gettext backend for shared UI components and layouts.
+  The one Gettext backend for shared UI and the host.
   """
   use Gettext.Backend, otp_app: :bilimbi_base_ui
 end

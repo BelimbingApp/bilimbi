@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.ResetPasswordLive do
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.User
 
