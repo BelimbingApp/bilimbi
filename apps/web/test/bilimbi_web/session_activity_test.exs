@@ -18,6 +18,7 @@ defmodule BilimbiWeb.SessionActivityTest do
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
     assert {:ok, 1} = Settings.put("session.retention_days", 1)
+    assert {:ok, _} = Settings.put("session.lifetime_minutes", 3 * 24 * 60)
     conn = log_in_as(conn)
     session_id = get_session(conn, "current_user")["session_id"]
     {:ok, view, _html} = live(conn, ~p"/dashboard")
@@ -85,7 +86,7 @@ defmodule BilimbiWeb.SessionActivityTest do
           fn -> render_patch(view, "/dashboard?search=activity") end,
           fn -> render_hook(view, "shell:preference", %{}) end
         ] do
-      age_session(session_id, 100)
+      age_session(session_id, System.system_time(:second) - 10 * 60)
       before_event = System.system_time(:second)
       interact.()
       assert {:ok, entry} = Session.fetch_session(session_id)
