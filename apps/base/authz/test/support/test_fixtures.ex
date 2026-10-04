@@ -111,14 +111,22 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
     Enum.each(statements, &SQL.query!(Repo, &1, []))
   end
 
-  def install_test_registry! do
+  @doc """
+  Installs one Authz contribution and leaves every other consumer empty.
+
+  A module whose tests need a wider company universe than `TestCompanyDirectory`
+  (tenant 1 owns companies 10 and 11) passes its own `:company_directory`, and
+  the `:descriptor` that owns it: the validator refuses a directory outside the
+  contributing module's namespace.
+  """
+  def install_test_registry!(opts \\ []) do
+    descriptor =
+      Keyword.get(opts, :descriptor, %{id: "base/authz", otp_app: :bilimbi_base_authz})
+
     authz =
       ContributionValidator.validate_contributions!([
         %{
-          descriptor: %{
-            id: "base/authz",
-            otp_app: :bilimbi_base_authz
-          },
+          descriptor: descriptor,
           payload: %{
             domains: %{"admin" => "Administrative operations"},
             verbs: ["view", "manage"],
@@ -131,12 +139,15 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
                 capabilities: ["admin.test.record.view"]
               }
             },
-            company_directory: TestCompanyDirectory
+            company_directory: Keyword.get(opts, :company_directory, TestCompanyDirectory)
           }
         }
       ])
 
-    ContributionRegistry.put_consumers_for_test!(%{authz: authz}, "authz-test")
+    ContributionRegistry.put_consumers_for_test!(
+      %{authz: authz},
+      Keyword.get(opts, :fingerprint, "authz-test")
+    )
   end
 
   @doc """

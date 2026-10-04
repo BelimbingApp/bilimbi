@@ -5,6 +5,9 @@ defmodule Bilimbi.Core.UserAdministration.TestCompanyDirectory do
 
   alias Bilimbi.Base.Tenancy.Scope
 
+  # Not Authz's double: these tests need a second tenant with a company of its
+  # own (20) and a third company (12) for tenant 1, which Authz's tests assert
+  # are absent.
   @impl true
   def company_ids(%Scope{} = scope) do
     case Scope.tenant_id(scope) do
@@ -30,37 +33,14 @@ end
 defmodule Bilimbi.Core.UserAdministration.TestAuthz do
   @moduledoc false
 
-  alias Bilimbi.Base.Authz.ContributionValidator
-  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Core.UserAdministration.TestCompanyDirectory
 
   def install_registry! do
-    authz =
-      ContributionValidator.validate_contributions!([
-        %{
-          descriptor: %{
-            id: "core/user_administration",
-            otp_app: :bilimbi_core_user_administration
-          },
-          payload: %{
-            domains: %{"admin" => "Administrative operations"},
-            verbs: ["view"],
-            capabilities: ["admin.test.record.view"],
-            roles: %{
-              "all_access" => %{name: "All Access", grant_all: true},
-              "viewer" => %{
-                name: "Viewer",
-                capabilities: ["admin.test.record.view"]
-              }
-            },
-            company_directory: TestCompanyDirectory
-          }
-        }
-      ])
-
-    ContributionRegistry.put_consumers_for_test!(
-      %{settings: [], authz: authz, menu: []},
-      "user-administration-test"
+    AuthzFixtures.install_test_registry!(
+      descriptor: %{id: "core/user_administration", otp_app: :bilimbi_core_user_administration},
+      company_directory: TestCompanyDirectory,
+      fingerprint: "user-administration-test"
     )
   end
 end

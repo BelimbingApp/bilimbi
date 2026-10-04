@@ -41,7 +41,4 @@ defmodule Bilimbi.Base.Authz.CompanyDirectoryContractTest do
   test "an empty scope yields no companies, not an error", %{empty: scope} do
     assert Directory.companies_in_scope(scope) == []
   end
-
-  # Built straight from an Identity rather than through `Tenancy.scope/1`, which
-  # would need a tenant row and drag a DataCase into what is a pure test.
 end

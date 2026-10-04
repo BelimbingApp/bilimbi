@@ -16,22 +16,20 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
     authz =
       Bilimbi.Base.Authz.ContributionValidator.validate_contributions!([
         %{
-          descriptor: %{id: "base/workflow", otp_app: :bilimbi_base_workflow},
+          descriptor: %{id: "base/authz", otp_app: :bilimbi_base_authz},
           payload: %{
             domains: %{"admin" => "Example"},
             verbs: ["view", "approve"],
             capabilities: ["admin.test.record.view", "admin.test.record.approve"],
-            company_directory: Bilimbi.Base.Workflow.TestCompanyDirectory
+            company_directory: Bilimbi.Base.Authz.TestCompanyDirectory
           }
         }
       ])
 
-    snapshot = ContributionRegistry.build!([])
-    snapshot = put_in(snapshot.consumers.authz, authz)
     entry = entry()
     entry = %{entry | payload: Map.put(entry.payload, :processes, processes)}
     workflow = ContributionValidator.validate_contributions!([entry])
-    ContributionRegistry.put_snapshot_for_test!(put_in(snapshot.consumers.workflow, workflow))
+    ContributionRegistry.put_consumers_for_test!(%{authz: authz, workflow: workflow})
   end
 
   def entry,
