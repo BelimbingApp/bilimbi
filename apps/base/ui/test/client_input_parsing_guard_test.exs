@@ -17,6 +17,8 @@ defmodule Bilimbi.Base.UI.ClientInputParsingGuardTest do
 
   use ExUnit.Case, async: true
 
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
+
   @workspace_root Path.expand("../../../..", __DIR__)
 
   # Any legitimate exceptions would be listed here relative to workspace root.
@@ -100,9 +102,9 @@ defmodule Bilimbi.Base.UI.ClientInputParsingGuardTest do
   end
 
   defp web_source_files do
-    @workspace_root
-    |> Path.join("apps/**/*.{ex,heex}")
-    |> Path.wildcard()
+    (MixDiscovery.module_source_files(@workspace_root, "lib/**/*.{ex,heex}") ++
+       Path.wildcard(Path.join(@workspace_root, "apps/web/lib/**/*.{ex,heex}")))
+    |> Enum.uniq()
     |> Enum.filter(&web_path?/1)
   end
 
