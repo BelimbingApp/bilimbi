@@ -176,11 +176,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = live(conn, ~p"/companies?status=suspended")
       assert has_element?(view, "#companies-empty")
 
-      {:ok, view, html} = live(conn, ~p"/companies?sort=name&dir=desc")
-      assert html =~ ~s(aria-sort="descending")
-
-      assert view |> element("#companies tr:first-child td:first-child") |> render() =~
-               "Bilimbi Subsidiary"
+      {:ok, view, _html} = live(conn, ~p"/companies?sort=name&dir=desc")
+      assert has_element?(view, "#companies-card [aria-sort=descending]")
+      assert has_element?(view, "#companies tr:first-child td:first-child", "Bilimbi Subsidiary")
     end
 
     test "toolbar search and status filter round-trip through the URL", %{conn: conn} do
@@ -227,15 +225,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
       grant_capabilities!(["admin.company.list"])
       CompanyFixtures.assign_primary_company!(41, 73)
 
-      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
 
       assert has_element?(view, "#companies-search")
       assert has_element?(view, "#companies-status-filter")
       assert has_element?(view, "#companies-pagination")
-      assert html =~ "Parent"
-      assert html =~ "Jurisdiction"
-      assert view |> element("#companies") |> render() =~ "Primary"
-      assert view |> element("#companies") |> render() =~ "Bilimbi Industries"
+      assert has_element?(view, "#companies-card th", "Parent")
+      assert has_element?(view, "#companies-card th", "Jurisdiction")
+      assert has_element?(view, "#companies", "Primary")
+      assert has_element?(view, "#companies", "Bilimbi Industries")
     end
 
     test "junk query parameters normalize to defaults", %{conn: conn} do
@@ -309,17 +307,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       conn = log_in_as(conn)
 
       # No distinct legal name: subtitle falls back to the code (#622).
-      {:ok, _view, html} = live(conn, ~p"/companies/73")
-      assert html =~ "Bilimbi Industries"
-      assert html =~ "bilimbi_industries"
+      {:ok, view, _html} = live(conn, ~p"/companies/73")
+      assert has_element?(view, "h1", "Bilimbi Industries")
+      assert has_element?(view, "header p", "bilimbi_industries")
 
       {:ok, scope} = Tenancy.scope(41)
 
       {:ok, _} =
         Company.update_company(scope, 73, %{legal_name: "Bilimbi Industries Sdn. Bhd."})
 
-      {:ok, _view, html} = live(conn, ~p"/companies/73")
-      assert html =~ "Bilimbi Industries Sdn. Bhd."
+      {:ok, view, _html} = live(conn, ~p"/companies/73")
+      assert has_element?(view, "header p", "Bilimbi Industries Sdn. Bhd.")
     end
 
     test "relationships embed shows the effective period", %{conn: conn} do
@@ -449,7 +447,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # its own ids; see the panel's forged-write test above.)
       render_click(view, "remove_activity", %{"index" => "abc"})
 
-      assert render(view) =~ "Bilimbi Industries"
+      assert has_element?(view, "h1", "Bilimbi Industries")
     end
 
     test "renders the company with its users and back link", %{conn: conn} do
@@ -702,15 +700,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
       # The "Head" column header lives in the card's <thead>, outside the table body.
-      card = view |> element("#company-departments-card") |> render()
-      assert card =~ "Head"
+      assert has_element?(view, "#company-departments-card th", "Head")
 
-      table = view |> element("#company-departments-table") |> render()
       # The headed department shows the resolved employee name...
-      assert table =~ "Grace Hopper"
+      assert has_element?(view, "#company-departments-table td", "Grace Hopper")
       # ...and the headless one falls back to the em dash, never a bare id.
-      assert table =~ "—"
-      refute table =~ "head_id"
+      assert has_element?(view, "#company-departments-table td", "—")
+      refute has_element?(view, "#company-departments-table", "head_id")
     end
 
     test "presents the company facts as the shared list under one section heading", %{
@@ -1710,16 +1706,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#company-parent option[value='74']")
       refute has_element?(view, "#company-parent option[value='75']")
 
-      html =
-        render_submit(view, "save", %{
-          "company" => %{
-            "parent_id" => "74",
-            "name" => "Forged Child",
-            "status" => "active"
-          }
-        })
+      render_submit(view, "save", %{
+        "company" => %{
+          "parent_id" => "74",
+          "name" => "Forged Child",
+          "status" => "active"
+        }
+      })
 
-      assert html =~ "is not available"
+      assert has_element?(view, "#company-parent-error-0", "is not available")
       {:ok, scope} = Tenancy.scope(41)
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Forged Child"))
@@ -1729,16 +1724,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
       grant_capabilities!(["admin.company.create"])
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      html =
-        render_submit(view, "save", %{
-          "company" => %{
-            "parent_id" => "-1",
-            "name" => "Invalid Parent Child",
-            "status" => "active"
-          }
-        })
+      render_submit(view, "save", %{
+        "company" => %{
+          "parent_id" => "-1",
+          "name" => "Invalid Parent Child",
+          "status" => "active"
+        }
+      })
 
-      assert html =~ "is not available"
+      assert has_element?(view, "#company-parent-error-0", "is not available")
       {:ok, scope} = Tenancy.scope(41)
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Invalid Parent Child"))
@@ -1802,16 +1796,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, forged, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      html =
-        render_submit(forged, "save", %{
-          "company" => %{
-            "parent_id" => "75",
-            "name" => "Cross Tenant Child",
-            "status" => "active"
-          }
-        })
+      render_submit(forged, "save", %{
+        "company" => %{
+          "parent_id" => "75",
+          "name" => "Cross Tenant Child",
+          "status" => "active"
+        }
+      })
 
-      assert html =~ "is not available"
+      assert has_element?(forged, "#company-parent-error-0", "is not available")
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Cross Tenant Child"))
     end
@@ -1821,14 +1814,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      html =
-        view
-        |> form("#company-form",
-          company: %{name: "Broken JSON Co", status: "active", metadata_json: "{not json"}
-        )
-        |> render_submit()
+      view
+      |> form("#company-form",
+        company: %{name: "Broken JSON Co", status: "active", metadata_json: "{not json"}
+      )
+      |> render_submit()
 
-      assert html =~ "must be valid JSON"
+      assert has_element?(view, "#company-metadata-error-0", "must be valid JSON")
       {:ok, scope} = Tenancy.scope(41)
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Broken JSON Co"))
@@ -1868,14 +1860,18 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      html =
-        view
-        |> element("#company-form")
-        |> render_submit(%{
-          "company" => %{"name" => "Fake Co", "status" => "active", "jurisdiction" => "XX"}
-        })
+      view
+      |> element("#company-form")
+      |> render_submit(%{
+        "company" => %{"name" => "Fake Co", "status" => "active", "jurisdiction" => "XX"}
+      })
 
-      assert html =~ "must be a valid country ISO code"
+      assert has_element?(
+               view,
+               "#company-jurisdiction-error-0",
+               "must be a valid country ISO code"
+             )
+
       {:ok, scope} = Tenancy.scope(41)
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Fake Co"))
@@ -1894,12 +1890,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      html =
-        view
-        |> element("#company-form")
-        |> render_submit(%{"company" => %{"name" => "", "status" => "active"}})
+      view
+      |> element("#company-form")
+      |> render_submit(%{"company" => %{"name" => "", "status" => "active"}})
 
-      assert html =~ "can&#39;t be blank"
+      assert has_element?(view, "#company-name-error-0", "can't be blank")
       assert has_element?(view, "#company-name[aria-invalid='true']")
       assert has_element?(view, "#company-name[aria-describedby='company-name-error-0']")
       assert has_element?(view, "#company-name-error-0")
