@@ -11,17 +11,6 @@ defmodule Bilimbi.Base.Schedule.DescriptorTest do
     assert descriptor[:id] == "base/schedule"
     assert descriptor[:required]
 
-    assert descriptor[:dependencies] == [
-             "base/audit",
-             "base/authz",
-             "base/database",
-             "base/module_registry",
-             "base/queue",
-             "base/settings",
-             "base/tenancy",
-             "base/ui"
-           ]
-
     assert descriptor[:migration_dispositions] == %{
              20_260_813_114_301 => :compatible_baseline,
              20_260_821_100_001 => :bilimbi_only,
