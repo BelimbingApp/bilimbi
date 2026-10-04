@@ -6,6 +6,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
   compatibility is covered independently by `Bilimbi.Core.CompatibilityTest`.
   """
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
@@ -14,11 +15,27 @@ defmodule Bilimbi.Core.Company.TestFixtures do
   def create_company_identity_tables! do
     apply(TenancyFixtures, :create_tenants_table!, [])
     apply(GeonamesTestFixtures, :create_geonames_tables!, [])
+    create_companies_table!()
 
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE companies (
+      CREATE TEMPORARY TABLE tenant_primary_companies (
+        tenant_id bigint PRIMARY KEY,
+        company_id bigint NOT NULL UNIQUE
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def create_companies_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
+    SQL.query!(
+      Repo,
+      """
+      #{TestTables.create(persistent)} companies (
         id bigserial PRIMARY KEY,
         parent_id bigint,
         tenant_id bigint NOT NULL,
@@ -37,18 +54,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
-
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE tenant_primary_companies (
-        tenant_id bigint PRIMARY KEY,
-        company_id bigint NOT NULL UNIQUE
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -124,13 +130,14 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     )
   end
 
-  def create_departments_table! do
-    create_department_types_table!()
+  def create_departments_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+    create_department_types_table!(opts)
 
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS company_departments (
+      #{TestTables.create(persistent)} IF NOT EXISTS company_departments (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         department_type_id bigint,
@@ -139,17 +146,19 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         metadata json,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
   end
 
-  def create_department_types_table! do
+  def create_department_types_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS company_department_types (
+      #{TestTables.create(persistent)} IF NOT EXISTS company_department_types (
         id bigserial PRIMARY KEY,
         code varchar(255) NOT NULL,
         name varchar(255) NOT NULL,
@@ -160,7 +169,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         CONSTRAINT company_department_types_code_unique UNIQUE (code)
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -213,11 +222,13 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     )
   end
 
-  def create_external_access_tables! do
+  def create_external_access_tables!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS company_relationship_types (
+      #{TestTables.create(persistent)} IF NOT EXISTS company_relationship_types (
         id bigserial PRIMARY KEY,
         code varchar(255) NOT NULL UNIQUE,
         name varchar(255) NOT NULL,
@@ -227,7 +238,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         metadata json,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -235,7 +246,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS company_relationships (
+      #{TestTables.create(persistent)} IF NOT EXISTS company_relationships (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         related_company_id bigint NOT NULL,
@@ -246,7 +257,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -254,7 +265,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS company_external_accesses (
+      #{TestTables.create(persistent)} IF NOT EXISTS company_external_accesses (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         relationship_id bigint NOT NULL,
@@ -267,7 +278,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )

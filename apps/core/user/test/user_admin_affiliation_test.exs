@@ -380,28 +380,32 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
 
   use ExUnit.Case, async: false
 
+  import Bilimbi.Base.Database.LockSchema
+
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Session.TestFixtures, as: SessionFixtures
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Ecto.Adapters.SQL
-  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Sandbox.checkout(Repo, sandbox: false)
-    schema = unique_schema!()
-    create_concurrency_schema!(schema)
+    schema = create!("user_affiliation_race")
     UserFixtures.install_user_authz_registry!()
-
-    on_exit(fn ->
-      ContributionRegistry.clear_for_test!()
-      drop_concurrency_schema!(schema)
-    end)
+    on_exit(&ContributionRegistry.clear_for_test!/0)
 
     on_schema!(schema, fn ->
+      CompanyFixtures.create_companies_table!(persistent: true)
+      UserFixtures.create_users_table!(persistent: true)
+      SessionFixtures.create_sessions_table!(persistent: true)
+      AuditFixtures.create_audit_tables!(persistent: true)
+      AuthzFixtures.create_authz_tables!(persistent: true)
       seed_concurrency_data!()
     end)
 
@@ -417,7 +421,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
 
     blocker =
       Task.async(fn ->
-        checkout_and_on_schema!(schema, fn ->
+        checkout_on_schema!(schema, fn ->
           Repo.transaction(fn ->
             %{rows: [[950]]} =
               SQL.query!(Repo, "SELECT id FROM users WHERE id = 950 FOR UPDATE", [])
@@ -432,7 +436,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
 
     winner =
       Task.async(fn ->
-        checkout_and_on_schema!(schema, fn ->
+        checkout_on_schema!(schema, fn ->
           send(parent, {:winner_backend, backend_pid!()})
 
           User.reassign_user_company(scope, 20, 950, 21, current_session_id: "keep-race-session")
@@ -440,11 +444,11 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
       end)
 
     assert_receive {:winner_backend, winner_backend}, 5_000
-    await_backend_lock_wait!(winner_backend)
+    await_row_lock!(winner_backend)
 
     loser =
       Task.async(fn ->
-        checkout_and_on_schema!(schema, fn ->
+        checkout_on_schema!(schema, fn ->
           send(parent, {:loser_backend, backend_pid!()})
 
           User.reassign_user_company(scope, 20, 950, 21,
@@ -454,7 +458,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
       end)
 
     assert_receive {:loser_backend, loser_backend}, 5_000
-    await_backend_lock_wait!(loser_backend)
+    await_row_lock!(loser_backend)
 
     try do
       send(blocker.pid, :release_user_row)
@@ -486,157 +490,17 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
     end
   end
 
-  defp unique_schema! do
-    random_suffix = :crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower)
-    "user_affiliation_race_#{random_suffix}"
-  end
-
-  defp create_concurrency_schema!(schema) do
-    quoted_schema = quote_ident!(schema)
-    SQL.query!(Repo, "CREATE SCHEMA #{quoted_schema}", [])
-
-    statements = [
-      """
-      CREATE TABLE #{quoted_schema}.companies (
-        id bigserial PRIMARY KEY,
-        parent_id bigint,
-        tenant_id bigint NOT NULL,
-        name varchar(255) NOT NULL,
-        code varchar(255) NOT NULL UNIQUE,
-        status varchar(255) NOT NULL DEFAULT 'active',
-        legal_name varchar(255),
-        registration_number varchar(255),
-        tax_id varchar(255),
-        legal_entity_type_id bigint,
-        jurisdiction varchar(255),
-        email varchar(255),
-        website varchar(255),
-        scope_activities json,
-        metadata json,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone,
-        deleted_at timestamp(0) without time zone
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.users (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        employee_id bigint,
-        name varchar(255) NOT NULL,
-        email varchar(255) NOT NULL,
-        email_verified_at timestamp(0) without time zone,
-        password varchar(255) NOT NULL,
-        remember_token varchar(100),
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.sessions (
-        id varchar(255) PRIMARY KEY,
-        user_id bigint,
-        ip_address varchar(45),
-        user_agent text,
-        payload text NOT NULL,
-        last_activity integer NOT NULL
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.base_audit_mutations (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        tenant_id bigint,
-        actor_type varchar(40) NOT NULL,
-        actor_id bigint NOT NULL,
-        actor_role varchar(100),
-        ip_address inet,
-        url text,
-        user_agent varchar(80),
-        auditable_type varchar(255) NOT NULL,
-        auditable_id varchar(128) NOT NULL,
-        subject_name varchar(255),
-        subject_id varchar(128),
-        subject_identifier varchar(255),
-        source varchar(20) NOT NULL DEFAULT 'listener',
-        event varchar(20) NOT NULL,
-        old_values jsonb,
-        new_values jsonb,
-        trace_id varchar(12),
-        occurred_at timestamp(0) without time zone NOT NULL
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.base_authz_roles (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        is_system boolean NOT NULL DEFAULT false,
-        grant_all boolean NOT NULL DEFAULT false
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.base_authz_principal_roles (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        principal_type varchar(40) NOT NULL,
-        principal_id bigint NOT NULL,
-        role_id bigint NOT NULL
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.base_authz_principal_capabilities (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        principal_type varchar(40) NOT NULL,
-        principal_id bigint NOT NULL,
-        capability_key varchar(255) NOT NULL,
-        is_allowed boolean NOT NULL DEFAULT true
-      )
-      """,
-      """
-      CREATE TABLE #{quoted_schema}.base_authz_decision_logs (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        actor_type varchar(40) NOT NULL,
-        actor_id bigint NOT NULL,
-        acting_for_user_id bigint,
-        capability varchar(255) NOT NULL,
-        resource_type varchar(255),
-        resource_id varchar(255),
-        allowed boolean NOT NULL,
-        reason_code varchar(255) NOT NULL,
-        applied_policies json,
-        context json,
-        trace_id varchar(12),
-        occurred_at timestamp(0) without time zone NOT NULL,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
-      )
-      """
-    ]
-
-    Enum.each(statements, &SQL.query!(Repo, &1, []))
-  end
-
   defp seed_concurrency_data! do
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO companies (id, tenant_id, name, code, status, deleted_at)
-      VALUES (20, 2, 'Current', 'current', 'active', NULL),
-             (21, 2, 'Target', 'target', 'active', NULL)
-      """,
-      []
-    )
+    CompanyFixtures.insert_company!(%{id: 20, tenant_id: 2, name: "Current", code: "current"})
+    CompanyFixtures.insert_company!(%{id: 21, tenant_id: 2, name: "Target", code: "target"})
 
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO users (id, company_id, employee_id, name, email, password)
-      VALUES (950, 20, NULL, 'Race Target', 'race-target@example.com', $1)
-      """,
-      [UserFixtures.password_hash("race-password")]
-    )
+    UserFixtures.insert_user!(%{
+      id: 950,
+      company_id: 20,
+      name: "Race Target",
+      email: "race-target@example.com",
+      password_hash: UserFixtures.password_hash("race-password")
+    })
 
     SQL.query!(
       Repo,
@@ -647,89 +511,6 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
       []
     )
 
-    %{rows: [[role_id]]} =
-      SQL.query!(
-        Repo,
-        """
-        INSERT INTO base_authz_roles (company_id, is_system, grant_all)
-        VALUES (20, false, true)
-        RETURNING id
-        """,
-        []
-      )
-
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO base_authz_principal_roles (company_id, principal_type, principal_id, role_id)
-      VALUES (20, 'user', 2, $1)
-      """,
-      [role_id]
-    )
-  end
-
-  defp backend_pid! do
-    %{rows: [[backend_pid]]} = SQL.query!(Repo, "SELECT pg_backend_pid()", [])
-    backend_pid
-  end
-
-  defp await_message!(message) do
-    receive do
-      ^message -> :ok
-    after
-      5_000 -> Repo.rollback({:timeout, message})
-    end
-  end
-
-  defp await_backend_lock_wait!(backend_pid), do: await_backend_lock_wait!(backend_pid, 50)
-
-  defp await_backend_lock_wait!(_backend_pid, 0) do
-    flunk("contender never waited on a PostgreSQL row lock")
-  end
-
-  defp await_backend_lock_wait!(backend_pid, remaining) do
-    %{rows: rows} =
-      SQL.query!(Repo, "SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [
-        backend_pid
-      ])
-
-    case rows do
-      [["Lock"]] ->
-        :ok
-
-      _other ->
-        receive do
-        after
-          20 -> await_backend_lock_wait!(backend_pid, remaining - 1)
-        end
-    end
-  end
-
-  defp checkout_and_on_schema!(schema, fun) do
-    :ok = Sandbox.checkout(Repo, sandbox: false)
-    on_schema!(schema, fun)
-  end
-
-  defp on_schema!(schema, fun) do
-    SQL.query!(Repo, "SET search_path TO #{quote_ident!(schema)}", [])
-
-    try do
-      fun.()
-    after
-      SQL.query!(Repo, "SET search_path TO public", [])
-    end
-  end
-
-  defp drop_concurrency_schema!(schema) do
-    :ok = Sandbox.checkout(Repo, sandbox: false)
-    SQL.query!(Repo, "DROP SCHEMA IF EXISTS #{quote_ident!(schema)} CASCADE", [])
-  end
-
-  defp quote_ident!(identifier) when is_binary(identifier) do
-    if identifier =~ ~r/^[a-z][a-z0-9_]*$/ do
-      ~s("#{identifier}")
-    else
-      raise ArgumentError, "refusing unsafe schema identifier #{inspect(identifier)}"
-    end
+    AuthzFixtures.grant_role!(20, 2, "user_admin", true)
   end
 end

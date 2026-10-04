@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.User.TestFixtures do
   the module that owns it and reused through that module's fixtures.
   """
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
   alias Bilimbi.Core.User.Password
@@ -36,30 +37,7 @@ defmodule Bilimbi.Core.User.TestFixtures do
     apply(EmployeeFixtures, :create_employee_tables!, [])
     apply(Bilimbi.Core.Company.TestFixtures, :create_external_access_tables!, [])
 
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE users (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        employee_id bigint,
-        name varchar(255) NOT NULL,
-        email varchar(255) NOT NULL,
-        email_verified_at timestamp(0) without time zone,
-        password varchar(255) NOT NULL,
-        remember_token varchar(100),
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
-
-    # Named explicitly, not an inline UNIQUE. PostgreSQL would name that
-    # `users_email_key`, but the migration creates `users_email_unique` and the
-    # changeset maps that name to a field error. A fixture that invents its own
-    # constraint name turns a caught error into a raised ConstraintError.
-    SQL.query!(Repo, "CREATE UNIQUE INDEX users_email_unique ON users (email)", [])
+    create_users_table!()
 
     SQL.query!(
       Repo,
@@ -74,6 +52,35 @@ defmodule Bilimbi.Core.User.TestFixtures do
     )
 
     create_notifications_table!()
+  end
+
+  def create_users_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
+    SQL.query!(
+      Repo,
+      """
+      #{TestTables.create(persistent)} users (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        employee_id bigint,
+        name varchar(255) NOT NULL,
+        email varchar(255) NOT NULL,
+        email_verified_at timestamp(0) without time zone,
+        password varchar(255) NOT NULL,
+        remember_token varchar(100),
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) #{TestTables.on_commit(persistent)}
+      """,
+      []
+    )
+
+    # Named explicitly, not an inline UNIQUE. PostgreSQL would name that
+    # `users_email_key`, but the migration creates `users_email_unique` and the
+    # changeset maps that name to a field error. A fixture that invents its own
+    # constraint name turns a caught error into a raised ConstraintError.
+    SQL.query!(Repo, "CREATE UNIQUE INDEX users_email_unique ON users (email)", [])
   end
 
   def create_user_database_queries_table! do

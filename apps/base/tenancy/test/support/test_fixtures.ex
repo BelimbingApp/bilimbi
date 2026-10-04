@@ -1,16 +1,19 @@
 defmodule Bilimbi.Base.Tenancy.TestFixtures do
   @moduledoc false
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Identity
   alias Bilimbi.Base.Tenancy.Scope
   alias Ecto.Adapters.SQL
 
-  def create_tenants_table! do
+  def create_tenants_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE tenants (
+      #{TestTables.create(persistent)} tenants (
         id bigserial PRIMARY KEY,
         parent_id bigint,
         name varchar(255) NOT NULL,
@@ -19,7 +22,7 @@ defmodule Bilimbi.Base.Tenancy.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )

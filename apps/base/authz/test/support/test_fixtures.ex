@@ -4,13 +4,16 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.Authz.TestCompanyDirectory
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
-  def create_authz_tables! do
+  def create_authz_tables!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     statements = [
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_roles (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_roles (
         id bigserial PRIMARY KEY,
         company_id bigint,
         name varchar(255) NOT NULL,
@@ -20,27 +23,27 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         grant_all boolean NOT NULL DEFAULT false,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       """
       CREATE UNIQUE INDEX IF NOT EXISTS base_authz_roles_company_id_code_unique
         ON base_authz_roles (company_id, code)
       """,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_role_capabilities (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_role_capabilities (
         id bigserial PRIMARY KEY,
         role_id bigint NOT NULL REFERENCES base_authz_roles(id) ON DELETE CASCADE,
         capability_key varchar(255) NOT NULL,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       """
       CREATE UNIQUE INDEX IF NOT EXISTS base_authz_role_capabilities_role_id_capability_key_unique
         ON base_authz_role_capabilities (role_id, capability_key)
       """,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_principal_roles (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_principal_roles (
         id bigserial PRIMARY KEY,
         company_id bigint,
         principal_type varchar(40) NOT NULL,
@@ -48,14 +51,14 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         role_id bigint NOT NULL REFERENCES base_authz_roles(id) ON DELETE CASCADE,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       """
       CREATE UNIQUE INDEX IF NOT EXISTS base_authz_principal_roles_unique
         ON base_authz_principal_roles (company_id, principal_type, principal_id, role_id)
       """,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_principal_capabilities (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_principal_capabilities (
         id bigserial PRIMARY KEY,
         company_id bigint,
         principal_type varchar(40) NOT NULL,
@@ -64,7 +67,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         is_allowed boolean NOT NULL DEFAULT true,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       """
       CREATE UNIQUE INDEX IF NOT EXISTS base_authz_principal_caps_unique
@@ -73,21 +76,21 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         )
       """,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_system_principal_capabilities (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_system_principal_capabilities (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         principal varchar(100) NOT NULL,
         capability_key varchar(255) NOT NULL,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       """
       CREATE UNIQUE INDEX IF NOT EXISTS base_authz_system_principal_caps_unique
         ON base_authz_system_principal_capabilities (company_id, principal, capability_key)
       """,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_decision_logs (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_decision_logs (
         id bigserial PRIMARY KEY,
         company_id bigint,
         actor_type varchar(40) NOT NULL,
@@ -104,7 +107,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         occurred_at timestamp(0) without time zone NOT NULL,
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """
     ]
 
