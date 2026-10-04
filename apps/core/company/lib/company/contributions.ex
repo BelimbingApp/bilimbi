@@ -6,6 +6,22 @@ defmodule Bilimbi.Core.Company.Contributions do
   @impl true
   def contributions do
     %{
+      dashboard: [
+        %{
+          id: "base-dashboard-company-stats",
+          label: "Companies",
+          embed: "dashboard.companies",
+          size: :small,
+          order: 10
+        },
+        %{
+          id: "current-company",
+          label: "Your Company",
+          embed: "dashboard.company",
+          placement: :section,
+          order: 10
+        }
+      ],
       menu: [
         %{
           id: "admin.company",

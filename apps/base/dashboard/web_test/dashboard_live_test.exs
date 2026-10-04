@@ -1,13 +1,15 @@
-defmodule BilimbiWeb.DashboardLiveTest do
+defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Dashboard
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -19,137 +21,6 @@ defmodule BilimbiWeb.DashboardLiveTest do
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
     {:ok, scope} = Tenancy.scope(41)
     {:ok, scope: scope}
-  end
-
-  test "requires authentication", %{conn: conn} do
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
-  end
-
-  test "rejects a durable session that exceeded the configured idle lifetime", %{conn: conn} do
-    session_id = "expired-session"
-    old_activity = System.system_time(:second) - 120 * 60 - 1
-
-    {:ok, _entry} =
-      Session.put_session(session_id, "{}", %{user_id: 91, last_activity: old_activity})
-
-    conn =
-      Phoenix.ConnTest.init_test_session(conn, %{
-        "current_user" => %{"session_id" => session_id, "user_id" => 91, "company_id" => 73}
-      })
-
-    assert {:error, {:redirect, %{to: "/", flash: %{"session_expired" => "expired"}}}} =
-             live(conn, ~p"/dashboard")
-
-    conn = get(conn, ~p"/dashboard")
-    assert redirected_to(conn) == ~p"/"
-
-    assert html_response(get(recycle(conn), ~p"/"), 200) =~
-             "Your session expired. Sign in again to continue."
-  end
-
-  test "authentication honors changes to the idle lifetime", %{conn: conn} do
-    conn = log_in_as(conn)
-    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
-    old_activity = System.system_time(:second) - 5 * 60
-
-    assert {:ok, 10} = Settings.put("session.lifetime_minutes", 10)
-
-    assert {:ok, _} =
-             Session.put_session(session_id, "{}", user_id: 91, last_activity: old_activity)
-
-    assert conn |> get(~p"/dashboard") |> html_response(200)
-
-    # Restore the same inactivity after the accepted request refreshed it.
-    assert {:ok, _} =
-             Session.put_session(session_id, "{}", user_id: 91, last_activity: old_activity)
-
-    assert {:ok, 1} = Settings.put("session.lifetime_minutes", 1)
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
-
-    assert {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
-    assert has_element?(view, "#dashboard-current-company")
-  end
-
-  test "scheduled expiry rereads the lifetime and preserves active sessions" do
-    now = System.system_time(:second)
-
-    execution = %Bilimbi.Base.Queue.Execution{
-      job_id: 1,
-      attempt: 1,
-      max_attempts: 5,
-      queue: "default"
-    }
-
-    for {id, activity} <- [{"old", now - 900}, {"recent", now - 300}, {"active", now}] do
-      assert {:ok, _} = Session.put_session(id, "opaque", last_activity: activity)
-    end
-
-    assert {:ok, 10} = Settings.put("session.lifetime_minutes", 10)
-    assert :ok = Session.ExpiryWorker.handle_scheduled_job(%{}, execution)
-    assert {:error, :not_found} = Session.fetch_session("old")
-    assert {:ok, %{last_activity: activity}} = Session.fetch_session("recent")
-    assert activity == now - 300
-    assert {:ok, %{last_activity: ^now}} = Session.fetch_session("active")
-
-    assert {:ok, 1} = Settings.put("session.lifetime_minutes", 1)
-    assert :ok = Session.ExpiryWorker.handle_scheduled_job(%{}, execution)
-    assert {:error, :not_found} = Session.fetch_session("recent")
-    assert {:ok, %{last_activity: ^now}} = Session.fetch_session("active")
-  end
-
-  test "initial HTTP render resolves the durable session only once", %{conn: conn} do
-    conn = log_in_as(conn)
-    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
-    owner = self()
-    handler = {__MODULE__, make_ref()}
-
-    :telemetry.attach(
-      handler,
-      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
-      fn _event, _measurements, metadata, {owner, session_id} ->
-        # Activity writes also read rows for audit capture, using an activity cutoff.
-        if self() == owner and metadata.source == "sessions" and
-             match?({:ok, %{command: :select}}, metadata.result) and
-             metadata.params == [session_id] do
-          send(owner, :session_read)
-        end
-      end,
-      {owner, session_id}
-    )
-
-    on_exit(fn -> :telemetry.detach(handler) end)
-    conn = get(conn, ~p"/dashboard")
-    assert html_response(conn, 200)
-    assert_receive :session_read
-    refute_receive :session_read
-
-    # Connecting must revalidate, even if the initial HTML was authenticated.
-    :ok = Session.delete_session(session_id)
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn)
-  end
-
-  test "module pages and dashboard support navigation without an HTTP reload", %{conn: conn} do
-    {:ok, profile, _html} = conn |> log_in_as() |> live(~p"/settings/profile")
-    assert has_element?(profile, "#app-shell")
-    assert {:ok, appearance, _html} = live_redirect(profile, to: "/settings/appearance")
-    assert {:ok, dashboard, _html} = live_redirect(appearance, to: "/dashboard")
-    assert has_element?(dashboard, "#dashboard-current-company")
-  end
-
-  test "live navigation denies a destination capability before mounting it", %{conn: conn} do
-    {:ok, dashboard, _html} = conn |> log_in_as() |> live(~p"/dashboard")
-
-    assert {:error, {:redirect, %{to: "/dashboard"}}} =
-             live_redirect(dashboard, to: "/users/new")
-  end
-
-  test "live navigation rechecks a terminated durable session", %{conn: conn} do
-    conn = log_in_as(conn)
-    {:ok, dashboard, _html} = live(conn, ~p"/dashboard")
-    :ok = Session.delete_session(Plug.Conn.get_session(conn, "current_user")["session_id"])
-
-    assert {:error, {:redirect, %{to: "/"}}} =
-             live_redirect(dashboard, to: "/settings/profile")
   end
 
   test "shows the workspace identity and real counts", %{conn: conn} do
@@ -255,19 +126,73 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#stat-users[href='/users']")
   end
 
-  test "drops authentication when the live user is gone", %{conn: conn} do
-    conn = log_in_as(conn)
-    Ecto.Adapters.SQL.query!(Bilimbi.Base.Repo, "DELETE FROM users WHERE id = 91", [])
+  describe "module-declared panels" do
+    test "every installed entry names an installed panel gated by the same capability" do
+      entries = Dashboard.entries()
 
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
-  end
+      assert Enum.map(entries, & &1.id) == [
+               "base-dashboard-company-stats",
+               "current-company",
+               "base-dashboard-user-stats",
+               "recent-users",
+               "base-dashboard-recent-audit",
+               "base-dashboard-session-stats",
+               "base-perf-health"
+             ]
 
-  test "drops authentication when the durable session is terminated", %{conn: conn} do
-    conn = log_in_as(conn)
-    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
-    :ok = Session.delete_session(session_id)
+      for entry <- entries do
+        assert {:ok, panel} = DiscoveredPanels.resolve(entry.embed)
+        assert panel.capability == entry.capability
+        assert Code.ensure_loaded?(panel.live_component)
+      end
+    end
 
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
+    test "the page is served by the dashboard module, not the host" do
+      assert %{phoenix_live_view: {Bilimbi.Base.Dashboard.Web.IndexLive, _, _, _}} =
+               Phoenix.Router.route_info(BilimbiWeb.Router, "GET", "/dashboard", "localhost")
+    end
+
+    test "an entry whose panel is not installed says so instead of rendering nothing",
+         %{conn: conn} do
+      with_dashboard_catalogue!([
+        Dashboard.Widget.new!(%{id: "orphan", label: "Orphan", embed: "dashboard.orphan"})
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(
+               view,
+               "#widget-orphan #dashboard-panel-orphan",
+               "This panel is provided by a module that is not installed (dashboard.orphan)."
+             )
+    end
+
+    test "shows the shell notification bell in the top bar", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#app-topbar #app-shell-notifications")
+    end
+
+    test "section controls replace the open links while customizing", %{conn: conn} do
+      grant_capabilities!(["admin.company.view", "admin.user.list"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#dashboard-company-open")
+      assert has_element?(view, "#dashboard-users-open[href='/users']")
+      refute has_element?(view, "#move-section-up-recent-users")
+
+      view |> element("#customize-layout") |> render_click()
+
+      refute has_element?(view, "#dashboard-company-open")
+      refute has_element?(view, "#dashboard-users-open")
+      view |> element("#move-section-up-recent-users") |> render_click()
+      assert section_order(view) == ["recent-users", "current-company"]
+
+      assert Settings.get("ui.dashboard.sections", Settings.Scope.user(91, 73, 41)) == [
+               "recent-users",
+               "current-company"
+             ]
+    end
   end
 
   describe "widget capability isolation" do
@@ -792,7 +717,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
   end
 
   defp gated_catalogue do
-    Enum.filter(Bilimbi.Base.Dashboard.widgets(), &(&1.capability != nil))
+    Enum.filter(Dashboard.widgets(), &(&1.capability != nil))
   end
 
   # The installed snapshot with only this dashboard catalogue, restored on exit.

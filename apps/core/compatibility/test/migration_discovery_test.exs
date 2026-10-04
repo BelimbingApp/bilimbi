@@ -33,13 +33,20 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     # depends on audit and then sorts ahead of settings. Safe for the same
     # reason: the settings baseline declares no foreign key, and entries still
     # execute in version order below.
+    #
+    # base/audit then took a base/dashboard dependency to contribute its
+    # dashboard widget (ADR 0009), and the dashboard depends on base/settings
+    # for each account's arrangement. Audit, and base/queue behind it, now
+    # follow settings. Safe for the same reason: no audit or queue migration
+    # declares a foreign key into the settings table, and entries still
+    # execute in version order below.
     assert Enum.map(migration_modules, & &1.id) == [
              "base/tenancy",
-             "base/audit",
-             "base/queue",
              "base/settings",
+             "base/audit",
              "base/artifacts",
              "base/authz",
+             "base/queue",
              "base/schedule",
              "base/perf",
              "base/session",

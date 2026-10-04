@@ -1,28 +1,37 @@
 defmodule Bilimbi.Base.Dashboard do
   @moduledoc """
-  Public API for the widget-based dashboard contributed by installed modules.
+  Public API for the dashboard installed modules contribute to.
 
-  Dashboard widgets are declared by their owning module through the contribution
-  provider. This module owns validation and ordering; it owns no tables and
-  performs no I/O.
+  A module declares its dashboard entries through its contribution provider
+  and draws each one with an embeddable panel it owns. This module owns
+  validation and ordering of the catalogue; it owns no tables.
 
-  The widget layout (order and visibility per user) is stored in the
-  `ui.dashboard.layout` setting. This module provides the widget catalogue;
-  the LiveView adapter applies the layout.
+  The arrangement each account chose (which entries, in what order) is stored
+  in the `ui.dashboard.layout` and `ui.dashboard.sections` settings. The
+  catalogue comes from here; `Bilimbi.Base.Dashboard.Web.IndexLive` applies
+  the arrangement and renders the page at `/dashboard`.
   """
 
   alias Bilimbi.Base.Dashboard.Widget
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
 
-  @typedoc "A validated widget definition contributed by an installed module."
+  @typedoc "A validated dashboard entry contributed by an installed module."
   @type t :: %Widget{}
 
-  @doc "Every validated widget, ordered, from all installed modules."
+  @doc "Every validated entry of either placement, ordered, from all installed modules."
+  @spec entries() :: [t()]
+  def entries, do: ContributionRegistry.consumer!(:dashboard)
+
+  @doc "The grid widgets, ordered."
   @spec widgets() :: [t()]
-  def widgets, do: ContributionRegistry.consumer!(:dashboard)
+  def widgets, do: Enum.filter(entries(), &(&1.placement == :grid))
+
+  @doc "The full-width sections below the grid, ordered."
+  @spec sections() :: [t()]
+  def sections, do: Enum.filter(entries(), &(&1.placement == :section))
 
   @doc """
-  Looks up a validated widget by its contribution id.
+  Looks up a validated grid widget by its contribution id.
   """
   @spec fetch_widget(String.t()) :: {:ok, t()} | :error
   def fetch_widget(id) when is_binary(id) do

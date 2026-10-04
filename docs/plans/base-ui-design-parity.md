@@ -312,8 +312,10 @@ lost inside a design ledger:
   `remove_capability` on a deny (`:1314`). `remove_capability` is listed twice
   deliberately — it backs two separate controls, and confirming only the first
   leaves the second live. Three remove dashboard content in
-  `web/.../dashboard_live.ex`: `remove-section` (`:609` and `:650`) and
-  `remove-widget` (`:723`). The eighth is `remove_activity`
+  `base/dashboard/.../web/index_live.ex` (moved from the host's
+  `dashboard_live.ex`, where the two sections were separate controls at `:609`
+  and `:650` and the widget control at `:723`): `remove-section` (`:524`, one
+  control for every section) and `remove-widget` (`:445`). The eighth is `remove_activity`
   (`core/company/.../show_live.ex:982`), a hand-written button rather than a shared
   danger control. 22 `data-confirm` attributes across 17 files exist elsewhere, so
   the convention is established and these are the exceptions. Resolved: the five

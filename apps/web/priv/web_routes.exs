@@ -15,8 +15,7 @@
   %{path: "/session", verb: :post, session: :none, capability: nil},
   %{path: "/session", verb: :delete, session: :none, capability: nil},
   %{path: "/admin/impersonate/leave", verb: :post, session: :auth, capability: nil},
-  %{path: "/admin/impersonate/:id", verb: :post, session: :auth},
-  %{path: "/dashboard", live: BilimbiWeb.DashboardLive, session: :auth, capability: nil}
+  %{path: "/admin/impersonate/:id", verb: :post, session: :auth}
 ] ++
   if Mix.env() == :test do
     [

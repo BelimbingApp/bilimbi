@@ -8,6 +8,17 @@ defmodule Bilimbi.Base.Session.Contributions do
   @impl true
   def contributions do
     %{
+      dashboard: [
+        %{
+          id: "base-dashboard-session-stats",
+          label: "Sessions",
+          embed: "dashboard.sessions",
+          size: :small,
+          order: 40,
+          capability: @list,
+          refresh_interval: 60_000
+        }
+      ],
       settings: %{
         definitions: %{
           "session.lifetime_minutes" => %{

@@ -153,7 +153,7 @@ pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 
 **`users.prefs` remains intentionally absent.** Belimbing dropped it in
 `0200_01_20_000007`. Core User contributes and validates `ui.theme`,
-`ui.landing_menu_id`, `ui.dashboard.layout`, and
+`ui.landing_menu_id`, `ui.dashboard.layout`, `ui.dashboard.sections`, and
 `ai.last_used_model_hints`; Base Settings persists their overrides under
 `scope_type: 'user'`.
 
