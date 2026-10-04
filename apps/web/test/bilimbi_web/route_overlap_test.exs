@@ -19,9 +19,9 @@ defmodule BilimbiWeb.RouteOverlapTest do
     ])
   end
 
-  test "a module dashboard conflicts with the injected host route" do
+  test "a second dashboard conflicts with the dashboard module's route" do
     assert_build_fails!([
-      route("/dashboard", :get, {:web, "web"}),
+      route("/dashboard", :get, {:base, "base/dashboard"}),
       route("/dashboard", :get, {:extension, "extension/dashboard"})
     ])
   end
@@ -103,7 +103,7 @@ defmodule BilimbiWeb.RouteOverlapTest do
 
     assert Enum.any?(routes, fn route ->
              route.path == "/dashboard" and
-               route.metadata[:bilimbi_route_owner] == {:web, "web"}
+               route.metadata[:bilimbi_route_owner] == {:base, "base/dashboard"}
            end)
 
     assert Enum.any?(routes, fn route ->

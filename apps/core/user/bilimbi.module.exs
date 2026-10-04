@@ -8,6 +8,7 @@
   dependencies: [
     "base/audit",
     "base/authz",
+    "base/dashboard",
     "base/datetime",
     "base/database",
     "base/locale",

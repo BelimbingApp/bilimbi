@@ -18,8 +18,8 @@ defmodule BilimbiWeb.RouteAccessTest do
     import Phoenix.LiveView.Router
 
     live_session :guard_test do
-      live("/combined", BilimbiWeb.DashboardLive, :"bilimbi:/combined")
-      live("/restricted", BilimbiWeb.DashboardLive, :"bilimbi:/restricted")
+      live("/combined", Bilimbi.Base.Dashboard.Web.IndexLive, :"bilimbi:/combined")
+      live("/restricted", Bilimbi.Base.Dashboard.Web.IndexLive, :"bilimbi:/restricted")
     end
   end
 

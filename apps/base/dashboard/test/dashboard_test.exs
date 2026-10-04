@@ -19,80 +19,90 @@ defmodule Bilimbi.Base.DashboardTest do
 
   describe "Widget struct validation" do
     test "constructs a valid widget" do
-      widget = Widget.new!(%{id: "test", label: "Test"})
+      widget = Widget.new!(%{id: "test", label: "Test", embed: "test.panel"})
       assert widget.id == "test"
       assert widget.label == "Test"
     end
 
     test "raises on missing id" do
       assert_raise ArgumentError, ~r/widget id is required/, fn ->
-        Widget.new!(%{label: "Test"})
+        Widget.new!(%{label: "Test", embed: "test.panel"})
       end
     end
 
     test "raises on empty label" do
       assert_raise ArgumentError, ~r/widget label must not be empty/, fn ->
-        Widget.new!(%{id: "test", label: ""})
+        Widget.new!(%{id: "test", label: "", embed: "test.panel"})
       end
     end
 
     test "defaults size to :small" do
-      widget = Widget.new!(%{id: "test", label: "Test"})
+      widget = Widget.new!(%{id: "test", label: "Test", embed: "test.panel"})
       assert widget.size == :small
     end
 
     test "validates size enum" do
       assert_raise ArgumentError, ~r/widget size must be/, fn ->
-        Widget.new!(%{id: "test", label: "Test", size: :huge})
+        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", size: :huge})
       end
     end
 
     test "defaults order to 0" do
-      widget = Widget.new!(%{id: "test", label: "Test"})
+      widget = Widget.new!(%{id: "test", label: "Test", embed: "test.panel"})
       assert widget.order == 0
     end
 
     test "raises on non-string id" do
       assert_raise ArgumentError, ~r/widget id must be a string/, fn ->
-        Widget.new!(%{id: 123, label: "Test"})
+        Widget.new!(%{id: 123, label: "Test", embed: "test.panel"})
       end
     end
 
     test "raises on non-string label" do
       assert_raise ArgumentError, ~r/widget label must be a string/, fn ->
-        Widget.new!(%{id: "test", label: :test})
+        Widget.new!(%{id: "test", label: :test, embed: "test.panel"})
+      end
+    end
+
+    test "requires the embed key of the panel that renders it" do
+      assert_raise ArgumentError, ~r/widget embed must name the panel/, fn ->
+        Widget.new!(%{id: "test", label: "Test"})
+      end
+
+      assert_raise ArgumentError, ~r/widget embed must name the panel/, fn ->
+        Widget.new!(%{id: "test", label: "Test", embed: ""})
+      end
+    end
+
+    test "defaults placement to :grid and accepts :section" do
+      assert Widget.new!(%{id: "test", label: "Test", embed: "test.panel"}).placement == :grid
+
+      assert Widget.new!(%{id: "test", label: "Test", embed: "test.panel", placement: :section}).placement ==
+               :section
+
+      assert_raise ArgumentError, ~r/widget placement must be :grid or :section/, fn ->
+        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", placement: :sidebar})
+      end
+    end
+
+    test "defaults refresh_interval to 0 and rejects a negative one" do
+      assert Widget.new!(%{id: "test", label: "Test", embed: "test.panel"}).refresh_interval == 0
+
+      assert_raise ArgumentError, ~r/widget refresh_interval must be a non-negative integer/, fn ->
+        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", refresh_interval: -1})
+      end
+    end
+
+    test "rejects a capability that is not a string" do
+      assert_raise ArgumentError, ~r/widget capability must be a string or nil/, fn ->
+        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", capability: :admin})
       end
     end
 
     test "raises on negative order" do
       assert_raise ArgumentError, ~r/widget order must be a non-negative integer/, fn ->
-        Widget.new!(%{id: "test", label: "Test", order: -1})
+        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", order: -1})
       end
-    end
-  end
-
-  defmodule DummyWidgetModule do
-    @behaviour Bilimbi.Base.Dashboard.Widget
-
-    @impl true
-    def widget_title, do: "Dummy"
-
-    @impl true
-    def widget_size, do: :medium
-
-    @impl true
-    def widget_refresh_interval, do: 60_000
-
-    @impl true
-    def widget_assigns, do: [:dummy_count]
-  end
-
-  describe "Widget behaviour" do
-    test "implements callbacks properly" do
-      assert DummyWidgetModule.widget_title() == "Dummy"
-      assert DummyWidgetModule.widget_size() == :medium
-      assert DummyWidgetModule.widget_refresh_interval() == 60_000
-      assert DummyWidgetModule.widget_assigns() == [:dummy_count]
     end
   end
 
@@ -101,8 +111,8 @@ defmodule Bilimbi.Base.DashboardTest do
       [%{id: "widget-a"}, %{id: "widget-b"}] =
         Validator.validate_contributions!([
           entry("core/a", [
-            %{id: "widget-b", label: "B", order: 20},
-            %{id: "widget-a", label: "A", order: 10}
+            %{id: "widget-b", label: "B", embed: "test.panel", order: 20},
+            %{id: "widget-a", label: "A", embed: "test.panel", order: 10}
           ])
         ])
     end
@@ -111,8 +121,8 @@ defmodule Bilimbi.Base.DashboardTest do
       [%{id: "widget-a"}, %{id: "widget-z"}] =
         Validator.validate_contributions!([
           entry("core/a", [
-            %{id: "widget-z", label: "Z", order: 10},
-            %{id: "widget-a", label: "A", order: 10}
+            %{id: "widget-z", label: "Z", embed: "test.panel", order: 10},
+            %{id: "widget-a", label: "A", embed: "test.panel", order: 10}
           ])
         ])
     end
@@ -120,8 +130,8 @@ defmodule Bilimbi.Base.DashboardTest do
     test "raises on duplicate ids and names both contributors" do
       assert_raise ArgumentError, ~r/duplicate widget ids.*core\/a.*core\/b/s, fn ->
         Validator.validate_contributions!([
-          entry("core/a", [%{id: "dup", label: "A"}]),
-          entry("core/b", [%{id: "dup", label: "B"}])
+          entry("core/a", [%{id: "dup", label: "A", embed: "test.panel"}]),
+          entry("core/b", [%{id: "dup", label: "B", embed: "test.panel"}])
         ])
       end
     end
@@ -136,7 +146,7 @@ defmodule Bilimbi.Base.DashboardTest do
   describe "public API" do
     test "widgets/0 returns validated widgets" do
       install!([
-        Widget.new!(%{id: "widget-a", label: "A"})
+        Widget.new!(%{id: "widget-a", label: "A", embed: "test.panel"})
       ])
 
       assert [%Widget{id: "widget-a"}] = Dashboard.widgets()
@@ -144,11 +154,23 @@ defmodule Bilimbi.Base.DashboardTest do
 
     test "fetch_widget/1 finds a widget by id" do
       install!([
-        Widget.new!(%{id: "widget-a", label: "A"})
+        Widget.new!(%{id: "widget-a", label: "A", embed: "test.panel"})
       ])
 
       assert {:ok, %Widget{id: "widget-a"}} = Dashboard.fetch_widget("widget-a")
       assert :error = Dashboard.fetch_widget("missing")
+    end
+
+    test "widgets/0 and sections/0 split the catalogue by placement" do
+      install!([
+        Widget.new!(%{id: "widget-a", label: "A", embed: "test.panel"}),
+        Widget.new!(%{id: "section-a", label: "S", embed: "test.section", placement: :section})
+      ])
+
+      assert [%Widget{id: "widget-a"}, %Widget{id: "section-a"}] = Dashboard.entries()
+      assert [%Widget{id: "widget-a"}] = Dashboard.widgets()
+      assert [%Widget{id: "section-a"}] = Dashboard.sections()
+      assert :error = Dashboard.fetch_widget("section-a")
     end
   end
 end

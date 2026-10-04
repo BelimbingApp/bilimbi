@@ -575,6 +575,17 @@ direction (the employee page's address section: `core/address` declares
 panel inverts UI ownership instead of inverting the dependency: the write
 lives with its owner, and the embedding page holds only a string key.
 
+## Amendment: the dashboard is a module page (2026-10-04)
+
+The dashboard was the one screen the host still owned, contrary to §5 and §6,
+because ADR 0009 assigned its rendering to a host LiveView. ADR 0009 is amended
+to agree with this record: `base/dashboard` owns
+`Bilimbi.Base.Dashboard.Web.IndexLive` and contributes `/dashboard` through its
+`web:` route data, and each widget and section is an embeddable panel declared
+by the module that owns its data. The host owns the login, forgot-password and
+reset-password screens and no other LiveView, and its discovered-route macro
+injects no route of its own.
+
 ## Interim placement rule for in-flight UI
 
 Before the `web:` descriptor key and host router macro land, UI-bearing

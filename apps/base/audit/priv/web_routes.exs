@@ -15,5 +15,10 @@
     embed: "record.history",
     live_component: Bilimbi.Base.Audit.Web.RecordHistory,
     capability: "admin.audit.log.list"
+  },
+  %{
+    embed: "dashboard.activity",
+    live_component: Bilimbi.Base.Audit.Web.DashboardActivityPanel,
+    capability: "admin.audit.log.list"
   }
 ]

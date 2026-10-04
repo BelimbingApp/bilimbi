@@ -33,9 +33,11 @@ defmodule Bilimbi.Base.Perf.Contributions do
         %{
           id: "base-perf-health",
           label: "Performance health",
+          embed: "dashboard.performance",
           size: :small,
           order: 50,
-          capability: @view
+          capability: @view,
+          refresh_interval: 60_000
         }
       ],
       schedule: %{

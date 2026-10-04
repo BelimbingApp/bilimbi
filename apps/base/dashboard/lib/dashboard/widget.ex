@@ -1,39 +1,39 @@
 defmodule Bilimbi.Base.Dashboard.Widget do
   @moduledoc """
-  A validated widget definition contributed by an installed module.
+  A validated dashboard entry contributed by an installed module.
 
-  Widgets are plain, immutable structs validated at boot time. The catalogue
-  determines which widgets appear and in what order. Rendering is owned by the
-  dashboard LiveView adapter; future widget renderer modules may implement the
-  `Bilimbi.Base.Dashboard.Widget` behaviour to receive their own assign set.
+  An entry is plain, immutable data validated at boot. It says where the entry
+  sits (`placement`), what it is called, which capability the viewer needs, how
+  often it refreshes, and which embeddable panel draws it (`embed`). The panel
+  is a LiveComponent its owner declares in `priv/web_routes.exs`; the dashboard
+  renders it with `<.discovered_panel>` and never names the owner's module
+  (ADR 0006 embeddable panels, ADR 0009).
+
+  `docs/README.md` in this package states what a panel receives.
   """
 
-  @typedoc "A validated widget definition."
+  @typedoc "A validated dashboard entry."
   @type t :: %__MODULE__{
           id: String.t(),
           label: String.t(),
+          embed: String.t(),
+          placement: :grid | :section,
           size: :small | :medium | :large,
           order: non_neg_integer(),
-          capability: String.t() | nil
+          capability: String.t() | nil,
+          refresh_interval: non_neg_integer()
         }
 
-  defstruct [:id, :label, size: :small, order: 0, capability: nil]
-
-  @doc "Display title for this widget."
-  @callback widget_title() :: String.t()
-
-  @doc "Grid size hint for this widget."
-  @callback widget_size() :: :small | :medium | :large
-
-  @doc """
-  Refresh interval in milliseconds. Return 0 to disable auto-refresh.
-  The dashboard LiveView will schedule a `handle_info(:refresh_widget, ...)`
-  message at this interval.
-  """
-  @callback widget_refresh_interval() :: non_neg_integer()
-
-  @doc "The assign keys this widget needs from the dashboard LiveView."
-  @callback widget_assigns() :: [atom()]
+  defstruct [
+    :id,
+    :label,
+    :embed,
+    placement: :grid,
+    size: :small,
+    order: 0,
+    capability: nil,
+    refresh_interval: 0
+  ]
 
   @doc false
   @spec new!(map()) :: t()
@@ -41,9 +41,12 @@ defmodule Bilimbi.Base.Dashboard.Widget do
     %__MODULE__{
       id: validate_id!(attrs[:id]),
       label: validate_label!(attrs[:label]),
+      embed: validate_embed!(attrs[:embed]),
+      placement: validate_placement(attrs[:placement]),
       size: validate_size(attrs[:size]),
       order: validate_order(attrs[:order]),
-      capability: attrs[:capability]
+      capability: validate_capability(attrs[:capability]),
+      refresh_interval: validate_refresh_interval(attrs[:refresh_interval])
     }
   end
 
@@ -59,6 +62,25 @@ defmodule Bilimbi.Base.Dashboard.Widget do
 
   defp validate_label!(label),
     do: raise(ArgumentError, "widget label must be a string, got: #{inspect(label)}")
+
+  defp validate_embed!(embed) when is_binary(embed) and embed != "", do: embed
+
+  defp validate_embed!(embed),
+    do:
+      raise(
+        ArgumentError,
+        "widget embed must name the panel that renders it, got: #{inspect(embed)}"
+      )
+
+  defp validate_placement(nil), do: :grid
+  defp validate_placement(placement) when placement in [:grid, :section], do: placement
+
+  defp validate_placement(placement),
+    do:
+      raise(
+        ArgumentError,
+        "widget placement must be :grid or :section, got: #{inspect(placement)}"
+      )
 
   defp validate_size(nil), do: :small
   defp validate_size(size) when size in [:small, :medium, :large], do: size
@@ -76,4 +98,27 @@ defmodule Bilimbi.Base.Dashboard.Widget do
   defp validate_order(order),
     do:
       raise(ArgumentError, "widget order must be a non-negative integer, got: #{inspect(order)}")
+
+  defp validate_capability(nil), do: nil
+  defp validate_capability(capability) when is_binary(capability), do: capability
+
+  defp validate_capability(capability),
+    do:
+      raise(
+        ArgumentError,
+        "widget capability must be a string or nil, got: #{inspect(capability)}"
+      )
+
+  defp validate_refresh_interval(nil), do: 0
+
+  defp validate_refresh_interval(interval) when is_integer(interval) and interval >= 0,
+    do: interval
+
+  defp validate_refresh_interval(interval),
+    do:
+      raise(
+        ArgumentError,
+        "widget refresh_interval must be a non-negative integer of milliseconds, " <>
+          "got: #{inspect(interval)}"
+      )
 end

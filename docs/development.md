@@ -120,7 +120,7 @@ apps/
 │   ├── bilimbi.container.exs     # Declares the Base layer
 │   ├── audit/                    # Mutation and action history
 │   ├── authz/                    # Capability, role, grant, and decision engine
-│   ├── dashboard/                # Dashboard sections and layout
+│   ├── dashboard/                # Dashboard page, catalogue and layout
 │   ├── database/                 # The one Repo, audit capture, console
 │   ├── datetime/                 # Time display and clocks
 │   ├── locale/                   # Locale and localization

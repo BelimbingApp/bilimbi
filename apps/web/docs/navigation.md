@@ -1,6 +1,6 @@
 # Live navigation
 
-Normal authenticated routes, including the host dashboard, share the
+Normal authenticated routes, including the dashboard, share the
 `:authenticated` LiveView session. `BilimbiWeb.DiscoveredRoutes` contributes
 these routes as one block so navigation can use the live connection instead
 of reloading the document. Authentication is rehydrated on each destination

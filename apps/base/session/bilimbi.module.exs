@@ -6,6 +6,7 @@
   otp_app: :bilimbi_base_session,
   namespace: Bilimbi.Base.Session,
   dependencies: [
+    "base/dashboard",
     "base/database",
     "base/module_registry",
     "base/principal_directory",

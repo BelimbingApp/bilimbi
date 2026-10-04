@@ -1,39 +1,81 @@
 # Bilimbi.Base.Dashboard
 
-Widget-based dashboard system. Modules contribute widget definitions through the
-`Bilimbi.Base.ModuleRegistry.ContributionProvider` contract under the
-`:dashboard` consumer key.
+The dashboard at `/dashboard`. Installed modules contribute its widgets and
+sections; this module owns the catalogue, the page and each account's
+arrangement. It reads no contributor's data (ADR 0009).
 
 ## Public API
 
-- `widgets/0` — all validated, ordered widget definitions
-- `fetch_widget/1` — lookup a widget by its contribution id
+- `entries/0` — every validated entry of either placement, ordered
+- `widgets/0` — the grid widgets
+- `sections/0` — the full-width sections below the grid
+- `fetch_widget/1` — look up a grid widget by its contribution id
 
-## Contribution shape
+## Contributing an entry
+
+An entry is two declarations in the module that owns the data, and that module
+lists `base/dashboard` in its descriptor dependencies.
+
+The contribution provider says what the entry is:
 
 ```elixir
 def contributions do
   %{
     dashboard: [
       %{
-        id: "my.module.widget-id",
-        label: "Widget Label",
-        size: :small,       # :small | :medium | :large (default :small)
-        order: 10,           # display order (default 0)
-        capability: "admin.my.list"  # optional capability gate
+        id: "my-module-open-orders",       # stored in each account's layout; never rename
+        label: "Open orders",
+        embed: "dashboard.open-orders",    # the panel that draws it
+        placement: :grid,                  # :grid (default) | :section
+        size: :small,                      # :small | :medium | :large (default :small)
+        order: 60,                         # display order (default 0)
+        capability: "admin.order.list",    # optional
+        refresh_interval: 60_000           # milliseconds; 0 (default) never refreshes
       }
     ]
   }
 end
 ```
 
-The `Bilimbi.Base.Dashboard.ContributionValidator` validates and orders all
-contributed widgets at boot time.
+`priv/web_routes.exs` declares the panel under the same key and the same
+capability:
 
-## Rendering
+```elixir
+%{
+  embed: "dashboard.open-orders",
+  live_component: MyModule.Web.DashboardOrdersPanel,
+  capability: "admin.order.list"
+}
+```
 
-Widget rendering is owned by the dashboard LiveView (`BilimbiWeb.DashboardLive`).
-The widget catalogue from `widgets/0` determines which widgets appear and
-their order; the LiveView renders built-in widgets directly and can resolve
-future widget components by `widget.component` when dynamic rendering is
-implemented.
+`Bilimbi.Base.Dashboard.ContributionValidator` validates and orders the
+contributions at boot. An entry without `embed` fails there. An entry whose
+panel is not installed renders the not-installed notice of
+`<.discovered_panel>`.
+
+## What a panel receives
+
+The page renders each visible entry with `<.discovered_panel>`, so a panel is
+a LiveComponent that gets:
+
+- `id` — the component id; put it on the root element
+- `current_scope` — the signed-in scope; read tenant data through
+  `current_scope.scope`
+- `editing` — `true` while the account is customizing the layout. Withhold
+  navigation while it is `true`: the page lays its move and remove controls
+  over the panel's top-right corner.
+- `refresh` — a count that grows by one each time the page refreshes. A panel
+  with live data reads again when the count changes; a panel that reads once
+  ignores it. `update/2` also runs when only `editing` changes, so do not
+  read on every call.
+
+`Bilimbi.Base.Session.Web.DashboardStatsPanel` is the smallest refreshing
+panel and `Bilimbi.Core.Company.Web.DashboardStatsPanel` the smallest
+read-once one.
+
+## Arrangement
+
+Which entries an account shows, and in what order, is stored per user in the
+`ui.dashboard.layout` (widgets) and `ui.dashboard.sections` (sections)
+settings, which Core User declares with its other account preferences. An
+account with no stored row sees the whole catalogue it is allowed to see.

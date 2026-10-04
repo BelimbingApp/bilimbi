@@ -57,6 +57,22 @@ defmodule Bilimbi.Core.User.Contributions do
   @impl true
   def contributions do
     %{
+      dashboard: [
+        %{
+          id: "base-dashboard-user-stats",
+          label: "Users",
+          embed: "dashboard.users",
+          size: :small,
+          order: 20
+        },
+        %{
+          id: "recent-users",
+          label: "People in this workspace",
+          embed: "dashboard.people",
+          placement: :section,
+          order: 20
+        }
+      ],
       menu: [
         %{
           id: "admin.user",

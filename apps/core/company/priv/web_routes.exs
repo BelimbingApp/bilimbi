@@ -48,5 +48,13 @@
     live: Bilimbi.Core.Company.Web.ShowLive,
     session: :auth,
     capability: "admin.company.view"
+  },
+  %{
+    embed: "dashboard.companies",
+    live_component: Bilimbi.Core.Company.Web.DashboardStatsPanel
+  },
+  %{
+    embed: "dashboard.company",
+    live_component: Bilimbi.Core.Company.Web.DashboardCompanyPanel
   }
 ]

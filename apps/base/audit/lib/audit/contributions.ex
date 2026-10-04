@@ -10,6 +10,17 @@ defmodule Bilimbi.Base.Audit.Contributions do
   @impl true
   def contributions do
     %{
+      dashboard: [
+        %{
+          id: "base-dashboard-recent-audit",
+          label: "Recent Activity",
+          embed: "dashboard.activity",
+          size: :medium,
+          order: 30,
+          capability: @list,
+          refresh_interval: 120_000
+        }
+      ],
       menu: [
         %{
           id: "admin.audit",
