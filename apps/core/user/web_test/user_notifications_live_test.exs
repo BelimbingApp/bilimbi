@@ -138,12 +138,11 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
   end
 
   test "renders empty state when there are no notifications", %{conn: conn} do
-    {:ok, view, html} = open(conn)
+    {:ok, view, _html} = open(conn)
 
-    assert has_element?(view, "#notifications-empty")
-    assert html =~ "No notifications"
+    assert has_element?(view, "#notifications-empty", "No notifications")
     # The label alone carries the empty state; no consumer-voice second line (#653).
-    refute html =~ "all caught up"
+    refute has_element?(view, "#notifications-empty", "all caught up")
   end
 
   test "renders notification items with title, body, and unread indicator", %{
@@ -162,8 +161,13 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     assert has_element?(view, "#notifications-list")
     assert has_element?(view, "#notifications-list [id$='#{n1.id}']")
     assert has_element?(view, "#mark-read-#{n1.id}")
-    assert render(view) =~ "Welcome aboard"
-    assert render(view) =~ "Your profile has been created."
+    assert has_element?(view, "#notifications-list [id$='#{n1.id}']", "Welcome aboard")
+
+    assert has_element?(
+             view,
+             "#notifications-list [id$='#{n1.id}']",
+             "Your profile has been created."
+           )
   end
 
   test "renders each notification's created time through the shared datetime", %{
@@ -187,7 +191,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     {:ok, :company} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), "company")
 
-    {:ok, view, html} = open(conn)
+    {:ok, view, _html} = open(conn)
 
     assert has_element?(
              view,
@@ -195,9 +199,8 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
              "18/08/2026, 18:00 +08"
            )
 
-    refute html =~ "m ago"
-    refute html =~ "Just now"
-    refute html =~ "ago"
+    refute has_element?(view, "#notification-created-#{note.id}", "ago")
+    refute has_element?(view, "#notification-created-#{note.id}", "Just now")
   end
 
   test "renders a row whose stored icon name is a legacy Belimbing one", %{
@@ -213,7 +216,12 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     {:ok, view, _html} = open(conn)
 
     assert has_element?(view, "#notifications-list [id$='#{legacy.id}']")
-    assert render(view) =~ "Adopted from Belimbing"
+
+    assert has_element?(
+             view,
+             "#notifications-list [id$='#{legacy.id}']",
+             "Adopted from Belimbing"
+           )
   end
 
   test "filters by all, unread, and read tabs", %{conn: conn, scope: scope} do
@@ -281,7 +289,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     assert User.unread_notification_count(as(scope, 91)) == {:ok, 0}
     refute has_element?(view, "#mark-all-read-btn")
-    assert render(view) =~ "All notifications marked as read."
+    assert has_element?(view, "#flash-success", "All notifications marked as read.")
   end
 
   test "supports pagination and per_page controls", %{conn: conn, scope: scope} do
@@ -332,7 +340,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     {:ok, view, _html} = open(conn)
     refute has_element?(view, "#notifications-list [id$='#{n_other.id}']")
-    refute render(view) =~ "Grace Secret Note"
+    refute has_element?(view, "#notifications-list", "Grace Secret Note")
   end
 
   describe "top-bar NotificationBellComponent" do
@@ -349,7 +357,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       # Bell button exists with badge
       assert has_element?(view, "#app-notifications-bell")
       assert has_element?(view, "#app-notifications-unread-badge")
-      assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
+      assert has_element?(view, "#app-notifications-unread-badge", "1")
 
       # Dropdown is closed initially
       refute has_element?(view, "#app-notifications-dropdown")
@@ -358,7 +366,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       view |> element("#app-notifications-bell") |> render_click()
       assert has_element?(view, "#app-notifications-dropdown")
       assert has_element?(view, "#bell-item-#{n1.id}")
-      assert render(view) =~ "Alert for Bell"
+      assert has_element?(view, "#bell-item-#{n1.id}", "Alert for Bell")
 
       # The open panel follows the shell's disclosure contract: focus moves
       # into it on open, Escape closes it and returns focus to the bell. The
@@ -366,11 +374,12 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert has_element?(view, "#app-notifications-dropdown[phx-mounted][phx-key='escape']")
       refute has_element?(view, "#app-shell-notifications[phx-window-keydown]")
 
-      panel = view |> element("#app-notifications-dropdown") |> render()
-      assert panel =~ ~s(phx-window-keydown)
-      assert panel =~ ~s(&quot;focus&quot;)
-      assert panel =~ ~s(#app-notifications-bell)
-      assert panel =~ ~s(close_dropdown)
+      for fragment <- ["close_dropdown", "focus", "#app-notifications-bell"] do
+        assert has_element?(
+                 view,
+                 "#app-notifications-dropdown[phx-window-keydown*='#{fragment}']"
+               )
+      end
 
       view |> element("#app-notifications-dropdown") |> render_keydown(%{"key" => "Escape"})
       refute has_element?(view, "#app-notifications-dropdown")
@@ -418,9 +427,8 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
       # The LiveView hook receives the event and updates the bell component live
       _ = render(view)
-      assert render(view) =~ "app-notifications-unread-badge"
       assert has_element?(view, "#app-notifications-unread-badge")
-      assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
+      assert has_element?(view, "#app-notifications-unread-badge", "1")
     end
 
     # The bell belongs to the shared shell, so a module page that never names
@@ -438,7 +446,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
         # The hook answers the event with a `send_update` the LiveView sends
         # itself; one render lets it handle that message first.
         _ = render(view)
-        assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
+        assert has_element?(view, "#app-notifications-unread-badge", "1")
       end
     end
 
@@ -531,7 +539,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
       # The LiveView receives the PubSub broadcast and updates its assigns/stream
       assert has_element?(view, "#notifications-list [id$='#{note.id}']")
-      assert render(view) =~ "Realtime PubSub Alert"
+      assert has_element?(view, "#notifications-list [id$='#{note.id}']", "Realtime PubSub Alert")
       refute has_element?(view, "#notifications-empty")
       refute has_element?(view, "#flash-error")
     end
