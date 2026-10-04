@@ -15,7 +15,7 @@ archived company as in scope. The docs table in
 
 Legal entity type, department type, and relationship writes take that same scope and check `admin.company.create`, `admin.company.update`, or `admin.company.delete` at call time (`authorize/2` in `reference_types.ex` and `relationships.ex`). A `can_*?` assign only hides the control. Pass the scope; do not add a write that trusts the mount-time assign.
 
-Reference types, departments, relationships, and external accesses are implemented in those sibling modules. `company.ex` keeps the public names with `defdelegate`. Add the next aggregate there, not as more queries in `company.ex`.
+Reference types, departments, relationships, and external accesses live in `reference_types.ex`, `departments.ex`, `relationships.ex`, and `external_accesses.ex`. `company.ex` keeps the public names with `defdelegate`; the `@doc` on those functions there owns the contract. Add the next aggregate beside those modules, not as more queries in `company.ex`.
 
 ## Maintaining this file
 

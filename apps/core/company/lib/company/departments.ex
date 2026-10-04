@@ -117,13 +117,6 @@ defmodule Bilimbi.Core.Company.Departments do
     end
   end
 
-  @doc """
-  Appoints (or clears, with `head_id: nil`) the head of an existing department.
-
-  The head is an employee id, which this module does not resolve — a caller that
-  can name employees (a Core module that depends on `core/company`) supplies it.
-  The department must belong to `company_id`.
-  """
   @spec update_department_head(Scope.t(), pos_integer(), pos_integer(), pos_integer() | nil) ::
           {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
   def update_department_head(%Scope{} = scope, company_id, department_id, head_id) do

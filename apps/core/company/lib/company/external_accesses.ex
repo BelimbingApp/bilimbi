@@ -28,17 +28,6 @@ defmodule Bilimbi.Core.Company.ExternalAccesses do
     list_accesses(scope, company_id, user_id)
   end
 
-  @doc """
-  Lists active external accesses granting access TO scoped companies FOR a user.
-
-  Returns accesses where the granted company is in scope and active, the access
-  is active and not deleted, and the target user ID matches.
-
-  Tenant isolation is preserved because the base query is scoped to companies
-  owned by the caller's tenant. The user ID filter is an opaque foreign integer
-  (Core User's job). Company only filters by that identity against scoped
-  companies and never queries `users`. The result is capped.
-  """
   @spec list_external_accesses_for_user(Scope.t(), pos_integer()) ::
           {:ok, [ExternalAccessSummary.t()]}
   def list_external_accesses_for_user(%Scope{} = scope, user_id)

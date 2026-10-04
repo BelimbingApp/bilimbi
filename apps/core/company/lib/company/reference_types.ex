@@ -43,13 +43,6 @@ defmodule Bilimbi.Core.Company.ReferenceTypes do
 
   def get_legal_entity_type(_id), do: {:error, :not_found}
 
-  @doc """
-  Creates a legal entity type.
-
-  Requires `admin.company.create` on the sealed scope now. The type screen's
-  `can_create?` assign only shows the control. An anonymous system actor
-  (seeds, `Tenancy.scope/1`) is allowed; a person is decided by Authz.
-  """
   @spec create_legal_entity_type(Scope.t(), map()) ::
           {:ok, LegalEntityType.t()} | {:error, :forbidden | Ecto.Changeset.t()}
   def create_legal_entity_type(%Scope{} = scope, attrs) when is_map(attrs) do
@@ -60,11 +53,6 @@ defmodule Bilimbi.Core.Company.ReferenceTypes do
     end
   end
 
-  @doc """
-  Updates a legal entity type.
-
-  Requires `admin.company.update` on the sealed scope now.
-  """
   @spec update_legal_entity_type(Scope.t(), pos_integer() | LegalEntityType.t(), map()) ::
           {:ok, LegalEntityType.t()} | {:error, :forbidden | :not_found | Ecto.Changeset.t()}
   def update_legal_entity_type(%Scope{} = scope, %LegalEntityType{} = type, attrs) do
@@ -191,13 +179,6 @@ defmodule Bilimbi.Core.Company.ReferenceTypes do
 
   def get_department_type(_id), do: {:error, :not_found}
 
-  @doc """
-  Creates a department type.
-
-  Requires `admin.company.create` on the sealed scope now. The type screen's
-  `can_create?` assign only shows the control. An anonymous system actor
-  (seeds, `Tenancy.scope/1`) is allowed; a person is decided by Authz.
-  """
   @spec create_department_type(Scope.t(), map()) ::
           {:ok, DepartmentType.t()} | {:error, :forbidden | Ecto.Changeset.t()}
   def create_department_type(%Scope{} = scope, attrs) when is_map(attrs) do
@@ -208,11 +189,6 @@ defmodule Bilimbi.Core.Company.ReferenceTypes do
     end
   end
 
-  @doc """
-  Updates a department type.
-
-  Requires `admin.company.update` on the sealed scope now.
-  """
   @spec update_department_type(Scope.t(), pos_integer() | DepartmentType.t(), map()) ::
           {:ok, DepartmentType.t()} | {:error, :forbidden | :not_found | Ecto.Changeset.t()}
   def update_department_type(%Scope{} = scope, %DepartmentType{} = type, attrs) do
