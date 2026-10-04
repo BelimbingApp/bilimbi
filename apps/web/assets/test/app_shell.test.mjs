@@ -548,6 +548,10 @@ test("a failed legacy migration keeps the pins already on the page", async () =>
   assert.equal(calls, 1)
   assert.deepEqual(pinnedLinks(), ["/companies"])
   assert.equal(shell.hook.pinnedEntries.length, 1)
+  assert.equal(
+    localStorage.getItem("sidebarPinnedItems"),
+    JSON.stringify([{id: "nav-users"}]),
+  )
   shell.hook.updated()
   assert.deepEqual(pinnedLinks(), ["/companies"])
 })
@@ -569,7 +573,49 @@ test("a legacy migration response that is not JSON keeps the pins already on the
   assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["POST /api/pins/toggle"])
   assert.deepEqual(pinnedLinks(), ["/companies"])
   assert.equal(shell.hook.pinnedEntries.length, 1)
+  assert.equal(
+    localStorage.getItem("sidebarPinnedItems"),
+    JSON.stringify([{id: "nav-users"}]),
+  )
   shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a non-OK legacy migration leaves the browser key for a later retry", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  const stored = JSON.stringify([{id: "nav-users"}])
+  localStorage.setItem("sidebarPinnedItems", stored)
+  failToggle = reply({error: "invalid_pin"}, 422)
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["POST /api/pins/toggle"])
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(localStorage.getItem("sidebarPinnedItems"), stored)
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a later failed legacy import keeps the browser key after an earlier import landed", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = "[]"
+  const stored = JSON.stringify([{id: "nav-companies"}, {id: "nav-users"}])
+  localStorage.setItem("sidebarPinnedItems", stored)
+  let calls = 0
+  globalThis.fetch = async (_path, options = {}) => {
+    calls += 1
+    if (calls === 1) {
+      const body = JSON.parse(options.body)
+      return reply({pins: [{id: 1, label: body.label, url: body.url}]})
+    }
+    return reply({error: "invalid_pin"}, 422)
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.equal(calls, 2)
+  assert.equal(localStorage.getItem("sidebarPinnedItems"), stored)
   assert.deepEqual(pinnedLinks(), ["/companies"])
 })
 

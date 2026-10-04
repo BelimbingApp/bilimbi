@@ -272,7 +272,6 @@ const AppShell = {
 
   async migrateLegacyPins(pins) {
     const legacy = this.readLegacyPinnedItems()
-    window.localStorage.removeItem?.(PINNED_STORAGE)
 
     const legacyUrls = legacy
       .filter((item) => item.navId)
@@ -286,8 +285,11 @@ const AppShell = {
         method: "POST",
         body: JSON.stringify({label: item.label, url, icon: null}),
       })
-      if (imported.ok) pins = this.acceptServerPins((await imported.json()).pins)
+      if (!imported.ok) return pins
+      pins = this.acceptServerPins((await imported.json()).pins)
     }
+
+    window.localStorage.removeItem?.(PINNED_STORAGE)
 
     const urls = legacyUrls.map(({url}) => url)
     const ordered = [
