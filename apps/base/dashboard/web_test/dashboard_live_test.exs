@@ -912,7 +912,8 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
       conn = log_in_as(conn)
       session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
       {:ok, view, _html} = live(conn, ~p"/dashboard")
-      stale = System.system_time(:second) - 120
+      # Past the default 5-minute touch interval, inside the 120-minute lifetime.
+      stale = System.system_time(:second) - 10 * 60
 
       assert {:ok, _} =
                Session.put_session(session_id, "{}", user_id: 91, last_activity: stale)

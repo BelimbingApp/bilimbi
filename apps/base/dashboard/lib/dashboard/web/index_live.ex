@@ -320,6 +320,12 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLive do
     end
   end
 
+  # Live navigation always invokes this callback. The dashboard has no
+  # query-param state; the callback exists so a patch does not crash and the
+  # session-activity hook attached to `handle_params` can run.
+  @impl true
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
   @impl true
   def handle_info(:refresh_widgets, socket) do
     {:noreply,

@@ -74,6 +74,7 @@ defmodule Bilimbi.Base.UI do
       use Phoenix.LiveComponent
       use Bilimbi.Base.UI.SessionGuard
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
+      use Bilimbi.Base.UI.ComponentActivity
 
       Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
 

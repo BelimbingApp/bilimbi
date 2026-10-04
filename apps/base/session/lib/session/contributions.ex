@@ -21,6 +21,17 @@ defmodule Bilimbi.Base.Session.Contributions do
       ],
       settings: %{
         definitions: %{
+          "session.last_activity_touch_minutes" => %{
+            type: :integer,
+            scopes: [:global],
+            default: 5,
+            minimum: 1,
+            maximum: 60,
+            label: "Session activity update interval",
+            help: "Minimum minutes between stored activity updates for an active session.",
+            editable: "operator",
+            capability: "base.settings.global.manage"
+          },
           "session.lifetime_minutes" => %{
             type: :integer,
             scopes: [:global],
@@ -34,6 +45,21 @@ defmodule Bilimbi.Base.Session.Contributions do
           }
         },
         runtime_claims: []
+      },
+      schedule: %{
+        definitions: [
+          %{
+            key: "base/session-expiry",
+            name: "Prune expired sessions",
+            expression: "*/5 * * * *",
+            timezone: "Etc/UTC",
+            task_name: "Base Session expiry",
+            worker: Bilimbi.Base.Session.ExpiryWorker,
+            args: %{},
+            overlap: :forbid,
+            misfire: :coalesce
+          }
+        ]
       },
       menu: [
         %{
@@ -52,21 +78,6 @@ defmodule Bilimbi.Base.Session.Contributions do
           "auditor" => %{capabilities: [@list]},
           "system_viewer" => %{capabilities: [@list]}
         }
-      },
-      schedule: %{
-        definitions: [
-          %{
-            key: "base/session-expiry",
-            name: "Prune expired sessions",
-            expression: "*/5 * * * *",
-            timezone: "Etc/UTC",
-            task_name: "Base Session expiry",
-            worker: Bilimbi.Base.Session.ExpiryWorker,
-            args: %{},
-            overlap: :forbid,
-            misfire: :coalesce
-          }
-        ]
       }
     }
   end

@@ -932,7 +932,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
     ContributionRegistry.put_snapshot_for_test!(
       update_in(installed, [:consumers, :settings, :definitions], fn definitions ->
         definitions
-        |> hide_session_setting!()
+        |> hide_session_settings!()
         |> Map.reject(fn {_key, definition} ->
           definition.editable == "operator" and definition.capability not in capabilities
         end)
@@ -940,9 +940,16 @@ defmodule BilimbiWeb.SettingsLiveTest do
     )
   end
 
-  defp hide_session_setting!(definitions) do
-    # Authentication still needs the lifetime when the operator group is narrowed.
-    Map.update!(definitions, "session.lifetime_minutes", &%{&1 | editable: nil})
+  defp hide_session_settings!(definitions) do
+    # Authentication still needs the lifetime and the touch interval when the
+    # operator group is narrowed.
+    Enum.reduce(
+      ["session.lifetime_minutes", "session.last_activity_touch_minutes"],
+      definitions,
+      fn key, acc ->
+        Map.update!(acc, key, &%{&1 | editable: nil})
+      end
+    )
   end
 
   # The installed snapshot minus every setting editable in the operator group,
@@ -954,7 +961,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
     ContributionRegistry.put_snapshot_for_test!(
       update_in(installed, [:consumers, :settings, :definitions], fn definitions ->
         definitions
-        |> hide_session_setting!()
+        |> hide_session_settings!()
         |> Map.reject(fn {_key, definition} -> definition.editable == "operator" end)
       end)
     )

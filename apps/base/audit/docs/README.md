@@ -90,3 +90,14 @@ its current value; the URL keeps each screen's own `page_size` key so
 bookmarked links from before the swap still resolve. The retain toggle names
 its glyphs through the icon registry as `retain` and `retained`, Belimbing's
 outline and solid bookmark.
+
+## Timeline indexes
+
+Each schema contract owns whether its timeline index is optional and which
+order a present index must match, so a compatible Belimbing database can still
+be adopted.
+
+Recorded before/after measurements for the additive indexes: audit tenant
+count 169 ms to 22.7 ms, audit page 100 189 ms to 19.5 ms, and Authz page
+0.76 ms to 0.14 ms. These figures were supplied with the change, not
+re-measured.

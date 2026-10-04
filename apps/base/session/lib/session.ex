@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.Session do
   @maximum_limit 500
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
+  @touch_interval_key "session.last_activity_touch_minutes"
+  @lifetime_key "session.lifetime_minutes"
   @sortable_fields [:user_id, :ip_address, :user_agent, :last_activity]
 
   @spec put_session(String.t(), String.t(), map() | keyword()) ::
@@ -53,15 +55,26 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
-  @doc "Refreshes activity when the stored timestamp is at least one minute old."
-  @spec refresh_activity(String.t(), non_neg_integer()) :: :ok
-  def refresh_activity(id, now) when is_binary(id) and is_integer(now) and now >= 0 do
-    # Clock update, not a user decision: would write one audit row per
-    # active session per minute otherwise.
+  @doc """
+  Advances session activity when the configured throttle interval elapsed.
+  The interval never exceeds half the session lifetime, so continuous use
+  refreshes the session before it can expire.
+
+  Activity updates to `sessions` bypass audit capture: they are machine
+  housekeeping, not changes to the user's identity or opaque payload.
+  A missing session is never recreated.
+  """
+  @spec touch_session(String.t(), non_neg_integer()) :: :ok
+  def touch_session(id, now \\ System.system_time(:second))
+      when is_binary(id) and is_integer(now) and now >= 0 do
+    touch_minutes = Bilimbi.Base.Settings.get(@touch_interval_key)
+    lifetime_minutes = Bilimbi.Base.Settings.get(@lifetime_key)
+    cutoff = now - min(touch_minutes * 60, div(lifetime_minutes * 60, 2))
+
     WriteCapture.without_capture(fn ->
       Repo.update_all(
         from(session in Schema,
-          where: session.id == ^id and session.last_activity <= ^(now - 60)
+          where: session.id == ^id and session.last_activity < ^cutoff
         ),
         set: [last_activity: now]
       )

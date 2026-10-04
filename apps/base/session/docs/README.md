@@ -13,7 +13,8 @@ The global operator setting `session.lifetime_minutes` is editable as **Session
 lifetime** at `/system/settings`. Its bounds and default are declared in
 [`Session.Contributions`](../lib/session/contributions.ex). The Web
 authentication edge rejects sessions older than that idle lifetime and refreshes
-activity on authenticated requests and user events at most once a minute. Mounted views guard events,
+activity on authenticated requests, user events, and component callbacks at most
+once per configured interval (`session.last_activity_touch_minutes`). Mounted views guard events,
 URL patches, component callbacks, and background refreshes; background work does
 not extend the idle lifetime. Expired requests and mounted callbacks redirect
 to sign-in when checked; an idle page has no expiry timer.
@@ -30,3 +31,14 @@ The [Session API documentation](../lib/session.ex) owns the bulk termination
 contract and the `subscribe_terminations/0` notification contract. The host's
 [Live navigation documentation](../../../web/docs/navigation.md) describes
 how session termination affects open pages.
+
+The Web authentication edge calls `touch_session/2` only after validating the
+session identity, including authenticated LiveView events and live-patch
+navigation. Component-targeted events reach the authenticated host through
+Base UI's shared component event wrapper. These use the server-held session
+identity, so a continuously used LiveView refreshes activity without requiring
+a remount. The `touch_session/2` documentation in `lib/session.ex` owns the
+update and audit policy. `session.last_activity_touch_minutes` is an operator
+setting, capped at half the session lifetime so an active session is refreshed
+before it can expire. Session keeps this lifecycle independent of Web and Core
+User.
