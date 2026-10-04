@@ -6,8 +6,6 @@ ExUnit.start()
 alias Bilimbi.Base.Queue
 alias Bilimbi.Base.Repo
 
-Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()
-
 unless Oban.whereis(Queue.oban_config()[:name]) do
   raise "the supervised Base Queue runtime did not start"
 end

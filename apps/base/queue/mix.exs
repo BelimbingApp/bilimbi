@@ -54,6 +54,7 @@ defmodule Bilimbi.Base.Queue.MixProject do
     [
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
         "test"
       ]
     ]

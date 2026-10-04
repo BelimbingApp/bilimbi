@@ -9,7 +9,6 @@ Code.ensure_loaded!(Bilimbi.Core.Company.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Employee.TestFixtures)
 
 ExUnit.start()
-Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()
 Ecto.Adapters.SQL.Sandbox.mode(Bilimbi.Base.Repo, :manual)
 
 pubsub_server = Bilimbi.Core.User.TestPubSub

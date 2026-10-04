@@ -93,6 +93,7 @@ defmodule Bilimbi.Web.MixProject do
       setup: ["deps.get", "assets.setup", "assets.build"],
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
         "test"
       ],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
