@@ -4,13 +4,29 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
+  alias Bilimbi.Core.Geonames.Web.CamelList
 
   import Bilimbi.Core.Geonames.Web.Components
 
   @page_sizes [25, 50, 100, 300]
-  @sorts ~w(iso country capital phone currency_code population updated_at)
-  @initial_directions %{"population" => "desc", "updated_at" => "desc"}
+  @list ListState.spec!(
+          sortable: %{
+            iso: :asc,
+            country: :asc,
+            capital: :asc,
+            phone: :asc,
+            currency_code: :asc,
+            population: :desc,
+            updated_at: :desc
+          },
+          default_sort: :country,
+          page_sizes: @page_sizes,
+          default_page_size: 25,
+          page_size_param: "perPage",
+          invalid_page_size: :default
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -23,7 +39,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    {:noreply, load_page(socket, CamelList.parse(params, @list))}
   end
 
   @impl true
@@ -46,27 +62,20 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   def handle_event("filters", %{"filters" => filters}, socket) do
-    state =
-      socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
-      |> Map.put(:page, 1)
-
+    state = CamelList.apply_filters(socket.assigns.index_state, filters)
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: countries_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = ListState.next_sort(socket.assigns.index_state, sort_by)
+    {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(
-        socket.assigns.index_state,
-        :page,
-        bounded_page(page, socket.assigns.countries_page)
-      )
+      socket.assigns.index_state
+      |> ListState.put_page(page)
+      |> ListState.clamp_to_last_page(socket.assigns.countries_page, empty: :reset)
 
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
@@ -176,30 +185,15 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
           </:actions>
         </.header>
 
-        <.form
-          for={@filters_form}
-          id="countries-filters"
-          phx-change="filters"
-          class="mb-2"
-        >
-          <div class="relative">
-            <.icon
-              name="search"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="countries-search"
-              type="search"
-              phx-debounce="300"
-              label="Search countries"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by country name or ISO code..."
-              class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="countries-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="countries-search"
+            label="Search countries"
+            placeholder="Search by country name or ISO code..."
+          />
+        </.filter_toolbar>
 
         <.card id="countries-card" inner_class="p-0">
 
@@ -272,85 +266,22 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
       Geonames.page_countries(%{
         search: state.search,
         page: state.page,
-        page_size: state.per_page,
+        page_size: state.page_size,
         sort_by: state.sort_by,
         sort_dir: state.sort_dir
       })
-
-    state = %{state | page: countries_page.page, per_page: countries_page.page_size}
 
     socket
     |> assign(:page_title, "Countries")
     |> assign(:page_sizes, @page_sizes)
     |> assign(:countries_page, countries_page)
-    |> assign(
-      :filters_form,
-      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
-    )
+    |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> stream(:countries, countries_page.entries, reset: true)
   end
 
-  defp state_from_params(params) do
-    sort_by = normalize_sort(Map.get(params, "sortBy"))
-
-    %{
-      search: Map.get(params, "search", ""),
-      page: parse_page(Map.get(params, "page")),
-      per_page: normalize_page_size(Map.get(params, "perPage")),
-      sort_by: sort_by,
-      sort_dir: normalize_direction(Map.get(params, "sortDir"), sort_by)
-    }
-  end
-
-  defp next_sort(state, sort_by) do
-    sort_by = normalize_sort(sort_by)
-
-    %{
-      state
-      | page: 1,
-        sort_by: sort_by,
-        sort_dir:
-          if(state.sort_by == sort_by,
-            do: flip_direction(state.sort_dir),
-            else: default_direction(sort_by)
-          )
-    }
-  end
-
   defp countries_path(state) do
-    ~p"/geonames/countries?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
-  end
-
-  defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
-  defp normalize_sort(_sort_by), do: "country"
-
-  defp normalize_direction(direction, _sort_by) when direction in ["asc", "desc"], do: direction
-  defp normalize_direction(_direction, sort_by), do: default_direction(sort_by)
-
-  defp default_direction(sort_by), do: Map.get(@initial_directions, sort_by, "asc")
-  defp flip_direction("asc"), do: "desc"
-  defp flip_direction(_direction), do: "asc"
-
-  defp normalize_page_size(value) do
-    value = parse_page(value)
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= value))
-  end
-
-  defp parse_page(value) when is_integer(value) and value > 0, do: value
-
-  defp parse_page(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {page, ""} when page > 0 -> page
-      _other -> 1
-    end
-  end
-
-  defp parse_page(_value), do: 1
-
-  defp bounded_page(value, page) do
-    page_number = parse_page(value)
-    max(page.total_pages, 1) |> min(page_number) |> max(1)
+    ~p"/geonames/countries?#{CamelList.to_params(state)}"
   end
 
   # A fallback is NOT an update. `:fallback` means the download failed and the

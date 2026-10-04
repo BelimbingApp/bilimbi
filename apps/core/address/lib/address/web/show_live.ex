@@ -38,6 +38,10 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.Layouts
+  alias Bilimbi.Core.Address.LocationSuggestion
+  alias Bilimbi.Core.Address.Web.LocationFields
+
+  import LocationFields
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Geonames
@@ -85,7 +89,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                owner_sort_dir: sort_dir
              ) do
         company_context_id = resolve_company_context(scope, address, params["company"])
-        countries = Geonames.list_countries()
+        country_options = Geonames.country_options()
 
         {:ok,
          socket
@@ -95,7 +99,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
          |> assign(:address, address)
          |> assign(:can_update?, allowed?(current_scope, "admin.address.update"))
          |> assign(:company_context_id, company_context_id)
-         |> assign(:countries, countries)
+         |> assign(:country_options, country_options)
          |> assign(:linked_sort_by, sort_by)
          |> assign(:linked_sort_dir, sort_dir)
          |> CommitStatus.init()
@@ -239,69 +243,20 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
      |> assign_location_form(socket.assigns.address)}
   end
 
-  def handle_event("validate_location", %{"location" => params}, socket) do
-    country_iso = normalize_param(params["country_iso"])
-    postcode = normalize_param(params["postcode"])
-    locality = normalize_param(params["locality"])
-    admin1_code = normalize_param(params["admin1_code"])
-
-    admin1_options =
-      if country_iso, do: Geonames.list_admin1(country_iso), else: []
-
-    postcode_options =
-      if country_iso && postcode && String.length(postcode) >= 2 do
-        Geonames.search_postcodes(country_iso, postcode)
-      else
-        []
-      end
-
-    matches =
-      if country_iso && postcode do
-        Geonames.lookup_postcode(country_iso, postcode)
-      else
-        []
-      end
-
-    localities = matches |> Enum.map(& &1.place_name) |> Enum.reject(&blank?/1) |> Enum.uniq()
-    auto_admin1 = matching_admin1_code(country_iso, matches)
-    auto_locality = if length(localities) == 1, do: hd(localities), else: nil
-
-    locality_options =
-      if country_iso && locality && String.length(locality) >= 2 do
-        Enum.uniq(localities ++ Geonames.search_city_names(country_iso, locality))
-      else
-        localities
-      end
-
-    effective_admin1 =
-      cond do
-        admin1_code != nil and admin1_code != "" -> admin1_code
-        auto_admin1 != nil -> auto_admin1
-        true -> nil
-      end
-
-    effective_locality =
-      cond do
-        locality != nil and locality != "" -> locality
-        auto_locality != nil -> auto_locality
-        true -> locality
-      end
-
-    merged_params = %{
-      "country_iso" => country_iso || "",
-      "admin1_code" => effective_admin1 || "",
-      "postcode" => postcode || "",
-      "locality" => effective_locality || ""
-    }
+  def handle_event("validate_location", %{"location" => incoming}, socket) do
+    {params, auto_location} =
+      LocationSuggestion.suggest(
+        incoming,
+        socket.assigns.location_params,
+        socket.assigns.auto_location
+      )
 
     {:noreply,
      socket
-     |> assign(:admin1_options, admin1_options)
-     |> assign(:postcode_options, postcode_options)
-     |> assign(:locality_options, locality_options)
-     |> assign(:auto_location, %{admin1_code: auto_admin1, locality: auto_locality})
-     |> assign(:location_params, merged_params)
-     |> assign(:location_form, to_form(merged_params, as: :location))}
+     |> assign(:auto_location, auto_location)
+     |> assign(:location_params, params)
+     |> assign(:location_form, to_form(params, as: :location))
+     |> assign_location_options(params)}
   end
 
   def handle_event("save_location", %{"location" => params}, socket) do
@@ -571,69 +526,19 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 phx-submit="save_location"
                 class="space-y-4"
               >
-                <div class="grid gap-x-4 sm:grid-cols-2">
-                  <.combobox
-                    field={@location_form[:country_iso]}
-                    id="address-location-country"
-                    label="Country"
-                    placeholder="Choose a country"
-                    options={country_options(@countries)}
-                  />
-                  <div>
-                    <.input
-                      field={@location_form[:admin1_code]}
-                      id="address-location-admin1"
-                      type="select"
-                      label="State or Province"
-                      prompt="Choose a division"
-                      options={admin1_options(@admin1_options)}
-                      disabled={@admin1_options == []}
-                    />
-                    <p
-                      :if={@auto_location.admin1_code}
-                      id="address-location-admin1-auto"
-                      class="-mt-2 mb-3 text-xs text-ink-subtle"
-                    >
-                      Suggested from postcode
-                    </p>
-                  </div>
-                </div>
-
-                <div class="grid gap-x-4 sm:grid-cols-2">
-                  <div>
-                    <.input
-                      field={@location_form[:postcode]}
-                      id="address-location-postcode"
-                      label="Postal Code"
-                      list="address-location-postcode-options"
-                      maxlength="255"
-                      disabled={blank?(@location_params["country_iso"])}
-                    />
-                    <datalist id="address-location-postcode-options">
-                      <option :for={postcode <- @postcode_options} value={postcode}></option>
-                    </datalist>
-                  </div>
-                  <div>
-                    <.input
-                      field={@location_form[:locality]}
-                      id="address-location-locality"
-                      label="Locality / City"
-                      list="address-location-locality-options"
-                      maxlength="255"
-                      disabled={blank?(@location_params["country_iso"])}
-                    />
-                    <datalist id="address-location-locality-options">
-                      <option :for={locality <- @locality_options} value={locality}></option>
-                    </datalist>
-                    <p
-                      :if={@auto_location.locality}
-                      id="address-location-locality-auto"
-                      class="-mt-2 mb-3 text-xs text-ink-subtle"
-                    >
-                      Suggested from postcode
-                    </p>
-                  </div>
-                </div>
+                <.location_fields
+                  form={@location_form}
+                  ids={location_field_ids()}
+                  country_options={@country_options}
+                  admin1_options={@admin1_options}
+                  postcode_options={@postcode_options}
+                  locality_options={@locality_options}
+                  auto={@auto_location}
+                  country_blank?={blank?(@location_params["country_iso"])}
+                  admin1_label="State or Province"
+                  postcode_label="Postal Code"
+                  locality_label="Locality / City"
+                />
 
                 <div class="flex items-center gap-3 pt-2">
                   <.button
@@ -917,36 +822,40 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   defp resolve_company_context(_scope, _address, _param), do: nil
 
   defp assign_location_form(socket, %Detail{} = address) do
-    country_iso = address.country_iso || ""
-    admin1_options = if country_iso != "", do: Geonames.list_admin1(country_iso), else: []
-
     data = %{
-      "country_iso" => country_iso,
+      "country_iso" => address.country_iso || "",
       "admin1_code" => address.admin1_code || "",
       "postcode" => address.postcode || "",
       "locality" => address.locality || ""
     }
 
     socket
-    |> assign(:admin1_options, admin1_options)
-    |> assign(:postcode_options, [])
-    |> assign(:locality_options, [])
-    |> assign(:auto_location, %{admin1_code: nil, locality: nil})
+    |> assign(:auto_location, %{admin1_code: false, locality: false})
     |> assign(:location_params, data)
     |> assign(:location_form, to_form(data, as: :location))
+    |> assign_location_options(data)
   end
 
-  defp matching_admin1_code(_country_iso, []), do: nil
+  defp assign_location_options(socket, params) do
+    options = LocationSuggestion.options(params)
 
-  defp matching_admin1_code(country_iso, [first | _rest]) do
-    raw_code = first.admin1_code
+    socket
+    |> assign(:admin1_options, options.admin1)
+    |> assign(:postcode_options, options.postcodes)
+    |> assign(:locality_options, options.localities)
+  end
 
-    country_iso
-    |> Geonames.list_admin1()
-    |> Enum.find_value(fn admin1 ->
-      if admin1.code == raw_code or String.ends_with?(admin1.code, ".#{raw_code}"),
-        do: admin1.code
-    end)
+  defp location_field_ids do
+    %{
+      country: "address-location-country",
+      admin1: "address-location-admin1",
+      postcode: "address-location-postcode",
+      locality: "address-location-locality",
+      postcode_list: "address-location-postcode-options",
+      locality_list: "address-location-locality-options",
+      admin1_auto: "address-location-admin1-auto",
+      locality_auto: "address-location-locality-auto"
+    }
   end
 
   defp normalize_param(nil), do: nil
@@ -975,12 +884,4 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   defp format_owner_type(:company), do: "Company"
   defp format_owner_type(:employee), do: "Employee"
   defp format_owner_type(other), do: other |> to_string() |> String.capitalize()
-
-  defp country_options(countries) do
-    Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-  end
-
-  defp admin1_options(admin1s) do
-    Enum.map(admin1s, &{&1.name, &1.code})
-  end
 end

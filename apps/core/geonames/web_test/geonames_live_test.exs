@@ -636,13 +636,24 @@ defmodule BilimbiWeb.GeonamesLiveTest do
           __changed__: %{},
           flash: %{},
           updating_countries?: true,
-          index_state: %{
-            search: "",
-            page: 1,
-            per_page: 25,
-            sort_by: :iso,
-            sort_dir: :asc
-          },
+          index_state:
+            Bilimbi.Core.Geonames.Web.CamelList.parse(
+              %{
+                "search" => "",
+                "page" => "1",
+                "perPage" => "25",
+                "sortBy" => "iso",
+                "sortDir" => "asc"
+              },
+              Bilimbi.Base.UI.ListState.spec!(
+                sortable: %{iso: :asc, country: :asc},
+                default_sort: :country,
+                page_sizes: [25, 50, 100, 300],
+                default_page_size: 25,
+                page_size_param: "perPage",
+                invalid_page_size: :default
+              )
+            ),
           streams: %{
             __changed__: MapSet.new(),
             __configured__: %{},

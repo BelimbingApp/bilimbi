@@ -26,11 +26,11 @@ defmodule Bilimbi.Core.Address.WebRoutesTest do
              },
              %{
                embed: "employee.addresses",
-               live_component: Bilimbi.Core.Address.Web.EmployeeAddressesPanel
+               live_component: Bilimbi.Core.Address.Web.AddressesPanel
              },
              %{
                embed: "company.addresses",
-               live_component: Bilimbi.Core.Address.Web.CompanyAddressesPanel
+               live_component: Bilimbi.Core.Address.Web.AddressesPanel
              }
            ]
   end

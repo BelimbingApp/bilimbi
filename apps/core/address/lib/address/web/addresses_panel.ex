@@ -1,49 +1,77 @@
-defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
+defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   @moduledoc """
-  Employee-page address panel, contributed as a discovered embed.
+  Address panel for a company or an employee, contributed as a discovered embed.
 
-  Core Address owns attachment state and every write on this panel; the
-  employee page renders it by the `"employee.addresses"` manifest key and
-  never names this module (#570). Ported behaviour-for-behaviour from the
-  employee show page's former inline section, which reached these operations
-  through `function_exported?` probing.
+  Both `"company.addresses"` and `"employee.addresses"` mount this component.
+  The page passes `company_id` or `employee_id` and never names this module.
+  An owner-specific twin is the copy this replaced: the capability, the noun,
+  the DOM-id prefix, and whether creating an address is offered are fields of
+  the owner, not a second LiveComponent. Creating and attaching is company-only.
 
   Visibility of the edit affordances uses the assign computed on update;
   every write re-evaluates the actor's current grants through `Authz.can/2`
-  (the #482/#541 pattern) — mount-time capability state is presentation, not
-  an authorization decision. Outcomes render through the shared
+  (the #482/#541/#610 pattern) — mount-time capability state is presentation,
+  not an authorization decision. Outcomes render through the shared
   `<.panel_notice>` because a LiveComponent cannot reach the page's flash
   without a parent contract; a completed write says `:success` there, as it
   would in the page's flash, an unlink whose link is already gone `:info`,
-  and a refusal or failure `:error`. While
-  the attach dialog is open the notice renders inside it instead of above the
-  cards: the page behind a modal dialog is inert, so a notice left outside
-  could be neither read nor dismissed. An unexpected failure recovered by
-  `Bilimbi.Base.UI` reports through the same notice for that reason.
+  and a refusal or failure `:error`. While one of
+  the panel's `<.modal>` dialogs is open the notice renders inside that
+  dialog instead of above the cards: the page behind a modal dialog is
+  inert, so a notice left outside could be neither read nor dismissed. An
+  unexpected failure recovered by `Bilimbi.Base.UI` reports through the same
+  notice for that reason.
+
+  Recorded divergence (#667, visual-lane disposition upheld on review): the
+  former inline section offered list search and rows-per-page; this panel,
+  like its #575 employee twin, has neither — every attached address renders
+  unpaged, so nothing is hidden, and search over the small attached set is
+  chrome, not capability. Restore both only if a real operator workflow
+  outgrows the full listing.
 
   The panel is one `<.card>` opened by the shared `<.section_heading>`, and
   the attached addresses are the shared `<.table>`, unframed inside it, with
-  the sort buttons addressed to this component. As on Belimbing's employee
-  page the label links to the address's read-first page, the kinds are a
-  choice fact whose read state is the trigger, the primary flag toggles on
-  click, priority commits on Enter or blur through `<.inline_edit>`, and
-  unlinking is a demoted icon action that confirms through the shared
-  `<.confirm_dialog>`, closed whatever the outcome so the notice reports it
-  above the table.
+  the sort buttons addressed to this component. As on Belimbing's
+  company-addresses partial the kinds are a choice fact whose read state is
+  the trigger, the primary flag toggles on click, priority commits on Enter or
+  blur through `<.inline_edit>`, and unlinking is a demoted icon action that
+  confirms through the shared `<.confirm_dialog>`, closed whatever the outcome
+  so the notice reports it above the table; the label opens the address's
+  read-first page carrying the company for the way back.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.LocationSuggestion
+  alias Bilimbi.Core.Address.Web.LocationFields
+  alias Bilimbi.Core.Geonames
 
-  @manage_capability "admin.employee.update"
-  @valid_address_kinds ~w(headquarters billing shipping branch other)
+  import Ecto.Changeset, only: [cast: 3, validate_length: 3, add_error: 4]
+  import LocationFields
 
   # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
   # state; the persistence event is `save_address_kinds`, which re-authorizes.
-  # There is no weaker capability for this handler to refuse.
+  # There is no weaker capability for this handler to refuse (#575 precedent).
   @write_guard_opt_out ~w(toggle_edit_kind)
+  @valid_address_kinds ~w(headquarters billing shipping branch other)
+
+  # The create-and-attach form's fields, cast as a schemaless changeset — the
+  # company page's inline create flow moved here whole (#595). Geonames resolves
+  # the cascading country/admin1/postcode/locality selects; core/address already
+  # declares the core/geonames edge, so nothing new lands on core/company.
+  @address_field_types %{
+    label: :string,
+    phone: :string,
+    line1: :string,
+    line2: :string,
+    line3: :string,
+    country_iso: :string,
+    admin1_code: :string,
+    postcode: :string,
+    locality: :string
+  }
 
   @impl true
   def mount(socket) do
@@ -58,19 +86,34 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
      |> assign(:selected_edit_kinds, [])
      |> assign(:addresses_sort_by, "label")
      |> assign(:addresses_sort_dir, "asc")
-     |> assign(:address_kinds, @valid_address_kinds)}
+     |> assign(:address_kinds, @valid_address_kinds)
+     # Create-and-attach flow (ported from the company page's inline section).
+     |> assign(:show_create_modal, false)
+     |> assign(:address_form, nil)
+     |> assign(:address_form_params, %{})
+     |> assign(:auto_location, %{admin1_code: false, locality: false})
+     |> assign(:admin1_options, [])
+     |> assign(:postcode_options, [])
+     |> assign(:locality_options, [])
+     |> assign(:create_address_kinds, [])
+     |> assign(:create_address_is_primary, false)
+     |> assign(:create_address_priority, 0)
+     |> assign(:country_options, [])}
   end
 
   @impl true
   def update(assigns, socket) do
+    owner = owner_profile(assigns)
+
     {:ok,
      socket
      |> assign(assigns)
-     |> assign(:can_manage?, allowed?(assigns.current_scope, @manage_capability))
+     |> assign(:owner, owner)
+     |> assign(:can_manage?, allowed?(assigns.current_scope, owner.capability))
      |> reload()}
   end
 
-  # --- Events (ported from the employee page's address section) ---
+  # --- Events (ported from the company page's address section) ---
 
   @impl true
   def handle_event("open_attach_modal", _params, socket) do
@@ -96,7 +139,6 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def handle_event("attach_address", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
       addr_params = params["address"] || params
       address_id_str = addr_params["address_id"] || ""
 
@@ -119,7 +161,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         address_id when is_integer(address_id) and address_id > 0 ->
           attrs = %{kind: kinds, is_primary: is_primary, priority: priority_int}
 
-          case Address.attach_to_employee(scope, address_id, socket.assigns.employee_id, attrs) do
+          case attach_to_owner(socket, address_id, attrs) do
             {:ok, :attached} ->
               {:noreply,
                socket
@@ -168,13 +210,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def handle_event("detach_address", _params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-
       case socket.assigns.pending_detach do
         %{id: address_id} ->
           socket = assign(socket, :pending_detach, nil)
 
-          case Address.detach_from_employee(scope, address_id, socket.assigns.employee_id) do
+          case detach_from_owner(socket, address_id) do
             :ok ->
               {:noreply, socket |> notice(:success, "Address unlinked.") |> reload()}
 
@@ -196,21 +236,12 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def handle_event("toggle_address_primary", %{"id" => address_id_str}, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-
       case parse_id(address_id_str) do
         address_id when is_integer(address_id) and address_id > 0 ->
           target_addr = Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id))
           new_primary = if target_addr, do: not target_addr.is_primary, else: true
 
-          case Address.update_employee_attachment(
-                 scope,
-                 address_id,
-                 socket.assigns.employee_id,
-                 %{
-                   is_primary: new_primary
-                 }
-               ) do
+          case update_owner_attachment(socket, address_id, %{is_primary: new_primary}) do
             {:ok, :updated} ->
               {:noreply, socket |> notice(:success, "Address setting updated.") |> reload()}
 
@@ -228,8 +259,6 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def handle_event("save_address_priority", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-
       address_id = params["id"] || params["address_id"]
 
       # The in-place editor sends whatever was typed; a value that is not a
@@ -242,9 +271,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
       case {parse_id(address_id), priority} do
         {id, {:ok, priority_int}} when is_integer(id) and id > 0 ->
-          case Address.update_employee_attachment(scope, id, socket.assigns.employee_id, %{
-                 priority: priority_int
-               }) do
+          case update_owner_attachment(socket, id, %{priority: priority_int}) do
             {:ok, :updated} ->
               {:noreply,
                socket
@@ -306,7 +333,6 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def handle_event("save_address_kinds", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
       address_id = socket.assigns.editing_kinds_address_id || params["address_id"] || params["id"]
 
       kinds =
@@ -317,9 +343,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
       case parse_id(address_id) do
         id when is_integer(id) and id > 0 ->
-          case Address.update_employee_attachment(scope, id, socket.assigns.employee_id, %{
-                 kind: kinds
-               }) do
+          case update_owner_attachment(socket, id, %{kind: kinds}) do
             {:ok, :updated} ->
               {:noreply,
                socket
@@ -337,10 +361,6 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
     else
       {:noreply, write_forbidden(socket)}
     end
-  end
-
-  def handle_event("clear_notice", _params, socket) do
-    {:noreply, assign(socket, :notice, nil)}
   end
 
   def handle_event("sort_addresses", params, socket) do
@@ -364,18 +384,160 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
      |> assign(:sorted_addresses, sorted)}
   end
 
+  # --- Create-and-attach: a new address made and linked in one step ---
+
+  def handle_event("open_create_modal", _params, %{assigns: %{owner: %{create?: false}}} = socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("open_create_modal", _params, socket) do
+    params = %{"country_iso" => "MY"}
+
+    {:noreply,
+     socket
+     |> assign(:notice, nil)
+     |> assign(:country_options, Geonames.country_options())
+     |> assign(:show_create_modal, true)
+     |> assign(:address_form_params, params)
+     |> assign(:auto_location, %{admin1_code: false, locality: false})
+     |> assign(:create_address_kinds, [])
+     |> assign(:create_address_is_primary, false)
+     |> assign(:create_address_priority, 0)
+     |> assign_address_form(address_form_changeset(params))
+     |> assign_address_location_options(params)}
+  end
+
+  def handle_event("close_create_modal", _params, socket) do
+    {:noreply, socket |> assign(:show_create_modal, false) |> assign(:address_form, nil)}
+  end
+
+  def handle_event(
+        "validate_create_address",
+        _params,
+        %{assigns: %{owner: %{create?: false}}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
+  def handle_event("validate_create_address", %{"address" => incoming}, socket) do
+    {params, auto_location} =
+      LocationSuggestion.suggest(
+        incoming,
+        socket.assigns.address_form_params,
+        socket.assigns.auto_location
+      )
+
+    kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
+    is_primary = incoming["is_primary"] in [true, "true", "1"]
+
+    priority =
+      case Integer.parse(incoming["priority"] || "0") do
+        {p, _} -> p
+        _ -> socket.assigns.create_address_priority
+      end
+
+    {:noreply,
+     socket
+     |> assign(:address_form_params, params)
+     |> assign(:auto_location, auto_location)
+     |> assign(:create_address_kinds, kinds)
+     |> assign(:create_address_is_primary, is_primary)
+     |> assign(:create_address_priority, priority)
+     |> assign_address_form(address_form_changeset(params))
+     |> assign_address_location_options(params)}
+  end
+
+  def handle_event("clear_notice", _params, socket) do
+    {:noreply, assign(socket, :notice, nil)}
+  end
+
+  def handle_event(
+        "save_create_address",
+        _params,
+        %{assigns: %{owner: %{create?: false}}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
+  def handle_event("save_create_address", %{"address" => incoming}, socket) do
+    if can_manage?(socket) do
+      {params, auto_location} =
+        LocationSuggestion.suggest(
+          incoming,
+          socket.assigns.address_form_params,
+          socket.assigns.auto_location
+        )
+
+      changeset = address_form_changeset(params)
+      scope = socket.assigns.current_scope.scope
+
+      if changeset.valid? do
+        kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
+        is_primary = incoming["is_primary"] in [true, "true", "1"]
+
+        priority =
+          case Integer.parse(incoming["priority"] || "0") do
+            {p, _} -> p
+            _ -> socket.assigns.create_address_priority
+          end
+
+        attachment_attrs = %{
+          kind: kinds,
+          is_primary: is_primary,
+          priority: priority,
+          valid_from: Date.utc_today()
+        }
+
+        case Address.create_and_attach_to_company(
+               scope,
+               socket.assigns.owner.id,
+               params,
+               attachment_attrs
+             ) do
+          {:ok, _address} ->
+            {:noreply,
+             socket
+             |> notice(:success, "Address created and attached.")
+             |> assign(:show_create_modal, false)
+             |> assign(:address_form, nil)
+             |> reload()}
+
+          {:error, %Ecto.Changeset{} = domain_changeset} ->
+            {:noreply,
+             socket
+             |> assign(:address_form_params, params)
+             |> assign(:auto_location, auto_location)
+             |> assign_address_form(copy_address_domain_errors(changeset, domain_changeset))
+             |> assign_address_location_options(params)}
+
+          {:error, reason} ->
+            {:noreply, notice(socket, :error, "Failed to create address: #{inspect(reason)}")}
+        end
+      else
+        {:noreply,
+         socket
+         |> assign(:address_form_params, params)
+         |> assign(:auto_location, auto_location)
+         |> assign_address_form(changeset)
+         |> assign_address_location_options(params)}
+      end
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
   # --- Data & helpers ---
 
   defp reload(socket) do
     scope = socket.assigns.current_scope.scope
-    employee_id = socket.assigns.employee_id
+    owner = socket.assigns.owner
 
-    # Deliberately strict: the page resolved this employee before rendering the
+    # Deliberately strict: the page resolved this owner before rendering the
     # panel, so a non-ok here is infrastructure failure or a mid-session
     # deletion — raising reaches the recovery boundary instead of rendering a
     # broken section as an empty one (#409).
-    {:ok, attached} = Address.list_employee_attached_addresses(scope, employee_id)
-    {:ok, available} = Address.list_available_employee_addresses(scope, employee_id)
+    {:ok, attached} = list_attached(owner, scope)
+    {:ok, available} = list_available(owner, scope)
 
     sorted =
       sort_addresses(
@@ -391,25 +553,61 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   end
 
   defp can_manage?(socket) do
-    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+    Authz.can(socket.assigns.current_scope.actor, socket.assigns.owner.capability).allowed
   end
 
   defp write_forbidden(socket) do
     socket
     |> assign(:can_manage?, false)
-    |> notice(:error, "You do not have permission to edit employees.")
+    |> notice(:error, socket.assigns.owner.forbidden)
   end
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
 
   def report_action_failure(socket, message), do: notice(socket, :error, message)
 
+  defp assign_address_location_options(socket, params) do
+    options = LocationSuggestion.options(params)
+
+    socket
+    |> assign(:admin1_options, options.admin1)
+    |> assign(:postcode_options, options.postcodes)
+    |> assign(:locality_options, options.localities)
+  end
+
+  defp address_form_changeset(params) do
+    {%{}, @address_field_types}
+    |> cast(params, Map.keys(@address_field_types))
+    |> validate_length(:label, max: 255)
+    |> validate_length(:phone, max: 255)
+    |> validate_length(:locality, max: 255)
+    |> validate_length(:postcode, max: 255)
+    |> validate_length(:country_iso, is: 2)
+    |> validate_length(:admin1_code, max: 20)
+    |> Map.put(:action, :validate)
+  end
+
+  defp copy_address_domain_errors(form_changeset, %Ecto.Changeset{} = domain_changeset) do
+    domain_changeset.errors
+    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
+      if Map.has_key?(@address_field_types, field),
+        do: add_error(acc, field, message, opts),
+        else: acc
+    end)
+    |> Map.put(:action, :insert)
+  end
+
+  defp assign_address_form(socket, %Ecto.Changeset{} = changeset),
+    do: assign(socket, :address_form, to_form(changeset, as: :address))
+
+  defp blank?(value), do: is_nil(value) or (is_binary(value) and String.trim(value) == "")
+
   @impl true
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
       <.panel_notice
-        :if={@notice && not @show_attach_modal}
+        :if={@notice && not @show_attach_modal && not @show_create_modal}
         id={"#{@id}-notice"}
         kind={elem(@notice, 0)}
         on_dismiss={JS.push("clear_notice", target: @myself)}
@@ -421,10 +619,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         id="addresses-card"
         inner_class="p-5 sm:p-6"
         role="region"
-        aria-labelledby="employee-addresses-heading"
+        aria-labelledby={"#{@owner.prefix}-addresses-heading"}
       >
         <.section_heading
-          id="employee-addresses-heading"
+          id={"#{@owner.prefix}-addresses-heading"}
           title="Addresses"
           count={length(@attached_addresses)}
         >
@@ -435,10 +633,22 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 JS.push("lv:clear-flash")
                 |> JS.push("open_attach_modal", target: @myself)
               }
-              variant="primary"
+              {attach_button_variant(@owner)}
               class="text-xs px-2.5 py-1"
             >
               <.icon name="create" class="size-3.5" /> <span>Attach Address</span>
+            </.button>
+            <.button
+              :if={@owner.create?}
+              id="btn-open-create-address"
+              phx-click={
+                JS.push("lv:clear-flash")
+                |> JS.push("open_create_modal", target: @myself)
+              }
+              variant="primary"
+              class="text-xs px-2.5 py-1"
+            >
+              <.icon name="create" class="size-3.5" /> <span>Create &amp; Attach</span>
             </.button>
           </:actions>
         </.section_heading>
@@ -452,14 +662,14 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
           sort_event="sort_addresses"
           sort_target={@myself}
           framed={false}
-          caption="Employee addresses"
+          caption={@owner.caption}
         >
           <:col :let={addr} label="Label" sort="label">
-            <%!-- The label opens the address's own read-first page, as
-                 Belimbing's employee addresses table links it. --%>
+            <%!-- The label opens the address's own read-first page. A company
+                 link carries the company so that page can offer the way back. --%>
             <.link
               id={"address-link-#{addr.id}"}
-              navigate={~p"/addresses/#{addr.id}"}
+              navigate={address_back_path(@owner, addr)}
               class="font-medium text-action hover:underline"
             >
               {addr.label || "Address #{addr.id}"}
@@ -602,11 +812,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
           <:empty
             :if={@sorted_addresses == []}
             title="No addresses linked."
-            reason={
-              if @can_manage?,
-                do: "Attach one of the company's addresses to this employee.",
-                else: "An operator who can edit employees can attach one."
-            }
+            reason={if @can_manage?, do: @owner.empty_manage, else: @owner.empty_read}
           />
         </.table>
       </.card>
@@ -616,7 +822,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         title="Attach Address"
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
-        <:description>Select an address from the company to attach to this employee.</:description>
+        <:description>{@owner.attach_description}</:description>
         <.panel_notice
           :if={@notice}
           id={"#{@id}-notice"}
@@ -635,16 +841,16 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         >
           <div>
             <label
-              for="employee-attach-address"
+              for={"#{@owner.prefix}-attach-address"}
               class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
             >
               Address
             </label>
 
             <select
-              id="employee-attach-address"
+              id={"#{@owner.prefix}-attach-address"}
               name="address[address_id]"
-              class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+              class="w-full rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
             >
               <option value="">Select an address...</option>
 
@@ -669,7 +875,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
               <%= for k <- @address_kinds do %>
                 <label class="flex items-center gap-2 text-xs text-ink cursor-pointer">
                   <input
-                    id={"employee-attach-kind-#{k}"}
+                    id={"#{@owner.prefix}-attach-kind-#{k}"}
                     type="checkbox"
                     name="address[kinds][]"
                     value={k}
@@ -682,14 +888,14 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
           <div class="flex items-center gap-2">
             <input
-              id="employee-attach-is-primary"
+              id={"#{@owner.prefix}-attach-is-primary"}
               type="checkbox"
               name="address[is_primary]"
               value="true"
               class="rounded border-line"
             />
             <label
-              for="employee-attach-is-primary"
+              for={"#{@owner.prefix}-attach-is-primary"}
               class="text-xs font-medium text-ink cursor-pointer"
             >
               Primary Address
@@ -698,19 +904,19 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
           <div>
             <label
-              for="employee-attach-priority"
+              for={"#{@owner.prefix}-attach-priority"}
               class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
             >
               Priority
             </label>
 
             <input
-              id="employee-attach-priority"
+              id={"#{@owner.prefix}-attach-priority"}
               type="number"
               name="address[priority]"
               value="0"
               min="0"
-              class="w-24 rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+              class="w-24 rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
             />
             <p class="text-xs text-ink-subtle mt-1">
               Lower number = higher priority. Used to order addresses of the same kind (0 = top).
@@ -739,10 +945,125 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         </.form>
       </.modal>
 
+      <%!-- Create & attach: a new address made and linked in one step (#595). --%>
+      <.modal
+        :if={@show_create_modal}
+        id="company-create-address-modal"
+        title="Create & Attach Address"
+        width={:wide}
+        on_cancel={JS.push("close_create_modal", target: @myself)}
+      >
+        <.panel_notice
+          :if={@notice}
+          id={"#{@id}-notice"}
+          kind={elem(@notice, 0)}
+          on_dismiss={JS.push("clear_notice", target: @myself)}
+          class="mb-3"
+        >
+          {elem(@notice, 1)}
+        </.panel_notice>
+        <.form
+          for={@address_form}
+          id="create-attach-address-form"
+          phx-change="validate_create_address"
+          phx-submit="save_create_address"
+          phx-target={@myself}
+          class="mt-4 space-y-4"
+        >
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <.input field={@address_form[:label]} id="create-address-label" label="Label" />
+            <.input field={@address_form[:phone]} id="create-address-phone" label="Phone" type="tel" />
+          </div>
+
+          <.input field={@address_form[:line1]} id="create-address-line1" label="Address Line 1" />
+          <.input field={@address_form[:line2]} id="create-address-line2" label="Address Line 2" />
+          <.input field={@address_form[:line3]} id="create-address-line3" label="Address Line 3" />
+
+          <.location_fields
+            form={@address_form}
+            ids={create_location_ids()}
+            country_options={@country_options}
+            admin1_options={@admin1_options}
+            postcode_options={@postcode_options}
+            locality_options={@locality_options}
+            auto={@auto_location}
+            country_blank?={blank?(@address_form_params["country_iso"])}
+            admin1_label="State / Province"
+            admin1_prompt="Select state..."
+          />
+
+          <div class="border-t border-line pt-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle mb-3">
+              Link Settings
+            </h4>
+            <div class="space-y-3">
+              <div>
+                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                  Kind
+                </span>
+                <div class="flex flex-wrap gap-4">
+                  <label
+                    :for={kind <- @address_kinds}
+                    class="flex items-center gap-2 text-sm text-ink cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      name="address[kinds][]"
+                      value={kind}
+                      checked={kind in @create_address_kinds}
+                      class="rounded border-line text-action focus:ring-brand-strong/30"
+                    />
+                    {String.capitalize(kind)}
+                  </label>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm text-ink cursor-pointer mt-6">
+                  <input
+                    type="checkbox"
+                    name="address[is_primary]"
+                    value="true"
+                    checked={@create_address_is_primary}
+                    class="rounded border-line text-action focus:ring-brand-strong/30"
+                  /> Primary Address
+                </label>
+
+                <div>
+                  <label
+                    for="create-address-priority"
+                    class="mb-1.5 block text-sm font-medium text-ink"
+                  >
+                    Priority
+                  </label>
+                  <input
+                    type="number"
+                    name="address[priority]"
+                    id="create-address-priority"
+                    value={@create_address_priority}
+                    min="0"
+                    class="w-28 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-line">
+            <.button type="button" phx-click="close_create_modal" phx-target={@myself}>
+              Cancel
+            </.button>
+            <.button id="btn-submit-create-address" type="submit" variant="primary">
+              Create &amp; Attach
+            </.button>
+          </div>
+        </.form>
+      </.modal>
+
       <.confirm_dialog
         :if={@pending_detach}
         id="unlink-address-confirm"
-        consequence={"#{address_name(@pending_detach)} will be unlinked from this employee."}
+        consequence={"#{address_name(@pending_detach)} will be unlinked from this #{@owner.noun}."}
         detail="The address itself is kept and can be attached again."
         confirm="Unlink"
         working="Unlinking…"
@@ -755,6 +1076,105 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   defp address_name(%{label: label}) when is_binary(label) and label != "", do: "“#{label}”"
   defp address_name(_address), do: "This address"
+
+  defp create_location_ids do
+    %{
+      country: "create-address-country-iso",
+      admin1: "create-address-admin1-code",
+      postcode: "create-address-postcode",
+      locality: "create-address-locality",
+      postcode_list: "create-address-postcode-options",
+      locality_list: "create-address-locality-options",
+      admin1_auto: "create-address-admin1-auto",
+      locality_auto: "create-address-locality-auto"
+    }
+  end
+
+  defp owner_profile(%{company_id: id}) when is_integer(id) and id > 0 do
+    %{
+      kind: :company,
+      id: id,
+      capability: "admin.company.update",
+      prefix: "company",
+      noun: "company",
+      caption: "Company addresses",
+      create?: true,
+      attach_variant: nil,
+      forbidden: "You do not have permission to edit companies.",
+      empty_manage: "Attach an existing address, or create one and attach it.",
+      empty_read: "An operator who can edit companies can attach one.",
+      attach_description: "Select an address to attach to this company."
+    }
+  end
+
+  defp owner_profile(%{employee_id: id}) when is_integer(id) and id > 0 do
+    %{
+      kind: :employee,
+      id: id,
+      capability: "admin.employee.update",
+      prefix: "employee",
+      noun: "employee",
+      caption: "Employee addresses",
+      create?: false,
+      attach_variant: "primary",
+      forbidden: "You do not have permission to edit employees.",
+      empty_manage: "Attach one of the company's addresses to this employee.",
+      empty_read: "An operator who can edit employees can attach one.",
+      attach_description: "Select an address from the company to attach to this employee."
+    }
+  end
+
+  defp attach_button_variant(%{attach_variant: variant}) when is_binary(variant),
+    do: %{variant: variant}
+
+  defp attach_button_variant(_owner), do: %{}
+
+  defp address_back_path(%{kind: :company, id: id}, addr),
+    do: ~p"/addresses/#{addr.id}?company=#{id}"
+
+  defp address_back_path(_owner, addr), do: ~p"/addresses/#{addr.id}"
+
+  defp attach_to_owner(socket, address_id, attrs) do
+    scope = socket.assigns.current_scope.scope
+
+    case socket.assigns.owner do
+      %{kind: :company, id: id} -> Address.attach_to_company(scope, address_id, id, attrs)
+      %{kind: :employee, id: id} -> Address.attach_to_employee(scope, address_id, id, attrs)
+    end
+  end
+
+  defp detach_from_owner(socket, address_id) do
+    scope = socket.assigns.current_scope.scope
+
+    case socket.assigns.owner do
+      %{kind: :company, id: id} -> Address.detach_from_company(scope, address_id, id)
+      %{kind: :employee, id: id} -> Address.detach_from_employee(scope, address_id, id)
+    end
+  end
+
+  defp update_owner_attachment(socket, address_id, attrs) do
+    scope = socket.assigns.current_scope.scope
+
+    case socket.assigns.owner do
+      %{kind: :company, id: id} ->
+        Address.update_company_attachment(scope, address_id, id, attrs)
+
+      %{kind: :employee, id: id} ->
+        Address.update_employee_attachment(scope, address_id, id, attrs)
+    end
+  end
+
+  defp list_attached(%{kind: :company, id: id}, scope),
+    do: Address.list_company_attached_addresses(scope, id)
+
+  defp list_attached(%{kind: :employee, id: id}, scope),
+    do: Address.list_employee_attached_addresses(scope, id)
+
+  defp list_available(%{kind: :company, id: id}, scope),
+    do: Address.list_available_company_addresses(scope, id)
+
+  defp list_available(%{kind: :employee, id: id}, scope),
+    do: Address.list_available_employee_addresses(scope, id)
 
   attr(:kinds, :list, required: true)
 

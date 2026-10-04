@@ -4,15 +4,39 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
+  alias Bilimbi.Core.Geonames.Web.CamelList
 
   import Bilimbi.Core.Geonames.Web.Components
 
   @page_sizes [25, 50, 100, 300]
-  @sorts ~w(country_name postcode place_name admin1_code updated_at)
-  @summary_sorts ~w(country_name country_iso record_count)
-  @initial_directions %{"updated_at" => "desc"}
-  @summary_initial_directions %{"record_count" => "desc"}
+  @list ListState.spec!(
+          sortable: %{
+            country_name: :asc,
+            postcode: :asc,
+            place_name: :asc,
+            admin1_code: :asc,
+            updated_at: :desc
+          },
+          default_sort: :country_name,
+          page_sizes: @page_sizes,
+          default_page_size: 25,
+          page_size_param: "perPage",
+          invalid_page_size: :default
+        )
+  @summary ListState.spec!(
+             sortable: %{
+               country_name: :asc,
+               country_iso: :asc,
+               record_count: :desc
+             },
+             default_sort: :country_name,
+             page_sizes: @page_sizes,
+             default_page_size: 25,
+             page_size_param: "perPage",
+             invalid_page_size: :default
+           )
   @update_capability "admin.geonames.update"
 
   @impl true
@@ -30,39 +54,33 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    {:noreply, load_page(socket, parse_index(params), parse_summary(params))}
   end
 
   @impl true
   def handle_event("filters", %{"filters" => filters}, socket) do
-    state =
-      socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
-      |> Map.put(:page, 1)
-
-    {:noreply, push_patch(socket, to: postcodes_path(state))}
+    state = CamelList.apply_filters(socket.assigns.index_state, filters)
+    {:noreply, push_patch(socket, to: postcodes_path(state, socket.assigns.summary_state))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: postcodes_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = ListState.next_sort(socket.assigns.index_state, sort_by)
+    {:noreply, push_patch(socket, to: postcodes_path(state, socket.assigns.summary_state))}
   end
 
   def handle_event("sort-summary", %{"sort" => sort_by}, socket) do
-    state = next_summary_sort(socket.assigns.index_state, sort_by)
-    {:noreply, push_patch(socket, to: postcodes_path(state))}
+    summary = ListState.next_sort(socket.assigns.summary_state, sort_by)
+
+    {:noreply, push_patch(socket, to: postcodes_path(socket.assigns.index_state, summary))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(
-        socket.assigns.index_state,
-        :page,
-        bounded_page(page, socket.assigns.postcodes_page)
-      )
+      socket.assigns.index_state
+      |> ListState.put_page(page)
+      |> ListState.clamp_to_last_page(socket.assigns.postcodes_page, empty: :reset)
 
-    {:noreply, push_patch(socket, to: postcodes_path(state))}
+    {:noreply, push_patch(socket, to: postcodes_path(state, socket.assigns.summary_state))}
   end
 
   def handle_event("new-postcode", _params, socket) do
@@ -75,7 +93,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
      |> assign(:modal_action, :new)
      |> assign(:editing_postcode_id, nil)
      |> assign(:editing_revision, nil)
-     |> assign(:admin1_options, admin1_options(default_country))
+     |> assign(:admin1_options, Geonames.admin1_options(default_country))
      |> assign_postcode_form(Geonames.change_postcode(attrs))}
   end
 
@@ -95,7 +113,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
              |> assign(:modal_action, :edit)
              |> assign(:editing_postcode_id, postcode.id)
              |> assign(:editing_revision, postcode.revision)
-             |> assign(:admin1_options, admin1_options(postcode.country_iso))
+             |> assign(:admin1_options, Geonames.admin1_options(postcode.country_iso))
              |> assign_postcode_form(Geonames.change_postcode(attrs))}
         end
 
@@ -118,7 +136,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
     {:noreply,
      socket
-     |> assign(:admin1_options, admin1_options(country_iso))
+     |> assign(:admin1_options, Geonames.admin1_options(country_iso))
      |> assign_postcode_form(changeset)}
   end
 
@@ -189,8 +207,8 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             id="postcodes-country-summary-rows"
             rows={@postcode_country_summaries}
             row_id={fn summary -> "postcode-country-#{summary.country_iso}" end}
-            sort_by={@index_state.summary_sort_by}
-            sort_dir={@index_state.summary_sort_dir}
+            sort_by={@summary_state.sort_by}
+            sort_dir={@summary_state.sort_dir}
             sort_event="sort-summary"
             framed={false}
           >
@@ -206,30 +224,15 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
           </.table>
         </.card>
 
-        <.form
-          for={@filters_form}
-          id="postcodes-filters"
-          phx-change="filters"
-          class="mb-2"
-        >
-          <div class="relative">
-            <.icon
-              name="search"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="postcodes-search"
-              type="search"
-              phx-debounce="300"
-              label="Search postcodes"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by postcode, place name, or country..."
-              class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="postcodes-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="postcodes-search"
+            label="Search postcodes"
+            placeholder="Search by postcode, place name, or country..."
+          />
+        </.filter_toolbar>
 
         <.card id="postcodes-card" inner_class="p-0">
 
@@ -330,7 +333,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                   type="select"
                   label="Country"
                   prompt="Select country..."
-                  options={country_options(@countries)}
+                  options={Geonames.country_options(@countries)}
                   required
                 />
                 <.input
@@ -399,23 +402,22 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     """
   end
 
-  defp load_page(socket, state) do
+  defp load_page(socket, state, summary) do
     postcodes_page =
       Geonames.page_postcodes(%{
         search: state.search,
         page: state.page,
-        page_size: state.per_page,
+        page_size: state.page_size,
         sort_by: state.sort_by,
         sort_dir: state.sort_dir
       })
 
     postcode_country_summaries =
       Geonames.list_postcode_country_summaries(%{
-        sort_by: state.summary_sort_by,
-        sort_dir: state.summary_sort_dir
+        sort_by: summary.sort_by,
+        sort_dir: summary.sort_dir
       })
 
-    state = %{state | page: postcodes_page.page, per_page: postcodes_page.page_size}
     countries = Geonames.list_countries()
 
     socket
@@ -425,11 +427,9 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     |> assign(:postcode_country_summaries, postcode_country_summaries)
     |> assign(:countries, countries)
     |> assign(:postcode_rows, Map.new(postcodes_page.entries, &{&1.id, &1}))
-    |> assign(
-      :filters_form,
-      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
-    )
+    |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
+    |> assign(:summary_state, summary)
     |> stream(:postcodes, postcodes_page.entries, reset: true)
   end
 
@@ -461,7 +461,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
          socket
          |> close_postcode_modal()
          |> put_flash(:success, message)
-         |> load_page(socket.assigns.index_state)}
+         |> load_page(socket.assigns.index_state, socket.assigns.summary_state)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_postcode_form(socket, Map.put(changeset, :action, :insert))}
@@ -474,14 +474,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
            :error,
            "Postcode changed while you were editing. Review the current values and try again."
          )
-         |> load_page(socket.assigns.index_state)}
+         |> load_page(socket.assigns.index_state, socket.assigns.summary_state)}
 
       {:error, :not_found} ->
         {:noreply,
          socket
          |> close_postcode_modal()
          |> put_flash(:error, "Postcode is no longer available.")
-         |> load_page(socket.assigns.index_state)}
+         |> load_page(socket.assigns.index_state, socket.assigns.summary_state)}
     end
   end
 
@@ -504,7 +504,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
            :error,
            "Postcode changed elsewhere. Review the current value and try again."
          )
-         |> load_page(socket.assigns.index_state)}
+         |> load_page(socket.assigns.index_state, socket.assigns.summary_state)}
 
       _other ->
         write_failed(socket)
@@ -557,16 +557,6 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     end)
   end
 
-  defp country_options(countries), do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-
-  defp admin1_options(nil), do: []
-
-  defp admin1_options(country_iso) do
-    country_iso
-    |> Geonames.list_admin1()
-    |> Enum.map(&{"#{&1.name} (#{&1.code})", &1.code})
-  end
-
   defp positive_id(id) when is_integer(id) and id > 0, do: {:ok, id}
 
   defp positive_id(id) when is_binary(id) do
@@ -578,96 +568,22 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   defp positive_id(_id), do: :error
 
-  defp state_from_params(params) do
-    sort_by = normalize_sort(Map.get(params, "sortBy"))
-    summary_sort_by = normalize_summary_sort(Map.get(params, "summarySortBy"))
+  defp parse_index(params), do: CamelList.parse(params, @list)
 
-    %{
-      search: Map.get(params, "search", ""),
-      page: parse_page(Map.get(params, "page")),
-      per_page: normalize_page_size(Map.get(params, "perPage")),
-      sort_by: sort_by,
-      sort_dir: normalize_direction(Map.get(params, "sortDir"), sort_by),
-      summary_sort_by: summary_sort_by,
-      summary_sort_dir:
-        normalize_summary_direction(Map.get(params, "summarySortDir"), summary_sort_by)
-    }
+  defp parse_summary(params) do
+    params
+    |> Map.put("sort_by", Map.get(params, "summarySortBy"))
+    |> Map.put("sort_dir", Map.get(params, "summarySortDir"))
+    |> ListState.parse(@summary)
   end
 
-  defp next_sort(state, sort_by) do
-    sort_by = normalize_sort(sort_by)
-
-    %{
+  defp postcodes_path(state, summary) do
+    query =
       state
-      | page: 1,
-        sort_by: sort_by,
-        sort_dir:
-          if(state.sort_by == sort_by,
-            do: flip_direction(state.sort_dir),
-            else: default_direction(sort_by)
-          )
-    }
-  end
+      |> CamelList.to_params()
+      |> Map.put("summarySortBy", Atom.to_string(summary.sort_by))
+      |> Map.put("summarySortDir", Atom.to_string(summary.sort_dir))
 
-  defp next_summary_sort(state, sort_by) do
-    sort_by = normalize_summary_sort(sort_by)
-
-    %{
-      state
-      | summary_sort_by: sort_by,
-        summary_sort_dir:
-          if(
-            state.summary_sort_by == sort_by,
-            do: flip_direction(state.summary_sort_dir),
-            else: default_summary_direction(sort_by)
-          )
-    }
-  end
-
-  defp postcodes_path(state) do
-    ~p"/geonames/postcodes?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir, summarySortBy: state.summary_sort_by, summarySortDir: state.summary_sort_dir}}"
-  end
-
-  defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
-  defp normalize_sort(_sort_by), do: "country_name"
-
-  defp normalize_summary_sort(sort_by) when sort_by in @summary_sorts, do: sort_by
-  defp normalize_summary_sort(_sort_by), do: "country_name"
-
-  defp normalize_direction(direction, _sort_by) when direction in ["asc", "desc"], do: direction
-  defp normalize_direction(_direction, sort_by), do: default_direction(sort_by)
-
-  defp normalize_summary_direction(direction, _sort_by) when direction in ["asc", "desc"],
-    do: direction
-
-  defp normalize_summary_direction(_direction, sort_by), do: default_summary_direction(sort_by)
-
-  defp default_direction(sort_by), do: Map.get(@initial_directions, sort_by, "asc")
-
-  defp default_summary_direction(sort_by),
-    do: Map.get(@summary_initial_directions, sort_by, "asc")
-
-  defp flip_direction("asc"), do: "desc"
-  defp flip_direction(_direction), do: "asc"
-
-  defp normalize_page_size(value) do
-    value = parse_page(value)
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= value))
-  end
-
-  defp parse_page(value) when is_integer(value) and value > 0, do: value
-
-  defp parse_page(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {page, ""} when page > 0 -> page
-      _other -> 1
-    end
-  end
-
-  defp parse_page(_value), do: 1
-
-  defp bounded_page(value, page) do
-    page_number = parse_page(value)
-    max(page.total_pages, 1) |> min(page_number) |> max(1)
+    ~p"/geonames/postcodes?#{query}"
   end
 end

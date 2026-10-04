@@ -4,11 +4,26 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
+  alias Bilimbi.Core.Geonames.Web.CamelList
 
   @page_sizes [25, 50, 100, 300]
-  @sorts ~w(country_name code name alt_name updated_at)
-  @initial_directions %{"updated_at" => "desc"}
+  @list ListState.spec!(
+          sortable: %{
+            country_name: :asc,
+            code: :asc,
+            name: :asc,
+            alt_name: :asc,
+            updated_at: :desc
+          },
+          default_sort: :country_name,
+          page_sizes: @page_sizes,
+          default_page_size: 25,
+          page_size_param: "perPage",
+          invalid_page_size: :default,
+          filters: [countryIso: {:string, ""}]
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,32 +35,25 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    {:noreply, load_page(socket, parse_index(params))}
   end
 
   @impl true
   def handle_event("filters", %{"filters" => filters}, socket) do
-    state =
-      socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(
-        :country_iso,
-        Map.get(filters, "countryIso", socket.assigns.index_state.country_iso)
-      )
-      |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
-      |> Map.put(:page, 1)
-
+    state = CamelList.apply_filters(socket.assigns.index_state, filters)
     {:noreply, push_patch(socket, to: admin1_path(state))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: admin1_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = ListState.next_sort(socket.assigns.index_state, sort_by)
+    {:noreply, push_patch(socket, to: admin1_path(state))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.admin1_page))
+      socket.assigns.index_state
+      |> ListState.put_page(page)
+      |> ListState.clamp_to_last_page(socket.assigns.admin1_page, empty: :reset)
 
     {:noreply, push_patch(socket, to: admin1_path(state))}
   end
@@ -106,43 +114,22 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
           <:subtitle>States, provinces, and top-level administrative divisions</:subtitle>
         </.header>
 
-        <.form
-          for={@filters_form}
-          id="admin1-filters"
-          phx-change="filters"
-          class="mb-2"
-        >
-          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
-            <div class="relative">
-              <.icon
-                name="search"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="admin1-search"
-                type="search"
-                phx-debounce="300"
-                label="Search Admin1 divisions"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by name, code, or country..."
-                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-              />
-            </div>
-            <.input
-              field={@filters_form[:countryIso]}
-              id="admin1-country-filter"
-              type="select"
-              label="Country"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              prompt="All Countries"
-              options={country_options(@filter_countries)}
-              class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="admin1-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="admin1-search"
+            label="Search Admin1 divisions"
+            placeholder="Search by name, code, or country..."
+          />
+          <:control
+            type={:select}
+            field={@filters_form[:countryIso]}
+            id="admin1-country-filter"
+            label="Country"
+            options={[{"All Countries", ""} | Geonames.country_options(@filter_countries)]}
+          />
+        </.filter_toolbar>
 
         <.card id="admin1-card" inner_class="p-0">
 
@@ -207,96 +194,37 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     admin1_page =
       Geonames.page_admin1(%{
         search: state.search,
-        country_iso: state.country_iso,
+        country_iso: state.filters.countryIso,
         page: state.page,
-        page_size: state.per_page,
+        page_size: state.page_size,
         sort_by: state.sort_by,
         sort_dir: state.sort_dir
       })
-
-    state = %{state | page: admin1_page.page, per_page: admin1_page.page_size}
 
     socket
     |> assign(:page_title, "Admin1 Divisions")
     |> assign(:page_sizes, @page_sizes)
     |> assign(:admin1_page, admin1_page)
     |> assign(:filter_countries, Geonames.admin1_filter_countries())
-    |> assign(
-      :filters_form,
-      to_form(
-        %{
-          "search" => state.search,
-          "countryIso" => state.country_iso,
-          "perPage" => state.per_page
-        },
-        as: :filters
-      )
-    )
+    |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> stream(:admin1, admin1_page.entries, reset: true)
   end
 
-  defp state_from_params(params) do
-    sort_by = normalize_sort(Map.get(params, "sortBy"))
-
-    %{
-      search: Map.get(params, "search", ""),
-      country_iso: Map.get(params, "filterCountryIso", ""),
-      page: parse_page(Map.get(params, "page")),
-      per_page: normalize_page_size(Map.get(params, "perPage")),
-      sort_by: sort_by,
-      sort_dir: normalize_direction(Map.get(params, "sortDir"), sort_by)
-    }
-  end
-
-  defp next_sort(state, sort_by) do
-    sort_by = normalize_sort(sort_by)
-
-    %{
-      state
-      | page: 1,
-        sort_by: sort_by,
-        sort_dir:
-          if(state.sort_by == sort_by,
-            do: flip_direction(state.sort_dir),
-            else: default_direction(sort_by)
-          )
-    }
+  # The form field stays `countryIso`. The URL key stays `filterCountryIso`.
+  defp parse_index(params) do
+    params
+    |> Map.put("countryIso", Map.get(params, "filterCountryIso", ""))
+    |> CamelList.parse(@list)
   end
 
   defp admin1_path(state) do
-    ~p"/geonames/admin1?#{%{search: state.search, filterCountryIso: state.country_iso, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
-  end
+    query =
+      state
+      |> CamelList.to_params()
+      |> Map.delete("countryIso")
+      |> Map.put("filterCountryIso", state.filters.countryIso)
 
-  defp country_options(countries), do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-  defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
-  defp normalize_sort(_sort_by), do: "country_name"
-
-  defp normalize_direction(direction, _sort_by) when direction in ["asc", "desc"], do: direction
-  defp normalize_direction(_direction, sort_by), do: default_direction(sort_by)
-
-  defp default_direction(sort_by), do: Map.get(@initial_directions, sort_by, "asc")
-  defp flip_direction("asc"), do: "desc"
-  defp flip_direction(_direction), do: "asc"
-
-  defp normalize_page_size(value) do
-    value = parse_page(value)
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= value))
-  end
-
-  defp parse_page(value) when is_integer(value) and value > 0, do: value
-
-  defp parse_page(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {page, ""} when page > 0 -> page
-      _other -> 1
-    end
-  end
-
-  defp parse_page(_value), do: 1
-
-  defp bounded_page(value, page) do
-    page_number = parse_page(value)
-    max(page.total_pages, 1) |> min(page_number) |> max(1)
+    ~p"/geonames/admin1?#{query}"
   end
 end

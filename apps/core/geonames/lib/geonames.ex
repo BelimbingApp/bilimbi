@@ -263,6 +263,34 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
+  Country select options, labelled `Name (ISO)`.
+
+  `country_options/1` maps a list the caller already loaded, including the
+  Admin1 filter's subset. `country_options/0` loads every country. A private
+  `"\#{country} (\#{iso})"` mapping is the copy this replaced.
+  """
+  @spec country_options() :: [{String.t(), String.t()}]
+  def country_options, do: country_options(list_countries())
+
+  @spec country_options([%{country: String.t(), iso: String.t()}]) :: [{String.t(), String.t()}]
+  def country_options(countries) when is_list(countries) do
+    Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
+  end
+
+  @doc """
+  First-level division options for one country, labelled by name and valued
+  by the stored code. A blank or unknown country is an empty list.
+  """
+  @spec admin1_options(term()) :: [{String.t(), String.t()}]
+  def admin1_options(country_iso) when is_binary(country_iso) do
+    country_iso
+    |> list_admin1()
+    |> Enum.map(&{&1.name, &1.code})
+  end
+
+  def admin1_options(_country_iso), do: []
+
+  @doc """
   Updates an admin1 division's display name by its ID.
 
   Requires `admin.geonames.update` on the sealed scope now.
