@@ -43,7 +43,11 @@ defmodule Bilimbi.Base.UI.MixProject do
       {:phoenix_live_view, "~> 1.2.0"},
       {:phoenix_html, "~> 4.3"},
       {:gettext, "~> 1.0"},
-      {:jason, "~> 1.4"}
-    ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      {:jason, "~> 1.4"},
+      {:lazy_html, "~> 0.1", only: :test},
+      {:phoenix_pubsub, "~> 2.2"},
+      {:plug, "~> 1.20"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 end

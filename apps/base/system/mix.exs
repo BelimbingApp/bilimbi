@@ -43,7 +43,11 @@ defmodule Bilimbi.Base.System.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}] ++
+    [
+      {:ecto_sql, "~> 3.14"},
+      {:gettext, "~> 1.0"},
+      {:phoenix_live_view, "~> 1.2.0"}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

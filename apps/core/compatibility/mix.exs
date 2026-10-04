@@ -49,7 +49,13 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}, {:jason, "~> 1.4"}] ++
+    [
+      {:ecto_sql, "~> 3.14"},
+      {:jason, "~> 1.4"},
+      {:db_connection, "~> 2.10"},
+      {:oban, "~> 2.23.1"},
+      {:postgrex, "~> 0.22"}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

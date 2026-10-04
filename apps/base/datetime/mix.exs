@@ -45,7 +45,8 @@ defmodule Bilimbi.Base.DateTime.MixProject do
   defp deps do
     [
       {:postgrex, "~> 0.22"},
-      {:time_zone_info, "~> 0.7.15"}
+      {:time_zone_info, "~> 0.7.15"},
+      {:ecto_sql, "~> 3.14"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end

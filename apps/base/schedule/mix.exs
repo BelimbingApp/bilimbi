@@ -42,8 +42,14 @@ defmodule Bilimbi.Base.Schedule.MixProject do
   defp deps do
     [
       {:crontab, "~> 1.2"},
-      {:time_zone_info, "~> 0.7.15"}
-    ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      {:time_zone_info, "~> 0.7.15"},
+      {:db_connection, "~> 2.10"},
+      {:ecto_sql, "~> 3.14"},
+      {:oban, "~> 2.23.1"},
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:postgrex, "~> 0.22"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 
   defp aliases do

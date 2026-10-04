@@ -19,7 +19,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
       bilimbi_module_root: __DIR__,
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      deps: deps()
     ]
   end
 
@@ -32,4 +32,11 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_environment), do: ["lib"]
+
+  defp deps do
+    [
+      {:jason, "~> 1.4"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+  end
 end

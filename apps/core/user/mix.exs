@@ -44,9 +44,13 @@ defmodule Bilimbi.Core.User.MixProject do
       {:bcrypt_elixir, "~> 3.3"},
       {:ecto_sql, "~> 3.14"},
       {:phoenix, "~> 1.8.9"},
-      {:phoenix_html, "~> 4.3"},
       {:phoenix_live_view, "~> 1.2.0"},
-      {:plug_crypto, "~> 2.2"}
+      {:plug_crypto, "~> 2.2"},
+      {:jason, "~> 1.4"},
+      {:lazy_html, "~> 0.1", only: :test},
+      {:phoenix_pubsub, "~> 2.2"},
+      {:plug, "~> 1.20"},
+      {:postgrex, "~> 0.22"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end

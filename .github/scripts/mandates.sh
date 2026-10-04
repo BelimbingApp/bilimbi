@@ -61,8 +61,50 @@ if [ -n "$atom_hits" ]; then
   fail=1
 fi
 
+# --- AGENTS.md §6: a module declares the libraries its lib/ calls ------------
+# Each row is "module-reference regex|accepted mix.exs dep names". ecto_sql
+# satisfies Ecto because it is the one Ecto distribution the modules use.
+dep_rows=(
+  '\bEcto\.|ecto|ecto_sql'
+  '\bPostgrex\.|postgrex'
+  '\bDBConnection\.|db_connection'
+  '\bJason\.|jason'
+  '\bDecimal\.|decimal'
+  '\bPhoenix\.(LiveView|Component)\b|phoenix_live_view'
+  '\bPhoenix\.HTML\b|phoenix_html'
+  '\bPhoenix\.PubSub\b|phoenix_pubsub'
+  '\bPlug\.(Conn|Crypto)\b|plug|plug_crypto'
+  '\bGettext\.|gettext'
+  '\bOban\.|oban'
+  '\bMint\.|mint'
+)
+dep_hits=""
+while IFS= read -r mixfile; do
+  pkg=$(dirname "$mixfile")
+  [ -d "$pkg/lib" ] || continue
+  for row in "${dep_rows[@]}"; do
+    pattern=${row%%|*}
+    accepted=${row#*|}
+    # Comments and "Elixir.Mod" name strings are mentions, not calls.
+    grep -rhE "$pattern" "$pkg/lib" 2>/dev/null | grep -vE '^\s*#|"Elixir\.' | grep -q . || continue
+    declared=0
+    for dep in ${accepted//|/ }; do
+      if grep -qE "\{:$dep," "$mixfile"; then declared=1; fi
+    done
+    if [ "$declared" -eq 0 ]; then
+      dep_hits+="$pkg calls ${accepted%%|*} but does not declare it"$'\n'
+    fi
+  done
+done < <(find apps -mindepth 3 -maxdepth 3 -name mix.exs | sort)
+
+if [ -n "$dep_hits" ]; then
+  echo "FAIL AGENTS.md §6 — library called from lib/ but not declared in the module's mix.exs:"
+  printf '%s' "$dep_hits"
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "mandates: §7, §12, §13 clean"
+  echo "mandates: §6, §7, §12, §13 clean"
 fi
 
 exit "$fail"

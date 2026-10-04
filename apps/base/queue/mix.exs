@@ -40,7 +40,13 @@ defmodule Bilimbi.Base.Queue.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [{:oban, "~> 2.23.1"}] ++
+    [
+      {:oban, "~> 2.23.1"},
+      {:ecto, "~> 3.14"},
+      {:ecto_sql, "~> 3.14"},
+      {:jason, "~> 1.4"},
+      {:plug_crypto, "~> 2.2"}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

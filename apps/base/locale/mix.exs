@@ -43,7 +43,10 @@ defmodule Bilimbi.Base.Locale.MixProject do
   end
 
   defp deps do
-    [{:postgrex, "~> 0.22"}] ++
+    [
+      {:postgrex, "~> 0.22"},
+      {:ecto_sql, "~> 3.14"}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 end

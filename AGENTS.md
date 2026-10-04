@@ -366,7 +366,11 @@ The Base and Core composition applications contain no `lib/`, `priv/`, or
 migrations, seeds, fixtures, and tests live in the owning child module; the
 containers delegate `mix test` to each child. External library dependencies
 belong to the module that uses them, never to a container for possible future
-use.
+use. A module declares in its own `mix.exs` every library its `lib/` or
+`test/` calls (`phoenix_live_view`, `ecto`, `jason`, `postgrex`, and so on),
+never relying on `base/ui` or `base/database` to bring it in; Mix rejects an
+`only:` restriction on a library another dependency requires. `mandates.sh`
+checks the common ones for `lib/`.
 
 Cross-module tests may load lower-layer test support from declared
 dependencies, but table DDL and fixtures are defined once by their owner. Base

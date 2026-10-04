@@ -45,8 +45,12 @@ defmodule Bilimbi.Core.Employee.MixProject do
     [
       {:ecto_sql, "~> 3.14"},
       {:phoenix, "~> 1.8.9"},
-      {:phoenix_live_view, "~> 1.2.0"}
-    ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:lazy_html, "~> 0.1", only: :test},
+      {:phoenix_html, "~> 4.3"},
+      {:postgrex, "~> 0.22"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 
   defp aliases do
