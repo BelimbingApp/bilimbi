@@ -136,6 +136,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     for {label, iso} <- filter_options do
       assert has_element?(admin1, "#admin1-country-filter option[value='#{iso}']", label)
     end
+
     assert has_element?(admin1, "#admin1-2", "California")
 
     admin1
