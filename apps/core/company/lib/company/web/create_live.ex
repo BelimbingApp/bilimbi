@@ -38,7 +38,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     case Company.list_selectable_companies(actor, @create_capability) do
       {:ok, companies} ->
         {:ok, types} = Company.list_legal_entity_types()
-        countries = Bilimbi.Core.Geonames.list_countries()
 
         {:ok,
          socket
@@ -46,7 +45,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
          |> assign(:active_nav, "admin.company")
          |> assign(:parent_companies, companies)
          |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
-         |> assign(:countries, countries)
+         |> assign(:country_options, Bilimbi.Core.Geonames.country_options())
          |> assign_form(form_changeset(%{"status" => "active"}))}
 
       {:error, :unauthorized} ->
@@ -177,7 +176,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 id="company-jurisdiction"
                 label="Jurisdiction"
                 placeholder="Select country..."
-                options={country_options(@countries)}
+                options={@country_options}
               />
               <.input
                 field={@form[:email]}
@@ -332,10 +331,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   defp legal_entity_type_options(types) do
     Enum.map(types, &{&1.name, &1.id})
-  end
-
-  defp country_options(countries) do
-    Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
   end
 
   defp status_options do
