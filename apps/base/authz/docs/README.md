@@ -36,6 +36,17 @@ a bare nullable column in the Base migration. Core Company contributes the
 named restricted foreign key and exact system/custom ownership check in its
 own later migration, so Base never depends upward on Core.
 
+## A record in another company
+
+Grants are per company, and `can/4` judges the company the user is signed in
+at: a resource naming any other company is `:denied_company_scope`. When the
+record being acted on belongs to another company of the same tenant, ask
+`can_in_company/5`. It takes the user from the sealed scope and judges their
+grants in the company named, which must be live in the scope's tenant; an
+archived, missing, or other-tenant company is `:denied_company_scope`. The
+decision is logged against that company with `signed_in_company_id` in the
+context. A system scope is never widened this way.
+
 ## System principals
 
 A named system principal (ADR 0017) is the identity a routine job runs as,
