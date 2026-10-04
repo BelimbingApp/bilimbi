@@ -27,7 +27,6 @@ defmodule Bilimbi.Core.MixProject do
 
   defp aliases do
     [
-      setup: ["deps.get"],
       test: Bilimbi.Base.ModuleRegistry.MixDiscovery.container_test_commands(__DIR__),
       "compile.strict":
         Bilimbi.Base.ModuleRegistry.MixDiscovery.container_compile_commands(__DIR__)

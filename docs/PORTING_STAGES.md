@@ -58,8 +58,7 @@ real modules.
 **Purpose:** Establish the required records and reference data on which later
 business workflows depend.
 
-Current/forthcoming capabilities include Tenancy, Company, Geonames, Address,
-Employee, and User. Exact ordering is determined by the source inventory and
+The capabilities are Tenancy, Company, Geonames, Address, Employee, and User. Exact ordering is determined by the source inventory and
 declared module graph. GeoNames reference import is operational work, not a
 schema migration. Employee precedes User where the canonical foreign-key order
 requires it.
@@ -76,7 +75,9 @@ requires it.
 - public APIs hide schemas and private queries;
 - the full precommit and fresh-schema gates are green.
 
-**State:** In progress.
+**State:** Modules shipped: Tenancy, Company, Geonames, Address, Employee, and
+User. The exit-gate bullets are open until the steward confirms each against
+the tree; reference-data import stays operational work.
 
 ## S2 — Access and governance
 
@@ -96,6 +97,10 @@ implementation tasks are created.
 - no credential or provider configuration resolves from tenant identity alone;
 - security review and precommit are green.
 
+**State:** Modules shipped: Authz, Session, Settings, Audit, and the Core User
+integrations. The exit-gate bullets are open until the steward confirms each
+against the tree.
+
 ## S3 — Operational platform services
 
 **Purpose:** Port the required cross-cutting services that make the baseline a
@@ -113,6 +118,11 @@ and identifies its proper Base/Core owner.
 - background work is supervised, observable, retry-safe, and testable;
 - Web shell contributions remain consistent and accessible;
 - operational setup and failure recovery are documented.
+
+**State:** Shipped: Datetime and Locale, Menu, Queue, Schedule, Dashboard,
+Workflow, and telemetry/performance (Perf), plus System, Tiling, and Artifacts.
+Media, Cache, and Integration have no module. The exit-gate bullets are open
+until the steward confirms each against the tree.
 
 ## S4 — AI and workflow runtime
 

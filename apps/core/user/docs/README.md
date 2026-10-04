@@ -91,7 +91,8 @@ token field by construction.
 
 **Account creation is not public registration.** Belimbing deliberately has no
 `/register` route. `register_user/3` is the trusted administrative primitive;
-the future Web adapter must gate it with the normal Authz capability. New
+the `/users/new` form calls it through its alias `create_user/3` and gates it with the
+normal Authz capability. New
 accounts start unverified. Changing an email clears its verification timestamp.
 
 **Reset and verification delivery remain adapters.** Core User stores the

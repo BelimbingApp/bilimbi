@@ -15,7 +15,7 @@ config :bilimbi_base_database, Bilimbi.Base.Repo,
     |> String.to_integer()
 
 config :web, BilimbiWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4002],
+  http: [ip: {127, 0, 0, 1}],
   secret_key_base: "MRty3402yaFk5Y1BBT0o3cqcXutsDD8jd0H3eALvFlKUJsWJjN609o5+P3RE94JQ",
   server: false
 

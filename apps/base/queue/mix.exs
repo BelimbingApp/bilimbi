@@ -41,7 +41,7 @@ defmodule Bilimbi.Base.Queue.MixProject do
 
   defp deps do
     [
-      {:oban, "~> 2.23.1"},
+      {:oban, "~> 2.23"},
       {:ecto, "~> 3.14"},
       {:ecto_sql, "~> 3.14"},
       {:jason, "~> 1.4"},
@@ -54,7 +54,7 @@ defmodule Bilimbi.Base.Queue.MixProject do
     [
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path priv/repo/migrations",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
         "test"
       ]
     ]

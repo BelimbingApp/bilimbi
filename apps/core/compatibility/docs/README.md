@@ -11,7 +11,7 @@ the schema lifecycle and `Bilimbi.Core.Compatibility.Cutover` for the one-shot
 stored-value remediation described below.
 
 The module coordinates fresh migration, structural verification, and explicit
-adoption for the currently installed Base and Core modules. It owns no business
+adoption for every installed Platform, Domain, or Extension module. It owns no business
 tables or migrations: each module ships its own migration path, while
 Compatibility orders those paths through `Bilimbi.Base.Repo` and the shared
 `bilimbi_schema_migrations` ledger.

@@ -2,7 +2,7 @@ defmodule Bilimbi.Base.Artifacts do
   @moduledoc """
   Private, company-scoped documents with owning-module access rechecks.
 
-  See README.md for the trusted Owner/PDF adapters and lifecycle contract.
+  See docs/README.md for the trusted Owner/PDF adapters and lifecycle contract.
   Bytes are returned only after authorization, integrity validation and a
   committed audit action. No paths, public URLs, Ecto schemas or access tokens
   are exposed. All public operations must be called outside a Repo transaction:

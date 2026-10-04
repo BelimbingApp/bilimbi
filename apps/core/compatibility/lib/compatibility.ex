@@ -15,13 +15,24 @@ defmodule Bilimbi.Core.Compatibility do
 
   @compatibility_source "e70b4d33c0b10790e681f4c2b5095d85a53bc918"
 
+  @doc "The name of Bilimbi's own migration ledger table (`bilimbi_schema_migrations`)."
+  @spec migration_source() :: String.t()
   def migration_source, do: migration_source(Repo)
+
+  @doc "The Belimbing merge commit whose schema is the compatibility reference."
+  @spec compatibility_source() :: String.t()
   def compatibility_source, do: @compatibility_source
 
+  @doc "The migration directories of every installed module, in Base, Core, Domain, Extension order."
+  @spec migration_paths() :: [String.t()]
   def migration_paths, do: ModuleRegistry.migration_paths!()
 
+  @doc "The versions of the installed migrations classed `:compatible_baseline`."
+  @spec baseline_versions() :: [integer()]
   def baseline_versions, do: baseline_versions(installed_migrations())
 
+  @doc "Every installed migration as `{version, module, disposition}`, in version order."
+  @spec migration_entries() :: [{integer(), module(), :compatible_baseline | :bilimbi_only}]
   def migration_entries do
     Enum.map(installed_migrations(), &{&1.version, &1.module, &1.disposition})
   end
@@ -60,6 +71,11 @@ defmodule Bilimbi.Core.Compatibility do
     end
   end
 
+  @doc """
+  Runs every installed migration through the single ledger and records provenance.
+
+  A ledger whose recorded versions are not class-valid raises `ArgumentError`.
+  """
   @spec migrate(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate(repo \\ Repo, opts \\ []) do
     installed = installed_migrations()
@@ -89,6 +105,10 @@ defmodule Bilimbi.Core.Compatibility do
     end
   end
 
+  @doc """
+  Runs only the `:compatible_baseline` migrations, for building the reference
+  schema before adoption.
+  """
   @spec migrate_baseline(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate_baseline(repo \\ Repo, opts \\ []) do
     baselines = Enum.filter(installed_migrations(), &(&1.disposition == :compatible_baseline))
@@ -103,6 +123,12 @@ defmodule Bilimbi.Core.Compatibility do
     run_and_record(repo, schema, baselines, opts)
   end
 
+  @doc """
+  Verifies the live schema against every installed module's schema contract and
+  live-data invariants.
+
+  Returns `:ok` or `{:error, messages}`.
+  """
   @spec verify(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
   def verify(repo \\ Repo, opts \\ []) do
     contracts =
@@ -125,6 +151,13 @@ defmodule Bilimbi.Core.Compatibility do
     end
   end
 
+  @doc """
+  Adopts an existing Belimbing database: verifies it strictly, then records the
+  compatible baselines in the ledger.
+
+  Returns `{:ok, :adopted | :advanced | :already_adopted}`, or an error for
+  structural drift or a conflicting ledger.
+  """
   @spec adopt(Ecto.Repo.t(), keyword()) ::
           {:ok, :adopted | :advanced | :already_adopted}
           | {:error, {:schema_drift, [String.t()]} | {:ledger_conflict, [integer()]}}

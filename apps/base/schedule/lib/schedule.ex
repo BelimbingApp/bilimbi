@@ -300,10 +300,12 @@ defmodule Bilimbi.Base.Schedule do
   def run_now(_key), do: {:error, :not_found}
 
   @doc false
+  @spec latest_scheduled_occurrences([String.t()]) :: %{optional(String.t()) => DateTime.t()}
   def latest_scheduled_occurrences(keys),
     do: Administration.latest_scheduled_occurrences(keys)
 
   @doc false
+  @spec authorize_execution(map(), pos_integer()) :: {:ok, struct()} | {:error, term()}
   def authorize_execution(metadata, job_id)
       when is_map(metadata) and is_integer(job_id) and job_id > 0 do
     current_definition = definition(metadata["key"])
@@ -322,6 +324,7 @@ defmodule Bilimbi.Base.Schedule do
   end
 
   @doc false
+  @spec fingerprint(Definition.t()) :: String.t()
   def fingerprint(definition), do: Administration.fingerprint(definition)
 
   defp recorder_availability do

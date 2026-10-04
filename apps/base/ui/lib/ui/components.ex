@@ -1942,7 +1942,7 @@ defmodule Bilimbi.Base.UI.Components do
   the menu entry that marks it, and `following` shows the link icon before
   the title and turns the entry into "Stop following". Pass no `on_follow`
   for a page with no record to follow, and the entry is absent, as
-  `DESIGN.md` "Withheld controls" allows for an operation that does not
+  `apps/AGENTS.md` "Withheld controls" allows for an operation that does not
   apply. The channel is `Bilimbi.Base.UI.Workspace`.
 
   Hyprland draws no title bars; this one exists because the mouse and touch

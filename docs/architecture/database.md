@@ -7,7 +7,7 @@
 **Purpose:** Define Bilimbi's database ownership, dependency, migration,
 compatibility, verification, adoption, and seeding rules.
 
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-26
 
 ## Purpose and authority
 

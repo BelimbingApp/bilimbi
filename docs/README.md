@@ -13,10 +13,7 @@ install it. These pages hold the detail.
 | Composition model: Platform, Domains, Extensions | [0010 Composition model](./architecture/0010_composition-model.md) |
 | Database architecture | [Database Architecture](./architecture/database.md) |
 | Inbound webhooks: module registration, limits, audit | [Inbound webhooks](./architecture/inbound-webhooks.md) |
-| Original Mix umbrella topology | [ADR 0001](./architecture/decisions/0001-mix-umbrella-topology.md) |
-| Compatible schema baselines | [ADR 0002](./architecture/decisions/0002-compatible-schema-baselines.md) |
-| Physical deep-module packages | [ADR 0003](./architecture/decisions/0003-physical-deep-module-packages.md) |
-| Module contribution contract | [ADR 0004](./architecture/decisions/0004-module-contribution-contract.md) |
+| Architecture decisions (ADRs) | [Decision records](./architecture/decisions/) |
 | Porting stages from Belimbing | [Porting stages](./PORTING_STAGES.md) |
 | Team of architects and AI contributors | [CONTRIBUTORS.md](../CONTRIBUTORS.md) |
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |

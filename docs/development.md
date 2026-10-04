@@ -105,12 +105,17 @@ The Web host loads its helper and every discovered module bridge through
 helper loader otherwise stops at the first warning; the bootstrap keeps all
 helpers loaded and preserves the normal warning diagnostics.
 
-See [the CI performance measurements](ci-performance.md) for the full before/after
-comparison, profiler findings, and shared-machine limits.
+See [the precommit profile](plans/2026-10-02-precommit-profile.md) for the one
+measured before/after comparison, profiler findings, and shared-machine limits.
 
 A release built with `mix release` has no Mix. Migrate and seed it with
 `bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and
 `bin/bilimbi eval "BilimbiWeb.Release.seed()"`.
+
+To size the internationalisation backlog, run `.github/scripts/i18n_scan.py`. It
+is a report-only inventory of user-facing string literals not wrapped in
+Gettext, per module (`--samples N`, `--dump-high`); no CI step runs it and it
+never fails a build.
 
 ## Architecture at a glance
 
@@ -118,6 +123,7 @@ A release built with `mix release` has no Mix. Migrate and seed it with
 apps/
 ├── base/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Base layer
+│   ├── artifacts/                # Private documents, PDF generation, retention
 │   ├── audit/                    # Mutation and action history
 │   ├── authz/                    # Capability, role, grant, and decision engine
 │   ├── dashboard/                # Dashboard page, catalogue and layout

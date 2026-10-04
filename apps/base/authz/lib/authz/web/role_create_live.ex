@@ -115,7 +115,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   #
   # Every destination is capability-gated, so the landing place has to be one
   # this actor may actually open -- `/authz/roles` needs `role.list`, not
-  # `role.view` (`priv/web_routes.exs:6`). Navigating somewhere they will be
+  # `role.view` (the `/authz/roles` entry in `priv/web_routes.exs`). Navigating somewhere they will be
   # bounced off is the same dashboard-dump this change exists to avoid; it just
   # takes two redirects to get there instead of one.
   #

@@ -64,7 +64,7 @@ defmodule Bilimbi.Web.MixProject do
       {:phoenix_live_reload, "~> 1.6", only: :dev},
       {:phoenix_live_view, "~> 1.2.0"},
       {:lazy_html, "~> 0.1", only: :test},
-      {:phoenix_live_dashboard, "~> 0.8.7"},
+      {:phoenix_live_dashboard, "~> 0.8"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:heroicons,
@@ -93,7 +93,7 @@ defmodule Bilimbi.Web.MixProject do
       setup: ["deps.get", "assets.setup", "assets.build"],
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../base/queue/priv/repo/migrations",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
         "test"
       ],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],

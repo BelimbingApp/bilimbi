@@ -1,11 +1,12 @@
 # ADR 0005: Laravel framework residue and the Bilimbi job runtime
 
 **Document Type:** Architecture Decision Record
-**Status:** Proposed
+**Status:** Accepted
+**Implemented by:** `apps/base/queue` (Oban runtime migration, `Bilimbi.Base.Queue`)
 **Agents:** codex/sol-high
 **Scope:** Laravel framework tables, schema adoption, caching, and durable
 background jobs
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-10-04
 
 ## Context
 

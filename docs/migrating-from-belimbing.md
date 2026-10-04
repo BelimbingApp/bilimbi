@@ -78,18 +78,8 @@ operator and `tenant_primary_companies` for each tenant's designated company.
 `companies.tenant_id` is always explicit and has no database default. ID 1 is
 only historical migration input in Belimbing, never a Bilimbi runtime role.
 
-Bilimbi-owned migrations live inside their owning module, currently
-`apps/base/session/priv/repo/migrations`,
-`apps/base/settings/priv/repo/migrations`,
-`apps/base/tenancy/priv/repo/migrations`,
-`apps/base/authz/priv/repo/migrations`,
-`apps/base/audit/priv/repo/migrations`,
-`apps/base/queue/priv/repo/migrations`,
-`apps/core/company/priv/repo/migrations`,
-`apps/core/geonames/priv/repo/migrations`,
-`apps/core/address/priv/repo/migrations`,
-`apps/core/employee/priv/repo/migrations`, and
-`apps/core/user/priv/repo/migrations`. The Compatibility coordinator obtains
+Bilimbi-owned migrations live inside their owning module, in its
+`priv/repo/migrations`; `mix bilimbi.migrations` lists them. The Compatibility coordinator obtains
 these paths from installed module descriptors; it contains no per-module path
 list. Each migration module uses its owning public namespace. Structural and
 live-data invariants are likewise implemented by the contributing module's

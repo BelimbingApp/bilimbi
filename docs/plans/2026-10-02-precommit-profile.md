@@ -1,3 +1,8 @@
+# docs/plans/2026-10-02-precommit-profile.md
+
+**Status:** Measurement record — one matched run on a shared machine; the numbers are not kept current
+**Last Updated:** 2026-10-02
+
 # CI performance measurements
 
 ## Method
@@ -93,7 +98,7 @@ still retains extracted files and proves they do not re-enter the bundle.
 
 The webhook registry lookup's empty-registry constraint is documented beside
 `BilimbiWeb.Webhooks.deliver/2`. For the separate `compile.strict` requirement,
-see [mounted-code traversal](architecture/0010_composition-model.md#realization-outcome).
+see [mounted-code traversal](../architecture/0010_composition-model.md#realization-outcome).
 
 | Measurement | Audit baseline | Implementation worktree |
 | --- | ---: | ---: |

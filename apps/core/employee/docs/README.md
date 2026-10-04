@@ -5,7 +5,7 @@ boundary is this directory and its public namespace is
 `Bilimbi.Core.Employee`.
 
 Employee records are deliberately separate from authentication users: an
-employee may exist without system access, while a future Core User module owns
+employee may exist without system access, while Core User owns
 the optional account link. The first slice covers tenant-scoped employee CRUD,
 department and supervisor validation, employee-type reference data, and the
 compatible Employee schema.

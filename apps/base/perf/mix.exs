@@ -55,7 +55,7 @@ defmodule Bilimbi.Base.Perf.MixProject do
       {:decimal, "~> 3.1"},
       {:ecto, "~> 3.14"},
       {:ecto_sql, "~> 3.14"},
-      {:oban, "~> 2.23.1"},
+      {:oban, "~> 2.23"},
       {:phoenix_live_view, "~> 1.2.0"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)

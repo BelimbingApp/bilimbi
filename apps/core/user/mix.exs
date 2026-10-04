@@ -59,7 +59,7 @@ defmodule Bilimbi.Core.User.MixProject do
     [
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../../base/queue/priv/repo/migrations",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
         "test"
       ]
     ]
