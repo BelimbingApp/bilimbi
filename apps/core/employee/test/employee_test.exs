@@ -168,6 +168,73 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert earlier_same_name.id < later_same_name.id
   end
 
+  test "lists each employee once when another company shares the type code", %{
+    owner: owner,
+    other: other
+  } do
+    assert {:ok, _} =
+             Employee.create_employee_type(owner, 73, %{
+               code: "consultant",
+               label: "House Consultant"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee_type(other, 74, %{
+               code: "consultant",
+               label: "Outside Consultant"
+             })
+
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-REPORT",
+               full_name: "Report Person",
+               employee_type: "consultant"
+             })
+
+    assert {:ok, open} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-OPEN",
+               full_name: "Open Person",
+               employee_type: "consultant"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, report.id)
+
+    assert {:ok, listed} = Employee.list_employees(owner, 73)
+
+    assert Enum.map(listed, &{&1.id, &1.employee_type_label}) == [
+             {lead.id, "Full Time"},
+             {report.id, "House Consultant"},
+             {open.id, "House Consultant"}
+           ]
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+
+    assert Enum.map(lists.employees, &{&1.id, &1.employee_type_label}) == [
+             {lead.id, "Full Time"},
+             {report.id, "House Consultant"},
+             {open.id, "House Consultant"}
+           ]
+
+    assert Enum.map(lists.subordinates, & &1.id) == [report.id]
+    assert Enum.map(lists.available, & &1.id) == [open.id]
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73)
+    assert page.total_entries == 3
+
+    assert Map.new(page.entries, &{&1.id, &1.employee_type_label}) == %{
+             lead.id => "Full Time",
+             report.id => "House Consultant",
+             open.id => "House Consultant"
+           }
+  end
+
   test "returns a bounded administration page with source search, filters, and stable order", %{
     owner: owner
   } do

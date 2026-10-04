@@ -84,7 +84,10 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   defp base_query(company_id) do
     from employee in Schema,
       left_join: employee_type in EmployeeType,
-      on: employee_type.code == employee.employee_type,
+      on:
+        employee_type.code == employee.employee_type and
+          (employee_type.company_id == employee.company_id or
+             (is_nil(employee_type.company_id) and employee_type.is_system == true)),
       where: employee.company_id == ^company_id
   end
 

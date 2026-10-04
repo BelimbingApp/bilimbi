@@ -93,18 +93,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_employees(%Scope{} = scope, company_id) do
     with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
-      employees =
-        from(employee in Schema,
-          left_join: employee_type in EmployeeType,
-          on: employee_type.code == employee.employee_type,
-          where: employee.company_id == ^company_id,
-          order_by: employee.id,
-          select: {employee, employee_type.label}
-        )
-        |> Repo.all()
-        |> Enum.map(&Summary.from_query_result/1)
-
-      {:ok, employees}
+      {:ok, list_company_summaries(company_id)}
     end
   end
 
@@ -272,16 +261,7 @@ defmodule Bilimbi.Core.Employee do
   def supervision_lists(%Scope{} = scope, company_id, employee_id) do
     with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, employee_id) do
-      employees =
-        from(employee in Schema,
-          left_join: employee_type in EmployeeType,
-          on: employee_type.code == employee.employee_type,
-          where: employee.company_id == ^company_id,
-          order_by: employee.id,
-          select: {employee, employee_type.label}
-        )
-        |> Repo.all()
-        |> Enum.map(&Summary.from_query_result/1)
+      employees = list_company_summaries(company_id)
 
       subordinates =
         employees
@@ -617,6 +597,21 @@ defmodule Bilimbi.Core.Employee do
       {:error, :forbidden} = error -> error
       {:error, :company_not_found} = error -> error
     end
+  end
+
+  defp list_company_summaries(company_id) do
+    from(employee in Schema,
+      left_join: employee_type in EmployeeType,
+      on:
+        employee_type.code == employee.employee_type and
+          (employee_type.company_id == employee.company_id or
+             (is_nil(employee_type.company_id) and employee_type.is_system == true)),
+      where: employee.company_id == ^company_id,
+      order_by: employee.id,
+      select: {employee, employee_type.label}
+    )
+    |> Repo.all()
+    |> Enum.map(&Summary.from_query_result/1)
   end
 
   # The delete screens already ask for these capabilities. Seeds, mix tasks,
