@@ -18,6 +18,13 @@ defmodule BilimbiWeb.PinControllerTest do
       email: "ada@example.com"
     })
 
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
     :ok
   end
 
@@ -158,6 +165,99 @@ defmodule BilimbiWeb.PinControllerTest do
            ) == %{"error" => "impersonating"}
 
     assert {:ok, ^pins} = User.list_user_pins(pin_scope(91))
+  end
+
+  test "Accept: application/json lists, pins, unpins, and reorders only that account" do
+    {:ok, :pinned, _} =
+      User.toggle_user_pin(pin_scope(92), %{
+        "label" => "Notifications",
+        "url" => "/notifications"
+      })
+
+    assert json_response(get(signed_in_json(), ~p"/api/pins"), 200)["pins"] == []
+
+    pinned =
+      signed_in_json()
+      |> post_json(~p"/api/pins/toggle", %{"label" => "Companies", "url" => "/companies"})
+      |> json_response(200)
+
+    assert pinned["pinned"] == true
+    assert Enum.map(pinned["pins"], & &1["url"]) == ["/companies"]
+
+    both =
+      signed_in_json()
+      |> post_json(~p"/api/pins/toggle", %{"label" => "Profile", "url" => "/settings/profile"})
+      |> json_response(200)
+
+    assert Enum.map(both["pins"], & &1["url"]) == ["/companies", "/settings/profile"]
+    [companies_id, profile_id] = Enum.map(both["pins"], & &1["id"])
+
+    reordered =
+      signed_in_json()
+      |> post_json(~p"/api/pins/reorder", %{
+        "pins" => [%{"id" => profile_id}, %{"id" => companies_id}]
+      })
+      |> json_response(200)
+
+    assert Enum.map(reordered["pins"], & &1["url"]) == ["/settings/profile", "/companies"]
+
+    unpinned =
+      signed_in_json()
+      |> post_json(~p"/api/pins/toggle", %{"label" => "Companies", "url" => "/companies"})
+      |> json_response(200)
+
+    assert unpinned["pinned"] == false
+    assert Enum.map(unpinned["pins"], & &1["url"]) == ["/settings/profile"]
+
+    listed = signed_in_json() |> get(~p"/api/pins") |> json_response(200)
+    assert Enum.map(listed["pins"], & &1["url"]) == ["/settings/profile"]
+
+    assert {:ok, [other]} = User.list_user_pins(pin_scope(92))
+    assert other.url == "/notifications"
+
+    impersonating = impersonating_json()
+
+    visible = impersonating |> get(~p"/api/pins") |> json_response(200)
+    assert Enum.map(visible["pins"], & &1["url"]) == ["/settings/profile"]
+
+    assert json_response(
+             post_json(impersonating_json(), ~p"/api/pins/toggle", %{
+               "label" => "Notifications",
+               "url" => "/notifications"
+             }),
+             403
+           ) == %{"error" => "impersonating"}
+
+    assert json_response(
+             post_json(impersonating_json(), ~p"/api/pins/reorder", %{
+               "pins" => [%{"id" => profile_id}]
+             }),
+             403
+           ) == %{"error" => "impersonating"}
+
+    assert {:ok, [unchanged]} = User.list_user_pins(pin_scope(91))
+    assert unchanged.url == "/settings/profile"
+    assert {:ok, [still_other]} = User.list_user_pins(pin_scope(92))
+    assert still_other.url == "/notifications"
+  end
+
+  defp signed_in_json do
+    build_conn()
+    |> put_req_header("accept", "application/json")
+    |> log_in_as()
+  end
+
+  defp impersonating_json do
+    signed_in_json()
+    |> Plug.Test.init_test_session(%{
+      "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
+    })
+  end
+
+  defp post_json(conn, path, payload) do
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> post(path, Phoenix.json_library().encode!(payload))
   end
 
   defp pin_scope(user_id) do
