@@ -88,9 +88,16 @@ defmodule Bilimbi.Base.DashboardTest do
     test "defaults refresh_interval to 0 and rejects a negative one" do
       assert Widget.new!(%{id: "test", label: "Test", embed: "test.panel"}).refresh_interval == 0
 
-      assert_raise ArgumentError, ~r/widget refresh_interval must be a non-negative integer/, fn ->
-        Widget.new!(%{id: "test", label: "Test", embed: "test.panel", refresh_interval: -1})
-      end
+      assert_raise ArgumentError,
+                   ~r/widget refresh_interval must be a non-negative integer/,
+                   fn ->
+                     Widget.new!(%{
+                       id: "test",
+                       label: "Test",
+                       embed: "test.panel",
+                       refresh_interval: -1
+                     })
+                   end
     end
 
     test "rejects a capability that is not a string" do
