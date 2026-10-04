@@ -641,10 +641,12 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert :ok = Schedule.review_definition(definition.key, true)
     assert Schedule.prune_occurrences() == 3
     assert Repo.aggregate(Occurrence, :count) == 3
+
     assert DateTime.compare(
              Schedule.latest_scheduled_occurrences([definition.key])[definition.key],
              old
            ) == :eq
+
     assert {:error, :already_claimed} = Scheduler.enqueue_due(definition, old)
     assert {:ok, %JobRef{}} = Scheduler.enqueue_due(definition, DateTime.utc_now())
   end
