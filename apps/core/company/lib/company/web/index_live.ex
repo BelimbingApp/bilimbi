@@ -32,7 +32,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           page_sizes: @page_sizes,
           default_page_size: @default_page_size,
           page_size_param: "per_page",
-          page_size_aliases: ["perPage"],
           invalid_page_size: :default,
           filters: [status_filter: {:one_of, ["all" | @statuses], "all"}],
           omit_blank: [:search]
