@@ -943,9 +943,13 @@ defmodule BilimbiWeb.SettingsLiveTest do
   defp hide_session_settings!(definitions) do
     # Authentication still needs the lifetime and the touch interval when the
     # operator group is narrowed.
-    Enum.reduce(["session.lifetime_minutes", "session.last_activity_touch_minutes"], definitions, fn key, acc ->
-      Map.update!(acc, key, &%{&1 | editable: nil})
-    end)
+    Enum.reduce(
+      ["session.lifetime_minutes", "session.last_activity_touch_minutes"],
+      definitions,
+      fn key, acc ->
+        Map.update!(acc, key, &%{&1 | editable: nil})
+      end
+    )
   end
 
   # The installed snapshot minus every setting editable in the operator group,

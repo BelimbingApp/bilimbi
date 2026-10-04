@@ -95,7 +95,6 @@ outline and solid bookmark.
 
 Recorded before/after measurements for the additive timeline indexes:
 audit tenant count 169 ms to 22.7 ms, audit page 100 189 ms to 19.5 ms,
-and Authz page 0.76 ms to 0.14 ms. These are the supplied measurements for
-PR notes, not measurements repeated during review. Each schema contract owns
-whether its timeline index is optional and which order a present index must
+and Authz page 0.76 ms to 0.14 ms. These figures were supplied with the
+change, not re-measured. Each schema contract owns whether its timeline index is optional and which order a present index must
 match, so a compatible Belimbing database can still be adopted.
