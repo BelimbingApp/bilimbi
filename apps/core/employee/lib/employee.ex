@@ -600,15 +600,13 @@ defmodule Bilimbi.Core.Employee do
   end
 
   defp list_company_summaries(company_id) do
-    from(employee in Schema,
-      left_join: employee_type in EmployeeType,
-      on:
-        employee_type.code == employee.employee_type and
-          (employee_type.company_id == employee.company_id or
-             (is_nil(employee_type.company_id) and employee_type.is_system == true)),
-      where: employee.company_id == ^company_id,
-      order_by: employee.id,
-      select: {employee, employee_type.label}
+    Schema
+    |> EmployeeType.with_resolved_type()
+    |> where([employee], employee.company_id == ^company_id)
+    |> order_by([employee], asc: employee.id)
+    |> select(
+      [employee, company_type, global_type],
+      {employee, coalesce(company_type.label, global_type.label)}
     )
     |> Repo.all()
     |> Enum.map(&Summary.from_query_result/1)

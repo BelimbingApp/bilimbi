@@ -235,6 +235,79 @@ defmodule Bilimbi.Core.EmployeeTest do
            }
   end
 
+  test "uses a preserved global custom type label unless the company has its own row", %{
+    owner: owner,
+    other: other
+  } do
+    insert_raw_employee_type!("seasonal", "Seasonal Worker", false, nil)
+    insert_raw_employee!(74, "EMP-ADA", "seasonal", "Ada")
+
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "EMP-FULL",
+               full_name: "Full Person"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee_type(other, 74, %{code: "zeta", label: "Zeta Role"})
+
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "EMP-ZETA",
+               full_name: "Zeta Person",
+               employee_type: "zeta"
+             })
+
+    assert {:ok, listed} = Employee.list_employees(other, 74)
+
+    assert Enum.map(listed, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "Seasonal Worker"},
+             {"Full Person", "Full Time"},
+             {"Zeta Person", "Zeta Role"}
+           ]
+
+    ada = Enum.find(listed, &(&1.full_name == "Ada"))
+    assert {:ok, lists} = Employee.supervision_lists(other, 74, ada.id)
+
+    assert Enum.map(lists.employees, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "Seasonal Worker"},
+             {"Full Person", "Full Time"},
+             {"Zeta Person", "Zeta Role"}
+           ]
+
+    assert {:ok, asc} =
+             Employee.list_administration_page(other, 74,
+               sort_by: :employee_type_label,
+               sort_dir: :asc
+             )
+
+    assert asc.total_entries == 3
+
+    assert Enum.map(asc.entries, & &1.employee_type_label) == [
+             "Full Time",
+             "Seasonal Worker",
+             "Zeta Role"
+           ]
+
+    insert_raw_employee!(73, "EMP-ADA", "seasonal", "Ada")
+
+    assert {:ok, _} =
+             Employee.create_employee_type(owner, 73, %{
+               code: "seasonal",
+               label: "House Seasonal"
+             })
+
+    assert {:ok, house} = Employee.list_employees(owner, 73)
+
+    assert Enum.map(house, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "House Seasonal"}
+           ]
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73)
+    assert page.total_entries == 1
+    assert Enum.map(page.entries, & &1.employee_type_label) == ["House Seasonal"]
+  end
+
   test "returns a bounded administration page with source search, filters, and stable order", %{
     owner: owner
   } do
