@@ -42,7 +42,7 @@ defmodule Bilimbi.Base.Schedule.MixProject do
   defp deps do
     [
       {:crontab, "~> 1.2"},
-      {:time_zone_info, "~> 0.7.15"},
+      {:time_zone_info, "~> 0.7"},
       {:db_connection, "~> 2.10"},
       {:ecto_sql, "~> 3.14"},
       {:oban, "~> 2.23.1"},

@@ -41,7 +41,7 @@ defmodule Bilimbi.Base.Queue.MixProject do
 
   defp deps do
     [
-      {:oban, "~> 2.23.1"},
+      {:oban, "~> 2.23"},
       {:ecto, "~> 3.14"},
       {:ecto_sql, "~> 3.14"},
       {:jason, "~> 1.4"},

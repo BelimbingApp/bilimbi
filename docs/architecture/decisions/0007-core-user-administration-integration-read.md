@@ -1,11 +1,12 @@
 # ADR 0007: Contained Core User Administration integration read
 
 **Document Type:** Architecture Decision Record
-**Status:** Proposed
+**Status:** Accepted
+**Implemented by:** `apps/core/user_administration` (`Query`, `ConsumedRelations`, and the tests in its `test/` directory)
 **Agents:** codex/terra-user-admin-adr-1
 **Scope:** Ownership, dependency direction, persistence access, bounded query,
 route transfer, and enforcement for the Users administration index
-**Last Updated:** 2026-08-14
+**Last Updated:** 2026-10-04
 
 ## Context
 

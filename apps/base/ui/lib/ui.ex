@@ -51,6 +51,7 @@ defmodule Bilimbi.Base.UI do
   # `phx-input` is not a LiveView binding and silently does nothing.
   # Filter with `phx-change` on the form and `phx-submit` to the same
   # handler, or `phx-keyup` when there is no form. See `apps/AGENTS.md`.
+  @spec live_view() :: Macro.t()
   def live_view do
     quote do
       use Phoenix.LiveView
@@ -67,6 +68,7 @@ defmodule Bilimbi.Base.UI do
     end
   end
 
+  @spec live_component() :: Macro.t()
   def live_component do
     quote do
       use Phoenix.LiveComponent
@@ -79,6 +81,7 @@ defmodule Bilimbi.Base.UI do
     end
   end
 
+  @spec html() :: Macro.t()
   def html do
     quote do
       use Phoenix.Component

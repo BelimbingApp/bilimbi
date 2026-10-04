@@ -17,6 +17,10 @@ defmodule Bilimbi.Base.Settings do
   alias Bilimbi.Base.Settings.Schema
   alias Bilimbi.Base.Settings.Scope
 
+  @doc """
+  The declared definition for `key`, or `nil`. An exact key wins; otherwise the
+  longest matching wildcard definition applies.
+  """
   @spec definition(String.t()) :: Definition.t() | nil
   def definition(key) when is_binary(key) and key != "" do
     definitions = registry!().definitions
@@ -29,17 +33,32 @@ defmodule Bilimbi.Base.Settings do
       |> Enum.find(&Definition.matches?(&1, key))
   end
 
+  @doc """
+  Like `definition/1`, but raises `ArgumentError` for an undeclared key.
+  """
   @spec definition!(String.t()) :: Definition.t()
   def definition!(key) do
     definition(key) || raise ArgumentError, "setting #{inspect(key)} has no discovered definition"
   end
 
+  @doc """
+  Every discovered definition, keyed by its declared key or wildcard pattern.
+  """
   @spec definitions() :: %{required(String.t()) => Definition.t()}
   def definitions, do: registry!().definitions
 
+  @doc """
+  The runtime-state keys modules have claimed. A claimed key has no default.
+  """
   @spec runtime_claims() :: [String.t()]
   def runtime_claims, do: registry!().runtime_claims
 
+  @doc """
+  Resolves `key` through the scopes its definition allows, then its default.
+
+  A claimed runtime-state key resolves to `nil` when no row exists. An undeclared
+  and unclaimed key raises.
+  """
   @spec get(String.t(), Scope.t() | nil) :: term()
   def get(key, scope \\ nil) when is_binary(key) and key != "" do
     case definition(key) do
@@ -63,6 +82,10 @@ defmodule Bilimbi.Base.Settings do
     end
   end
 
+  @doc """
+  Resolves several keys and returns only their values. See `resolve_many/2` for
+  override metadata.
+  """
   @spec get_many([String.t()], Scope.t() | nil) :: %{required(String.t()) => term()}
   def get_many(keys, scope \\ nil) when is_list(keys) do
     Map.new(resolve_many(keys, scope), fn {key, resolved} -> {key, resolved.value} end)
@@ -131,6 +154,12 @@ defmodule Bilimbi.Base.Settings do
     end)
   end
 
+  @doc """
+  Stores `value` for `key` at `scope`, validating it against the definition.
+
+  Returns `{:ok, value}`, or `{:error, changeset}` when validation fails. The
+  cache entry is invalidated after the surrounding transaction commits.
+  """
   @spec put(String.t(), term(), Scope.t() | nil) :: {:ok, term()} | {:error, Ecto.Changeset.t()}
   def put(key, value, scope \\ nil) when is_binary(key) and key != "" do
     definition = definition(key)
@@ -206,6 +235,10 @@ defmodule Bilimbi.Base.Settings do
     end
   end
 
+  @doc """
+  Removes the override stored for `key` at exactly `scope`, so resolution falls
+  back to the next scope or the default. Succeeds when no row exists.
+  """
   @spec delete(String.t(), Scope.t() | nil) :: :ok
   def delete(key, scope \\ nil) when is_binary(key) and key != "" do
     assert_claimed_at_scope!(key, scope)
@@ -220,6 +253,9 @@ defmodule Bilimbi.Base.Settings do
     :ok
   end
 
+  @doc """
+  Whether `key` has a stored row at exactly `scope`.
+  """
   @spec overridden?(String.t(), Scope.t() | nil) :: boolean()
   def overridden?(key, scope \\ nil) when is_binary(key) and key != "" do
     assert_claimed_at_scope!(key, scope)

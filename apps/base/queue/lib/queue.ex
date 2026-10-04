@@ -290,6 +290,7 @@ defmodule Bilimbi.Base.Queue do
   end
 
   @doc false
+  @spec health_status() :: String.t() | :unavailable
   def health_status do
     case diagnostics() do
       %Diagnostics{available?: true, backlog: backlog, retryable: retryable, discarded: discarded} ->

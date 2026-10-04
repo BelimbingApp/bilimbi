@@ -32,6 +32,6 @@ Restart the server on the same Bash Terminal by pressing ctrl+c twice.
 
 ## Email in development
 
-- Swoosh is the Elixir mailer library Phoenix apps use to send email. Read it on the bash terminal the server was started.
-- In local development, emails are often captured instead of sent to the real internet; this avoids accidental deliveries while testing.
-- Mailpit is a common local inbox for capturing Swoosh mail in development, usually viewed at `http://localhost:8025`.
+- Swoosh is the Elixir mailer library Phoenix apps use to send email.
+- In local development, Swoosh's Local adapter captures email instead of sending it, so testing cannot deliver to the real internet. Read it at `http://localhost:4000/dev/mailbox`.
+- The test environment uses the Test adapter.

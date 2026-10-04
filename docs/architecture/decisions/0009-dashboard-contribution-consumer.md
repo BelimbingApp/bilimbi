@@ -103,6 +103,7 @@ interval is data on the contribution. The two sections below the grid, which
 were literal branches in the host page, are contributions with
 `placement: :section` and keep the ids stored in `ui.dashboard.sections`.
 
-The dashboard needs the top-bar notification bell, which is Core User's
-component. Core User contributes it as the `"shell.notifications"` embed and
-the dashboard renders it by that key.
+The top-bar notification bell is Core User's component. Core User contributes
+it as the `"shell.notifications"` embed, and the shared shell
+(`Bilimbi.Base.UI.Layouts.app/1`) renders it on every authenticated page. The
+dashboard does not render it.

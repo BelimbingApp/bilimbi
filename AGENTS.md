@@ -25,6 +25,7 @@ append it. Each guide points at the component comment that enforces the rule.
 - `apps/domains/AGENTS.md` — mounting an optional repository; meta-terms only
   in Domain code
 - `apps/extensions/AGENTS.md` — what an Extension may adapt
+- `docs/plans/AGENTS.md` — how to write a plan
 
 Normative sources this file points at rather than restates:
 

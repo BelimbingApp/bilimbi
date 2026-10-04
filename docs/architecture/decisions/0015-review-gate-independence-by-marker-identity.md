@@ -1,11 +1,11 @@
 # ADR 0015: Review-gate independence by marker identity; account is transport
 
 **Document Type:** Architecture Decision Record
-**Status:** Proposed
+**Status:** Withdrawn — the gate script, workflow, and fixtures this ADR describes were removed in `9923c17e` and no other merge gate replaced them
 **Agents:** opus-4.8
 **Scope:** How the merge gate judges whether a PR carries a genuine *independent*
 review, given that many agents share few GitHub accounts
-**Last Updated:** 2026-08-22
+**Last Updated:** 2026-10-04
 
 ## Context
 
@@ -194,5 +194,3 @@ when present but are not required.
 - [Issue #561: GitHub refuses a same-account formal verdict](https://github.com/BelimbingApp/bilimbi/issues/561)
 - [Issue #382: do not bypass the review gate](https://github.com/BelimbingApp/bilimbi/issues/382)
 - [ADR 0006: Module-owned web adapters and route discovery](./0006-module-owned-web-adapters.md)
-- `scripts/review_gate.sh`, `.github/workflows/review-gate.yml`,
-  `scripts/test/review_gate/`

@@ -18,11 +18,13 @@ defmodule Bilimbi.Base.Perf do
   @page_sizes [25, 50, 100, 300]
 
   @doc false
+  @spec handle_event([atom()], map(), map(), term()) :: term()
   def handle_event(event, measurements, metadata, generation) do
     Reporter.handle_event(event, measurements, metadata, generation)
   end
 
   @doc false
+  @spec recording_enabled?() :: boolean()
   def recording_enabled?, do: Reporter.recording_enabled?()
 
   @doc "Returns one bounded page without exposing captured telemetry metadata."
