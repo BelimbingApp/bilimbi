@@ -75,17 +75,16 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT 1;"
         })
 
-      {:ok, view, html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
 
-      assert html =~ "Database Queries"
-      assert html =~ "Active Users"
-      assert html =~ "Company Directory"
-      refute html =~ "Secret Query"
-      table_html = view |> element("#database-queries-card") |> render()
+      assert has_element?(view, "#database-queries-index", "Database Queries")
+      assert has_element?(view, "#query-row-#{q1.id}", "Active Users")
+      assert has_element?(view, "#query-row-#{q2.id}", "Company Directory")
+      refute has_element?(view, "#database-queries-table", "Secret Query")
       assert has_element?(view, "#database-queries-table")
-      assert html =~ ~s(id="database-queries-table-sort-updated_at")
-      assert html =~ ~s(aria-sort="descending")
-      refute table_html =~ "uppercase"
+      assert has_element?(view, "#database-queries-table-sort-updated_at")
+      assert has_element?(view, "#database-queries-card [aria-sort=descending]")
+      refute has_element?(view, "#database-queries-card [class*=uppercase]")
 
       # Refute create button and row action buttons for read-only user
       refute has_element?(view, "#btn-create-query")
@@ -93,22 +92,21 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "#delete-query-#{q2.id}")
 
       # Unauthorized event attempts fail server-side
-      assert render_click(view, "delete", %{"id" => to_string(q2.id)}) =~
-               "You are not authorized to modify queries."
+      render_click(view, "delete", %{"id" => to_string(q2.id)})
+      assert has_element?(view, "#flash-error", "You are not authorized to modify queries.")
 
       assert {:ok, _} = User.get_database_query(as(scope, 91), q2.slug)
 
-      assert render_click(view, "duplicate", %{"id" => to_string(q1.id)}) =~
-               "You are not authorized to modify queries."
+      render_click(view, "duplicate", %{"id" => to_string(q1.id)})
+      assert has_element?(view, "#flash-error", "You are not authorized to modify queries.")
 
       # Test search
-      search_html =
-        view
-        |> form("#database-queries-filters", %{"filters" => %{"search" => "Directory"}})
-        |> render_change()
+      view
+      |> form("#database-queries-filters", %{"filters" => %{"search" => "Directory"}})
+      |> render_change()
 
-      assert search_html =~ "Company Directory"
-      refute search_html =~ "Active Users"
+      assert has_element?(view, "#query-row-#{q2.id}")
+      refute has_element?(view, "#query-row-#{q1.id}")
 
       patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
       assert patched["search"] == "Directory"
@@ -274,7 +272,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       # Cancelling keeps the query.
       view2 |> element("#delete-query-confirm-cancel", "Cancel") |> render_click()
       refute has_element?(view2, "#delete-query-confirm")
-      assert render(view2) =~ "Company Directory"
+      assert has_element?(view2, "#query-row-#{q2.id}", "Company Directory")
 
       # Confirming deletes it and reports the completed write as a success.
       view2 |> element("#delete-query-#{q2.id}") |> render_click()
@@ -312,10 +310,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT id, name FROM users;"
         })
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "Read Only Query"
+      assert has_element?(view, "#query-name-input[value='Read Only Query']")
       refute has_element?(view, "#btn-save-query")
       refute has_element?(view, "#btn-duplicate-query")
       refute has_element?(view, "#btn-delete-query")
@@ -329,9 +327,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "button#database-query-back")
 
       # Server-side event authorization rejection
-      assert render_click(view, "save") =~ "You are not authorized to modify queries."
-      assert render_click(view, "duplicate") =~ "You are not authorized to modify queries."
-      assert render_click(view, "delete") =~ "You are not authorized to modify queries."
+      for event <- ["save", "duplicate", "delete"] do
+        render_click(view, event)
+        assert has_element?(view, "#flash-error", "You are not authorized to modify queries.")
+      end
     end
 
     test "warns, where SQL runs, that the console reads across every company", %{
@@ -373,10 +372,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
         "admin.system.database-table.edit"
       ])
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
 
-      assert html =~ "New Query"
+      assert page_title(view) =~ "New Query"
       assert has_element?(view, "#btn-save-query")
 
       # Fill in fields
@@ -416,14 +415,14 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT id, name FROM users WHERE name = :user_name;"
         })
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn
         |> put_req_header("user-agent", "ConsoleTest/1.0 (needle-agent)")
         |> log_in_as()
         |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "Find User By Name"
-      assert html =~ ":user_name"
+      assert has_element?(view, "#query-name-input[value='Find User By Name']")
+      assert has_element?(view, "#param-input-user_name")
 
       # The page ran the saved query on each of its two mounts (the
       # disconnected render, then the socket): both are commands, recorded
@@ -438,10 +437,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> render_change()
 
       # Run query
-      result_html = view |> element("#btn-run-query") |> render_click()
+      view |> element("#btn-run-query") |> render_click()
 
-      assert result_html =~ "Ada Lovelace"
-      assert result_html =~ "1 total rows"
+      assert has_element?(view, "#query-results-table", "Ada Lovelace")
+      assert has_element?(view, "#query-results-summary", "1 total rows")
 
       # One record per command, naming who ran it, from where, what they
       # typed, and what it did — and never the row it returned.
@@ -480,8 +479,13 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "DELETE FROM users"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "Only SELECT or WITH queries are permitted."
+      view |> element("#btn-run-query") |> render_click()
+
+      assert has_element?(
+               view,
+               "#query-execution-error",
+               "Only SELECT or WITH queries are permitted."
+             )
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -511,8 +515,13 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT 1; DELETE FROM users"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "Write or DDL statements are not permitted in queries."
+      view |> element("#btn-run-query") |> render_click()
+
+      assert has_element?(
+               view,
+               "#query-execution-error",
+               "Write or DDL statements are not permitted in queries."
+             )
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -536,8 +545,8 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT setval('__blb_console_page_probe', 42)"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "read-only transaction"
+      view |> element("#btn-run-query") |> render_click()
+      assert has_element?(view, "#query-execution-error", "read-only transaction")
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -561,8 +570,8 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT * FROM __blb_absent_console_table"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "does not exist"
+      view |> element("#btn-run-query") |> render_click()
+      assert has_element?(view, "#query-execution-error", "does not exist")
 
       assert [failed] = console_actions(scope)
       assert failed.event == "database_query.failed"
@@ -809,10 +818,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT invalid_column_xyz FROM non_existent_table;"
         })
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "does not exist" or html =~ "error"
+      assert has_element?(view, "#query-execution-error", "does not exist")
     end
 
     test "deletes existing query when user has edit capability", %{conn: conn, scope: scope} do
