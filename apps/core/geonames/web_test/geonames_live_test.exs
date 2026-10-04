@@ -129,6 +129,13 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(admin1, "caption.sr-only", "Admin1 divisions")
     assert has_element?(admin1, "#admin1-country-filter")
     assert has_element?(admin1, "label[for='admin1-country-filter'].sr-only", "Country")
+
+    filter_options = Geonames.country_options(Geonames.admin1_filter_countries())
+    assert {"Malaysia (MY)", "MY"} in filter_options
+
+    for {label, iso} <- filter_options do
+      assert has_element?(admin1, "#admin1-country-filter option[value='#{iso}']", label)
+    end
     assert has_element?(admin1, "#admin1-2", "California")
 
     admin1
@@ -489,7 +496,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     postcodes |> element("#postcodes-new") |> render_click()
     assert has_element?(postcodes, "#postcode-modal")
-    assert has_element?(postcodes, "#postcode-country option[value='MY']")
+
+    assert {"Malaysia (MY)", "MY"} in Geonames.country_options()
+
+    for {label, iso} <- Geonames.country_options() do
+      assert has_element?(postcodes, "#postcode-country option[value='#{iso}']", label)
+    end
 
     assert has_element?(
              postcodes,

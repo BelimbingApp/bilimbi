@@ -116,6 +116,23 @@ defmodule Bilimbi.Core.GeonamesTest do
              Geonames.page_countries(%{"search" => "Japan", "page" => "9"})
   end
 
+  test "country options label Name (ISO) and store the ISO" do
+    assert Geonames.country_options() == [
+             {"Malaysia (MY)", "MY"},
+             {"United States (US)", "US"}
+           ]
+
+    assert Geonames.country_options(Geonames.list_countries()) == Geonames.country_options()
+
+    [%{iso: "MY"} = malaysia | _] = Geonames.list_countries()
+    assert Geonames.country_options([malaysia]) == [{"Malaysia (MY)", "MY"}]
+
+    assert Geonames.country_options(Geonames.admin1_filter_countries()) == [
+             {"Malaysia (MY)", "MY"},
+             {"United States (US)", "US"}
+           ]
+  end
+
   test "division options label the name, and the postcode form adds the code" do
     assert Geonames.admin1_options("MY") == [
              {"Kuala Lumpur", "MY.14"},

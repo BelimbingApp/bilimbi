@@ -10,6 +10,7 @@ defmodule BilimbiWeb.AddressLiveTest do
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -234,7 +235,14 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-cancel[href='/addresses']", "Cancel")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
     assert has_element?(view, "#address-country[role='combobox']")
-    assert has_element?(view, "#address-country-option-MY[role='option']", "Malaysia")
+    assert Geonames.country_options() == [{"Malaysia (MY)", "MY"}]
+
+    assert has_element?(
+             view,
+             "#address-country-option-MY[role='option'][data-value='MY'][data-label='Malaysia (MY)']",
+             "Malaysia (MY)"
+           )
+
     assert has_element?(view, "#address-country-value[name='address[country_iso]'][value='']")
 
     view
