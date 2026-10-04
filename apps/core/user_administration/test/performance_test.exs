@@ -4,8 +4,7 @@ defmodule Bilimbi.Core.UserAdministration.PerformanceTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.TestAuthz
@@ -50,10 +49,11 @@ defmodule Bilimbi.Core.UserAdministration.PerformanceTest do
       ])
     end)
 
-    assert {:ok, role} = Authz.create_role(scope(), 10, %{name: "Reviewer", code: "reviewer"})
+    assert {:ok, role} =
+             Authz.create_role(TenancyFixtures.scope(), 10, %{name: "Reviewer", code: "reviewer"})
 
     Enum.each(1..40//3, fn id ->
-      assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, id, role.id)
+      assert {:ok, :assigned} = Authz.assign_role(TenancyFixtures.scope(), 10, :user, id, role.id)
     end)
 
     %{role_id: role.id}
@@ -104,7 +104,7 @@ defmodule Bilimbi.Core.UserAdministration.PerformanceTest do
         nil
       )
 
-    page = UserAdministration.list_users(scope(), options)
+    page = UserAdministration.list_users(TenancyFixtures.scope(), options)
     :ok = :telemetry.detach(handler_id)
 
     assert_receive {:page_query, %{query: query, params: params}}, 1_000
@@ -132,14 +132,5 @@ defmodule Bilimbi.Core.UserAdministration.PerformanceTest do
           root["Temp Written Blocks"]
         ])
     }
-  end
-
-  defp scope do
-    Scope.for_tenant(%Identity{
-      id: 1,
-      name: "Tenant one",
-      status: "active",
-      is_platform_operator: false
-    })
   end
 end

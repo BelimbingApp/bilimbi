@@ -4,8 +4,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.User, as: CoreUser
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration
@@ -43,9 +42,9 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     archive_company!(11)
 
     assert {:ok, role} =
-             Authz.create_role(scope(), 10, %{name: "Viewer", code: "viewer"})
+             Authz.create_role(TenancyFixtures.scope(), 10, %{name: "Viewer", code: "viewer"})
 
-    assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 1, role.id)
+    assert {:ok, :assigned} = Authz.assign_role(TenancyFixtures.scope(), 10, :user, 1, role.id)
 
     assert %Page{
              entries: [
@@ -56,7 +55,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
              page_size: 25,
              total_entries: 2,
              total_pages: 1
-           } = page = UserAdministration.list_users(scope())
+           } = page = UserAdministration.list_users(TenancyFixtures.scope())
 
     assert listed_role.id == role.id
     [entry | _entries] = page.entries
@@ -92,7 +91,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     archive_company!(11)
 
     assert %Page{entries: entries, total_entries: 2} =
-             UserAdministration.list_users(scope(), sort_by: :name)
+             UserAdministration.list_users(TenancyFixtures.scope(), sort_by: :name)
 
     assert Enum.map(entries, &{&1.id, &1.company_name, &1.company_archived}) == [
              {2, "Archive Company", true},
@@ -145,15 +144,17 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert {:ok, second} = custom_role!(10, "Second", "second")
 
     Enum.each(1..15, fn id ->
-      assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, id, first.id)
+      assert {:ok, :assigned} =
+               Authz.assign_role(TenancyFixtures.scope(), 10, :user, id, first.id)
     end)
 
     Enum.each(15..27, fn id ->
-      assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, id, second.id)
+      assert {:ok, :assigned} =
+               Authz.assign_role(TenancyFixtures.scope(), 10, :user, id, second.id)
     end)
 
     assert %Page{entries: entries, total_entries: 27, total_pages: 2} =
-             UserAdministration.list_users(scope(),
+             UserAdministration.list_users(TenancyFixtures.scope(),
                role_ids: [first.id, second.id],
                page_size: 25
              )
@@ -166,7 +167,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert [first_id, second_id] == [first.id, second.id]
 
     assert %Page{entries: [], total_entries: 0, total_pages: 0} =
-             UserAdministration.list_users(scope(), role_ids: [9_999_999])
+             UserAdministration.list_users(TenancyFixtures.scope(), role_ids: [9_999_999])
   end
 
   test "shows only integration-valid system and custom roles" do
@@ -187,13 +188,17 @@ defmodule Bilimbi.Core.UserAdministrationTest do
           owned_system,
           global_custom
         ] do
-      assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 1, role.id)
+      assert {:ok, :assigned} = Authz.assign_role(TenancyFixtures.scope(), 10, :user, 1, role.id)
     end
 
     assert {:ok, _} = Authz.reconcile_system_roles()
-    system_role = Enum.find(Authz.list_roles(scope()), & &1.is_system)
-    assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 1, system_role.id)
-    assert {:ok, :assigned} = Authz.assign_role(scope(), 12, :user, 1, system_role.id)
+    system_role = Enum.find(Authz.list_roles(TenancyFixtures.scope()), & &1.is_system)
+
+    assert {:ok, :assigned} =
+             Authz.assign_role(TenancyFixtures.scope(), 10, :user, 1, system_role.id)
+
+    assert {:ok, :assigned} =
+             Authz.assign_role(TenancyFixtures.scope(), 12, :user, 1, system_role.id)
 
     archive_company!(11)
     move_role_to_missing_company!(foreign_custom.id, 20)
@@ -201,7 +206,8 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     corrupt_role_identity!(owned_system.id, 10, true)
     corrupt_role_identity!(global_custom.id, nil, false)
 
-    assert %Page{entries: [%Entry{roles: roles}]} = UserAdministration.list_users(scope())
+    assert %Page{entries: [%Entry{roles: roles}]} =
+             UserAdministration.list_users(TenancyFixtures.scope())
 
     assert Enum.map(roles, & &1.id) ==
              [live_custom.id, system_role.id]
@@ -222,10 +228,11 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert {:ok, same_a_two} = custom_role!(12, "Same", "a")
 
     for role <- [same_b, same_a_one, same_a_two] do
-      assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 1, role.id)
+      assert {:ok, :assigned} = Authz.assign_role(TenancyFixtures.scope(), 10, :user, 1, role.id)
     end
 
-    assert %Page{entries: [%Entry{roles: roles}]} = UserAdministration.list_users(scope())
+    assert %Page{entries: [%Entry{roles: roles}]} =
+             UserAdministration.list_users(TenancyFixtures.scope())
 
     same_a_ids = Enum.sort([same_a_one.id, same_a_two.id])
     assert Enum.map(roles, & &1.id) == same_a_ids ++ [same_b.id]
@@ -233,24 +240,24 @@ defmodule Bilimbi.Core.UserAdministrationTest do
 
   test "returns truthful empty and out-of-range envelopes" do
     assert %Page{entries: [], page: 1, total_entries: 0, total_pages: 0} =
-             UserAdministration.list_users(scope())
+             UserAdministration.list_users(TenancyFixtures.scope())
 
     Enum.each(1..26, fn id ->
       user!(id, 10, "User #{id}", "u#{id}@example.com", nil)
     end)
 
     assert %Page{entries: [], page: 3, page_size: 25, total_entries: 26, total_pages: 2} =
-             UserAdministration.list_users(scope(), page: 3, page_size: 25)
+             UserAdministration.list_users(TenancyFixtures.scope(), page: 3, page_size: 25)
   end
 
   test "a later page call truthfully observes a public Core User hard delete" do
     user!(1, 10, "Ada", "ada@example.com", nil)
     assert ids([]) == [1]
 
-    assert :ok = CoreUser.delete_user(scope(), 10, 1)
+    assert :ok = CoreUser.delete_user(TenancyFixtures.scope(), 10, 1)
 
     assert %Page{entries: [], total_entries: 0, total_pages: 0} =
-             UserAdministration.list_users(scope())
+             UserAdministration.list_users(TenancyFixtures.scope())
   end
 
   test "rejects every malformed or unnormalized option without dynamic atoms" do
@@ -281,11 +288,16 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     ]
 
     Enum.each(malformed, fn options ->
-      assert_raise ArgumentError, fn -> UserAdministration.list_users(scope(), options) end
+      assert_raise ArgumentError, fn ->
+        UserAdministration.list_users(TenancyFixtures.scope(), options)
+      end
     end)
 
-    assert %Page{page: 1, page_size: 25} = UserAdministration.list_users(scope())
-    assert %Page{page: 1, page_size: 300} = UserAdministration.list_users(scope(), page_size: 300)
+    assert %Page{page: 1, page_size: 25} = UserAdministration.list_users(TenancyFixtures.scope())
+
+    assert %Page{page: 1, page_size: 300} =
+             UserAdministration.list_users(TenancyFixtures.scope(), page_size: 300)
+
     user!(1, 10, "Ada", "ada@example.com", nil)
 
     assert %Page{
@@ -293,13 +305,13 @@ defmodule Bilimbi.Core.UserAdministrationTest do
              page: ^max_page,
              total_entries: 1,
              total_pages: 1
-           } = UserAdministration.list_users(scope(), page: max_page)
+           } = UserAdministration.list_users(TenancyFixtures.scope(), page: max_page)
   end
 
   test "executes one parameterized PostgreSQL statement for a combined page snapshot" do
     user!(1, 10, "Ada", "ada@example.com", nil)
     assert {:ok, role} = custom_role!(10, "Viewer", "viewer")
-    assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 1, role.id)
+    assert {:ok, :assigned} = Authz.assign_role(TenancyFixtures.scope(), 10, :user, 1, role.id)
 
     handler_id = "user-administration-query-#{System.unique_integer([:positive])}"
     event = Repo.config()[:telemetry_prefix] ++ [:query]
@@ -318,7 +330,10 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     on_exit(fn -> :telemetry.detach(handler_id) end)
 
     assert %Page{entries: [%Entry{id: 1}], total_entries: 1} =
-             UserAdministration.list_users(scope(), search: "A%", role_ids: [role.id])
+             UserAdministration.list_users(TenancyFixtures.scope(),
+               search: "A%",
+               role_ids: [role.id]
+             )
 
     assert_receive {:repo_query, _measurements, %{query: query}}, 1_000
     refute_receive {:repo_query, _, _}, 50
@@ -331,27 +346,18 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert query =~ "$1"
 
     assert %Page{entries: [], total_entries: 1, total_pages: 1} =
-             UserAdministration.list_users(scope(), page: 2, page_size: 25)
+             UserAdministration.list_users(TenancyFixtures.scope(), page: 2, page_size: 25)
 
     assert_receive {:repo_query, _, %{query: out_of_range_query}}, 1_000
     refute_receive {:repo_query, _, _}, 50
     assert out_of_range_query =~ ~s("user_total")
 
     assert %Page{entries: [], total_entries: 0, total_pages: 0} =
-             UserAdministration.list_users(scope(), search: "missing")
+             UserAdministration.list_users(TenancyFixtures.scope(), search: "missing")
 
     assert_receive {:repo_query, _, %{query: empty_query}}, 1_000
     refute_receive {:repo_query, _, _}, 50
     assert empty_query =~ ~s("user_total")
-  end
-
-  defp scope(tenant_id \\ 1) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Tenant #{tenant_id}",
-      status: "active",
-      is_platform_operator: false
-    })
   end
 
   defp user!(id, company_id, name, email, created_at) do
@@ -367,10 +373,11 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   end
 
   defp ids(options),
-    do: UserAdministration.list_users(scope(), options).entries |> Enum.map(& &1.id)
+    do:
+      UserAdministration.list_users(TenancyFixtures.scope(), options).entries |> Enum.map(& &1.id)
 
   defp custom_role!(company_id, name, code) do
-    Authz.create_role(scope(), company_id, %{name: name, code: code})
+    Authz.create_role(TenancyFixtures.scope(), company_id, %{name: name, code: code})
   end
 
   defp archive_company!(id) do

@@ -1,5 +1,6 @@
 defmodule Bilimbi.Base.Workflow.HumanActionTest do
   use Bilimbi.Base.Database.DataCase, async: false
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.{Authentication, ForgedActorError}
@@ -19,7 +20,7 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
     create_tables!()
     install_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
-    system = Bilimbi.Base.Authz.TestFixtures.scope()
+    system = TenancyFixtures.scope()
     scope = Authentication.sign_in(system, 7, 10)
 
     assert {:ok, :stored} =
@@ -58,7 +59,7 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
              Workflow.available_actions(unprivileged, c.subject)
 
     assert {:error, :human_actor_required} = Workflow.available_actions(c.system, c.subject)
-    foreign = Authentication.sign_in(Bilimbi.Base.Authz.TestFixtures.scope(2), 7, 10)
+    foreign = Authentication.sign_in(TenancyFixtures.scope(2), 7, 10)
     assert {:error, :subject_not_found} = Workflow.available_actions(foreign, c.subject)
 
     assert {:error, :owner_refused} =
@@ -289,7 +290,7 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
   test "another tenant, a missing capability, a system actor and a forged actor refuse", c do
     assert {:ok, %{subject_version: version}} = Workflow.available_actions(c.scope, c.subject)
     request = approve("refused", version, %{})
-    foreign = Authentication.sign_in(Bilimbi.Base.Authz.TestFixtures.scope(2), 7, 10)
+    foreign = Authentication.sign_in(TenancyFixtures.scope(2), 7, 10)
     assert {:error, :subject_not_found} = Workflow.execute_action(foreign, c.subject, request)
     unprivileged = Authentication.sign_in(c.system, 9, 10)
 

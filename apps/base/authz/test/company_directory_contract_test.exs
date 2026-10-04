@@ -13,11 +13,10 @@ defmodule Bilimbi.Base.Authz.CompanyDirectoryContractTest do
   use ExUnit.Case, async: true
 
   alias Bilimbi.Base.Authz.TestCompanyDirectory, as: Directory
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   setup do
-    %{populated: scope_for(1), empty: scope_for(2)}
+    %{populated: TenancyFixtures.scope(1), empty: TenancyFixtures.scope(2)}
   end
 
   test "reports the same companies as company_ids/1", %{populated: scope} do
@@ -45,12 +44,4 @@ defmodule Bilimbi.Base.Authz.CompanyDirectoryContractTest do
 
   # Built straight from an Identity rather than through `Tenancy.scope/1`, which
   # would need a tenant row and drag a DataCase into what is a pure test.
-  defp scope_for(tenant_id) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Tenant #{tenant_id}",
-      status: "active",
-      is_platform_operator: false
-    })
-  end
 end

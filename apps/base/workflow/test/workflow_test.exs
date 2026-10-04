@@ -1,5 +1,6 @@
 defmodule Bilimbi.Base.WorkflowTest do
   use Bilimbi.Base.Database.DataCase, async: false
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.{Authentication, ForgedActorError}
@@ -11,7 +12,7 @@ defmodule Bilimbi.Base.WorkflowTest do
     create_tables!()
     install_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
-    system = Bilimbi.Base.Authz.TestFixtures.scope()
+    system = TenancyFixtures.scope()
     actor = Authentication.sign_in(system, 7, 10)
 
     assert {:ok, :stored} =

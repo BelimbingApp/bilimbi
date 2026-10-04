@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Workflow.ReferenceAuthorizationTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
@@ -12,7 +13,7 @@ defmodule Bilimbi.Base.Workflow.ReferenceAuthorizationTest do
     create_tables!()
     install_reference_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
-    system = Authz.TestFixtures.scope()
+    system = TenancyFixtures.scope()
     scope = Authentication.sign_in(system, 7, 10)
 
     assert {:ok, :stored} =

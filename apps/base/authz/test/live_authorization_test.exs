@@ -12,6 +12,7 @@ defmodule Bilimbi.Base.Authz.LiveAuthorizationTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -23,8 +24,10 @@ defmodule Bilimbi.Base.Authz.LiveAuthorizationTest do
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
 
-    {:ok, :stored} = Authz.put_principal_capability(scope(), 10, :user, 7, @capability, true)
-    {:ok, actor} = scope() |> Authentication.sign_in(7, 10) |> Authz.scope_actor()
+    {:ok, :stored} =
+      Authz.put_principal_capability(TenancyFixtures.scope(), 10, :user, 7, @capability, true)
+
+    {:ok, actor} = TenancyFixtures.scope() |> Authentication.sign_in(7, 10) |> Authz.scope_actor()
 
     %{actor: actor}
   end
@@ -43,7 +46,8 @@ defmodule Bilimbi.Base.Authz.LiveAuthorizationTest do
   end
 
   defp revoke! do
-    {:ok, :stored} = Authz.put_principal_capability(scope(), 10, :user, 7, @capability, false)
+    {:ok, :stored} =
+      Authz.put_principal_capability(TenancyFixtures.scope(), 10, :user, 7, @capability, false)
   end
 
   test "a held capability proceeds with the socket untouched", %{actor: actor} do

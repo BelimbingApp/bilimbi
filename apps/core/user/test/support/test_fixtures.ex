@@ -31,8 +31,6 @@ defmodule Bilimbi.Core.User.TestFixtures do
 
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
 
   def create_user_tables! do
     apply(EmployeeFixtures, :create_employee_tables!, [])
@@ -150,24 +148,6 @@ defmodule Bilimbi.Core.User.TestFixtures do
       %{settings: [], authz: authz, menu: []},
       "user-test"
     )
-  end
-
-  def operator_scope(tenant_id \\ 1) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Operator Tenant",
-      status: "active",
-      is_platform_operator: true
-    })
-  end
-
-  def tenant_scope(tenant_id \\ 2) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Tenant #{tenant_id}",
-      status: "active",
-      is_platform_operator: false
-    })
   end
 
   def insert_user!(attributes \\ %{}) do

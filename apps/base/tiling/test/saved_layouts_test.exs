@@ -9,8 +9,7 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
   alias Bilimbi.Base.Settings.Scope
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.Tiling.SharedLayouts
 
@@ -23,7 +22,7 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     AuthzFixtures.create_authz_tables!()
     install_tiling_registry!()
 
-    system = system_scope()
+    system = TenancyFixtures.scope(41, true)
 
     {:ok, :stored} =
       Authz.put_principal_capability(system, 73, :user, 91, @publish, true)
@@ -154,15 +153,6 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
 
     assert SavedLayouts.set_layout(@scope, "missing", "master", "/a") ==
              {:error, :not_found}
-  end
-
-  defp system_scope do
-    TenancyScope.for_tenant(%Identity{
-      id: 41,
-      name: "Operator tenant",
-      status: "active",
-      is_platform_operator: true
-    })
   end
 
   defp install_tiling_registry! do

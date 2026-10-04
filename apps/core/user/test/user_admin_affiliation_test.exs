@@ -7,6 +7,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session.TestFixtures, as: SessionFixtures
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Password
@@ -43,7 +44,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       code: "ACM-2"
     })
 
-    tenant_scope = UserFixtures.tenant_scope(2)
+    tenant_scope = TenancyFixtures.scope(2)
 
     :ok = Bilimbi.Core.Employee.ensure_system_types()
 
@@ -312,7 +313,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
 
       AuthzFixtures.grant_role!(30, 9, "user_admin_30", true)
       AuthzFixtures.grant_role!(20, 9, "user_admin_stray", true)
-      outsider = Authentication.sign_in(UserFixtures.tenant_scope(3), 9, 30)
+      outsider = Authentication.sign_in(TenancyFixtures.scope(3), 9, 30)
 
       assert {:error, :unauthorized} =
                User.admin_change_password(outsider, 20, 801, "brandnewsecurepassword123")
@@ -382,6 +383,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -403,7 +405,7 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
       seed_concurrency_data!()
     end)
 
-    scope = UserFixtures.tenant_scope(2)
+    scope = TenancyFixtures.scope(2)
     %{schema: schema, scope: Authentication.sign_in(scope, 2, 20)}
   end
 

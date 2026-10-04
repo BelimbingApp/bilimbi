@@ -6,6 +6,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
   alias Bilimbi.Base.Audit.MutationCapture
   alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Audit.TestFixtures
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Ecto.Adapters.SQL
 
   defmodule Widget do
@@ -380,15 +381,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     end
   end
 
-  defp fake_scope(tenant_id) do
-    {:ok,
-     Bilimbi.Base.Tenancy.Scope.for_tenant(%Bilimbi.Base.Tenancy.Identity{
-       id: tenant_id,
-       name: "T",
-       status: "active",
-       is_platform_operator: false
-     })}
-  end
+  defp fake_scope(tenant_id), do: {:ok, TenancyFixtures.scope(tenant_id)}
 
   defp explicit_attributes do
     %{

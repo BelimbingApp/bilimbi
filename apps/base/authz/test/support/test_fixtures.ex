@@ -5,8 +5,6 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
   alias Bilimbi.Base.Authz.TestCompanyDirectory
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
   alias Ecto.Adapters.SQL
 
   def create_authz_tables! do
@@ -157,24 +155,6 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         agent: Bilimbi.Base.Authz.TestAgentDirectory
       })
     )
-  end
-
-  def scope(tenant_id \\ 1) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Tenant #{tenant_id}",
-      status: "active",
-      is_platform_operator: false
-    })
-  end
-
-  def platform_scope do
-    Scope.for_tenant(%Identity{
-      id: 1,
-      name: "Platform operator",
-      status: "active",
-      is_platform_operator: true
-    })
   end
 
   # Raw SQL on purpose: the public API refuses `grant_all` on a custom role

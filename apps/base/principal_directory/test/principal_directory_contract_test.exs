@@ -15,13 +15,12 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.PrincipalDirectory.TestAgentProvider
   alias Bilimbi.Base.PrincipalDirectory.TestUserProvider
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   @providers %{user: TestUserProvider, agent: TestAgentProvider}
 
   setup do
-    %{scope: scope(), providers: @providers}
+    %{scope: TenancyFixtures.scope(), providers: @providers}
   end
 
   test "orders by the name displayed, case-insensitively", %{scope: scope, providers: p} do
@@ -154,12 +153,4 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
              PrincipalDirectory.choices(scope, :agent, :anything, providers: @providers)
   end
 
-  defp scope do
-    Scope.for_tenant(%Identity{
-      id: 1,
-      name: "Tenant 1",
-      status: "active",
-      is_platform_operator: false
-    })
-  end
 end

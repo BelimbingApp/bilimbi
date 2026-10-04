@@ -24,11 +24,10 @@ defmodule Bilimbi.Base.ScheduleTest do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
 
   @execute "admin.system.schedule.execute"
   @manage "admin.system.schedule.manage"
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Crontab.CronExpression.Parser
 
   setup do
@@ -239,7 +238,7 @@ defmodule Bilimbi.Base.ScheduleTest do
     install_operator_authz!()
     AuthzFixtures.create_authz_tables!()
 
-    system = system_scope()
+    system = TenancyFixtures.scope(41, true)
     refused = Authentication.sign_in(system, 91, 73)
 
     for scope <- [system, refused] do
@@ -747,19 +746,10 @@ defmodule Bilimbi.Base.ScheduleTest do
     )
   end
 
-  defp system_scope do
-    Scope.for_tenant(%Identity{
-      id: 41,
-      name: "Operator tenant",
-      status: "active",
-      is_platform_operator: true
-    })
-  end
-
   defp granted_operator(capabilities) do
     install_operator_authz!()
     AuthzFixtures.create_authz_tables!()
-    scope = system_scope()
+    scope = TenancyFixtures.scope(41, true)
 
     Enum.each(capabilities, fn capability ->
       {:ok, :stored} = Authz.put_principal_capability(scope, 73, :user, 91, capability, true)

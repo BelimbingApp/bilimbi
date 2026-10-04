@@ -1,5 +1,6 @@
 defmodule Bilimbi.Base.Workflow.ConcurrencyTest do
   use ExUnit.Case, async: false
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Base.{Authz, Repo, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
@@ -57,7 +58,7 @@ defmodule Bilimbi.Base.Workflow.ConcurrencyTest do
       )
 
       install_registry!()
-      system = Bilimbi.Base.Authz.TestFixtures.scope()
+      system = TenancyFixtures.scope()
       scope = Authentication.sign_in(system, 7, 10)
 
       assert {:ok, :stored} =
