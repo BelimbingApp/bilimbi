@@ -53,7 +53,7 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
       {:ecto_sql, "~> 3.14"},
       {:jason, "~> 1.4"},
       {:db_connection, "~> 2.10"},
-      {:oban, "~> 2.23.1"},
+      {:oban, "~> 2.23"},
       {:postgrex, "~> 0.22"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
@@ -63,7 +63,6 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
     [
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../../base/queue/priv/repo/migrations",
         "test"
       ]
     ]

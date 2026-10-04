@@ -93,7 +93,6 @@ defmodule Bilimbi.Web.MixProject do
       setup: ["deps.get", "assets.setup", "assets.build"],
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../base/queue/priv/repo/migrations",
         "test"
       ],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
