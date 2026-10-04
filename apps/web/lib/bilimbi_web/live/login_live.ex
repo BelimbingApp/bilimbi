@@ -27,7 +27,7 @@ defmodule BilimbiWeb.LoginLive do
   field the failure concerns and a screen reader still hears it.
   """
 
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.Company
   alias BilimbiWeb.RateLimit

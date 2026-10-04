@@ -44,6 +44,8 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    retention = retention_definition()
+
     socket =
       socket
       |> assign(:page_title, "Schedule")
@@ -52,6 +54,8 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:task_count, 0)
       |> assign(:task_state, :available)
       |> assign(:run_state, :available)
+      |> assign(:retention_minimum, retention.minimum)
+      |> assign(:retention_maximum, retention.maximum)
       |> assign(:retention_days, retention_days())
       |> assign(:retention_form, retention_form(retention_days()))
       |> assign(:run_page, empty_run_page())
@@ -337,7 +341,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   defp invalid_retention(socket),
-    do: {:noreply, put_flash(socket, :error, "Retention must be a whole number from 0 to 3650.")}
+    do: {:noreply, put_flash(socket, :error, retention_bounds_message())}
 
   defp load(socket, state) do
     socket =
@@ -440,15 +444,27 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   defp known_timezone(_timezone), do: nil
 
+  defp retention_definition, do: Settings.definition!("schedule.history.keep_days")
+
   defp retention_days do
-    case Settings.get("schedule.history.keep_days") do
-      days when is_integer(days) and days in 0..3650 -> days
-      _unknown -> :unavailable
+    definition = retention_definition()
+
+    case Settings.get(definition.key) do
+      days when is_integer(days) ->
+        if Settings.Definition.accepts?(definition, days), do: days, else: :unavailable
+
+      _unknown ->
+        :unavailable
     end
   rescue
     _error -> :unavailable
   catch
     :exit, _reason -> :unavailable
+  end
+
+  defp retention_bounds_message do
+    definition = retention_definition()
+    "Retention must be a whole number from #{definition.minimum} to #{definition.maximum}."
   end
 
   defp task_form(state) do
@@ -582,7 +598,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     do: "The action was not applied because audit evidence could not be recorded."
 
   defp error_message(:disabled), do: "Enable this definition before queuing it."
-  defp error_message(:invalid_retention), do: "Retention must be a whole number from 0 to 3650."
+  defp error_message(:invalid_retention), do: retention_bounds_message()
   defp error_message(:not_found), do: "That schedule definition is no longer installed."
   defp error_message(:overlap), do: "This task already has an active occurrence."
   defp error_message(:suppressed), do: "Resume this task before queuing it."

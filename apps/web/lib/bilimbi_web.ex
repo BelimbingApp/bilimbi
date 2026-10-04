@@ -1,15 +1,17 @@
 defmodule BilimbiWeb do
   @moduledoc """
   The entrypoint for defining the host web interface, such
-  as controllers, LiveViews, and HTML.
+  as controllers and the router.
+
+  LiveViews use `Bilimbi.Base.UI, :live_view`. There is one Gettext
+  backend, `Bilimbi.Base.UI.Gettext`.
 
   This can be used in your application as:
 
       use BilimbiWeb, :controller
-      use BilimbiWeb, :html
 
-  The definitions below will be executed for every controller,
-  component, etc, so keep them short and clean, focused
+  The definitions below will be executed for every controller
+  and the router, so keep them short and clean, focused
   on imports, uses and aliases.
 
   Do NOT define functions inside the quoted expressions
@@ -34,54 +36,10 @@ defmodule BilimbiWeb do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
 
-      use Gettext, backend: BilimbiWeb.Gettext
+      use Gettext, backend: Bilimbi.Base.UI.Gettext
 
       import Plug.Conn
 
-      unquote(verified_routes())
-    end
-  end
-
-  def live_view do
-    quote do
-      use Phoenix.LiveView
-      use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
-
-      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
-
-      unquote(html_helpers())
-    end
-  end
-
-  def html do
-    quote do
-      use Phoenix.Component
-
-      # Import convenience functions from controllers
-      import Phoenix.Controller,
-        only: [get_csrf_token: 0, view_module: 1, view_template: 1]
-
-      # Include general helpers for rendering HTML
-      unquote(html_helpers())
-    end
-  end
-
-  defp html_helpers do
-    quote do
-      # Translation
-      use Gettext, backend: BilimbiWeb.Gettext
-
-      # HTML escaping functionality
-      import Phoenix.HTML
-      # Core UI helpers and components
-      import Bilimbi.Base.UI, only: [allowed?: 2]
-      import Bilimbi.Base.UI.Components
-
-      # Common modules used in templates
-      alias BilimbiWeb.Layouts
-      alias Phoenix.LiveView.JS
-
-      # Routes generation with the ~p sigil
       unquote(verified_routes())
     end
   end
@@ -96,7 +54,7 @@ defmodule BilimbiWeb do
   end
 
   @doc """
-  When used, dispatch to the appropriate controller/live_view/etc.
+  When used, dispatch to the appropriate controller or router.
   """
   defmacro __using__(which) when is_atom(which) do
     apply(__MODULE__, which, [])

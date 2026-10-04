@@ -1,22 +1,3 @@
-// If you want to use Phoenix channels, run `mix help phx.gen.channel`
-// to get started and then uncomment the line below.
-// import "./user_socket.js"
-
-// You can include dependencies in two ways.
-//
-// The simplest option is to put them in assets/vendor and
-// import them using relative paths:
-//
-//     import "../vendor/some-package.js"
-//
-// Alternatively, you can `npm install some-package --prefix assets` and import
-// them using a path starting with the package name:
-//
-//     import "some-package"
-//
-// If you have dependencies that try to import CSS, esbuild will generate a separate `app.css` file.
-// To load it, simply add a second `<link>` to your `root.html.heex` file.
-
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
@@ -59,9 +40,23 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, SecretClear, SecretStored, Modal, FlashAutoDismiss, ClipboardCopy, TabStrip, Tiling},
 })
 
-// Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
-window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
+// The loading bar uses the orientation colour from the theme. Canvas cannot
+// paint a `var(--color-brand-strong)` token, so a probe resolves the used
+// colour when loading starts.
+function brandStrong() {
+  const brandProbe = document.createElement("span")
+  brandProbe.style.color = "var(--color-brand-strong)"
+  document.documentElement.appendChild(brandProbe)
+  const color = getComputedStyle(brandProbe).color
+  brandProbe.remove()
+  return color
+}
+
+topbar.config({shadowColor: "rgba(0, 0, 0, .3)"})
+window.addEventListener("phx:page-loading-start", _info => {
+  topbar.config({barColors: {0: brandStrong()}})
+  topbar.show(300)
+})
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 // A pressed `phx-disable-with` control is disabled and relabelled while the

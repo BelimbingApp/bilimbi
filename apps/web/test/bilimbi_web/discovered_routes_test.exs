@@ -58,14 +58,26 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
     {"/users/:id", "/users/91", Bilimbi.Core.User.Web.ShowLive}
   ]
 
-  test "module_routes/1 drops host-owned routes" do
+  test "module_routes/1 drops host routes the router compiles and keeps dashboard" do
     routes = [
       %{path: "/widgets", live: Foo, source: "core/foo"},
-      %{path: "/", live: BilimbiWeb.LoginLive, source: "web"}
+      %{path: "/", live: BilimbiWeb.LoginLive, source: "web"},
+      %{
+        path: "/dashboard",
+        live: BilimbiWeb.DashboardLive,
+        source: "web",
+        session: :auth
+      }
     ]
 
     assert DiscoveredRoutes.module_routes(routes) == [
-             %{path: "/widgets", live: Foo, source: "core/foo"}
+             %{path: "/widgets", live: Foo, source: "core/foo"},
+             %{
+               path: "/dashboard",
+               live: BilimbiWeb.DashboardLive,
+               source: "web",
+               session: :auth
+             }
            ]
   end
 
@@ -116,6 +128,13 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
           do: path
 
     assert MapSet.disjoint?(host_paths, module_paths)
+  end
+
+  test "dashboard is registered once, from the host manifest" do
+    dashboard =
+      Enum.filter(BilimbiWeb.Router.__routes__(), &(&1.path == "/dashboard" and &1.verb == :get))
+
+    assert length(dashboard) == 1
   end
 
   test "router reaches the transferred index and two retained User routes exactly once" do

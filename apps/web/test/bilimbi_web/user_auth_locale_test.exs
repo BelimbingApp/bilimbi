@@ -41,12 +41,10 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
     conn = conn |> log_in_as() |> get(~p"/dashboard")
     assert html_response(conn, 200)
-    assert Gettext.get_locale(BilimbiWeb.Gettext) == "de"
     assert Gettext.get_locale(Bilimbi.Base.UI.Gettext) == "de"
 
     anonymous_conn = build_conn() |> get(~p"/")
     assert html_response(anonymous_conn, 200)
-    assert Gettext.get_locale(BilimbiWeb.Gettext) == "fr"
     assert Gettext.get_locale(Bilimbi.Base.UI.Gettext) == "fr"
   end
 
@@ -71,7 +69,6 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
     conn = get(conn, ~p"/")
     assert html_response(conn, 200)
-    assert Gettext.get_locale(BilimbiWeb.Gettext) == "fr"
     assert Gettext.get_locale(Bilimbi.Base.UI.Gettext) == "fr"
 
     # Inference persisted globally; later requests resolve from Settings alone.
@@ -93,9 +90,7 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
       |> log_in_as(session_user(%{"user_id" => 92}))
       |> live(~p"/dashboard")
 
-    assert process_gettext_locale(first_view.pid, BilimbiWeb.Gettext) == "de"
     assert process_gettext_locale(first_view.pid, Bilimbi.Base.UI.Gettext) == "de"
-    assert process_gettext_locale(second_view.pid, BilimbiWeb.Gettext) == "zh"
     assert process_gettext_locale(second_view.pid, Bilimbi.Base.UI.Gettext) == "zh"
   end
 

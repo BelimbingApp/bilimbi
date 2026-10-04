@@ -1,3 +1,5 @@
+import {commit as commitValue, focusTrigger, settle as settleCommit} from "./inline_commit.js"
+
 const InlineEdit = {
   mounted() {
     this.init()
@@ -14,7 +16,6 @@ const InlineEdit = {
     this.triggerEl = this.el.querySelector('[data-role="trigger"]')
     this.inputEl = this.el.querySelector('input[data-role="input"]')
     this.textEl = this.el.querySelector('[data-role="text"]')
-    this.savingEl = this.el.querySelector('[data-role="saving"]')
 
     if (!this.triggerEl || !this.inputEl) return
 
@@ -78,9 +79,6 @@ const InlineEdit = {
 
   commit() {
     const newValue = this.inputEl.value.trim()
-    const id = this.el.dataset.id
-    const field = this.el.dataset.field || "value"
-    const saveEvent = this.el.dataset.saveEvent || "save"
     // Clearing a value is a real edit only where the owner says the field may
     // be empty; elsewhere an emptied input is treated as "no change" so a
     // required value is never blanked by a stray Enter.
@@ -95,37 +93,29 @@ const InlineEdit = {
     // sends no patch. Leaving the text alone means a failure needs no rollback
     // -- the row simply never changed (#302).
     if ((newValue !== "" || allowEmpty) && newValue !== this.originalValue) {
-      this.markSaving()
       // Addressed to the element rather than pushed bare: LiveView then
       // routes the event to the LiveComponent that rendered this field, when
       // one did (the address panels' table rows), and to the LiveView
       // otherwise (a detail page's facts). A bare pushEvent always reaches
       // the LiveView, which has no handler for a component's field.
-      this.pushEventTo(this.el, saveEvent, {id: id, [field]: newValue}, () => this.settle())
+      commitValue(this, {value: newValue})
     } else {
       this.inputEl.value = this.originalValue
     }
   },
 
   // The wait between commit and the server's reply is the one state the server
-  // cannot render, so the hook announces it: `aria-busy` on the field and the
-  // owner's "Saving…" text, if the markup carries one. The reply patch renders
-  // the saved or failed outcome and `settle` clears the in-flight marks.
-  markSaving() {
-    this.el.setAttribute("aria-busy", "true")
-    if (this.savingEl) this.savingEl.classList.remove("hidden")
-  },
-
+  // cannot render. `inline_commit` announces it; the reply patch renders the
+  // saved or failed outcome and `settle` clears the in-flight marks.
   settle() {
-    this.el.removeAttribute("aria-busy")
-    if (this.savingEl) this.savingEl.classList.add("hidden")
+    settleCommit(this)
   },
 
   cancel() {
     this.inputEl.value = this.originalValue
     this.inputEl.classList.add("hidden")
     this.triggerEl.classList.remove("invisible", "pointer-events-none")
-    this.triggerEl.focus()
+    focusTrigger(this)
   },
 }
 

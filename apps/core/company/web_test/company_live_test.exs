@@ -1430,7 +1430,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-timezone-card", "No timezone is configured")
 
       view |> element("#company-timezone-display") |> render_click()
-      assert has_element?(view, "#company-timezone-form select#company-timezone-select")
+
+      assert has_element?(
+               view,
+               "#company-timezone-form input#company-timezone-select[role='combobox']"
+             )
 
       view
       |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
