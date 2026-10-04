@@ -24,7 +24,7 @@ defmodule Bilimbi.Base.Perf.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      deps: deps()
     ]
   end
 
@@ -47,5 +47,17 @@ defmodule Bilimbi.Base.Perf.MixProject do
         "test"
       ]
     ]
+  end
+
+  defp deps do
+    [
+      {:db_connection, "~> 2.10"},
+      {:decimal, "~> 3.1"},
+      {:ecto, "~> 3.14"},
+      {:ecto_sql, "~> 3.14"},
+      {:oban, "~> 2.23.1"},
+      {:phoenix_live_view, "~> 1.2.0"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 end

@@ -41,7 +41,8 @@ defmodule Bilimbi.Core.Address.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.14"},
-      {:phoenix_live_view, "~> 1.2.0"}
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:decimal, "~> 3.1"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end

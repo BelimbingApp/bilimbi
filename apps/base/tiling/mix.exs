@@ -23,7 +23,7 @@ defmodule Bilimbi.Base.Tiling.MixProject do
       bilimbi_module_root: __DIR__,
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      deps: deps()
     ]
   end
 
@@ -36,4 +36,13 @@ defmodule Bilimbi.Base.Tiling.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp deps do
+    [
+      {:ecto, "~> 3.14"},
+      {:ecto_sql, "~> 3.14"},
+      {:phoenix_live_view, "~> 1.2.0"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+  end
 end

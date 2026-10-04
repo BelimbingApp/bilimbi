@@ -40,8 +40,10 @@ defmodule Bilimbi.Base.Artifacts.MixProject do
 
   defp deps do
     [
-      {:ecto_sql, "~> 3.14"}
-    ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      {:ecto_sql, "~> 3.14"},
+      {:postgrex, "~> 0.22"}
+    ] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 
   defp aliases do

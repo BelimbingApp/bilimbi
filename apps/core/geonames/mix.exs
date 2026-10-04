@@ -43,7 +43,11 @@ defmodule Bilimbi.Core.Geonames.MixProject do
       {:ecto_sql, "~> 3.14"},
       {:phoenix_live_view, "~> 1.2.0"},
       {:req, "~> 0.7"},
-      {:plug, "~> 1.20"}
+      {:plug, "~> 1.20"},
+      {:db_connection, "~> 2.10"},
+      {:decimal, "~> 3.1"},
+      {:mint, "~> 1.11"},
+      {:postgrex, "~> 0.22"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
