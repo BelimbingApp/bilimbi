@@ -26,8 +26,8 @@ and reset-token hashes never leave the module; account reads return
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete. A person must hold `admin.user.delete` when the call runs; `delete_user/3` owns that check |
-| `reassign_user_company(scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering. The person is `Scope.actor/1` |
-| `admin_change_password(scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation. The person is `Scope.actor/1` |
+| `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering. The actor is evaluated at the account's current company |
+| `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation. The actor is evaluated at the account's current company |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
 | `confirm_password(...)` / `update_password(...)` | Current-password confirmation and replacement |
 | `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
@@ -108,13 +108,17 @@ companies and nothing else. A user always belongs to a company and is the
 same person operating under a different one, so the page never detaches an
 account: Belimbing's select offers "None" and Bilimbi's does not, and a
 blank value that still arrives is refused on the fact without a write. The
-reassignment ends the account's sessions — `reassign_user_company/5` calls
+reassignment ends the account's sessions — `reassign_user_company/6` calls
 `Session.terminate_user_sessions/2` with a sentinel that spares none — so the
 open editor carries a warning saying so beside the select, before the
 operator chooses; it is a note, not a confirmation, because choosing the
 previous company again reverses the change. A reassignment authorizes
 `admin.user.update` against the account's **current** company, so its
-refusal names that company and never the chosen one.
+refusal names that company and never the chosen one. Password reset uses
+the same company. Both still take an authorization actor for that company,
+so a grant there allows the write while the operator is signed in
+elsewhere. Evaluating those grants from the sealed scope instead is an
+Authz change and a separate follow-up.
 
 **An account with no company is reachable from no screen.** Tenancy is
 derived from `company_id`, so `get_tenant_user/2` resolves no user without

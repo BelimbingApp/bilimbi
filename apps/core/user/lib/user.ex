@@ -41,6 +41,7 @@ defmodule Bilimbi.Core.User do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Actor, as: AuthzActor
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
@@ -690,6 +691,7 @@ defmodule Bilimbi.Core.User do
   Terminates existing sessions and records an atomic audit mutation.
   """
   @spec reassign_user_company(
+          AuthzActor.t(),
           Scope.t(),
           pos_integer(),
           pos_integer(),
@@ -699,6 +701,7 @@ defmodule Bilimbi.Core.User do
           {:ok, Summary.t()}
           | {:error, lookup_error() | :employee_not_found | :unauthorized | Changeset.t()}
   def reassign_user_company(
+        actor,
         scope,
         current_company_id,
         user_id,
@@ -707,6 +710,7 @@ defmodule Bilimbi.Core.User do
       )
 
   def reassign_user_company(
+        %AuthzActor{} = actor,
         %Scope{} = scope,
         current_company_id,
         user_id,
@@ -720,8 +724,9 @@ defmodule Bilimbi.Core.User do
     employee_id = Keyword.get(opts, :employee_id)
     current_session_id = Keyword.get(opts, :current_session_id, "revoke-reassigned-user")
 
-    with {:ok, actor} <-
+    with :ok <-
            authorize_company_user(
+             actor,
              scope,
              current_company_id,
              user_id,
@@ -767,6 +772,7 @@ defmodule Bilimbi.Core.User do
   end
 
   def reassign_user_company(
+        %AuthzActor{},
         %Scope{},
         current_company_id,
         _user_id,
@@ -777,6 +783,7 @@ defmodule Bilimbi.Core.User do
       do: {:error, :company_not_found}
 
   def reassign_user_company(
+        %AuthzActor{},
         %Scope{},
         _current_company_id,
         user_id,
@@ -787,6 +794,7 @@ defmodule Bilimbi.Core.User do
       do: {:error, :user_not_found}
 
   def reassign_user_company(
+        %AuthzActor{},
         %Scope{},
         _current_company_id,
         _user_id,
@@ -805,6 +813,7 @@ defmodule Bilimbi.Core.User do
   credentials.
   """
   @spec admin_change_password(
+          AuthzActor.t(),
           Scope.t(),
           pos_integer(),
           pos_integer(),
@@ -813,9 +822,10 @@ defmodule Bilimbi.Core.User do
         ) ::
           {:ok, Summary.t()}
           | {:error, lookup_error() | :unauthorized | Changeset.t()}
-  def admin_change_password(scope, company_id, user_id, new_password, opts \\ [])
+  def admin_change_password(actor, scope, company_id, user_id, new_password, opts \\ [])
 
   def admin_change_password(
+        %AuthzActor{} = actor,
         %Scope{} = scope,
         company_id,
         user_id,
@@ -826,7 +836,7 @@ defmodule Bilimbi.Core.User do
              is_integer(user_id) and user_id > 0 and is_list(opts) do
     current_session_id = Keyword.get(opts, :current_session_id, "revoke-admin-password-reset")
 
-    with {:ok, actor} <- authorize_password_change(scope, company_id, user_id) do
+    with :ok <- authorize_password_change(actor, scope, company_id, user_id) do
       Repo.transaction(fn ->
         with {:ok, _proof} <- lock_target_company(scope, company_id),
              {:ok, user} <- lock_company_user(company_id, user_id),
@@ -852,12 +862,12 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  def admin_change_password(%Scope{}, company_id, _user_id, new_password, opts)
+  def admin_change_password(%AuthzActor{}, %Scope{}, company_id, _user_id, new_password, opts)
       when not (is_integer(company_id) and company_id > 0) and is_binary(new_password) and
              is_list(opts),
       do: {:error, :company_not_found}
 
-  def admin_change_password(%Scope{}, company_id, user_id, new_password, opts)
+  def admin_change_password(%AuthzActor{}, %Scope{}, company_id, user_id, new_password, opts)
       when is_integer(company_id) and company_id > 0 and
              not (is_integer(user_id) and user_id > 0) and is_binary(new_password) and
              is_list(opts),
@@ -871,7 +881,7 @@ defmodule Bilimbi.Core.User do
       auditable_type: notifiable_identity(),
       auditable_id: to_string(user_id),
       actor_type: to_string(actor.type),
-      actor_id: actor.user_id,
+      actor_id: actor.id,
       company_id: company_id,
       old_values: old_values,
       new_values: new_values
@@ -1136,27 +1146,21 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  # The person is the one sealed on the scope. A system scope names nobody,
-  # so it is refused instead of trusting an actor argument.
-  defp authorize_company_user(%Scope{} = scope, company_id, user_id, capability) do
-    case Scope.actor(scope) do
-      %TenancyActor{type: :user, user_id: actor_id} = actor
-      when is_integer(actor_id) and actor_id > 0 ->
-        resource =
-          Authz.resource("user", to_string(user_id), scope: scope, company_id: company_id)
+  defp authorize_company_user(actor, scope, company_id, user_id, capability) do
+    if Scope.tenant_id(actor.scope) == Scope.tenant_id(scope) do
+      resource = Authz.resource("user", to_string(user_id), scope: scope, company_id: company_id)
 
-        case Authz.can(scope, capability, resource) do
-          %{allowed: true} -> {:ok, actor}
-          _denied -> {:error, :unauthorized}
-        end
-
-      %TenancyActor{} ->
-        {:error, :unauthorized}
+      case Authz.can(actor, capability, resource) do
+        %{allowed: true} -> :ok
+        _denied -> {:error, :unauthorized}
+      end
+    else
+      {:error, :unauthorized}
     end
   end
 
-  defp authorize_password_change(%Scope{} = scope, company_id, user_id) do
-    authorize_company_user(scope, company_id, user_id, "admin.user.update")
+  defp authorize_password_change(actor, scope, company_id, user_id) do
+    authorize_company_user(actor, scope, company_id, user_id, "admin.user.update")
   end
 
   defp lock_target_company(scope, company_id) do
