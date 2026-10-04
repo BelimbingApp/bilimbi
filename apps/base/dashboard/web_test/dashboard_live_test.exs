@@ -173,7 +173,7 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
   end
 
   describe "module-declared panels" do
-    test "every installed entry names an installed panel gated by the same capability" do
+    test "every installed entry names an installed panel, and a card that stays after revocation is the only embed without its catalogue grant" do
       entries = Dashboard.entries()
 
       assert Enum.map(entries, & &1.id) == [
@@ -186,10 +186,27 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
                "base-perf-health"
              ]
 
+      # Recent activity, sessions, and performance keep the grant on the
+      # catalogue entry. The embed omits it so a card already on the page
+      # stays mounted after the grant is removed; the panel then skips the read.
+      stays_mounted = %{
+        "base-dashboard-recent-audit" => "admin.audit.log.list",
+        "base-dashboard-session-stats" => "admin.system.session.list",
+        "base-perf-health" => "admin.system.perf.view"
+      }
+
       for entry <- entries do
         assert {:ok, panel} = DiscoveredPanels.resolve(entry.embed)
-        assert panel.capability == entry.capability
         assert Code.ensure_loaded?(panel.live_component)
+
+        case Map.fetch(stays_mounted, entry.id) do
+          {:ok, capability} ->
+            assert entry.capability == capability
+            assert panel.capability == nil
+
+          :error ->
+            assert panel.capability == entry.capability
+        end
       end
     end
 
