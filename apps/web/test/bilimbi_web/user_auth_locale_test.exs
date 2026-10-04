@@ -75,10 +75,8 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
   end
 
   test "an open page does not look up the operator address again", %{conn: conn} do
-    AddressFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
-    AddressFixtures.insert_country!(%{iso: "FR"})
-    AddressFixtures.assign_primary_company!(41, 73)
+    GeonamesFixtures.insert_country!(%{iso: "FR"})
+    CompanyFixtures.assign_primary_company!(41, 73)
 
     {:ok, operator} = Tenancy.scope(41)
 
