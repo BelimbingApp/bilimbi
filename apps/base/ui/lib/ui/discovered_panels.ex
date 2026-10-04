@@ -15,9 +15,24 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
   capability the current scope lacks hides the panel the way menu entries hide.
   The panel component itself still re-authorizes every write it handles;
   mount-time visibility is presentation state, not an authorization decision.
+
+  A `shell.*` key is a panel the shared shell itself renders, on every
+  authenticated page (`Bilimbi.Base.UI.Layouts.app/1`). The shell passes
+  `optional`, because a composition without the provider has nothing to
+  apologise for in the top bar, and takes the component id from `shell_id/1`
+  so the provider can address its own panel with `send_update/2` from an
+  `on_mount` hook without either side hard-coding the other's id.
   """
 
   use Phoenix.Component
+
+  @doc """
+  The component id the shell gives the panel it renders for a `shell.*` key.
+
+  The provider's `on_mount` hook passes the same id to `send_update/2`.
+  """
+  @spec shell_id(String.t()) :: String.t()
+  def shell_id("shell." <> name) when name != "", do: "app-shell-" <> name
 
   @manifest_path Path.join([
                    Path.expand("../../../../..", __DIR__),
@@ -54,6 +69,13 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
     attr(:current_scope, :map, required: true)
     attr(:opts, :map, default: %{}, doc: "assigns passed through to the panel component")
 
+    attr(:optional, :boolean,
+      default: false,
+      doc: "render nothing, not the not-installed notice, when no loaded module provides the key"
+    )
+
+    def discovered_panel(%{optional: true} = assigns), do: ~H""
+
     def discovered_panel(assigns) do
       ~H"""
       <div id={@id} class="rounded-xl border border-line bg-surface-muted p-4 text-sm text-muted">
@@ -87,10 +109,16 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
     attr(:current_scope, :map, required: true)
     attr(:opts, :map, default: %{}, doc: "assigns passed through to the panel component")
 
+    attr(:optional, :boolean,
+      default: false,
+      doc: "render nothing, not the not-installed notice, when no loaded module provides the key"
+    )
+
     def discovered_panel(assigns) do
       case resolve(assigns.key) do
         {:ok, %{capability: capability} = panel} ->
-          if is_nil(capability) or Bilimbi.Base.UI.allowed?(assigns.current_scope, capability) do
+          if loaded?(panel, assigns.optional) and
+               (is_nil(capability) or Bilimbi.Base.UI.allowed?(assigns.current_scope, capability)) do
             assigns = assign(assigns, :panel, panel)
 
             ~H"""
@@ -105,6 +133,9 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
             ~H""
           end
 
+        :error when assigns.optional ->
+          ~H""
+
         :error ->
           ~H"""
           <div id={@id} class="rounded-xl border border-line bg-surface-muted p-4 text-sm text-muted">
@@ -113,5 +144,11 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
           """
       end
     end
+
+    # The manifest is the workspace's, while a package's own test VM loads
+    # only its dependency closure. An optional panel whose provider is not
+    # loaded here is absent, the same as one nobody declared.
+    defp loaded?(_panel, false), do: true
+    defp loaded?(%{live_component: module}, true), do: Code.ensure_loaded?(module)
   end
 end

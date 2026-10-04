@@ -51,8 +51,6 @@ defmodule BilimbiWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
-  require Logger
-
   use BilimbiWeb, :verified_routes
 
   alias Bilimbi.Base.Authz
@@ -451,19 +449,6 @@ defmodule BilimbiWeb.UserAuth do
 
     if socket.assigns.current_scope do
       current_scope = socket.assigns.current_scope
-      user_id = current_scope.actor.id
-
-      if Phoenix.LiveView.connected?(socket) do
-        case User.subscribe_notifications(current_scope.scope, user_id) do
-          :ok ->
-            :ok
-
-          {:error, reason} ->
-            Logger.warning(
-              "UserAuth: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
-            )
-        end
-      end
 
       if Phoenix.LiveView.connected?(socket) do
         Bilimbi.Base.UI.SessionGuard.install(fn activity? ->
@@ -489,25 +474,6 @@ defmodule BilimbiWeb.UserAuth do
         |> Phoenix.LiveView.attach_hook(:durable_session_async, :handle_async, fn
           _name, _result, socket -> guard_session(socket, false)
         end)
-
-      socket =
-        Phoenix.LiveView.attach_hook(
-          socket,
-          :user_notifications_live_subscriber,
-          :handle_info,
-          fn
-            {:notification_event, _event}, socket ->
-              Phoenix.LiveView.send_update(
-                Bilimbi.Core.User.Web.NotificationBellComponent,
-                id: "topbar-notification-bell"
-              )
-
-              {:cont, socket}
-
-            _other, socket ->
-              {:cont, socket}
-          end
-        )
 
       socket =
         Phoenix.LiveView.attach_hook(socket, :durable_session_activity, :handle_event, fn

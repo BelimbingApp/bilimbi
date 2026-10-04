@@ -59,5 +59,11 @@
   %{
     embed: "company.users",
     live_component: Bilimbi.Core.User.Web.CompanyUsersPanel
+  },
+  %{
+    # The top-bar bell. The shared shell renders it on every authenticated
+    # page; no capability, for the reason `/notifications` has none.
+    embed: "shell.notifications",
+    live_component: Bilimbi.Core.User.Web.NotificationBellComponent
   }
 ]

@@ -51,12 +51,14 @@ defmodule BilimbiWeb.DiscoveredRoutes do
 
         # The frame flag hook runs after authentication has built the scope it
         # marks, and before the route check, which does not depend on it. The
-        # workspace channel joins last, so a refused page never joins.
+        # notification subscription and the workspace channel come after the
+        # route check, so a refused page never subscribes or joins.
         hooks =
           hooks ++
             [
               {BilimbiWeb.FramedRender, :framed},
               {BilimbiWeb.RouteAccess, policies},
+              {Bilimbi.Core.User.Web.NotificationSubscription, :attach},
               {Bilimbi.Base.UI.Workspace, :attach}
             ]
 

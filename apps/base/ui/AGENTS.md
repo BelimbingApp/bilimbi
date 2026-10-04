@@ -53,6 +53,10 @@ A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hoo
 
 happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`. Shell out only for what this runner cannot give: another host locale, the shipped LiveView bundle, or markup the server renders in the same test.
 
+## Shell panels
+
+The notification bell is the shell's: `Layouts.app/1` renders the `shell.notifications` panel on every authenticated page, and `Bilimbi.Core.User.Web.NotificationSubscription` keeps it live. Do not paste the bell into a page's `<:topbar_actions>`, subscribe a page to notifications, or `send_update` a shell panel by a literal id; a page that pasted the bell is why 49 pages had none while every one of them was subscribed. A new shell-wide panel is an `embed: "shell.<name>"` entry rendered with `<.discovered_panel optional>` and the id from `DiscoveredPanels.shell_id/1`; the moduledoc of `Bilimbi.Base.UI.DiscoveredPanels` owns the contract.
+
 ## Tiled workspace
 
 A page shown inside a workspace tile renders chromeless through the `framed` branch of `Layouts.app/1`; the flag comes from `BilimbiWeb.FramedRender` through the LiveView session, never from a page. Do not add a tile special case to a page: if a page needs to know it is in a tile beyond that branch, that is the signal to design a tile contract, not a special case. The tile bar is `<.tile_header>` and the divider `<.split_handle>`; the tree, the host page and its hook are `apps/base/tiling` and `apps/web/assets/js/tiling.js`. See `DESIGN.md` "Tiled workspace".

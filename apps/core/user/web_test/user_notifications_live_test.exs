@@ -45,6 +45,12 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
   defp open(conn), do: conn |> log_in_as() |> live(~p"/notifications")
 
+  defp subscriptions(view) do
+    BilimbiWeb.PubSub
+    |> Registry.lookup(User.notification_topic(41, 91))
+    |> Enum.count(fn {pid, _meta} -> pid == view.pid end)
+  end
+
   for action <- [:patch, :toggle_dropdown, :mark_all_read, :visit, :broadcast, :component_update] do
     @expiry_action action
     test "expired sessions reject #{@expiry_action}", %{conn: conn, scope: scope} do
@@ -79,7 +85,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
         :component_update ->
           Phoenix.LiveView.send_update(view.pid, User.Web.NotificationBellComponent,
-            id: "topbar-notification-bell"
+            id: "app-shell-notifications"
           )
       end
 
@@ -359,7 +365,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       # into it on open, Escape closes it and returns focus to the bell. The
       # listener is the panel's own, so a closed bell claims no key.
       assert has_element?(view, "#app-notifications-dropdown[phx-mounted][phx-key='escape']")
-      refute has_element?(view, "#topbar-notification-bell[phx-window-keydown]")
+      refute has_element?(view, "#app-shell-notifications[phx-window-keydown]")
 
       panel = view |> element("#app-notifications-dropdown") |> render()
       assert panel =~ ~s(phx-window-keydown)
@@ -418,9 +424,72 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
     end
 
+    # The bell belongs to the shared shell, so a module page that never names
+    # it has it, and the subscription reaches it there.
+    for path <- ["/settings/profile", "/settings/appearance", "/notifications"] do
+      @path path
+      test "the shell renders a live bell on #{@path}", %{conn: conn, scope: scope} do
+        {:ok, view, _html} = conn |> log_in_as() |> live(@path)
+
+        assert has_element?(view, "#app-topbar #app-shell-notifications #app-notifications-bell")
+        refute has_element?(view, "#app-notifications-unread-badge")
+
+        {:ok, _note} = User.send_notification(scope, 91, %{title: "Shell alert"})
+
+        # The hook answers the event with a `send_update` the LiveView sends
+        # itself; one render lets it handle that message first.
+        _ = render(view)
+        assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
+      end
+    end
+
+    test "a page with no clause for the event survives a notification", %{
+      conn: conn,
+      scope: scope
+    } do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/settings/profile")
+      ref = Process.monitor(view.pid)
+
+      {:ok, _note} = User.send_notification(scope, 91, %{title: "Shell alert"})
+
+      _ = render(view)
+      assert has_element?(view, "#app-notifications-unread-badge")
+      refute_received {:DOWN, ^ref, :process, _pid, _reason}
+    end
+
+    test "a framed page has no bell and holds no subscription", %{conn: conn} do
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> put_req_header("sec-fetch-dest", "iframe")
+        |> live(~p"/settings/profile")
+
+      refute has_element?(view, "#app-notifications-bell")
+      assert subscriptions(view) == 0
+    end
+
+    test "the framed notifications list still follows new notifications", %{
+      conn: conn,
+      scope: scope
+    } do
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> put_req_header("sec-fetch-dest", "iframe")
+        |> live(~p"/notifications")
+
+      refute has_element?(view, "#app-notifications-bell")
+      assert subscriptions(view) == 1
+
+      {:ok, note} = User.send_notification(scope, 91, %{title: "Framed alert"})
+
+      assert has_element?(view, "#notifications-list [id$='#{note.id}']")
+    end
+
     # The regression #424 fixed: NotificationsLive subscribed in its own `mount/3`
-    # while `UserAuth.on_mount(:require_authenticated)` had already subscribed the
-    # same process to the same topic, so every event was delivered twice.
+    # while the session's `on_mount` hook (now `NotificationSubscription`) had
+    # already subscribed the same process to the same topic, so every event was
+    # delivered twice.
     #
     # Asserted against the registry rather than by counting messages, because a
     # duplicate registration is the defect itself — counting deliveries would make
@@ -443,7 +512,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
              to #{topic}, found #{length(own_registrations)}.
 
              More than one means something subscribed in `mount/3` on top of
-             `UserAuth.on_mount(:require_authenticated)`, and every notification
+             `NotificationSubscription.on_mount/4`, and every notification
              will be delivered once per registration.
              """
     end
@@ -468,7 +537,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       refute has_element?(view, "#flash-error")
     end
 
-    test "logs warning when notification subscription fails in UserAuth", %{conn: conn} do
+    test "logs a warning when the notification subscription fails", %{conn: conn} do
       name = :failing_pubsub_test
       start_supervised!({Registry, keys: :unique, name: name})
       Registry.register(name, "user_notifications:41:91", nil)
@@ -483,7 +552,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
             {:ok, _view, _html} = open(conn)
           end)
 
-        assert log =~ "UserAuth: failed to subscribe to user notifications topic"
+        assert log =~ "failed to subscribe to the notifications topic for user 91"
       after
         Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
       end

@@ -10,6 +10,8 @@ defmodule Bilimbi.Base.UI.Layouts do
     * `app/1` — the authenticated workspace shell: a full-width top bar,
       a left menu sidebar, and a persistent status bar. Account context is
       disclosed from the bottom-left circle; safety warnings stay visible.
+      The top bar carries the notification bell when a module provides the
+      `shell.notifications` panel (`Bilimbi.Base.UI.DiscoveredPanels`).
 
   Navigation sidebar conventions:
 
@@ -32,6 +34,8 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   import Phoenix.Controller, only: [get_csrf_token: 0]
   import Bilimbi.Base.UI.Components
+  import Bilimbi.Base.UI.DiscoveredPanels, only: [discovered_panel: 1]
+  alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Base.UI.ShellComponents
 
   # How long a `:success` or `:info` flash stays before it dismisses itself.
@@ -185,6 +189,17 @@ defmodule Bilimbi.Base.UI.Layouts do
 
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             {render_slot(@topbar_actions)}
+
+            <%!-- The notification bell is the shell's, so every authenticated
+                 page has it. A page never pastes it into `topbar_actions`.
+                 The framed render above has no top bar and so no bell; the
+                 provider's `on_mount` hook knows that. --%>
+            <.discovered_panel
+              key="shell.notifications"
+              id={DiscoveredPanels.shell_id("shell.notifications")}
+              current_scope={@current_scope}
+              optional
+            />
 
             <ShellComponents.display_controls
               id="app-display"

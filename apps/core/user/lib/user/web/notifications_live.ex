@@ -58,11 +58,8 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def handle_info({:notification_event, _event}, socket) do
-    send_update(Bilimbi.Core.User.Web.NotificationBellComponent,
-      id: "topbar-notification-bell",
-      refresh: true
-    )
-
+    # `NotificationSubscription` subscribed this process and has already
+    # refreshed the shell's bell; this page only reloads its own list.
     {:noreply,
      load_notifications(
        socket,
