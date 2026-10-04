@@ -2843,15 +2843,4 @@ defmodule BilimbiWeb.CompanyLiveTest do
     {:ok, scope} = Tenancy.scope(41)
     scope
   end
-
-  # Drops the signed-in user's direct grant of `capability`, so a page that
-  # mounted with it must refuse the next write on its own.
-  defp revoke_capability!(scope, capability) do
-    grant =
-      Authz.list_principal_capabilities(scope, page_size: 100)
-      |> Map.fetch!(:entries)
-      |> Enum.find(&(&1.capability == capability))
-
-    {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
-  end
 end

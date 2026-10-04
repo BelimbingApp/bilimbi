@@ -4,7 +4,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
@@ -877,15 +876,6 @@ defmodule BilimbiWeb.EmployeeShowTest do
     refute has_element?(view, "#flash-success")
     refute has_element?(view, "#employee-delete")
     assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
-  end
-
-  defp revoke_capability!(scope, capability) do
-    grant =
-      Authz.list_principal_capabilities(scope, page_size: 100)
-      |> Map.fetch!(:entries)
-      |> Enum.find(&(&1.capability == capability))
-
-    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   # The account panel is a `core/user`-owned discovered embed (#581); these

@@ -188,6 +188,20 @@ defmodule BilimbiWeb.ConnCase do
     :ok
   end
 
+  @doc """
+  Drops the signed-in user's direct grant of `capability`, so a page that
+  mounted with it must refuse the next write on its own. `scope` is the
+  tenant's, as `Tenancy.scope/1` returns it.
+  """
+  def revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+  end
+
   defp generate_session_id do
     :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
   end

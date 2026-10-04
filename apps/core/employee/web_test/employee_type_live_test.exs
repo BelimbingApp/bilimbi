@@ -3,7 +3,6 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
@@ -285,15 +284,6 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     refute has_element?(view, "#flash-success")
     assert has_element?(view, "#employee-types td", "Latched")
     assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
-  end
-
-  defp revoke_capability!(scope, capability) do
-    grant =
-      Authz.list_principal_capabilities(scope, page_size: 100)
-      |> Map.fetch!(:entries)
-      |> Enum.find(&(&1.capability == capability))
-
-    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "rejects deleting an in-use custom type", %{conn: conn} do

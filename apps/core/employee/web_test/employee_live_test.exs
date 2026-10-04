@@ -3,7 +3,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
@@ -531,15 +530,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "#flash-success")
     assert has_element?(view, "#employees td", "John Doe")
     assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
-  end
-
-  defp revoke_capability!(scope, capability) do
-    grant =
-      Authz.list_principal_capabilities(scope, page_size: 100)
-      |> Map.fetch!(:entries)
-      |> Enum.find(&(&1.capability == capability))
-
-    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "the list's Edit action opens the employee's read-first record page", %{
