@@ -393,7 +393,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
       assert has_element?(view, "#stat-recent-audit")
-      assert render(view) =~ "No recent activity."
+      assert has_element?(view, "#stat-recent-audit-empty", "No recent activity.")
 
       assert has_element?(
                view,
@@ -426,7 +426,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
       assert has_element?(view, "#stat-recent-audit")
-      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#stat-recent-audit-empty")
       assert has_element?(view, "#audit-entry-#{mutation.id}")
       assert render(view) =~ "created"
       assert render(view) =~ "Company"
@@ -730,7 +730,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-recent-audit")
-      assert render(view) =~ "No recent activity."
+      assert has_element?(view, "#stat-recent-audit-empty", "No recent activity.")
 
       {:ok, mutation} =
         Audit.record_mutation(scope, %{
@@ -747,7 +747,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-recent-audit")
-      refute render(view) =~ "No recent activity."
+      refute has_element?(view, "#stat-recent-audit-empty")
       assert has_element?(view, "#audit-entry-#{mutation.id}")
       assert render(view) =~ "updated"
       assert render(view) =~ "User"
