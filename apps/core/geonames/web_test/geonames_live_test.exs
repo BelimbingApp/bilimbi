@@ -324,13 +324,13 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     |> element("#admin1-1-name")
     |> render_hook("save-admin1-name", %{"id" => "invalid", "name" => "Some Division"})
 
-    assert render(admin1) =~ "Failed to save division name."
+    assert has_element?(admin1, "#flash-error", "Failed to save division name.")
 
     admin1
     |> element("#admin1-1-name")
     |> render_hook("save-admin1-name", %{"id" => 1, "name" => ""})
 
-    assert render(admin1) =~ "Failed to save division name."
+    assert has_element?(admin1, "#flash-error", "Failed to save division name.")
   end
 
   test "refuses write operations when user holds only admin.geonames.list", %{conn: conn} do
@@ -345,14 +345,23 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     countries
     |> render_hook("save-country-name", %{"id" => 1, "country" => "Hacked Name"})
 
-    assert render(countries) =~ "You do not have permission to update countries."
+    assert has_element?(
+             countries,
+             "#flash-error",
+             "You do not have permission to update countries."
+           )
+
     assert Geonames.get_country("MY").country == "Malaysia"
 
     # Forging update-countries is denied
     countries
     |> render_hook("update-countries", %{})
 
-    assert render(countries) =~ "You do not have permission to update countries."
+    assert has_element?(
+             countries,
+             "#flash-error",
+             "You do not have permission to update countries."
+           )
 
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
 
@@ -362,7 +371,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     admin1
     |> render_hook("save-admin1-name", %{"id" => 1, "name" => "Hacked Division"})
 
-    assert render(admin1) =~ "You do not have permission to update Admin1 divisions."
+    assert has_element?(
+             admin1,
+             "#flash-error",
+             "You do not have permission to update Admin1 divisions."
+           )
+
     assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
   end
 
@@ -397,7 +411,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     |> element("#country-1-name")
     |> render_hook("save-country-name", %{"id" => 1, "country" => "After revocation"})
 
-    assert render(countries) =~ "You do not have permission to update countries."
+    assert has_element?(
+             countries,
+             "#flash-error",
+             "You do not have permission to update countries."
+           )
+
     assert Geonames.get_country("MY").country == "Malaysia"
   end
 
@@ -418,7 +437,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     countries |> element("#countries-update") |> render_click()
 
-    assert render(countries) =~ "You do not have permission to update countries."
+    assert has_element?(
+             countries,
+             "#flash-error",
+             "You do not have permission to update countries."
+           )
+
     assert Geonames.get_country("MY").country == "Malaysia"
   end
 
@@ -440,7 +464,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     |> element("#admin1-1-name")
     |> render_hook("save-admin1-name", %{"id" => 1, "name" => "After revocation"})
 
-    assert render(admin1) =~ "You do not have permission to update Admin1 divisions."
+    assert has_element?(
+             admin1,
+             "#flash-error",
+             "You do not have permission to update Admin1 divisions."
+           )
+
     assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
   end
 
@@ -573,7 +602,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       }
     })
 
-    assert render(postcodes) =~ "You do not have permission to update postcodes."
+    assert has_element?(
+             postcodes,
+             "#flash-error",
+             "You do not have permission to update postcodes."
+           )
+
     assert [%{place_name: "Kuala Lumpur"}] = Geonames.lookup_postcode("MY", "50000")
     assert Geonames.lookup_postcode("MY", "99999") == []
   end
@@ -606,7 +640,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       "place_name" => "Revocation bypass"
     })
 
-    assert render(postcodes) =~ "You do not have permission to update postcodes."
+    assert has_element?(
+             postcodes,
+             "#flash-error",
+             "You do not have permission to update postcodes."
+           )
+
     assert [%{place_name: "Kuala Lumpur"}] = Geonames.lookup_postcode("MY", "50000")
   end
 
@@ -780,9 +819,9 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     # ArgumentError and took the process down. Geonames already answers
     # :not_found for garbage, so the value is passed straight through (#302).
     for bad <- ["abc", "", "1; DROP TABLE countries"] do
-      html = render_hook(view, "save-country-name", %{"id" => bad, "country" => "Nowhere"})
+      render_hook(view, "save-country-name", %{"id" => bad, "country" => "Nowhere"})
 
-      assert html =~ "Failed to save country name.",
+      assert has_element?(view, "#flash-error", "Failed to save country name."),
              "expected a refusal flash for id #{inspect(bad)}"
     end
   end
@@ -791,19 +830,20 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     grant_capabilities!("admin.geonames.list")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
 
-    select = view |> element("#countries-pagination-page-size") |> render()
+    select = "#countries-pagination-page-size"
 
     # The options run to three digits (100, 300). A fixed `w-14` left ~32px for
     # the value AND the native dropdown arrow, so even "25" painted as "2" with
     # the 5 hidden behind the arrow (#304). Nothing about the DOM was wrong --
     # every option is present -- only the width, so this guards the class.
-    assert select =~ "w-auto",
+    assert has_element?(view, "#{select}.w-auto"),
            "the selector must size to its content; a fixed width clips three-digit options"
 
-    refute select =~ "w-14"
+    refute has_element?(view, "#{select}.w-14")
 
     for value <- ~w(25 50 100 300) do
-      assert select =~ ">#{value}</option>", "expected the #{value} option to be offered"
+      assert has_element?(view, "#{select} option[value='#{value}']"),
+             "expected the #{value} option to be offered"
     end
   end
 end
