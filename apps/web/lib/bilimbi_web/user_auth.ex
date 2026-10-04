@@ -628,8 +628,9 @@ defmodule BilimbiWeb.UserAuth do
 
       # Session metadata is housekeeping, not a user action. Touch only after
       # this edge has proved the durable session and identity, throttled by the
-      # Session setting so ordinary requests do not amplify writes.
-      _ = Session.touch_session(session_id)
+      # Session setting so ordinary requests do not amplify writes. Background
+      # refreshes (`activity?` false) never extend the idle lifetime.
+      if activity?, do: Session.touch_session(session_id)
 
       {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)

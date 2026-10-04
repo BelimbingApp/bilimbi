@@ -93,6 +93,19 @@ defmodule BilimbiWeb.SessionActivityTest do
     end
   end
 
+  test "background dashboard refreshes do not extend activity", %{
+    view: view,
+    session_id: session_id
+  } do
+    aged = System.system_time(:second) - 10 * 60
+    age_session(session_id, aged)
+
+    send(view.pid, :refresh_widgets)
+    _ = :sys.get_state(view.pid)
+
+    assert {:ok, %{last_activity: ^aged}} = Session.fetch_session(session_id)
+  end
+
   test "activity does not recreate a terminated session", %{view: view, session_id: session_id} do
     assert :ok = Session.delete_session(session_id)
 
