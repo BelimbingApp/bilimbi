@@ -36,9 +36,8 @@ defmodule Bilimbi.Base.ScheduleTest do
     AuditFixtures.create_audit_tables!()
     definition = definition()
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "schedule-test",
-      consumers: %{
+    ContributionRegistry.put_consumers_for_test!(
+      %{
         schedule: %{definition.key => definition},
         settings: %{
           definitions: %{
@@ -57,8 +56,9 @@ defmodule Bilimbi.Base.ScheduleTest do
           },
           runtime_claims: []
         }
-      }
-    })
+      },
+      "schedule-test"
+    )
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
     on_exit(fn -> Application.delete_env(:bilimbi_base_schedule, :test_recipient) end)

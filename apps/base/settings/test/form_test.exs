@@ -439,9 +439,6 @@ defmodule Bilimbi.Base.Settings.FormTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "test",
-      consumers: %{settings: settings, authz: [], menu: []}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{settings: settings, authz: [], menu: []})
   end
 end

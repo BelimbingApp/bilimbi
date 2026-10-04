@@ -121,10 +121,10 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
 
     definition = definition()
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "schedule-concurrency-test",
-      consumers: %{schedule: %{definition.key => definition}}
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{schedule: %{definition.key => definition}},
+      "schedule-concurrency-test"
+    )
 
     with_repo(repos.observer, fn ->
       assert Repo.get_dynamic_repo() == repos.observer

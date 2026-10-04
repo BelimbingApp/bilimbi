@@ -530,11 +530,11 @@ defmodule Bilimbi.Base.PerfTest do
          })}
       end)
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "perf-test",
-      consumers: %{
+    ContributionRegistry.put_consumers_for_test!(
+      %{
         settings: %{definitions: definitions, runtime_claims: []}
-      }
-    })
+      },
+      "perf-test"
+    )
   end
 end

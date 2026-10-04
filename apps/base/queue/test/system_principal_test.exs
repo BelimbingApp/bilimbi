@@ -185,12 +185,12 @@ defmodule Bilimbi.Base.Queue.SystemPrincipalTest do
         }
       end)
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: nil,
-      consumers: %{
+    ContributionRegistry.put_consumers_for_test!(
+      %{
         actor_verifier: nil,
         system_principals: ContributionValidator.validate_contributions!(entries)
-      }
-    })
+      },
+      nil
+    )
   end
 end

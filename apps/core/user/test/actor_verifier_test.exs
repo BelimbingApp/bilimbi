@@ -42,10 +42,7 @@ defmodule Bilimbi.Core.User.ActorVerifierTest do
       email: "grace@example.com"
     })
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: nil,
-      consumers: %{actor_verifier: ActorVerifier}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{actor_verifier: ActorVerifier}, nil)
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
 

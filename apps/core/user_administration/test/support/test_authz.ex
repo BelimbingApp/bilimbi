@@ -58,9 +58,9 @@ defmodule Bilimbi.Core.UserAdministration.TestAuthz do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "user-administration-test",
-      consumers: %{settings: [], authz: authz, menu: []}
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{settings: [], authz: authz, menu: []},
+      "user-administration-test"
+    )
   end
 end

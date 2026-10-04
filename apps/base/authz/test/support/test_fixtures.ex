@@ -138,13 +138,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "authz-test",
-      # Merged over the registry's own empty snapshot rather than written out
-      # by hand: a consumer added later gets its correct empty shape here for
-      # free, instead of this fixture raising KeyError on the new key (#496).
-      consumers: Map.merge(ContributionRegistry.build!([]).consumers, %{authz: authz})
-    })
+    ContributionRegistry.put_consumers_for_test!(%{authz: authz}, "authz-test")
   end
 
   @doc """

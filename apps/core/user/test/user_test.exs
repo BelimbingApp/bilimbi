@@ -24,10 +24,10 @@ defmodule Bilimbi.Core.UserTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "core-user-test",
-      consumers: %{settings: settings, authz: [], menu: []}
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{settings: settings, authz: [], menu: []},
+      "core-user-test"
+    )
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok

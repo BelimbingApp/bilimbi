@@ -23,10 +23,7 @@ defmodule Bilimbi.Base.DateTimeTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "base-datetime-test",
-      consumers: %{settings: settings}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{settings: settings}, "base-datetime-test")
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok

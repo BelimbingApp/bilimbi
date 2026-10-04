@@ -146,10 +146,10 @@ defmodule Bilimbi.Core.User.TestFixtures do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "user-test",
-      consumers: %{settings: [], authz: authz, menu: []}
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{settings: [], authz: authz, menu: []},
+      "user-test"
+    )
   end
 
   def operator_scope(tenant_id \\ 1) do

@@ -26,10 +26,7 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "address-bootstrap-test",
-      consumers: %{settings: settings}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{settings: settings}, "address-bootstrap-test")
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok

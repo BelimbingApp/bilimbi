@@ -157,9 +157,6 @@ defmodule Bilimbi.Core.CompanySelectableCompaniesTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "company-selectable",
-      consumers: Map.merge(ContributionRegistry.build!([]).consumers, %{authz: authz})
-    })
+    ContributionRegistry.put_consumers_for_test!(%{authz: authz}, "company-selectable")
   end
 end

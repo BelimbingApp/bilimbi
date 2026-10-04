@@ -182,13 +182,12 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "tiling-test",
-      consumers:
-        Map.merge(ContributionRegistry.build!([]).consumers, %{
-          settings: %{definitions: definitions, runtime_claims: []},
-          authz: validated
-        })
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{
+        settings: %{definitions: definitions, runtime_claims: []},
+        authz: validated
+      },
+      "tiling-test"
+    )
   end
 end
