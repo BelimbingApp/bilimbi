@@ -175,7 +175,8 @@ defmodule Bilimbi.Base.UI.ListState do
   Query params for `state`, using the keys recorded in its spec.
 
   Values are strings and integers. Blank keys named in `omit_blank` are left
-  out; every other key is written, including `""`.
+  out, and so is a value `omit_defaults` says the URL parses back to the same
+  thing; every other key is written, including `""`.
   """
   @spec to_params(t()) :: %{optional(String.t()) => String.t() | pos_integer()}
   def to_params(%__MODULE__{} = state) do
