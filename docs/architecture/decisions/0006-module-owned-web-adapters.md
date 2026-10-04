@@ -550,7 +550,7 @@ A module's web manifest may also declare **embeddable panels** — LiveComponent
 another module's page renders inline without naming the providing module:
 
 ```elixir
-%{embed: "employee.addresses", live_component: Bilimbi.Core.Address.Web.EmployeeAddressesPanel}
+%{embed: "employee.addresses", live_component: Bilimbi.Core.Address.Web.AddressesPanel}
 ```
 
 An embed entry carries exactly `:embed` (a workspace-unique string key),

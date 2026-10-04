@@ -129,6 +129,14 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(admin1, "caption.sr-only", "Admin1 divisions")
     assert has_element?(admin1, "#admin1-country-filter")
     assert has_element?(admin1, "label[for='admin1-country-filter'].sr-only", "Country")
+
+    filter_options = Geonames.country_options(Geonames.admin1_filter_countries())
+    assert {"Malaysia (MY)", "MY"} in filter_options
+
+    for {label, iso} <- filter_options do
+      assert has_element?(admin1, "#admin1-country-filter option[value='#{iso}']", label)
+    end
+
     assert has_element?(admin1, "#admin1-2", "California")
 
     admin1
@@ -489,8 +497,18 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     postcodes |> element("#postcodes-new") |> render_click()
     assert has_element?(postcodes, "#postcode-modal")
-    assert has_element?(postcodes, "#postcode-country option[value='MY']")
-    assert has_element?(postcodes, "#postcode-admin1 option[value='MY.14']")
+
+    assert {"Malaysia (MY)", "MY"} in Geonames.country_options()
+
+    for {label, iso} <- Geonames.country_options() do
+      assert has_element?(postcodes, "#postcode-country option[value='#{iso}']", label)
+    end
+
+    assert has_element?(
+             postcodes,
+             "#postcode-admin1 option[value='MY.14']",
+             "Kuala Lumpur (MY.14)"
+           )
 
     postcodes
     |> form("#postcode-form",
@@ -636,13 +654,24 @@ defmodule BilimbiWeb.GeonamesLiveTest do
           __changed__: %{},
           flash: %{},
           updating_countries?: true,
-          index_state: %{
-            search: "",
-            page: 1,
-            per_page: 25,
-            sort_by: :iso,
-            sort_dir: :asc
-          },
+          index_state:
+            Bilimbi.Core.Geonames.Web.CamelList.parse(
+              %{
+                "search" => "",
+                "page" => "1",
+                "perPage" => "25",
+                "sortBy" => "iso",
+                "sortDir" => "asc"
+              },
+              Bilimbi.Base.UI.ListState.spec!(
+                sortable: %{iso: :asc, country: :asc},
+                default_sort: :country,
+                page_sizes: [25, 50, 100, 300],
+                default_page_size: 25,
+                page_size_param: "perPage",
+                invalid_page_size: :default
+              )
+            ),
           streams: %{
             __changed__: MapSet.new(),
             __configured__: %{},

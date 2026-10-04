@@ -123,6 +123,82 @@ defmodule Bilimbi.Core.GeonamesTest do
              Geonames.page_countries(%{"search" => "Japan", "page" => "9"})
   end
 
+  test "country options label Name (ISO) and store the ISO" do
+    assert Geonames.country_options() == [
+             {"Malaysia (MY)", "MY"},
+             {"United States (US)", "US"}
+           ]
+
+    assert Geonames.country_options(Geonames.list_countries()) == Geonames.country_options()
+
+    [%{iso: "MY"} = malaysia | _] = Geonames.list_countries()
+    assert Geonames.country_options([malaysia]) == [{"Malaysia (MY)", "MY"}]
+
+    assert Geonames.country_options(Geonames.admin1_filter_countries()) == [
+             {"Malaysia (MY)", "MY"},
+             {"United States (US)", "US"}
+           ]
+  end
+
+  test "division options label the name, and the postcode form adds the code" do
+    assert Geonames.admin1_options("MY") == [
+             {"Kuala Lumpur", "MY.14"},
+             {"Negeri Sembilan", "MY.05"}
+           ]
+
+    assert Geonames.admin1_options("MY", label: :name_and_code) == [
+             {"Kuala Lumpur (MY.14)", "MY.14"},
+             {"Negeri Sembilan (MY.05)", "MY.05"}
+           ]
+
+    assert Geonames.admin1_options(nil) == []
+    assert Geonames.admin1_options("") == []
+  end
+
+  test "geonames list pages read sortBy and sortDir only" do
+    spec =
+      Bilimbi.Base.UI.ListState.spec!(
+        sortable: %{name: :asc, population: :desc},
+        default_sort: :name,
+        page_sizes: [25],
+        default_page_size: 25,
+        page_size_param: "perPage",
+        invalid_page_size: :default
+      )
+
+    snake =
+      Bilimbi.Core.Geonames.Web.CamelList.parse(
+        %{"sort_by" => "population", "sort_dir" => "desc"},
+        spec
+      )
+
+    assert snake.sort_by == :name
+    assert snake.sort_dir == :asc
+
+    both =
+      Bilimbi.Core.Geonames.Web.CamelList.parse(
+        %{
+          "sortBy" => "name",
+          "sort_by" => "population",
+          "sortDir" => "asc",
+          "sort_dir" => "desc"
+        },
+        spec
+      )
+
+    assert both.sort_by == :name
+    assert both.sort_dir == :asc
+
+    camel =
+      Bilimbi.Core.Geonames.Web.CamelList.parse(
+        %{"sortBy" => "population", "sortDir" => "desc"},
+        spec
+      )
+
+    assert camel.sort_by == :population
+    assert camel.sort_dir == :desc
+  end
+
   test "lists only administrative divisions owned by the requested country" do
     assert Enum.map(Geonames.list_admin1("my"), &{&1.code, &1.country_iso}) == [
              {"MY.14", "MY"},

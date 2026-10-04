@@ -4,11 +4,18 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Address
 
   @page_sizes [25, 50, 100]
-  @default_page_size 25
-  @sorts ~w(label country_iso verification_status)
+  @list ListState.spec!(
+          sortable: %{label: :asc, country_iso: :asc, verification_status: :asc},
+          default_sort: :label,
+          page_sizes: @page_sizes,
+          default_page_size: 25,
+          page_size_param: "perPage",
+          invalid_page_size: :default
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,32 +27,25 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    {:noreply, load_page(socket, parse_index(params))}
   end
 
   @impl true
   def handle_event("filters", %{"filters" => filters}, socket) do
-    state =
-      socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
-      |> Map.put(:page, 1)
-
+    state = ListState.apply_filters(socket.assigns.index_state, filters)
     {:noreply, push_patch(socket, to: addresses_path(state))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: addresses_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = ListState.next_sort(socket.assigns.index_state, sort_by)
+    {:noreply, push_patch(socket, to: addresses_path(state))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(
-        socket.assigns.index_state,
-        :page,
-        bounded_page(page, socket.assigns.addresses_page)
-      )
+      socket.assigns.index_state
+      |> ListState.put_page(page)
+      |> ListState.clamp_to_last_page(socket.assigns.addresses_page, empty: :reset)
 
     {:noreply, push_patch(socket, to: addresses_path(state))}
   end
@@ -131,30 +131,15 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.form
-          for={@filters_form}
-          id="addresses-filters"
-          phx-change="filters"
-          class="mb-2"
-        >
-          <div class="relative">
-            <.icon
-              name="search"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="addresses-search"
-              type="search"
-              phx-debounce="300"
-              label="Search addresses"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by label, address, locality, postcode, or country..."
-              class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="addresses-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="addresses-search"
+            label="Search addresses"
+            placeholder="Search by label, address, locality, postcode, or country..."
+          />
+        </.filter_toolbar>
 
         <.card id="addresses-card" inner_class="p-0">
           <.table
@@ -253,7 +238,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   defp load_page(socket, state) do
     page = address_page(socket, state)
-    state = bound_state_page(state, page)
+    state = ListState.clamp_to_last_page(state, page)
     page = if state.page == page.page, do: page, else: address_page(socket, state)
 
     socket
@@ -261,10 +246,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     |> assign(:active_nav, "admin.address")
     |> assign(:addresses_page, page)
     |> assign(:page_sizes, @page_sizes)
-    |> assign(
-      :filters_form,
-      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
-    )
+    |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> stream(:addresses, page.entries, reset: true)
   end
@@ -273,9 +255,9 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     Address.list_addresses(socket.assigns.current_scope.scope,
       search: state.search,
       page: state.page,
-      page_size: state.per_page,
-      sort_by: String.to_existing_atom(state.sort_by),
-      sort_dir: String.to_existing_atom(state.sort_dir)
+      page_size: state.page_size,
+      sort_by: state.sort_by,
+      sort_dir: state.sort_dir
     )
   end
 
@@ -315,70 +297,26 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   defp address_name(%{label: label}) when is_binary(label) and label != "", do: "“#{label}”"
   defp address_name(_address), do: "This address"
 
-  defp state_from_params(params) do
-    %{
-      search: Map.get(params, "search", ""),
-      page: parse_page(Map.get(params, "page")),
-      per_page: normalize_page_size(Map.get(params, "perPage")),
-      sort_by: normalize_sort(Map.get(params, "sortBy")),
-      sort_dir: normalize_direction(Map.get(params, "sortDir"))
-    }
+  defp parse_index(params) do
+    ListState.parse(camel_params(params), @list)
   end
 
-  defp next_sort(state, sort_by) do
-    sort_by = normalize_sort(sort_by)
-
-    %{
-      state
-      | page: 1,
-        sort_by: sort_by,
-        sort_dir: if(state.sort_by == sort_by, do: flip_direction(state.sort_dir), else: "asc")
-    }
+  defp camel_params(params) do
+    params
+    |> Map.put("sort_by", params["sortBy"])
+    |> Map.put("sort_dir", params["sortDir"])
   end
 
   defp addresses_path(state) do
-    ~p"/addresses?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
+    query =
+      state
+      |> ListState.to_params()
+      |> Map.drop(["sort_by", "sort_dir"])
+      |> Map.put("sortBy", Atom.to_string(state.sort_by))
+      |> Map.put("sortDir", Atom.to_string(state.sort_dir))
+
+    ~p"/addresses?#{query}"
   end
-
-  defp normalize_sort(value) when value in @sorts, do: value
-  defp normalize_sort(_value), do: "label"
-
-  defp normalize_direction(value) when value in ["asc", "desc"], do: value
-  defp normalize_direction(_value), do: "asc"
-
-  defp flip_direction("asc"), do: "desc"
-  defp flip_direction(_direction), do: "asc"
-
-  defp normalize_page_size(value) do
-    case parse_page(value) do
-      size when size in @page_sizes -> size
-      _size -> @default_page_size
-    end
-  end
-
-  defp parse_page(value) when is_integer(value) and value > 0, do: value
-
-  defp parse_page(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {page, ""} when page > 0 -> page
-      _other -> 1
-    end
-  end
-
-  defp parse_page(_value), do: 1
-
-  defp bounded_page(value, page) do
-    value
-    |> parse_page()
-    |> min(max(page.total_pages, 1))
-    |> max(1)
-  end
-
-  defp bound_state_page(state, %{total_pages: total_pages})
-       when total_pages > 0 and state.page > total_pages,
-       do: %{state | page: total_pages}
-
-  defp bound_state_page(state, _page), do: state
 
   defp status_kind("verified"), do: :success
   defp status_kind("suggested"), do: :warning

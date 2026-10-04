@@ -6,8 +6,23 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
   import Ecto.Changeset
 
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.LocationSuggestion
+  alias Bilimbi.Core.Address.Web.LocationFields
   alias Bilimbi.Core.Geonames
   alias Ecto.Changeset
+
+  import LocationFields
+
+  @location_ids %{
+    country: "address-country",
+    admin1: "address-admin1",
+    postcode: "address-postcode",
+    locality: "address-locality",
+    postcode_list: "address-postcode-options",
+    locality_list: "address-locality-options",
+    admin1_auto: "address-admin1-auto",
+    locality_auto: "address-locality-auto"
+  }
 
   @field_types %{
     label: :string,
@@ -34,9 +49,10 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
 
     {:ok,
      socket
+     |> assign(:location_ids, @location_ids)
      |> assign(:page_title, "Create Address")
      |> assign(:active_nav, "admin.address")
-     |> assign(:countries, Geonames.list_countries())
+     |> assign(:country_options, Geonames.country_options())
      |> assign(:form_params, params)
      |> assign(:auto_location, %{admin1_code: false, locality: false})
      |> assign_form(form_changeset(params))
@@ -45,7 +61,12 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
 
   @impl true
   def handle_event("validate", %{"address" => incoming}, socket) do
-    {params, auto_location} = location_params(socket, incoming)
+    {params, auto_location} =
+      LocationSuggestion.suggest(
+        incoming,
+        socket.assigns.form_params,
+        socket.assigns.auto_location
+      )
 
     {:noreply,
      socket
@@ -56,7 +77,13 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
   end
 
   def handle_event("save", %{"address" => incoming}, socket) do
-    {params, auto_location} = location_params(socket, incoming)
+    {params, auto_location} =
+      LocationSuggestion.suggest(
+        incoming,
+        socket.assigns.form_params,
+        socket.assigns.auto_location
+      )
+
     changeset = form_changeset(params)
 
     if changeset.valid? do
@@ -122,58 +149,16 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
             <h2 id="address-location-heading" class="mb-4 text-sm font-semibold text-ink">
               Location
             </h2>
-            <div class="grid gap-x-4 sm:grid-cols-2">
-              <.combobox
-                field={@form[:country_iso]}
-                id="address-country"
-                label="Country"
-                placeholder="Choose a country"
-                options={country_options(@countries)}
-              />
-              <div>
-                <.input
-                  field={@form[:admin1_code]}
-                  id="address-admin1"
-                  type="select"
-                  label="State or province"
-                  prompt="Choose a division"
-                  options={admin1_options(@admin1_options)}
-                  disabled={@admin1_options == []}
-                />
-                <p :if={@auto_location.admin1_code} id="address-admin1-auto" class="-mt-2 mb-4 text-xs text-ink-subtle">
-                  Suggested from postcode
-                </p>
-              </div>
-              <div>
-                <.input
-                  field={@form[:postcode]}
-                  id="address-postcode"
-                  label="Postcode"
-                  list="address-postcode-options"
-                  maxlength="255"
-                  disabled={blank?(@form_params["country_iso"])}
-                />
-                <datalist id="address-postcode-options">
-                  <option :for={postcode <- @postcode_options} value={postcode}></option>
-                </datalist>
-              </div>
-              <div>
-                <.input
-                  field={@form[:locality]}
-                  id="address-locality"
-                  label="Locality"
-                  list="address-locality-options"
-                  maxlength="255"
-                  disabled={blank?(@form_params["country_iso"])}
-                />
-                <datalist id="address-locality-options">
-                  <option :for={locality <- @locality_options} value={locality}></option>
-                </datalist>
-                <p :if={@auto_location.locality} id="address-locality-auto" class="-mt-2 mb-4 text-xs text-ink-subtle">
-                  Suggested from postcode
-                </p>
-              </div>
-            </div>
+            <.location_fields
+              form={@form}
+              ids={@location_ids}
+              country_options={@country_options}
+              admin1_options={@admin1_options}
+              postcode_options={@postcode_options}
+              locality_options={@locality_options}
+              auto={@auto_location}
+              country_blank?={blank?(@form_params["country_iso"])}
+            />
           </section>
 
           <section class="rounded-xl border border-line bg-surface px-6 py-5" aria-labelledby="address-provenance-heading">
@@ -219,87 +204,13 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
     """
   end
 
-  defp location_params(socket, incoming) do
-    old = socket.assigns.form_params
-    old_auto = socket.assigns.auto_location
-    params = normalize_country(incoming)
-
-    cond do
-      field(params, "country_iso") != field(old, "country_iso") ->
-        {clear_location_dependents(params), %{admin1_code: false, locality: false}}
-
-      field(params, "postcode") != field(old, "postcode") ->
-        apply_postcode(params, old_auto)
-
-      true ->
-        {params,
-         %{
-           admin1_code:
-             old_auto.admin1_code and
-               field(params, "admin1_code") == field(old, "admin1_code"),
-           locality: old_auto.locality and field(params, "locality") == field(old, "locality")
-         }}
-    end
-  end
-
-  defp apply_postcode(params, old_auto) do
-    params =
-      params
-      |> maybe_clear_auto("admin1_code", old_auto.admin1_code)
-      |> maybe_clear_auto("locality", old_auto.locality)
-
-    matches =
-      Geonames.lookup_postcode(field(params, "country_iso"), field(params, "postcode"))
-
-    localities = matches |> Enum.map(& &1.place_name) |> Enum.reject(&blank?/1) |> Enum.uniq()
-    admin1_code = matching_admin1_code(field(params, "country_iso"), matches)
-
-    params = if admin1_code, do: Map.put(params, "admin1_code", admin1_code), else: params
-
-    params =
-      if length(localities) == 1, do: Map.put(params, "locality", hd(localities)), else: params
-
-    {params,
-     %{
-       admin1_code: not is_nil(admin1_code),
-       locality: length(localities) == 1
-     }}
-  end
-
-  defp matching_admin1_code(_country_iso, []), do: nil
-
-  defp matching_admin1_code(country_iso, [first | _rest]) do
-    raw_code = first.admin1_code
-
-    country_iso
-    |> Geonames.list_admin1()
-    |> Enum.find_value(fn admin1 ->
-      if admin1.code == raw_code or String.ends_with?(admin1.code, ".#{raw_code}"),
-        do: admin1.code
-    end)
-  end
-
   defp assign_location_options(socket, params) do
-    country_iso = field(params, "country_iso")
-    postcode = field(params, "postcode")
-    locality = field(params, "locality")
-    admin1_code = field(params, "admin1_code")
-
-    exact_localities =
-      country_iso
-      |> Geonames.lookup_postcode(postcode)
-      |> Enum.map(& &1.place_name)
-      |> Enum.reject(&blank?/1)
-      |> Enum.uniq()
-
-    locality_options =
-      exact_localities ++
-        Geonames.search_city_names(country_iso, locality, admin1_code: admin1_code)
+    options = LocationSuggestion.options(params)
 
     socket
-    |> assign(:admin1_options, Geonames.list_admin1(country_iso))
-    |> assign(:postcode_options, Geonames.search_postcodes(country_iso, postcode))
-    |> assign(:locality_options, Enum.uniq(locality_options))
+    |> assign(:admin1_options, options.admin1)
+    |> assign(:postcode_options, options.postcodes)
+    |> assign(:locality_options, options.localities)
   end
 
   defp form_changeset(params) do
@@ -333,26 +244,6 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
 
   defp assign_form(socket, %Changeset{} = changeset),
     do: assign(socket, :form, to_form(changeset, as: :address))
-
-  defp normalize_country(params) do
-    Map.update(params, "country_iso", "", fn value ->
-      value |> to_string() |> String.trim() |> String.upcase()
-    end)
-  end
-
-  defp clear_location_dependents(params) do
-    Enum.reduce(~w(admin1_code postcode locality), params, &Map.put(&2, &1, ""))
-  end
-
-  defp maybe_clear_auto(params, field_name, true), do: Map.put(params, field_name, "")
-  defp maybe_clear_auto(params, _field_name, false), do: params
-
-  defp field(params, name), do: Map.get(params, name, "")
-
-  defp country_options(countries),
-    do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-
-  defp admin1_options(admin1), do: Enum.map(admin1, &{&1.name, &1.code})
 
   defp verification_status_options do
     Enum.map(@verification_statuses, &{String.capitalize(&1), &1})

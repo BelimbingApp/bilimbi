@@ -118,6 +118,9 @@ defmodule Bilimbi.Core.Geonames do
   Every country as a `{"Name (ISO)", iso}` select option, ordered like
   `list_countries/0`. A form that only fills a country select uses this
   rather than loading each summary and labelling it itself.
+
+  `country_options/1` labels a list the caller already loaded, including
+  the Admin1 filter's subset.
   """
   @spec country_options() :: [{String.t(), String.t()}]
   def country_options do
@@ -276,6 +279,38 @@ defmodule Bilimbi.Core.Geonames do
         []
     end
   end
+
+  @doc """
+  Labels an already loaded country list as `{"Name (ISO)", iso}`.
+  """
+  @spec country_options([%{country: String.t(), iso: String.t()}]) :: [{String.t(), String.t()}]
+  def country_options(countries) when is_list(countries) do
+    Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
+  end
+
+  @doc """
+  First-level division options for one country, valued by the stored code.
+
+  The label is the division name. `label: :name_and_code` labels
+  `Name (code)`, which the postcode form uses. Address forms keep the
+  default. A blank or unknown country is an empty list.
+  """
+  @spec admin1_options(term()) :: [{String.t(), String.t()}]
+  @spec admin1_options(term(), keyword()) :: [{String.t(), String.t()}]
+  def admin1_options(country_iso, opts \\ [])
+
+  def admin1_options(country_iso, opts) when is_binary(country_iso) and is_list(opts) do
+    label = Keyword.get(opts, :label)
+
+    country_iso
+    |> list_admin1()
+    |> Enum.map(&{admin1_option_label(&1, label), &1.code})
+  end
+
+  def admin1_options(_country_iso, opts) when is_list(opts), do: []
+
+  defp admin1_option_label(admin1, :name_and_code), do: "#{admin1.name} (#{admin1.code})"
+  defp admin1_option_label(admin1, nil), do: admin1.name
 
   @doc """
   Updates an admin1 division's display name by its ID.
