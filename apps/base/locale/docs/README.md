@@ -12,7 +12,7 @@ uses this order:
 1. explicit user override;
 2. valid stored global locale and provenance;
 3. one-time inference from bounded platform-operator address facts;
-4. declared `en-MY` default.
+4. the declared settings default.
 
 The higher-layer company owner supplies a `%Bilimbi.Base.Locale.Bootstrap{}`.
 Base Locale never queries Company, Address, or Geonames tables and never

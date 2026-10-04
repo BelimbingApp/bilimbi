@@ -58,9 +58,9 @@ remain inert and are never translated.
 The occurrence and definition-review relations are Bilimbi-only runtime state
 and are never adopted as compatible migrations. Run history is best effort:
 recorder or retention failure is logged with only bounded source/key facts and
-cannot reverse committed business work. `schedule.history.keep_days` is global,
-defaults to 90, accepts the operational range 0..3650, and treats zero as
-pruning disabled. Pruning is opportunistic at capability-worker start, avoiding
+cannot reverse committed business work. `schedule.history.keep_days` is global.
+Its default and bounds come from the setting definition; zero means pruning is
+disabled. Pruning is opportunistic at capability-worker start, avoiding
 a recurrence that depends on the scheduler to prune the scheduler itself.
 
 Rollback must first stop all Bilimbi producers and workers. The migrations
@@ -77,7 +77,7 @@ them, and changes retention. Those operator functions take the sealed scope
 and check that same capability; the board's `can_*` assigns only choose which
 controls to show, and `Bilimbi.Base.Authz.LiveAuthorization.authorize_event/2`
 re-asks before the event. A system actor is refused. The scheduler enqueues
-through `enqueue_due/2`, not the operator functions. Successful operator
+through `Scheduler.enqueue_due/2`, not the operator functions. Successful operator
 commands and their actor are recorded through Base Audit in the same
 transaction as the controlled state change; operational run rows remain
 separate best-effort evidence.

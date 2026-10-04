@@ -336,8 +336,8 @@
               type="number"
               label="Days"
               wrapper_class="mb-0"
-              min="0"
-              max="3650"
+              min={@retention_minimum}
+              max={@retention_maximum}
               required
               class="mt-1 w-40 rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
             />
