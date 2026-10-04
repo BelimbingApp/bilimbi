@@ -11,7 +11,6 @@ defmodule BilimbiWeb.PlatformOperatorSetupLiveTest do
   setup do
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_legal_entity_types_table!()
-    CompanyFixtures.create_external_access_tables!()
 
     CompanyFixtures.insert_tenant!(%{id: 41, is_platform_operator: true})
     CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
