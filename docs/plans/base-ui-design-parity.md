@@ -950,12 +950,13 @@ Not delivered by this slice:
 
 - **Seven shipped pages still place `<.back_link>` before their primary
   button**, against the order settled above: Core Company's
-  `departments_live.ex`, `relationships_live.ex`, `legal_entity_types_live.ex`
-  and `department_types_live.ex`; Core Employee's `type_index_live.ex` and
-  `show_live.ex`; and Core User's `show_live.ex`. The same seven header rows
-  also still lack the `flex items-center gap-3` wrapper the rule above settles,
-  so their controls sit one collapsed space apart. Both gaps pre-date this
-  slice and are deferred together for a later change.
+  `departments_live.ex`, `relationships_live.ex`, and `reference_types_live.ex`
+  for both department types and legal entity types; Core Employee's
+  `type_index_live.ex` and `show_live.ex`; and Core User's `show_live.ex`.
+  The same seven header rows also still lack the `flex items-center gap-3`
+  wrapper the rule above settles, so their controls sit one collapsed space
+  apart. Both gaps pre-date this slice and are deferred together for a later
+  change.
 - **CMP-03 stayed open here.** `/companies/:id` still kept its facts behind
   explicit edit modes after this slice; only the header and the section
   affordances were settled. The company detail read-first slice below closed
