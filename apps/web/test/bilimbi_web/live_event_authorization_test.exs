@@ -113,16 +113,16 @@ defmodule BilimbiWeb.LiveEventAuthorizationTest do
   end
 
   test "an open page costs one route decision per event and per patch", c do
-    # LiveViewTest mounts twice: the disconnected render and the connected
-    # mount each prove the route once, and neither first handle_params adds
-    # a second decision.
+    # An allowed mount answers from the in-memory capability list, so the
+    # disconnected render and the connected mount write no decision row.
+    # A later event and a same-route patch each re-check live.
     {:ok, view, _html} = live(c.conn, ~p"/employees")
-    assert decisions("admin.employee.list") == 2
+    assert decisions("admin.employee.list") == 0
 
     assert is_binary(render_hook(view, "cancel_delete", %{}))
-    assert decisions("admin.employee.list") == 3
+    assert decisions("admin.employee.list") == 1
 
     assert is_binary(render_patch(view, ~p"/employees?dir=desc"))
-    assert decisions("admin.employee.list") == 4
+    assert decisions("admin.employee.list") == 2
   end
 end
