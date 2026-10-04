@@ -76,6 +76,238 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.get_employee(owner, 73, employee.id + 1)
   end
 
+  test "partitions one company read into a supervisor's subordinate lists", %{owner: owner} do
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-REPORT",
+               full_name: "Report Person"
+             })
+
+    assert {:ok, other} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-OTHER",
+               full_name: "Other Person"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, report.id)
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+    assert Enum.map(lists.subordinates, & &1.id) == [report.id]
+    assert Enum.map(lists.available, & &1.id) == [other.id]
+
+    assert Enum.sort(Enum.map(lists.employees, & &1.id)) ==
+             Enum.sort([lead.id, report.id, other.id])
+
+    assert {:ok, same_subs} = Employee.list_subordinates(owner, 73, lead.id)
+    assert Enum.map(same_subs, & &1.id) == Enum.map(lists.subordinates, & &1.id)
+
+    assert {:ok, same_available} = Employee.list_available_subordinates(owner, 73, lead.id)
+    assert Enum.map(same_available, & &1.id) == Enum.map(lists.available, & &1.id)
+
+    assert {:error, :company_not_found} = Employee.supervision_lists(owner, 74, lead.id)
+    assert {:error, :employee_not_found} = Employee.supervision_lists(owner, 73, lead.id + 9_000)
+  end
+
+  test "orders both supervision lists by case-insensitive name, then id", %{owner: owner} do
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, late_report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ZULU-REPORT",
+               full_name: "Zulu Report"
+             })
+
+    assert {:ok, early_report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-EREPORT",
+               full_name: "eReport"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ZULU",
+               full_name: "Zulu"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-EMART",
+               full_name: "eMart"
+             })
+
+    assert {:ok, earlier_same_name} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-SAM",
+               full_name: "Sam"
+             })
+
+    assert {:ok, later_same_name} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-sam",
+               full_name: "sam"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, late_report.id)
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, early_report.id)
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+
+    assert Enum.map(lists.subordinates, & &1.full_name) == ["eReport", "Zulu Report"]
+
+    assert Enum.map(lists.available, & &1.full_name) == ["eMart", "Sam", "sam", "Zulu"]
+    assert earlier_same_name.id < later_same_name.id
+  end
+
+  test "lists each employee once when another company shares the type code", %{
+    owner: owner,
+    other: other
+  } do
+    assert {:ok, _} =
+             Employee.create_employee_type(owner, 73, %{
+               code: "consultant",
+               label: "House Consultant"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee_type(other, 74, %{
+               code: "consultant",
+               label: "Outside Consultant"
+             })
+
+    assert {:ok, lead} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-LEAD",
+               full_name: "Lead Person"
+             })
+
+    assert {:ok, report} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-REPORT",
+               full_name: "Report Person",
+               employee_type: "consultant"
+             })
+
+    assert {:ok, open} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-OPEN",
+               full_name: "Open Person",
+               employee_type: "consultant"
+             })
+
+    assert {:ok, _} = Employee.assign_subordinate(owner, 73, lead.id, report.id)
+
+    assert {:ok, listed} = Employee.list_employees(owner, 73)
+
+    assert Enum.map(listed, &{&1.id, &1.employee_type_label}) == [
+             {lead.id, "Full Time"},
+             {report.id, "House Consultant"},
+             {open.id, "House Consultant"}
+           ]
+
+    assert {:ok, lists} = Employee.supervision_lists(owner, 73, lead.id)
+
+    assert Enum.map(lists.employees, &{&1.id, &1.employee_type_label}) == [
+             {lead.id, "Full Time"},
+             {report.id, "House Consultant"},
+             {open.id, "House Consultant"}
+           ]
+
+    assert Enum.map(lists.subordinates, & &1.id) == [report.id]
+    assert Enum.map(lists.available, & &1.id) == [open.id]
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73)
+    assert page.total_entries == 3
+
+    assert Map.new(page.entries, &{&1.id, &1.employee_type_label}) == %{
+             lead.id => "Full Time",
+             report.id => "House Consultant",
+             open.id => "House Consultant"
+           }
+  end
+
+  test "uses a preserved global custom type label unless the company has its own row", %{
+    owner: owner,
+    other: other
+  } do
+    insert_raw_employee_type!("seasonal", "Seasonal Worker", false, nil)
+    insert_raw_employee!(74, "EMP-ADA", "seasonal", "Ada")
+
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "EMP-FULL",
+               full_name: "Full Person"
+             })
+
+    assert {:ok, _} =
+             Employee.create_employee_type(other, 74, %{code: "zeta", label: "Zeta Role"})
+
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "EMP-ZETA",
+               full_name: "Zeta Person",
+               employee_type: "zeta"
+             })
+
+    assert {:ok, listed} = Employee.list_employees(other, 74)
+
+    assert Enum.map(listed, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "Seasonal Worker"},
+             {"Full Person", "Full Time"},
+             {"Zeta Person", "Zeta Role"}
+           ]
+
+    ada = Enum.find(listed, &(&1.full_name == "Ada"))
+    assert {:ok, lists} = Employee.supervision_lists(other, 74, ada.id)
+
+    assert Enum.map(lists.employees, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "Seasonal Worker"},
+             {"Full Person", "Full Time"},
+             {"Zeta Person", "Zeta Role"}
+           ]
+
+    assert {:ok, asc} =
+             Employee.list_administration_page(other, 74,
+               sort_by: :employee_type_label,
+               sort_dir: :asc
+             )
+
+    assert asc.total_entries == 3
+
+    assert Enum.map(asc.entries, & &1.employee_type_label) == [
+             "Full Time",
+             "Seasonal Worker",
+             "Zeta Role"
+           ]
+
+    insert_raw_employee!(73, "EMP-ADA", "seasonal", "Ada")
+
+    assert {:ok, _} =
+             Employee.create_employee_type(owner, 73, %{
+               code: "seasonal",
+               label: "House Seasonal"
+             })
+
+    assert {:ok, house} = Employee.list_employees(owner, 73)
+
+    assert Enum.map(house, &{&1.full_name, &1.employee_type_label}) == [
+             {"Ada", "House Seasonal"}
+           ]
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73)
+    assert page.total_entries == 1
+    assert Enum.map(page.entries, & &1.employee_type_label) == ["House Seasonal"]
+  end
+
   test "returns a bounded administration page with source search, filters, and stable order", %{
     owner: owner
   } do
