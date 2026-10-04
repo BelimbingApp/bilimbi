@@ -6,7 +6,7 @@ A reference-type admin page is a spec on `Bilimbi.Core.Company.Web.ReferenceType
 
 ## Address panels
 
-An owner-specific address panel is a parameter on `Bilimbi.Core.Address.Web.AddressesPanel`, not a second LiveView. The company and employee pages pass `company_id` or `employee_id`; the panel owns the capability, the noun, and whether creating an address is offered. Location fields on an address form are `Bilimbi.Core.Address.Web.LocationFields`, and the postcode cascade is `Bilimbi.Core.Address.LocationSuggestion`.
+An owner-specific address panel is a parameter on `Bilimbi.Core.Address.Web.AddressesPanel`, not a second LiveComponent. The company and employee pages pass `company_id` or `employee_id`; the panel owns the capability, the noun, and whether creating an address is offered. Location fields on an address form are `Bilimbi.Core.Address.Web.LocationFields`, and the postcode cascade is `Bilimbi.Core.Address.LocationSuggestion`.
 
 ## An archived company is final
 
