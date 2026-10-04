@@ -212,10 +212,17 @@ and the round trip is the cost already accepted for theme and time display in #7
 **NAV-01 amendment (2026-09-24) — the controller is the one write path.** The
 `ShellPins` hook, the scope's `:pins` snapshot and the deletion of `PinController`
 above are superseded. Pins are written only through the existing authenticated
-`PinController` (`/api/pins/toggle|reorder`) over `user_pins`, and the shell syncs
-from `GET /api/pins`; there is no `ShellPins` hook and no second write path. The
-controller refuses writes from an impersonated session. `user_pins` remaining the sole
+`PinController` (`/api/pins/toggle|reorder`) over `user_pins`. The mount read
+that synced from `GET /api/pins` is the 2026-10-04 read path below. There is
+no `ShellPins` hook and no second write path. The controller refuses
+writes from an impersonated session. `user_pins` remaining the sole
 store, and rail, width and branch expansion staying browser-local, still stand.
+
+**NAV-01 read path (2026-10-04).** The mount no longer syncs from
+`GET /api/pins`. The full shell renders `current_scope.pins` as `data-pins`;
+the hook reads that attribute and requests `/api/pins` only after a toggle
+that did not return the list. Writes stay on `PinController`. The operative
+rule is `apps/base/ui/AGENTS.md`.
 
 **CMP-03 — one detail assembly.** Bilimbi has five section-heading treatments, four
 `dt` label treatments, three grid rules, two card paddings and three editing models
@@ -336,9 +343,9 @@ lost inside a design ledger:
   `/api/pins/toggle|reorder`, `User.toggle_user_pin/reorder_user_pins` and the
   `user_pins` table exist, and `app_shell.js` calls that API zero times while using
   `localStorage` ten times. Pins do not follow the account.
-  Resolved: the shell loads pins from `GET /api/pins` and writes through
-  `/api/pins/toggle|reorder`. It imports legacy browser navigation pins once and
-  drops legacy record pins.
+  Resolved: the shell writes through `/api/pins/toggle|reorder`. It imports
+  legacy browser navigation pins once and drops legacy record pins. The mount
+  read later moved off `GET /api/pins`; see the 2026-10-04 NAV-01 read path.
 - Pinned reordering is mouse-only. `app_shell.js` wires HTML5 drag events on
   `[data-pinned-item]` with no keyboard or pointer-free equivalent, and the grip
   advertising it is `aria-hidden`, so keyboard and assistive-technology users cannot
@@ -711,7 +718,7 @@ Validation: Bilimbi matches or exceeds the useful design capability of Belimbing
 
 These shipped on `main` and were absent as checklist rows. The reduced-motion page-loading bar is the ticked FND-05 follow-up in Phase 3 (#806), not a second row. Each line records the observable result; the catalog and the contradiction notes above carry the design detail.
 
-- [x] Durable account-backed pins. The shell loads pins from `GET /api/pins` and writes through `/api/pins/toggle|reorder` (#791). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Durable account-backed pins. Writes go through `/api/pins/toggle|reorder` (#791). `{fm/parity-plan-bookkeeping/composer}` The mount read is the 2026-10-04 NAV-01 read path, not a `GET /api/pins` on shell mount.
 - [x] Country and jurisdiction combobox. `/companies/create`, the Company jurisdiction fact and Address country fields use `<.combobox>` (#793). `{fm/parity-plan-bookkeeping/composer}`
 - [x] Users filter toolbar. `/users` renders its filters through `<.filter_toolbar>` (#792). `{fm/parity-plan-bookkeeping/composer}`
 - [x] Shared notification and User datetime. `/notifications` and the Users Created column render through `<.datetime>` (#795). `{fm/parity-plan-bookkeeping/composer}`
