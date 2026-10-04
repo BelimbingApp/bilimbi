@@ -15,12 +15,12 @@ defmodule Bilimbi.Base.Schedule do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule.Administration
   alias Bilimbi.Base.Schedule.Definition
-  alias Bilimbi.Base.Schedule.Scheduler
   alias Bilimbi.Base.Schedule.DefinitionReview
   alias Bilimbi.Base.Schedule.Diagnostics
   alias Bilimbi.Base.Schedule.Occurrence
   alias Bilimbi.Base.Schedule.Run
   alias Bilimbi.Base.Schedule.RunPage
+  alias Bilimbi.Base.Schedule.Scheduler
   alias Bilimbi.Base.Schedule.Suppression
   alias Bilimbi.Base.Schedule.TaskSummary
   alias Bilimbi.Base.Settings

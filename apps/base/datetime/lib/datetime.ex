@@ -6,7 +6,8 @@ defmodule Bilimbi.Base.DateTime do
   ownership of their stored timestamps and deadline semantics, and canonical
   storage stays UTC (compatible `NaiveDateTime` values are explicitly
   interpreted as UTC). This module owns the user-scoped `ui.timezone.mode`
-  preference (`company | local | utc`, default `company`), validates IANA
+  preference (`company | local | utc`; its default comes from that
+  setting's definition), validates IANA
   identifiers against a real time zone database, and resolves the
   server-authorized `Display` metadata the web edge hands to presentation.
 
@@ -50,7 +51,7 @@ defmodule Bilimbi.Base.DateTime do
   @spec time_zone_database() :: module()
   def time_zone_database, do: @tz_db
 
-  @doc "Reads the account's display mode; unset or invalid resolves to `:company`."
+  @doc "Reads the account's display mode; unset or invalid resolves to the setting definition's default."
   @spec mode(SettingsScope.t()) :: mode()
   def mode(%SettingsScope{type: :user} = scope) do
     case Settings.get(@mode_key, scope) do
@@ -107,11 +108,12 @@ defmodule Bilimbi.Base.DateTime do
   def timezones, do: TimeZoneInfo.time_zones(links: :include)
 
   @doc """
-  Reads the company time zone by explicit company scope; default `UTC`.
+  Reads the company time zone by explicit company scope. The default comes
+  from the setting definition.
 
-  A stored value that no longer names a convertible zone resolves to `UTC`
-  rather than raising in presentation — the invalid value stays visible on
-  the company management surface, which is where it gets fixed.
+  A stored value that no longer names a convertible zone resolves to that
+  default rather than raising in presentation — the invalid value stays
+  visible on the company management surface, which is where it gets fixed.
   """
   @spec company_timezone(SettingsScope.t() | nil) :: String.t()
   def company_timezone(nil), do: default_timezone()

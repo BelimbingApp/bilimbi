@@ -5,8 +5,8 @@ Phoenix router, LiveView callback, and Ecto telemetry by starting this required
 Base application; Queue's Oban telemetry is observed through the same reporter.
 Observed business work never waits for or depends on history persistence.
 The reporter reads `perf.enabled`, `perf.sample_rate`, and
-`perf.minimum_duration_ms` through `Settings.get/2`. Settings.Cache already
-holds those rows for 30 seconds and drops them on put, so the reporter does
+`perf.minimum_duration_ms` through `Settings.get/2`. That read uses
+`Settings.Cache` (see `apps/base/settings/docs/README.md`); the reporter does
 not keep a second cache.
 
 History is stored in the Bilimbi-only `base_perf_samples` PostgreSQL ledger.

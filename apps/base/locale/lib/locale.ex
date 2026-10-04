@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Locale do
     2. a valid explicitly stored global locale and its provenance;
     3. a supported locale inferred from bounded bootstrap facts and persisted
        globally once;
-       4. the declared settings default.
+    4. the declared settings default.
 
   The regional code remains intact for number, currency, and later date/time
   consumers. `language/1` separately returns the language code a Gettext
