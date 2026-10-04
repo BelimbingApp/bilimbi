@@ -2,9 +2,9 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.Audit.MutationSchema
-  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Password
@@ -377,9 +377,9 @@ defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
 
   use ExUnit.Case, async: false
 
-  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
