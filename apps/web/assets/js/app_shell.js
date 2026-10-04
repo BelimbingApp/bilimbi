@@ -236,9 +236,16 @@ const AppShell = {
   },
 
   async loadPinnedItems() {
-    let pins = this.readRenderedPins()
+    const rendered = this.readRenderedPins()
+    let pins = rendered
 
-    if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
+    if (!this.impersonating) {
+      try {
+        pins = await this.migrateLegacyPins(rendered)
+      } catch (_error) {
+        pins = rendered
+      }
+    }
 
     this.pinnedEntries = pins
     this.renderPinnedItems()

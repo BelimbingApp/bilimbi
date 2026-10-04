@@ -533,6 +533,46 @@ test("keyboard move controls reorder durably, announce, and restore focus", asyn
   assert.equal(document.activeElement.className.includes("app-pinned-link"), true)
 })
 
+test("a failed legacy migration keeps the pins already on the page", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-users"}]))
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    throw new Error("offline")
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.equal(calls, 1)
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(shell.hook.pinnedEntries.length, 1)
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("a legacy migration response that is not JSON keeps the pins already on the page", async () => {
+  const root = render(SHELL, "app-shell")
+  root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-users"}]))
+  failToggle = {
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError("not json")
+    },
+  }
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["POST /api/pins/toggle"])
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.equal(shell.hook.pinnedEntries.length, 1)
+  shell.hook.updated()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
 test("legacy migration imports navigation pins only and clears the browser key", async () => {
   localStorage.setItem("sidebarPinnedItems", JSON.stringify([
     {id: "nav-companies"},

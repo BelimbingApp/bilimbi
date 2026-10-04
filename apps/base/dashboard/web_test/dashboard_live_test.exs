@@ -750,6 +750,49 @@ defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
       assert render(view) =~ "User"
     end
 
+    test "a revoked session or performance grant leaves the visible widget unmarked", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!(["admin.system.session.list", "admin.system.perf.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open1"
+      refute cell_text(render(view), "stat-performance-item-0") == "Health—"
+      refute render(view) =~ "Unknown"
+
+      for capability <- ["admin.system.session.list", "admin.system.perf.view"] do
+        assert {:ok, :stored} =
+                 Authz.put_principal_capability(scope, 73, :user, 91, capability, false)
+      end
+
+      Session.put_session("dash-revoked", "opaque", %{
+        user_id: 91,
+        ip_address: "127.0.0.4",
+        user_agent: "Bilimbi test",
+        last_activity: 400
+      })
+
+      view |> element("#customize-layout") |> render_click()
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-sessions")
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open—"
+      assert cell_text(render(view), "stat-performance-item-0") == "Health—"
+      assert cell_text(render(view), "stat-performance-item-1") == "Samples—"
+      refute render(view) =~ "Unknown"
+
+      view |> element("#remove-base-dashboard-session-stats") |> render_click()
+      view |> element("#add-widget-base-dashboard-session-stats") |> render_click()
+      assert cell_text(render(view), "stat-sessions-item-0") == "Open—"
+
+      view |> element("#remove-base-perf-health") |> render_click()
+      view |> element("#add-widget-base-perf-health") |> render_click()
+      assert cell_text(render(view), "stat-performance-item-0") == "Health—"
+      refute render(view) =~ "Unknown"
+    end
+
     test "a revoked audit grant leaves the visible widget unmarked", %{conn: conn, scope: scope} do
       grant_capabilities!(["admin.audit.log.list"])
 
