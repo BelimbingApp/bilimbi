@@ -792,11 +792,10 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:checked, :boolean, doc: "the checked flag for checkbox inputs")
   attr(:prompt, :string, default: nil, doc: "the prompt for select inputs")
   attr(:options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2")
-  attr(:multiple, :boolean, default: false, doc: "the multiple flag for select inputs")
 
-  attr(:size, :integer,
-    default: nil,
-    doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
+  attr(:multiple, :boolean,
+    default: false,
+    doc: "the multiple flag for select inputs; the listbox shows five rows"
   )
 
   attr(:selection_label, :string,
@@ -805,7 +804,6 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:class, :any, default: nil, doc: "the input class to use over defaults")
-  attr(:error_class, :any, default: nil, doc: "the input error class to use over defaults")
 
   attr(:hint, :string,
     default: nil,
@@ -923,17 +921,17 @@ defmodule Bilimbi.Base.UI.Components do
         aria-describedby={described_by(@id, @hint, @errors)}
         class={
           [
-            field_class(@class, @error_class, @errors),
+            field_class(@class, @errors),
             # A listbox is sized in rows, not pixels. `py-2` makes the box taller
             # than the rows it holds, and the browser fills the slack with the
             # *next* option -- so the last row is painted sliced through its
             # glyphs and reads as a rendering fault rather than "scroll for more"
-            # (#281). Height comes from `size` instead.
+            # (#281). Height comes from the five-row `size` instead.
             @multiple && "!py-0"
           ]
         }
         multiple={@multiple}
-        size={@multiple && (@size || 5)}
+        size={@multiple && 5}
         {@rest}
       >
         <option :if={@prompt} value="" selected={@value in [nil, ""]}>{@prompt}</option>
@@ -983,7 +981,7 @@ defmodule Bilimbi.Base.UI.Components do
         aria-invalid={@errors != [] && "true"}
         aria-describedby={described_by(@id, @hint, @errors)}
         class={
-          field_class(@class, @error_class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
+          field_class(@class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
         }
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
@@ -1039,7 +1037,7 @@ defmodule Bilimbi.Base.UI.Components do
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           aria-invalid={@errors != [] && "true"}
           aria-describedby={described_by(@id, @hint, @errors)}
-          class={[field_class(@class, @error_class, @errors), "pr-10"]}
+          class={[field_class(@class, @errors), "pr-10"]}
           {@rest}
         />
         <button
@@ -1089,7 +1087,7 @@ defmodule Bilimbi.Base.UI.Components do
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         aria-invalid={@errors != [] && "true"}
         aria-describedby={described_by(@id, @hint, @errors)}
-        class={field_class(@class, @error_class, @errors, readonly: @rest[:readonly])}
+        class={field_class(@class, @errors, readonly: @rest[:readonly])}
         {@rest}
       />
       <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
@@ -1123,9 +1121,6 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:errors, :list, default: [])
   attr(:cancel_event, :string, default: nil)
   attr(:wrapper_class, :any, default: nil)
-  attr(:label_class, :any, default: nil)
-  attr(:class, :any, default: nil)
-  attr(:error_class, :any, default: nil)
 
   attr(:rest, :global,
     include:
@@ -1184,11 +1179,7 @@ defmodule Bilimbi.Base.UI.Components do
         name={@name}
         value={@value_string}
       />
-      <label
-        :if={@label}
-        for={@id}
-        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
-      >
+      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-ink">
         {@label}
       </label>
 
@@ -1205,10 +1196,7 @@ defmodule Bilimbi.Base.UI.Components do
           autocomplete="off"
           value={@selected_label}
           placeholder={@placeholder}
-          class={[
-            field_class(@class, @error_class, @errors),
-            "pr-9"
-          ]}
+          class={[field_class(nil, @errors), "pr-9"]}
           {@rest}
         />
         <button
@@ -1280,12 +1268,12 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   # One control family for every field type. `class` replaces the default
-  # entirely; `error_class` replaces only the invalid-state styling.
-  defp field_class(class, error_class, errors, opts \\ []) do
+  # entirely; the invalid-state styling is not the caller's to replace.
+  defp field_class(class, errors, opts \\ []) do
     [
       class || field_base_class(opts[:readonly]),
       is_nil(class) && opts[:extra],
-      field_state_class(errors, "border-high-contrast-line", error_class)
+      field_state_class(errors, "border-high-contrast-line")
     ]
   end
 
@@ -1307,11 +1295,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   # A field in error reads the same whichever control draws it, so the invalid
   # appearance is decided once here rather than per control family.
-  defp field_state_class(errors, valid_class, error_class \\ nil)
-  defp field_state_class([], valid_class, _error_class), do: valid_class
+  defp field_state_class([], valid_class), do: valid_class
 
-  defp field_state_class(_errors, _valid_class, error_class),
-    do: error_class || "border-danger focus:border-danger focus:ring-danger/20"
+  defp field_state_class(_errors, _valid_class),
+    do: "border-danger focus:border-danger focus:ring-danger/20"
 
   # `readonly` is a statement the caller made about this field. The CSS
   # `:read-only` pseudo-class is not the same statement: it matches every
@@ -1352,7 +1339,6 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:label, :string, default: nil)
   attr(:label_class, :any, default: nil)
   attr(:wrapper_class, :any, default: nil)
-  attr(:class, :any, default: nil)
 
   attr(:field, Phoenix.HTML.FormField,
     doc: "a form field struct retrieved from the form, for example @form[:role_ids]"
@@ -1524,8 +1510,7 @@ defmodule Bilimbi.Base.UI.Components do
           field_state_class(
             @errors,
             "border-line focus:border-brand-strong focus:ring-brand-strong/30"
-          ),
-          @class
+          )
         ]}
         {@rest}
       >
@@ -1623,9 +1608,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:hint, :string, default: nil)
   attr(:disabled, :boolean, default: false)
-  attr(:class, :any, default: nil)
   attr(:wrapper_class, :any, default: nil)
-  attr(:label_class, :any, default: nil)
   attr(:rest, :global)
 
   def radio_group(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
@@ -1656,7 +1639,7 @@ defmodule Bilimbi.Base.UI.Components do
       class={@wrapper_class || "mb-4"}
       {@rest}
     >
-      <legend :if={@label} class={["mb-1.5 text-sm font-medium text-ink", @label_class]}>
+      <legend :if={@label} class="mb-1.5 text-sm font-medium text-ink">
         {@label}
       </legend>
       <div class="space-y-2">
@@ -1676,10 +1659,7 @@ defmodule Bilimbi.Base.UI.Components do
             value={opt_value}
             checked={opt_value == @selected}
             disabled={@disabled}
-            class={
-              @class ||
-                "size-4 shrink-0 accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed"
-            }
+            class="size-4 shrink-0 accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed"
           />
           {opt_label}
         </label>
@@ -2715,7 +2695,6 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:id, :string, required: true)
   attr(:rows, :any, required: true)
   attr(:row_id, :any, default: nil, doc: "the function for generating the row id")
-  attr(:row_click, :any, default: nil, doc: "the function for handling phx-click on each row")
 
   attr(:row_item, :any,
     default: &Function.identity/1,
@@ -2768,6 +2747,9 @@ defmodule Bilimbi.Base.UI.Components do
 
   # Flat on purpose. This component takes no radius, so a rounded table is
   # hand-written markup. DESIGN.md "Table geometry".
+  #
+  # A row is not clickable. The row that opens a record carries a
+  # `<.record_link>` in a cell, which is a real link a keyboard reaches.
   def table(assigns) do
     assigns =
       with %{rows: %Phoenix.LiveView.LiveStream{}} <- assigns do
@@ -2813,12 +2795,7 @@ defmodule Bilimbi.Base.UI.Components do
           <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="hover:bg-surface-sunken">
             <td
               :for={col <- @col}
-              phx-click={@row_click && @row_click.(row)}
-              class={[
-                "px-2 py-0.5 text-ink",
-                col[:align] == :right && "text-right",
-                @row_click && "hover:cursor-pointer"
-              ]}
+              class={["px-2 py-0.5 text-ink", col[:align] == :right && "text-right"]}
             >
               {render_slot(col, @row_item.(row))}
             </td>
