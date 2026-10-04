@@ -1,32 +1,77 @@
 defmodule Bilimbi.Core.Address.CompanyAddressesPanelGeonamesTest do
   @moduledoc """
-  The create-and-attach Geonames cascade lives in `LocationSuggestion`.
-  core/address declares core/geonames, so these are direct calls; this
-  tripwires them staying direct rather than reverting to the
-  `function_exported?` probe form.
+  The create page, the address detail editor, and the company panel ask
+  `LocationSuggestion` for the same postcode cascade.
   """
 
-  use ExUnit.Case, async: true
+  use Bilimbi.Base.Database.DataCase, async: true
 
-  @panel Path.expand("../lib/address/location_suggestion.ex", __DIR__)
+  alias Bilimbi.Core.Address.LocationSuggestion
 
-  @cascade_funs [:list_admin1, :lookup_postcode, :search_postcodes, :search_city_names]
+  import Bilimbi.Core.Geonames.TestFixtures
 
-  test "location suggestions pin direct Geonames calls and tripwire the probe form" do
-    source = File.read!(@panel)
+  setup do
+    create_geonames_tables!()
+    insert_country!()
+    insert_admin1!()
+    insert_postcode!()
+    :ok
+  end
 
-    assert source =~ "alias Bilimbi.Core.Geonames"
-    assert source =~ "Geonames.list_admin1("
-    assert source =~ "Geonames.lookup_postcode("
-    assert source =~ "Geonames.search_postcodes("
-    assert source =~ "Geonames.search_city_names("
+  test "a changed postcode fills the division and the single matching locality" do
+    previous = blank_location("MY")
 
-    refute source =~ ~r/geonames_mod\b/
-    refute source =~ ~r/Module\.concat\(\["Bilimbi", "Core", "Geonames"\]\)/
+    assert {params, auto} =
+             LocationSuggestion.suggest(
+               %{previous | "postcode" => "50000"},
+               previous,
+               %{admin1_code: false, locality: false}
+             )
 
-    for fun <- @cascade_funs do
-      refute source =~ ~r/function_exported\?\([^,]+,\s*:#{fun}\b/
-    end
+    assert params["country_iso"] == "MY"
+    assert params["admin1_code"] == "MY.14"
+    assert params["postcode"] == "50000"
+    assert params["locality"] == "Kuala Lumpur"
+    assert auto == %{admin1_code: true, locality: true}
+  end
+
+  test "several localities for one postcode fill the division and leave the locality" do
+    insert_postcode!(%{place_name: "Chow Kit"})
+    previous = %{blank_location("MY") | "locality" => "Typed"}
+
+    assert {params, auto} =
+             LocationSuggestion.suggest(
+               %{previous | "postcode" => "50000"},
+               previous,
+               %{admin1_code: false, locality: false}
+             )
+
+    assert params["admin1_code"] == "MY.14"
+    assert params["postcode"] == "50000"
+    assert params["locality"] == "Typed"
+    assert auto == %{admin1_code: true, locality: false}
+  end
+
+  test "option lists follow the country, postcode, and locality" do
+    insert_city!(%{
+      geoname_id: 1_735_162,
+      name: "Petaling",
+      ascii_name: "Petaling",
+      admin1_code: "14",
+      population: 100
+    })
+
+    options =
+      LocationSuggestion.options(%{
+        "country_iso" => "my",
+        "admin1_code" => "MY.14",
+        "postcode" => "50000",
+        "locality" => "Pet"
+      })
+
+    assert options.admin1 == [{"Kuala Lumpur", "MY.14"}]
+    assert options.postcodes == ["50000"]
+    assert options.localities == ["Kuala Lumpur", "Petaling"]
   end
 
   test "a country change clears division, postcode, and locality" do
@@ -40,7 +85,7 @@ defmodule Bilimbi.Core.Address.CompanyAddressesPanelGeonamesTest do
     incoming = %{previous | "country_iso" => "sg", "postcode" => "018989"}
 
     assert {params, auto} =
-             Bilimbi.Core.Address.LocationSuggestion.suggest(incoming, previous, %{
+             LocationSuggestion.suggest(incoming, previous, %{
                admin1_code: true,
                locality: true
              })
@@ -50,5 +95,9 @@ defmodule Bilimbi.Core.Address.CompanyAddressesPanelGeonamesTest do
     assert params["postcode"] == ""
     assert params["locality"] == ""
     assert auto == %{admin1_code: false, locality: false}
+  end
+
+  defp blank_location(country_iso) do
+    %{"country_iso" => country_iso, "admin1_code" => "", "postcode" => "", "locality" => ""}
   end
 end

@@ -864,6 +864,22 @@ defmodule BilimbiWeb.AddressLiveTest do
         "country_iso" => "MY",
         "admin1_code" => "",
         "postcode" => "50000",
+        "locality" => "Kuala Lumpur"
+      }
+    })
+
+    assert has_element?(view, "#address-location-admin1 option[value='MY.14']")
+    refute has_element?(view, "#address-location-admin1 option[value='MY.14'][selected]")
+    refute has_element?(view, "#address-location-postcode[value='50000']")
+    refute has_element?(view, "#address-location-locality[value='Kuala Lumpur']")
+
+    view
+    |> element("#address-location-form")
+    |> render_change(%{
+      "location" => %{
+        "country_iso" => "MY",
+        "admin1_code" => "",
+        "postcode" => "50000",
         "locality" => ""
       }
     })
@@ -999,5 +1015,105 @@ defmodule BilimbiWeb.AddressLiveTest do
       view,
       ~p"/addresses/#{address.id}?#{%{linked_sort_by: "priority", linked_sort_dir: "asc"}}"
     )
+  end
+
+  test "loads location suggestions when the editor opens", %{conn: conn, scope: scope} do
+    {:ok, address} =
+      Address.create_address(scope, %{
+        label: "HQ",
+        country_iso: "MY",
+        admin1_code: "MY.14",
+        postcode: "50000",
+        locality: "Kuala Lumpur"
+      })
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {mount_queries, view} =
+      capture_queries(fn ->
+        {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+        assert has_element?(view, "#address-view-postcode", "50000")
+        refute has_element?(view, "#address-location-form")
+        view
+      end)
+
+    refute Enum.any?(mount_queries, &suggestion_query?/1)
+
+    {open_queries, _} =
+      capture_queries(fn ->
+        view |> element("#address-edit-location-button") |> render_click()
+
+        assert has_element?(view, "#address-location-form")
+        assert has_element?(view, "#address-location-admin1 option[value='MY.14']")
+        assert has_element?(view, "#address-location-postcode-options option[value='50000']")
+
+        assert has_element?(
+                 view,
+                 "#address-location-locality-options option[value='Kuala Lumpur']"
+               )
+      end)
+
+    assert Enum.any?(open_queries, &suggestion_query?/1)
+
+    {cancel_queries, _} =
+      capture_queries(fn ->
+        view |> element("#address-cancel-location") |> render_click()
+        refute has_element?(view, "#address-location-form")
+        assert has_element?(view, "#address-view-locality", "Kuala Lumpur")
+      end)
+
+    refute Enum.any?(cancel_queries, &suggestion_query?/1)
+
+    view |> element("#address-edit-location-button") |> render_click()
+
+    {save_queries, _} =
+      capture_queries(fn ->
+        view
+        |> element("#address-location-form")
+        |> render_submit(%{
+          "location" => %{
+            "country_iso" => "MY",
+            "admin1_code" => "MY.14",
+            "postcode" => "50000",
+            "locality" => "Kuala Lumpur"
+          }
+        })
+
+        refute has_element?(view, "#address-location-form")
+        assert has_element?(view, "#address-location-status[role='status']", "Saved")
+      end)
+
+    refute Enum.any?(save_queries, &suggestion_query?/1)
+  end
+
+  defp capture_queries(fun) do
+    handler = "address-location-queries-#{System.unique_integer([:positive])}"
+    parent = self()
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _, _, %{query: query}, _ -> send(parent, {:address_location_query, handler, query}) end,
+      nil
+    )
+
+    try do
+      result = fun.()
+      {flush_queries(handler, []), result}
+    after
+      :telemetry.detach(handler)
+    end
+  end
+
+  defp flush_queries(handler, queries) do
+    receive do
+      {:address_location_query, ^handler, query} -> flush_queries(handler, [query | queries])
+    after
+      0 -> Enum.reverse(queries)
+    end
+  end
+
+  defp suggestion_query?(query) do
+    String.contains?(query, "geonames_postcodes") or String.contains?(query, "geonames_cities")
   end
 end

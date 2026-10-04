@@ -227,10 +227,12 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
   def handle_event("edit_location", _params, socket) do
     if can_update?(socket) do
-      {:noreply,
-       socket
-       |> assign(:editing_location?, true)
-       |> assign_location_form(socket.assigns.address)}
+      socket =
+        socket
+        |> assign(:editing_location?, true)
+        |> assign_location_form(socket.assigns.address)
+
+      {:noreply, assign_location_options(socket, socket.assigns.location_params)}
     else
       {:noreply, write_forbidden(socket)}
     end
@@ -833,7 +835,6 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     |> assign(:auto_location, %{admin1_code: false, locality: false})
     |> assign(:location_params, data)
     |> assign(:location_form, to_form(data, as: :location))
-    |> assign_location_options(data)
   end
 
   defp assign_location_options(socket, params) do
