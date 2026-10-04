@@ -58,11 +58,18 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(view, "#nav-admin-authz-decision-log[aria-current='page']")
   end
 
-  test "shows the count without dead page controls on a single page", %{conn: conn} do
+  test "shows the count without dead page controls on a single page", %{
+    conn: conn,
+    scope: scope
+  } do
+    # An allowed open writes nothing, so the count is the seeded decision.
+    record_decision(scope, "admin.user.list")
+
     {:ok, view, _html} = open(conn)
 
+    assert has_element?(view, "#decision-logs", "admin.user.list")
     summary = view |> element("#logs-pagination-summary") |> render()
-    assert summary =~ ~r/Showing 1 to [1-9]\d* of [1-9]\d* results/
+    assert summary =~ "Showing 1 to 1 of 1 results"
     # The standard <.pagination> renders the size select always and the page
     # controls only past one page (#623).
     assert has_element?(view, "#logs-pagination-page-size")
@@ -212,9 +219,8 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(view, "th[scope='col'][aria-sort='none']")
     refute has_element?(view, "#decision-logs-empty")
 
-    # The unfiltered table is never empty here: opening the screen authorizes
-    # it, and that authorization writes a decision log of its own. The filtered
-    # case is the only reachable empty state, so it is the one worth asserting.
+    # Opening the screen writes no decision of its own. The seeded row is why
+    # the unfiltered table is not empty; the filtered case is the empty state.
     view
     |> form("#logs-filters", filters: %{"search" => "zzz-no-such-capability"})
     |> render_change()
@@ -249,7 +255,8 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     grant_capabilities!("admin.authz.decision-log.list")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/decision-logs?page=2")
 
-    assert has_element?(view, "#decision-logs", "admin.authz.decision-log.list")
+    assert has_element?(view, "#decision-logs", "admin.user.list")
+    refute has_element?(view, "#decision-logs", "admin.authz.decision-log.list")
   end
 
   test "an unrecognised sort or result in the URL falls back", %{conn: conn} do
@@ -264,16 +271,19 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(view, "#logs-result option[value=''][selected]")
   end
 
-  test "records the access check that opened it", %{conn: conn} do
-    # Not a quirk of the test: reaching this page is itself an authorization
-    # decision, so the log is never empty once someone has looked at it. Worth
-    # pinning -- it means the empty state is effectively unreachable in
-    # practice, and anyone reading these rows should expect to see their own
-    # visit near the top.
+  test "an allowed open writes no decision of its own", %{conn: conn} do
+    # The route gate answers from the in-memory capability list, so looking at
+    # this page does not record admin.authz.decision-log.list. With nothing
+    # else seeded, the empty state is what the screen shows.
     {:ok, view, _html} = open(conn)
 
-    assert has_element?(view, "#decision-logs", "admin.authz.decision-log.list")
-    refute render(view) =~ "No authorization decisions have been recorded"
+    refute has_element?(view, "#decision-logs", "admin.authz.decision-log.list")
+
+    assert has_element?(
+             view,
+             "#decision-logs-empty",
+             "No authorization decisions have been recorded in this tenant."
+           )
   end
 
   describe "operator reach caution" do
