@@ -168,6 +168,110 @@ defmodule Bilimbi.Base.UI.CommitStatusTest do
     end
   end
 
+  describe "commit/4" do
+    defp refusal do
+      {%{}, %{name: :string}}
+      |> Ecto.Changeset.cast(%{}, [])
+      |> Ecto.Changeset.add_error(:name, "can't be blank")
+    end
+
+    defp commit(socket, result, extra \\ []) do
+      CommitStatus.commit(
+        socket,
+        "name",
+        result,
+        [
+          submitted: "typed",
+          label: "Name",
+          field: :name,
+          on_ok: fn socket, record -> Phoenix.Component.assign(socket, :record, record) end
+        ] ++ extra
+      )
+    end
+
+    test "runs on_ok with the stored record, then records Saved" do
+      socket = commit(socket(), {:ok, :stored})
+
+      assert socket.assigns.record == :stored
+      assert statuses(socket) == %{"name" => :saved}
+    end
+
+    test "words a changeset refusal with the label, the field's reasons and the rejected value" do
+      socket = commit(socket(), {:error, refusal()})
+
+      assert statuses(socket) == %{
+               "name" => {:error, "\"typed\" was not saved: Name can't be blank."}
+             }
+
+      refute Map.has_key?(socket.assigns, :record)
+    end
+
+    test "uses the page's sentence for a reason it has a noun for" do
+      socket = commit(socket(), {:error, :gone}, failures: %{gone: "It is gone."})
+
+      assert statuses(socket) == %{"name" => {:error, "It is gone."}}
+    end
+
+    test "accepts a function when the sentence depends on the page's state" do
+      failures = fn
+        :gone -> "It is gone."
+        _reason -> nil
+      end
+
+      assert statuses(commit(socket(), {:error, :gone}, failures: failures)) ==
+               %{"name" => {:error, "It is gone."}}
+
+      assert statuses(commit(socket(), {:error, :other}, failures: failures)) ==
+               %{"name" => {:error, CommitStatus.failure_message()}}
+    end
+
+    test "falls through to the generic sentence for a reason with no noun" do
+      assert statuses(commit(socket(), {:error, :other})) ==
+               %{"name" => {:error, CommitStatus.failure_message()}}
+    end
+
+    test "Saved belongs to the most recent commit only" do
+      socket = socket() |> CommitStatus.put("email", :saved) |> commit({:error, :other})
+
+      assert statuses(socket) == %{"name" => {:error, CommitStatus.failure_message()}}
+    end
+  end
+
+  describe "save_field/4" do
+    @fields %{"name" => :name}
+
+    defp save_field(socket, params, can?) do
+      CommitStatus.save_field(socket, params, @fields,
+        can?: can?,
+        forbidden: "Not allowed.",
+        write: fn socket, name, field, value ->
+          Phoenix.Component.assign(socket, :written, {name, field, value})
+        end
+      )
+    end
+
+    test "hands the declared fact to the page's write" do
+      socket = save_field(socket(), %{"id" => "x", "name" => "Ada"}, true)
+
+      assert socket.assigns.written == {"name", :name, "Ada"}
+    end
+
+    test "ignores params that name no declared fact" do
+      socket = save_field(socket(), %{"other" => "Ada"}, true)
+
+      refute Map.has_key?(socket.assigns, :written)
+    end
+
+    test "refuses an actor who lost the capability, without calling the write" do
+      saved = CommitStatus.put(socket(), "email", :saved)
+      socket = save_field(saved, %{"name" => "Ada"}, false)
+
+      refute Map.has_key?(socket.assigns, :written)
+      assert statuses(socket) == %{}
+      assert socket.assigns.flash["error"] == "Not allowed."
+    end
+  end
+
   describe "failure_message/0" do
     test "is the generic sentence for a reason the page has no noun for" do
       assert CommitStatus.failure_message() ==

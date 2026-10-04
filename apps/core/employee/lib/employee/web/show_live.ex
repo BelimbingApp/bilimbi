@@ -99,6 +99,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   @statuses ~w(pending probation active inactive terminated)
 
+  @forbidden "You do not have permission to edit employees."
+
   @fact_labels %{
     "full_name" => "Full Name",
     "short_name" => "Short Name",
@@ -237,27 +239,20 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # Authz; the `can_manage?` assign only decides what the page shows.
   @impl true
   def handle_event("save_field", params, socket) do
-    if can_manage?(socket) do
-      case CommitStatus.inline_field(params, @inline_fields) do
-        {:ok, name, field, value} ->
-          socket = save_fact(socket, name, %{field => normalize_param(value)}, value)
+    {:noreply,
+     CommitStatus.save_field(socket, params, @inline_fields,
+       can?: can_manage?(socket),
+       forbidden: @forbidden,
+       write: fn socket, name, field, value ->
+         socket = save_fact(socket, name, %{field => normalize_param(value)}, value)
 
-          socket =
-            if name == "job_description" and
-                 match?({:error, _}, socket.assigns.field_status[name]) do
-              assign(socket, :job_description_input, value)
-            else
-              socket
-            end
-
-          {:noreply, socket}
-
-        :error ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
-    end
+         if name == "job_description" and match?({:error, _}, socket.assigns.field_status[name]) do
+           assign(socket, :job_description_input, value)
+         else
+           socket
+         end
+       end
+     )}
   end
 
   # --- Event Handlers: Choice Facts ---
@@ -584,44 +579,31 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # subtitle, supervisor and subordinate lists) from the server; refusal keeps
   # the stored value on screen and says what was rejected and why.
   defp commit(socket, name, result, submitted) do
-    case result do
-      {:ok, updated_employee} ->
-        socket
-        |> load_data(updated_employee)
-        |> CommitStatus.put(name, :saved)
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
-
-      {:error, reason} ->
-        CommitStatus.put(socket, name, {:error, failure_message(reason, submitted)})
-    end
+    CommitStatus.commit(socket, name, result,
+      submitted: submitted,
+      label: fact_label(name),
+      # A choice fact reports on the schema field it writes.
+      field: Map.get(@inline_fields, name) || Map.fetch!(@choice_fields, name),
+      on_ok: &load_data/2,
+      failures: failures(submitted)
+    )
   end
 
-  # A choice fact reports on the schema field it writes; the shared wording
-  # names the rejected value and the label.
-  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
-    field = Map.get(@inline_fields, name) || Map.fetch!(@choice_fields, name)
-    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
+  defp failures(submitted) do
+    %{
+      employee_not_found:
+        "This employee no longer exists. Return to the list to find their replacement.",
+      company_not_found:
+        "The change was not saved because this employee's company could not be found.",
+      # The domain refuses the change outright for the platform orchestrator
+      # (`SYS-001` / `agent`); the fact says so rather than a generic sentence.
+      invariant_violation:
+        "#{inspect(CommitStatus.rejected_value(submitted))} was not saved: " <>
+          "the platform orchestrator's identity is protected."
+    }
   end
 
-  defp failure_message(:employee_not_found, _submitted),
-    do: "This employee no longer exists. Return to the list to find their replacement."
-
-  defp failure_message(:company_not_found, _submitted),
-    do: "The change was not saved because this employee's company could not be found."
-
-  # The domain refuses the change outright for the platform orchestrator
-  # (`SYS-001` / `agent`); the fact says so rather than a generic sentence.
-  defp failure_message(:invariant_violation, submitted),
-    do:
-      "#{inspect(CommitStatus.rejected_value(submitted))} was not saved: " <>
-        "the platform orchestrator's identity is protected."
-
-  defp failure_message(_reason, _submitted), do: CommitStatus.failure_message()
-
-  defp write_forbidden(socket),
-    do: CommitStatus.write_forbidden(socket, "You do not have permission to edit employees.")
+  defp write_forbidden(socket), do: CommitStatus.write_forbidden(socket, @forbidden)
 
   # What the operator chose, as the alert names it: the option's visible
   # label when it came from this page's list, "None" for the blank option,

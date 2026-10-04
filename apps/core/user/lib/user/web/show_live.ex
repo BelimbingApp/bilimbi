@@ -110,6 +110,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   @fact_labels %{"name" => "Name", "email" => "Email", "company" => "Company"}
 
+  @forbidden "You do not have permission to edit users."
+
+  # The page's own sentences for a refused write; any other reason falls
+  # through to `CommitStatus.failure_message/0`.
+  @failures %{
+    user_not_found: "This user no longer exists. Return to the list to find their replacement.",
+    company_not_found: "The change was not saved because this user's company could not be found."
+  }
+
   defp init_ui_state(socket) do
     socket
     |> CommitStatus.init()
@@ -254,17 +263,18 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # assigns only decide what the page shows.
   @impl true
   def handle_event("save_field", params, socket) do
-    with true <- can_manage?(socket),
-         {:ok, name, field, value} <- CommitStatus.inline_field(params, @inline_fields) do
-      if archived_company?(socket) do
-        {:noreply, archived_refused(socket, name)}
-      else
-        {:noreply, save_fact(socket, name, %{field => value}, value)}
-      end
-    else
-      false -> {:noreply, write_forbidden(socket)}
-      :error -> {:noreply, socket}
-    end
+    {:noreply,
+     CommitStatus.save_field(socket, params, @inline_fields,
+       can?: can_manage?(socket),
+       forbidden: @forbidden,
+       write: fn socket, name, field, value ->
+         if archived_company?(socket) do
+           archived_refused(socket, name)
+         else
+           save_fact(socket, name, %{field => value}, value)
+         end
+       end
+     )}
   end
 
   def handle_event("edit_field", %{"field" => "company"}, socket) do
@@ -708,8 +718,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   # --- Confirmation helpers ---
 
-  defp users_forbidden(socket),
-    do: put_flash(socket, :error, "You do not have permission to edit users.")
+  defp users_forbidden(socket), do: put_flash(socket, :error, @forbidden)
 
   # A write on an archived-company account is refused where the page reports
   # that write: on the fact that asked, or through the error flash. Either
@@ -1412,45 +1421,38 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       not company_archived?
   end
 
-  # One commit, one outcome on the fact that made it. Success reloads the
-  # detail so every projection (title, subtitle, roles scope) is the
-  # server's; refusal keeps the stored value on screen and says what was
-  # rejected and why.
+  # One commit, one outcome on the fact that made it.
   defp save_fact(socket, name, attrs, submitted) do
     scope = socket.assigns.current_scope.scope
     user = socket.assigns.user
 
-    case User.update_user(scope, user.company_id, user.id, attrs) do
-      {:ok, updated_user} ->
-        socket
-        |> load_data(updated_user)
-        |> CommitStatus.put(name, :saved)
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
-
-      {:error, :company_not_found} when is_nil(socket.assigns.company_name) ->
-        CommitStatus.put(socket, name, {:error, archived_company_message()})
-
-      {:error, reason} ->
-        CommitStatus.put(socket, name, {:error, failure_message(reason)})
-    end
+    commit(
+      socket,
+      name,
+      User.update_user(scope, user.company_id, user.id, attrs),
+      submitted,
+      # An archived company refuses every write, so it is the cause whatever
+      # the rule reported.
+      fn
+        :company_not_found when is_nil(socket.assigns.company_name) -> archived_company_message()
+        reason -> CommitStatus.failure_message(@failures, reason)
+      end
+    )
   end
 
-  # The choice fact reports on the schema field it writes; the shared wording
-  # names the rejected value and the label.
-  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
-    field = Map.get(@inline_fields, name, :company_id)
-    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
+  # The one place a fact's outcome is recorded. Success reloads the detail so
+  # every projection (title, subtitle, roles scope) is the server's; a refusal
+  # keeps the stored value on screen and says what was rejected and why. The
+  # choice fact reports on the schema field it writes.
+  defp commit(socket, name, result, submitted, failures) do
+    CommitStatus.commit(socket, name, result,
+      submitted: submitted,
+      label: fact_label(name),
+      field: Map.get(@inline_fields, name, :company_id),
+      on_ok: &load_data/2,
+      failures: failures
+    )
   end
-
-  defp failure_message(:user_not_found),
-    do: "This user no longer exists. Return to the list to find their replacement."
-
-  defp failure_message(:company_not_found),
-    do: "The change was not saved because this user's company could not be found."
-
-  defp failure_message(_reason), do: CommitStatus.failure_message()
 
   # A refusal names the rule that applied and the company it was evaluated
   # against. A reassignment authorizes `admin.user.update` on the account's
@@ -1467,7 +1469,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     do: "#{inspect(choice)} was not saved: that company is not in this workspace."
 
   defp company_failure_message(reason, _choice, _company_name),
-    do: failure_message(reason)
+    do: CommitStatus.failure_message(@failures, reason)
 
   # The account's own company is archived, so no write on it can land; the
   # refusal names that company rather than the value the operator submitted.
@@ -1496,28 +1498,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   defp commit_company(socket, result, choice) do
     company_name = socket.assigns.company_name
-    socket = close_company_editor(socket)
 
-    case result do
-      {:ok, updated_user} ->
-        socket
-        |> load_data(updated_user)
-        |> CommitStatus.put("company", :saved)
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        CommitStatus.put(
-          socket,
-          "company",
-          {:error, refusal_message("company", choice, changeset)}
-        )
-
-      {:error, reason} ->
-        CommitStatus.put(
-          socket,
-          "company",
-          {:error, company_failure_message(reason, choice, company_name)}
-        )
-    end
+    socket
+    |> close_company_editor()
+    |> commit("company", result, choice, &company_failure_message(&1, choice, company_name))
   end
 
   defp close_company_editor(socket), do: assign(socket, :editing_field, nil)
@@ -1544,8 +1528,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     Map.get(socket.assigns.company_names, company_id, Integer.to_string(company_id))
   end
 
-  defp write_forbidden(socket),
-    do: CommitStatus.write_forbidden(socket, "You do not have permission to edit users.")
+  defp write_forbidden(socket), do: CommitStatus.write_forbidden(socket, @forbidden)
 
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 

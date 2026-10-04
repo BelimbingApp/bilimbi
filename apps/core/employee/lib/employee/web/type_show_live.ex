@@ -43,6 +43,16 @@ defmodule Bilimbi.Core.Employee.Web.TypeShowLive do
 
   @fact_labels %{"code" => "Code", "label" => "Label", "kind" => "Kind"}
 
+  @forbidden "You do not have permission to update employee types."
+
+  # The page's own sentences for a refused write; any other reason falls
+  # through to `CommitStatus.failure_message/0`.
+  @failures %{
+    is_system: "System employee types cannot be edited.",
+    type_not_found:
+      "This employee type no longer exists. Return to the list to find its replacement."
+  }
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -74,14 +84,12 @@ defmodule Bilimbi.Core.Employee.Web.TypeShowLive do
 
   @impl true
   def handle_event("save_field", params, socket) do
-    if can_update?(socket) do
-      case CommitStatus.inline_field(params, @inline_fields) do
-        {:ok, name, field, value} -> {:noreply, save_fact(socket, name, field, value)}
-        :error -> {:noreply, socket}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
-    end
+    {:noreply,
+     CommitStatus.save_field(socket, params, @inline_fields,
+       can?: can_update?(socket),
+       forbidden: @forbidden,
+       write: &save_fact/4
+     )}
   end
 
   # One commit, one outcome on the fact that made it. The domain trims the
@@ -91,40 +99,24 @@ defmodule Bilimbi.Core.Employee.Web.TypeShowLive do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.current_scope.user["company_id"]
 
-    case Employee.update_employee_type(scope, company_id, socket.assigns.type_id, %{
-           field => submitted
-         }) do
-      {:ok, type} ->
-        socket
-        |> assign_type(type)
-        |> CommitStatus.put(name, :saved)
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        message =
-          CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
-
-        CommitStatus.put(socket, name, {:error, message})
-
-      {:error, reason} ->
-        CommitStatus.put(socket, name, {:error, failure_message(reason)})
-    end
+    CommitStatus.commit(
+      socket,
+      name,
+      Employee.update_employee_type(scope, company_id, socket.assigns.type_id, %{
+        field => submitted
+      }),
+      submitted: submitted,
+      label: fact_label(name),
+      field: field,
+      on_ok: &assign_type/2,
+      failures: @failures
+    )
   end
 
   defp assign_type(socket, type) do
     socket
     |> assign(:type, type)
     |> assign(:page_title, type.label)
-  end
-
-  defp failure_message(:is_system), do: "System employee types cannot be edited."
-
-  defp failure_message(:type_not_found),
-    do: "This employee type no longer exists. Return to the list to find its replacement."
-
-  defp failure_message(_reason), do: CommitStatus.failure_message()
-
-  defp write_forbidden(socket) do
-    CommitStatus.write_forbidden(socket, "You do not have permission to update employee types.")
   end
 
   # Every write re-asks Authz: the `can_update?` assign decides what the page

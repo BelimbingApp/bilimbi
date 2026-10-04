@@ -19,6 +19,7 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
 
   alias Bilimbi.Core.User
   alias Ecto.Changeset
+  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{
     current_password: :string,
@@ -72,10 +73,7 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
           {:noreply, assign(socket, form: to_form(changeset, as: :password_change))}
 
         {:error, %Changeset{} = domain_changeset} ->
-          changeset =
-            changeset
-            |> merge_domain_errors(domain_changeset)
-            |> Map.put(:action, :validate)
+          changeset = FormErrors.copy(changeset, domain_changeset, action: :validate)
 
           {:noreply, assign(socket, form: to_form(changeset, as: :password_change))}
 
@@ -101,12 +99,6 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
     |> validate_required([:current_password, :password, :password_confirmation])
     |> validate_length(:password, min: 8)
     |> validate_confirmation(:password, message: "does not match password")
-  end
-
-  defp merge_domain_errors(target_changeset, %Changeset{errors: errors}) do
-    Enum.reduce(errors, target_changeset, fn {field, {msg, opts}}, acc ->
-      add_error(acc, field, msg, opts)
-    end)
   end
 
   defp extract_user_id(%{user: %{"user_id" => id}}), do: id

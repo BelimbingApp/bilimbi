@@ -24,7 +24,7 @@ Render a timestamp with `<.datetime>`, which follows the reader's saved clock, s
 
 ## Read-first pages
 
-A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Short facts commit through `<.inline_edit>`, multi-line facts through `<.inline_long_text>`, and the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages" and "Inline editing".
+A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Short facts commit through `<.inline_edit>`, multi-line facts through `<.inline_long_text>`, and the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. A page's `save_field` handler is `CommitStatus.save_field/4` and its write's result goes through `CommitStatus.commit/4`; a private `refusal_message/3`, three-branch result `case` or generic-failure fallback is the copy those replaced, and the page keeps only its labels, `@failures` nouns, forbidden wording and the write itself. A schemaless form that shows a domain changeset's refusal calls `Bilimbi.Base.UI.FormErrors.copy/3`, not a private `copy_domain_errors`; it decides once what happens to an error on a field the form does not render. See `DESIGN.md` "Read-first detail pages" and "Inline editing".
 
 ## Who performed it
 

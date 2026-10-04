@@ -47,8 +47,9 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
   alias Bilimbi.Core.Geonames
+  alias Bilimbi.Base.UI.FormErrors
 
-  import Ecto.Changeset, only: [cast: 3, validate_length: 3, add_error: 4]
+  import Ecto.Changeset, only: [cast: 3, validate_length: 3]
   import LocationFields
 
   # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
@@ -507,7 +508,12 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
              socket
              |> assign(:address_form_params, params)
              |> assign(:auto_location, auto_location)
-             |> assign_address_form(copy_address_domain_errors(changeset, domain_changeset))
+             |> assign_address_form(
+               FormErrors.copy(changeset, domain_changeset,
+                 only: @address_field_types,
+                 action: :insert
+               )
+             )
              |> assign_address_location_options(params)}
 
           {:error, reason} ->
@@ -585,16 +591,6 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
     |> validate_length(:country_iso, is: 2)
     |> validate_length(:admin1_code, max: 20)
     |> Map.put(:action, :validate)
-  end
-
-  defp copy_address_domain_errors(form_changeset, %Ecto.Changeset{} = domain_changeset) do
-    domain_changeset.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@address_field_types, field),
-        do: add_error(acc, field, message, opts),
-        else: acc
-    end)
-    |> Map.put(:action, :insert)
   end
 
   defp assign_address_form(socket, %Ecto.Changeset{} = changeset),

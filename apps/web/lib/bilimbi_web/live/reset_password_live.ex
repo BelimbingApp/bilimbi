@@ -2,6 +2,7 @@ defmodule BilimbiWeb.ResetPasswordLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.User
+  alias Bilimbi.Base.UI.FormErrors
 
   @types %{email: :string, password: :string, password_confirmation: :string}
 
@@ -54,19 +55,9 @@ defmodule BilimbiWeb.ResetPasswordLive do
          )}
 
       {:error, %Ecto.Changeset{} = password_changeset} ->
-        changeset = copy_password_errors(changeset, password_changeset)
+        changeset = FormErrors.copy(changeset, password_changeset, only: [:password])
         {:noreply, assign_form(socket, changeset)}
     end
-  end
-
-  defp copy_password_errors(changeset, password_changeset) do
-    Enum.reduce(password_changeset.errors, changeset, fn
-      {:password, {message, metadata}}, acc ->
-        Ecto.Changeset.add_error(acc, :password, message, metadata)
-
-      _, acc ->
-        acc
-    end)
   end
 
   defp changeset(attrs) do

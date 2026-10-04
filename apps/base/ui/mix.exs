@@ -39,6 +39,7 @@ defmodule Bilimbi.Base.UI.MixProject do
 
   defp deps do
     [
+      {:ecto, "~> 3.14"},
       {:phoenix, "~> 1.8.9"},
       {:phoenix_live_view, "~> 1.2.0"},
       {:phoenix_html, "~> 4.3"},

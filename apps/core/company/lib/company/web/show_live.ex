@@ -101,6 +101,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   @choice_facts Map.keys(@choice_fields) ++ ["timezone"]
 
+  @forbidden "You do not have permission to change company administration data."
+
+  # The page's own sentences for a refused write; any other reason falls
+  # through to `CommitStatus.failure_message/0`.
+  @failures %{
+    not_found: "This company no longer exists in this workspace. Return to the list to find it."
+  }
+
   @fact_labels %{
     "name" => "Name",
     "code" => "Code",
@@ -496,16 +504,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     # document back instead of the text to correct.
     socket = assign(socket, :metadata_input, json)
 
-    with {:ok, metadata} <- decode_metadata(trimmed),
-         {:ok, socket} <- commit_company(socket, "metadata", %{metadata: metadata}, trimmed) do
-      {:noreply,
-       socket
-       |> assign(:editing_metadata?, false)
-       |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))
-       |> CommitStatus.put("metadata", :saved)}
-    else
-      {:error, %Phoenix.LiveView.Socket{} = socket} ->
-        {:noreply, socket}
+    case decode_metadata(trimmed) do
+      {:ok, metadata} ->
+        close_editor = fn socket, updated ->
+          socket
+          |> assign_company(updated)
+          |> assign(:editing_metadata?, false)
+          |> assign(:metadata_input, format_metadata(updated.metadata))
+        end
+
+        {:noreply, save_fact(socket, "metadata", %{metadata: metadata}, trimmed, close_editor)}
 
       :invalid ->
         rejected = CommitStatus.rejected_value(trimmed)
@@ -560,7 +568,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
              |> CommitStatus.put("timezone", :saved)}
 
           {:error, _} ->
-            {:noreply, CommitStatus.put(socket, "timezone", {:error, failure_message(:settings)})}
+            {:noreply,
+             CommitStatus.put(socket, "timezone", {:error, CommitStatus.failure_message()})}
         end
     end
   end
@@ -573,31 +582,25 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # company so every projection (title, header badge, parent name) is the
   # server's; refusal keeps the stored value on screen and says what was
   # rejected and why.
-  defp save_fact(socket, name, attrs, submitted) do
-    case commit_company(socket, name, attrs, submitted) do
-      {:ok, socket} -> CommitStatus.put(socket, name, :saved)
-      {:error, socket} -> socket
-    end
+  defp save_fact(socket, name, attrs, submitted, on_ok \\ &assign_company/2) do
+    scope = socket.assigns.current_scope.scope
+
+    CommitStatus.commit(
+      socket,
+      name,
+      Company.update_company(scope, socket.assigns.company.id, attrs),
+      submitted: submitted,
+      label: fact_label(name),
+      field: fact_field(name),
+      on_ok: on_ok,
+      failures: @failures
+    )
   end
 
-  defp commit_company(socket, name, attrs, submitted) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case Company.update_company(scope, company.id, attrs) do
-      {:ok, updated} ->
-        {:ok,
-         socket
-         |> assign(:company, updated)
-         |> assign(:page_title, Company.Summary.display_name(updated))}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        message = refusal_message(name, submitted, changeset)
-        {:error, CommitStatus.put(socket, name, {:error, message})}
-
-      {:error, reason} ->
-        {:error, CommitStatus.put(socket, name, {:error, failure_message(reason)})}
-    end
+  defp assign_company(socket, updated) do
+    socket
+    |> assign(:company, updated)
+    |> assign(:page_title, Company.Summary.display_name(updated))
   end
 
   defp decode_metadata(""), do: {:ok, nil}
@@ -609,27 +612,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  # The shared wording names the rejected value, the fact's label and the
-  # changeset's reasons for the field the fact writes.
-  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
-    CommitStatus.refusal_message(fact_label(name), fact_field(name), submitted, changeset.errors)
-  end
-
+  # The field a fact writes, so a refusal names its own reasons.
   defp fact_field("activities"), do: :scope_activities
   defp fact_field("metadata"), do: :metadata
   defp fact_field(name), do: Map.get(@inline_fields, name) || Map.fetch!(@choice_fields, name)
 
-  defp failure_message(:not_found),
-    do: "This company no longer exists in this workspace. Return to the list to find it."
-
-  defp failure_message(_reason), do: CommitStatus.failure_message()
-
-  defp write_forbidden(socket) do
-    CommitStatus.write_forbidden(
-      socket,
-      "You do not have permission to change company administration data."
-    )
-  end
+  defp write_forbidden(socket), do: CommitStatus.write_forbidden(socket, @forbidden)
 
   # Every write re-asks Authz: the `can_update?` assign decides what the page
   # shows, and a grant revoked while the page is open must still be refused.

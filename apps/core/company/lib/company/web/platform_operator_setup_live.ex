@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Ecto.Changeset
+  alias Bilimbi.Base.UI.FormErrors
 
   @field_types %{
     name: :string,
@@ -99,7 +100,8 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
            |> push_navigate(to: ~p"/companies/#{company.id}")}
 
         {:error, %Changeset{} = domain_changeset} ->
-          {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+          {:noreply,
+           assign_form(socket, FormErrors.copy(changeset, domain_changeset, action: :insert))}
       end
     else
       {:noreply, assign_form(socket, changeset)}
@@ -269,13 +271,6 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
 
   defp blank_to_nil(value) when value in [nil, ""], do: nil
   defp blank_to_nil(value), do: value
-
-  defp copy_domain_errors(form_changeset, domain_changeset) do
-    Enum.reduce(domain_changeset.errors, form_changeset, fn {field, {message, opts}}, acc ->
-      add_error(acc, field, message, opts)
-    end)
-    |> Map.put(:action, :insert)
-  end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :company))
