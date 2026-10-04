@@ -14,7 +14,7 @@ defmodule BilimbiWeb.DashboardLive do
   `refresh_interval` are auto-refreshed through a `handle_info` timer.
   """
 
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Dashboard
@@ -456,6 +456,13 @@ defmodule BilimbiWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
+      <:topbar_actions>
+        <.live_component
+          module={Bilimbi.Core.User.Web.NotificationBellComponent}
+          id="topbar-notification-bell"
+          current_scope={@current_scope}
+        />
+      </:topbar_actions>
       <.page variant={:detail}>
         <.header>
           Dashboard

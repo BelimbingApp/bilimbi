@@ -8,6 +8,8 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz.LiveAuthorization
+  alias Bilimbi.Base.UI.ListState
+  alias Bilimbi.Base.UI.Params
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.AdministrationPage
@@ -16,32 +18,30 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
-  @sorts %{
-    "name" => :full_name,
-    "full_name" => :full_name,
-    "type" => :employee_type_label,
-    "employee_type" => :employee_type_label,
-    "employee_type_label" => :employee_type_label,
-    "status" => :status
-  }
-  @type_filters %{
-    "all" => :all,
-    "human" => :human,
-    "agent" => :agent
-  }
-  @default_sort_by :full_name
-  @default_sort_dir :asc
-  @default_page 1
 
-  defmodule State do
-    @moduledoc false
-    defstruct search: nil,
-              type_filter: :all,
-              sort_by: :full_name,
-              sort_dir: :asc,
-              page: 1,
-              per_page: 25
-  end
+  # URL keys stay `sort`, `dir`, `type`, and `per_page`. ListState's own query
+  # names are `sort_by` and `sort_dir`; this page translates at the boundary
+  # so an existing link still opens the same list. Inbound sort aliases
+  # (`name`, `type`, `employee_type`) become the column the header uses.
+  @sort_aliases %{
+    "name" => "full_name",
+    "full_name" => "full_name",
+    "type" => "employee_type_label",
+    "employee_type" => "employee_type_label",
+    "employee_type_label" => "employee_type_label",
+    "status" => "status"
+  }
+
+  @list ListState.spec!(
+          sortable: %{full_name: :asc, employee_type_label: :asc, status: :asc},
+          default_sort: :full_name,
+          page_sizes: @page_sizes,
+          default_page_size: @default_page_size,
+          page_size_param: "per_page",
+          invalid_page_size: :default,
+          filters: [type_filter: {:one_of, ["all", "human", "agent"], "all"}],
+          omit_blank: [:search]
+        )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -50,46 +50,41 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:page_title, "Employees")
      |> assign(:active_nav, "admin.employee")
      |> assign(:page_sizes, @page_sizes)
-     |> assign(:index_state, %State{})
+     |> assign(:index_state, parse_list(%{}))
      |> assign(:employees_page, empty_page())
      |> assign(:department_map, %{})
      |> assign(:pending_delete, nil)
-     |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
+     |> assign(:filters_form, ListState.filters_form(parse_list(%{})))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    state = state_from_params(params)
-    {:noreply, load_page(socket, state)}
+    {:noreply, load_page(socket, parse_list(params))}
   end
 
   @impl true
-  def handle_event("filters", %{"filters" => filters}, socket) do
+  def handle_event("filters", %{"filters" => filters}, socket) when is_map(filters) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
-      |> Map.put(:type_filter, normalize_type_filter(Map.get(filters, "type_filter")))
-      |> Map.put(:per_page, normalize_page_size(Map.get(filters, "perPage")))
-      |> Map.put(:page, 1)
+      |> ListState.apply_filters(filters)
+      |> trim_search()
 
     {:noreply, push_patch(socket, to: employees_path(state))}
   end
 
   @impl true
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply,
-     push_patch(socket, to: employees_path(next_sort(socket.assigns.index_state, sort_by)))}
+    state = socket.assigns.index_state
+
+    case ListState.next_sort(state, sort_by) do
+      ^state -> {:noreply, socket}
+      next -> {:noreply, push_patch(socket, to: employees_path(next))}
+    end
   end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    target_page =
-      case positive_integer(page) do
-        n when is_integer(n) -> n
-        _ -> 1
-      end
-
-    state = Map.put(socket.assigns.index_state, :page, target_page)
+    state = ListState.put_page(socket.assigns.index_state, page)
     {:noreply, push_patch(socket, to: employees_path(state))}
   end
 
@@ -172,7 +167,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   end
 
   defp find_listed(socket, id) do
-    case positive_integer(id) do
+    case Params.positive_integer(id) do
       employee_id when is_integer(employee_id) ->
         Enum.find(socket.assigns.employees_page.entries, &(&1.id == employee_id))
 
@@ -187,31 +182,28 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
     options = [
       page: state.page,
-      page_size: state.per_page,
-      search: state.search,
-      type_filter: state.type_filter,
+      page_size: state.page_size,
+      search: Params.blank_to_nil(state.search),
+      type_filter: type_atom(state.filters.type_filter),
       sort_by: state.sort_by,
       sort_dir: state.sort_dir
     ]
 
     case Employee.list_administration_page(scope, company_id, options) do
-      {:ok, %AdministrationPage{total_pages: total_pages}}
-      when total_pages > 0 and state.page > total_pages ->
-        clamped_state = %{state | page: total_pages}
-        push_patch(socket, to: employees_path(clamped_state))
-
-      {:ok, %AdministrationPage{total_pages: 0}} when state.page > 1 ->
-        clamped_state = %{state | page: 1}
-        push_patch(socket, to: employees_path(clamped_state))
-
       {:ok, %AdministrationPage{} = page} ->
-        socket
-        |> assign(:index_state, state)
-        |> assign(:employees_page, page)
-        |> assign(:department_map, department_map(scope, company_id))
-        |> assign(:company_id, company_id)
-        |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
-        |> stream(:employees, page.entries, reset: true)
+        corrected = ListState.clamp_to_last_page(state, page, empty: :reset)
+
+        if corrected.page != state.page do
+          push_patch(socket, to: employees_path(corrected))
+        else
+          socket
+          |> assign(:index_state, state)
+          |> assign(:employees_page, page)
+          |> assign(:department_map, department_map(scope, company_id))
+          |> assign(:company_id, company_id)
+          |> assign(:filters_form, ListState.filters_form(state))
+          |> stream(:employees, page.entries, reset: true)
+        end
 
       {:error, _reason} ->
         socket
@@ -261,122 +253,89 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     socket.assigns.current_scope.user["company_id"]
   end
 
-  defp state_from_params(params) do
-    %State{
-      search: normalize_search(params["search"] || params["q"]),
-      type_filter: normalize_type_filter(params["type"] || params["type_filter"]),
-      sort_by: normalize_sort_by(params["sort"]),
-      sort_dir: normalize_sort_dir(params["dir"]),
-      page: normalize_page(params["page"]),
-      per_page: normalize_page_size(params["per_page"] || params["perPage"])
-    }
+  defp parse_list(params) do
+    params
+    |> translate_inbound()
+    |> ListState.parse(@list)
+    |> trim_search()
   end
 
-  defp normalize_search(nil), do: nil
-
-  defp normalize_search(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp normalize_type_filter(nil), do: :all
-
-  defp normalize_type_filter(value) when is_binary(value) do
-    Map.get(@type_filters, String.downcase(String.trim(value)), :all)
-  end
-
-  defp normalize_type_filter(value) when is_atom(value), do: value
-  defp normalize_type_filter(_value), do: :all
-
-  defp normalize_sort_by(nil), do: @default_sort_by
-
-  defp normalize_sort_by(value) when is_binary(value) do
-    Map.get(@sorts, String.downcase(String.trim(value)), @default_sort_by)
-  end
-
-  defp normalize_sort_by(_value), do: @default_sort_by
-
-  defp normalize_sort_dir(nil), do: @default_sort_dir
-
-  defp normalize_sort_dir(value) when is_binary(value) do
-    case String.downcase(String.trim(value)) do
-      "desc" -> :desc
-      _ -> :asc
-    end
-  end
-
-  defp normalize_sort_dir(_value), do: @default_sort_dir
-
-  defp normalize_page(value) do
-    case positive_integer(value) do
-      page when is_integer(page) -> page
-      _ -> @default_page
-    end
-  end
-
-  defp normalize_page_size(value) do
-    case positive_integer(value) do
-      size when size in @page_sizes -> size
-      _ -> @default_page_size
-    end
-  end
-
-  defp positive_integer(value) when is_integer(value) and value > 0, do: value
-
-  defp positive_integer(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
-    end
-  end
-
-  defp positive_integer(_value), do: nil
-
-  defp next_sort(state, sort_key) do
-    field = Map.get(@sorts, sort_key, :full_name)
-
-    if state.sort_by == field do
-      %{state | sort_dir: toggle_sort_dir(state.sort_dir), page: 1}
-    else
-      %{state | sort_by: field, sort_dir: :asc, page: 1}
-    end
-  end
-
-  defp toggle_sort_dir(:asc), do: :desc
-  defp toggle_sort_dir(:desc), do: :asc
-
-  defp filters_form_params(state) do
+  defp translate_inbound(params) when is_map(params) do
     %{
-      "search" => state.search || "",
-      "type_filter" => to_string(state.type_filter),
-      "perPage" => to_string(state.per_page)
+      "search" => first_present(params, ["search", "q"]),
+      "page" => params["page"],
+      "per_page" => first_present(params, ["per_page", "perPage"]),
+      "sort_by" => sort_alias(params["sort"]),
+      "sort_dir" => downcase_binary(params["dir"]),
+      "type_filter" => downcase_binary(first_present(params, ["type", "type_filter"]))
     }
   end
 
-  defp employees_path(state) do
-    search_val = if state.search not in [nil, ""], do: state.search
-    type_val = if state.type_filter != :all, do: to_string(state.type_filter)
-    sort_val = if state.sort_by != :full_name, do: to_string(state.sort_by)
-    dir_val = if state.sort_dir != :asc, do: to_string(state.sort_dir)
-    page_val = if state.page != @default_page, do: state.page
-    per_page_val = if state.per_page != @default_page_size, do: state.per_page
+  defp translate_inbound(_params), do: %{}
 
+  defp first_present(params, keys) do
+    Enum.find_value(keys, fn key ->
+      case Map.get(params, key) do
+        value when is_binary(value) -> value
+        _ -> nil
+      end
+    end)
+  end
+
+  defp sort_alias(value) when is_binary(value) do
+    key = value |> String.trim() |> String.downcase()
+    Map.get(@sort_aliases, key, key)
+  end
+
+  defp sort_alias(_value), do: nil
+
+  defp downcase_binary(value) when is_binary(value),
+    do: value |> String.trim() |> String.downcase()
+
+  defp downcase_binary(_value), do: nil
+
+  defp trim_search(%ListState{search: search} = state) do
+    %{state | search: Params.trimmed(search)}
+  end
+
+  defp type_atom("human"), do: :human
+  defp type_atom("agent"), do: :agent
+  defp type_atom(_value), do: :all
+
+  defp employees_path(%ListState{} = state) do
     params =
       []
-      |> maybe_put(:search, search_val)
-      |> maybe_put(:type, type_val)
-      |> maybe_put(:sort, sort_val)
-      |> maybe_put(:dir, dir_val)
-      |> maybe_put(:page, page_val)
-      |> maybe_put(:per_page, per_page_val)
+      |> maybe_put(:search, present_search(state.search))
+      |> maybe_put(:type, present_type(state.filters.type_filter))
+      |> maybe_put(:sort, present_sort(state))
+      |> maybe_put(:dir, present_dir(state))
+      |> maybe_put(:page, present_page(state))
+      |> maybe_put(:per_page, present_page_size(state))
 
     case params do
       [] -> ~p"/employees"
       _ -> ~p"/employees?#{params}"
     end
   end
+
+  defp present_search(search) when search in [nil, ""], do: nil
+  defp present_search(search), do: search
+
+  defp present_type("all"), do: nil
+  defp present_type(type), do: type
+
+  defp present_sort(%ListState{sort_by: sort_by, spec: %{default_sort: sort_by}}), do: nil
+  defp present_sort(%ListState{sort_by: sort_by}), do: Atom.to_string(sort_by)
+
+  defp present_dir(%ListState{sort_by: sort_by, sort_dir: sort_dir, spec: %{sortable: sortable}}) do
+    if sort_dir == Map.fetch!(sortable, sort_by), do: nil, else: Atom.to_string(sort_dir)
+  end
+
+  defp present_page(%ListState{page: 1}), do: nil
+  defp present_page(%ListState{page: page}), do: page
+
+  defp present_page_size(%ListState{page_size: size, spec: %{default_page_size: size}}), do: nil
+  defp present_page_size(%ListState{page_size: size}), do: size
 
   defp maybe_put(params, _key, nil), do: params
   defp maybe_put(params, key, value), do: params ++ [{key, value}]
@@ -429,46 +388,26 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.form
-          for={@filters_form}
-          id="employees-filters"
-          phx-change="filters"
-          class="mb-2"
-        >
-          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
-            <div class="relative">
-              <.icon
-                name="search"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="employees-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search employees"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by name, employee number, email, designation, or job description..."
-                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-              />
-            </div>
-            <.input
-              field={@filters_form[:type_filter]}
-              id="employees-type-filter"
-              type="select"
-              label="Type filter"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              options={[
-                {"All types", "all"},
-                {"Human only", "human"},
-                {"Agent only", "agent"}
-              ]}
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="employees-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="employees-search"
+            label="Search employees"
+            placeholder="Search by name, employee number, email, designation, or job description..."
+          />
+          <:control
+            type={:select}
+            field={@filters_form[:type_filter]}
+            id="employees-type-filter"
+            label="Type filter"
+            options={[
+              {"All types", "all"},
+              {"Human only", "human"},
+              {"Agent only", "agent"}
+            ]}
+          />
+        </.filter_toolbar>
 
         <.card id="employees-card" inner_class="p-0">
           <h2 id="employees-table-title" class="sr-only">Employees</h2>

@@ -17,10 +17,10 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
 
   use Bilimbi.Base.UI, :live_component
 
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Employee
 
   @page_sizes [25, 50, 100, 300]
-  @default_state %{search: nil, sort_by: "full_name", sort_dir: :asc, page: 1, per_page: 25}
 
   @impl true
   def update(assigns, socket) do
@@ -37,18 +37,17 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
   defp reload(socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company_id
-    table_state = normalize_table_state(socket.assigns[:table_state])
+    table_state = socket.assigns.table_state
     page_sizes = socket.assigns[:page_sizes] || @page_sizes
     {:ok, employees} = Employee.list_employees(scope, company_id)
-    employees_page = build_page(employees, table_state)
+    employees_page = employees |> filter_and_sort(table_state) |> ListState.paginate(table_state)
 
     socket
     |> assign(:employees, employees)
     |> assign(:employees_count, length(employees))
     |> assign(:employees_page, employees_page)
     |> assign(:page_sizes, page_sizes)
-    |> assign(:table_state, table_state)
-    |> assign(:filters_form, to_form(filters_form_params(table_state), as: :employees_filters))
+    |> assign(:filters_form, ListState.filters_form(table_state, as: :employees_filters))
   end
 
   @impl true
@@ -146,48 +145,21 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
     """
   end
 
-  defp normalize_table_state(%{} = state) do
-    %{
-      search: normalize_search(state[:search]),
-      sort_by: normalize_sort_by(state[:sort_by]),
-      sort_dir: normalize_sort_dir(state[:sort_dir]),
-      page: normalize_page(state[:page]),
-      per_page: normalize_page_size(state[:per_page])
-    }
-  end
+  # The company page parses the URL once and passes the `ListState`; this
+  # panel only filters and sorts the rows it listed, and `ListState.paginate/2`
+  # slices them.
+  defp filter_and_sort(employees, state) do
+    search = state.search |> String.trim() |> String.downcase()
 
-  defp normalize_table_state(_state), do: @default_state
-
-  defp build_page(employees, state) do
-    filtered =
+    sorted =
       employees
-      |> Enum.filter(&matches_search?(&1, state.search && String.downcase(state.search)))
+      |> Enum.filter(&matches_search?(&1, search))
       |> Enum.sort_by(&sort_value(&1, state.sort_by))
 
-    sorted = if state.sort_dir == :desc, do: Enum.reverse(filtered), else: filtered
-    total_entries = length(sorted)
-    total_pages = total_pages(total_entries, state.per_page)
-    page = clamp_page(state.page, total_pages)
-    entries = Enum.slice(sorted, (page - 1) * state.per_page, state.per_page)
-
-    %{
-      entries: entries,
-      page: page,
-      page_size: state.per_page,
-      total_entries: total_entries,
-      total_pages: total_pages,
-      has_prev?: total_pages > 0 and page > 1,
-      has_next?: total_pages > 0 and page < total_pages
-    }
+    if state.sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
   end
 
-  defp total_pages(0, _page_size), do: 0
-  defp total_pages(total_entries, page_size), do: ceil(total_entries / page_size)
-
-  defp clamp_page(_page, 0), do: 1
-  defp clamp_page(page, total_pages), do: min(max(page, 1), total_pages)
-
-  defp matches_search?(_employee, nil), do: true
+  defp matches_search?(_employee, ""), do: true
 
   defp matches_search?(employee, search) do
     [
@@ -208,74 +180,13 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
     end)
   end
 
-  defp sort_value(employee, "full_name"), do: sort_string(employee.full_name)
-  defp sort_value(employee, "employee_number"), do: sort_string(employee.employee_number)
+  defp sort_value(employee, :full_name), do: sort_string(employee.full_name)
+  defp sort_value(employee, :employee_number), do: sort_string(employee.employee_number)
 
-  defp sort_value(employee, "employee_type"),
+  defp sort_value(employee, :employee_type),
     do: sort_string(employee.employee_type_label || employee.employee_type)
 
-  defp sort_value(employee, "status"), do: sort_string(employee.status)
-  defp sort_value(employee, _sort), do: sort_value(employee, "full_name")
-
-  defp filters_form_params(state) do
-    %{
-      "search" => state.search || "",
-      "perPage" => to_string(state.per_page)
-    }
-  end
-
-  defp normalize_search(nil), do: nil
-
-  defp normalize_search(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp normalize_search(_value), do: nil
-
-  defp normalize_sort_by(value) when value in ~w(full_name employee_number employee_type status),
-    do: value
-
-  defp normalize_sort_by(_value), do: @default_state.sort_by
-
-  defp normalize_sort_dir(value) when value in [:asc, :desc], do: value
-
-  defp normalize_sort_dir(value) when is_binary(value) do
-    case String.downcase(String.trim(value)) do
-      "desc" -> :desc
-      "asc" -> :asc
-      _ -> @default_state.sort_dir
-    end
-  end
-
-  defp normalize_sort_dir(_value), do: @default_state.sort_dir
-
-  defp normalize_page(value) do
-    case positive_integer(value) do
-      page when is_integer(page) -> page
-      _ -> @default_state.page
-    end
-  end
-
-  defp normalize_page_size(value) do
-    case positive_integer(value) do
-      size when size in @page_sizes -> size
-      _ -> @default_state.per_page
-    end
-  end
-
-  defp positive_integer(value) when is_integer(value) and value > 0, do: value
-
-  defp positive_integer(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
-    end
-  end
-
-  defp positive_integer(_value), do: nil
+  defp sort_value(employee, :status), do: sort_string(employee.status)
 
   defp sort_string(nil), do: ""
   defp sort_string(value), do: value |> to_string() |> String.downcase()

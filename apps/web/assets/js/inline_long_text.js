@@ -1,3 +1,5 @@
+import {commit as commitValue, focusTrigger, settle as settleCommit} from "./inline_commit.js"
+
 const InlineLongText = {
   mounted() {
     this.init()
@@ -7,7 +9,6 @@ const InlineLongText = {
     this.triggerEl = this.el.querySelector('[data-role="trigger"]')
     this.inputEl = this.el.querySelector('textarea[data-role="input"]')
     this.textEl = this.el.querySelector('[data-role="text"]')
-    this.savingEl = this.el.querySelector('[data-role="saving"]')
     this.originalValue = this.el.dataset.value ?? this.inputEl?.value ?? ""
     this.inFlight = false
 
@@ -29,7 +30,6 @@ const InlineLongText = {
 
     this.triggerEl = this.el.querySelector('[data-role="trigger"]')
     this.textEl = this.el.querySelector('[data-role="text"]')
-    this.savingEl = this.el.querySelector('[data-role="saving"]')
   },
 
   bindInput() {
@@ -65,7 +65,6 @@ const InlineLongText = {
   commit() {
     const value = this.inputEl.value
     const allowEmpty = this.el.hasAttribute("data-allow-empty")
-    const field = this.el.dataset.field
 
     if (value === this.originalValue || (value.trim() === "" && !allowEmpty)) {
       this.pushEventTo(this.el, this.el.dataset.cancelEvent, {})
@@ -73,31 +72,19 @@ const InlineLongText = {
     }
 
     this.inFlight = true
-    this.markSaving()
-    this.pushEventTo(
-      this.el,
-      this.el.dataset.saveEvent,
-      {id: this.el.dataset.id, [field]: value},
-      () => this.settle()
-    )
+    commitValue(this, {value})
   },
 
   cancel() {
     this.canceling = true
     this.pushEventTo(this.el, this.el.dataset.cancelEvent, {})
     this.settle()
-    this.triggerEl?.focus()
-  },
-
-  markSaving() {
-    this.el.setAttribute("aria-busy", "true")
-    this.savingEl?.classList.remove("hidden")
+    focusTrigger(this)
   },
 
   settle() {
     this.inFlight = false
-    this.el.removeAttribute("aria-busy")
-    this.savingEl?.classList.add("hidden")
+    settleCommit(this)
   },
 }
 

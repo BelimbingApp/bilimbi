@@ -66,7 +66,10 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
       |> apply_order(options.sort_by, options.sort_dir)
       |> offset(^((options.page - 1) * options.page_size))
       |> limit(^options.page_size)
-      |> select([employee, employee_type], {employee, employee_type.label})
+      |> select(
+        [employee, company_type, global_type],
+        {employee, coalesce(company_type.label, global_type.label)}
+      )
       |> Repo.all()
       |> Enum.map(&AdministrationEntry.from_query_result/1)
 
@@ -82,10 +85,9 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   end
 
   defp base_query(company_id) do
-    from employee in Schema,
-      left_join: employee_type in EmployeeType,
-      on: employee_type.code == employee.employee_type,
-      where: employee.company_id == ^company_id
+    Schema
+    |> EmployeeType.with_resolved_type()
+    |> where([employee], employee.company_id == ^company_id)
   end
 
   defp apply_search(query, ""), do: query
@@ -120,10 +122,22 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
     do: order_by(query, [employee, _employee_type], desc: employee.full_name, desc: employee.id)
 
   defp apply_order(query, :employee_type_label, :asc),
-    do: order_by(query, [employee, employee_type], asc: employee_type.label, desc: employee.id)
+    do:
+      order_by(
+        query,
+        [employee, company_type, global_type],
+        asc: coalesce(company_type.label, global_type.label),
+        desc: employee.id
+      )
 
   defp apply_order(query, :employee_type_label, :desc),
-    do: order_by(query, [employee, employee_type], desc: employee_type.label, desc: employee.id)
+    do:
+      order_by(
+        query,
+        [employee, company_type, global_type],
+        desc: coalesce(company_type.label, global_type.label),
+        desc: employee.id
+      )
 
   defp apply_order(query, :status, :asc),
     do: order_by(query, [employee, _employee_type], asc: employee.status, desc: employee.id)

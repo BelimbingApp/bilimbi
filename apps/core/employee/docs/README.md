@@ -63,10 +63,9 @@ Web adapters live under `lib/employee/web/` as `Bilimbi.Core.Employee.Web.*`
 and are discovered from `priv/web_routes.exs`. Screens are company-scoped
 through the signed-in `company_id`: there is no tenant-wide employee list.
 This is an initial module-owned adapter slice, not the complete pinned
-Belimbing workflow. Employee index controls and relationship-heavy form/show
-behavior remain deferred behind their public Core contracts. Deleting the
-platform orchestrator is refused as `:invariant_violation`, and the show screen
-reports that honestly.
+Belimbing workflow. The employee and employee-type indexes keep their existing
+URL keys through the shared filter toolbar. Deleting the platform orchestrator
+is refused as `:invariant_violation`, and the show screen reports that honestly.
 
 **The detail page is read-first.** `/employees/:id` shows the employee as
 facts. An operator holding `admin.employee.update` edits the seven text facts

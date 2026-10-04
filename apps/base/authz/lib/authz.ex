@@ -87,9 +87,6 @@ defmodule Bilimbi.Base.Authz do
     String.downcase(capability) in capabilities()
   end
 
-  @spec system_role_definitions() :: %{required(String.t()) => map()}
-  def system_role_definitions, do: registry!().roles
-
   @doc """
   Decides whether a principal holds `capability`.
 
@@ -163,16 +160,17 @@ defmodule Bilimbi.Base.Authz do
     end
   end
 
-  @spec filter_allowed(Actor.t(), String.t(), Enumerable.t(), map()) :: list()
-  def filter_allowed(%Actor{} = actor, capability, resources, context \\ %{}) do
-    resources
-    |> Enum.filter(fn
-      %Resource{} = resource -> can(actor, capability, resource, context).allowed
-      other -> raise ArgumentError, "expected an Authz resource, got: #{inspect(other)}"
-    end)
-  end
+  @doc """
+  Effective allows, denies, and whether a grant-all role is in effect.
 
-  @spec effective_capabilities(Actor.t()) :: %{allowed: [String.t()], denied: [String.t()]}
+  `grant_all` is the boolean `EffectivePermissions.load/2` already computed.
+  Callers that only need the allow list keep reading `:allowed`.
+  """
+  @spec effective_capabilities(Actor.t()) :: %{
+          allowed: [String.t()],
+          denied: [String.t()],
+          grant_all: boolean()
+        }
   def effective_capabilities(%Actor{} = actor) do
     registry = registry!()
     directory = directory!(registry)
@@ -189,7 +187,8 @@ defmodule Bilimbi.Base.Authz do
             allowed -- registry.platform_capabilities
           end
         end),
-      denied: EffectivePermissions.denied(permissions)
+      denied: EffectivePermissions.denied(permissions),
+      grant_all: permissions.grant_all
     }
   end
 

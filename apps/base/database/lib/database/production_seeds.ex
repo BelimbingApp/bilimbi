@@ -8,7 +8,9 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
   @table "bilimbi_production_seeds"
   @interrupted_error "Seed execution was interrupted before completion and will be retried."
-  @status_constraint_definition "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying]::text[]))"
+  # `pg_get_constraintdef` expands `status IN (...)` into this form. SchemaVerifier
+  # compares the normalised expression, so the spec names what PostgreSQL stores.
+  @status_check_expression "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying]::text[]))"
 
   @provider_key :bilimbi_production_seed_provider
 
@@ -139,9 +141,12 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       []
     )
 
-    {prefix, bare_table} = split_qualified_table(table)
-    verify_ledger_columns!(repo, prefix, bare_table)
-    verify_ledger_constraints!(repo, prefix, bare_table)
+    {prefix, _bare_table} = split_qualified_table(table)
+    # Columns and the status check are proved before the index statement. A
+    # drifted table must raise here; creating the index first would fail in
+    # PostgreSQL on a column that is not there, and that error is not the
+    # ledger-drift refusal.
+    verify_ledger!(repo, prefix, ledger_spec(status_index_optional: true))
 
     SQL.query!(
       repo,
@@ -152,221 +157,76 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       []
     )
 
-    verify_ledger_indexes!(repo, prefix, bare_table)
+    verify_ledger!(repo, prefix, ledger_spec())
   end
 
-  defp verify_ledger_columns!(repo, prefix, table) do
-    result =
-      SQL.query!(
-        repo,
-        """
-        SELECT column_name, data_type, character_maximum_length,
-               datetime_precision, is_nullable, column_default
-        FROM information_schema.columns
-        WHERE table_schema = $1 AND table_name = $2
-        """,
-        [prefix, table]
-      )
+  defp verify_ledger!(repo, prefix, spec) do
+    case SchemaVerifier.verify(repo, [spec], prefix: prefix) do
+      :ok -> :ok
+      {:error, messages} -> raise_ledger_drift!(messages)
+    end
+  end
 
-    actual =
-      Map.new(result.rows, fn [name, type, length, precision, nullable, default] ->
-        {name,
-         %{
-           type: type,
-           length: length,
-           precision: precision,
-           nullable: nullable == "YES",
-           default: default
-         }}
-      end)
+  # The ledger is a SchemaVerifier table spec. Do not read information_schema
+  # or pg_index for it; that was a second drift engine beside the one every
+  # module contract already uses.
+  defp ledger_spec(opts \\ []) do
+    pkey = %{columns: ["seed_id"], unique: true, where: nil}
 
-    expected = %{
-      "seed_id" => {"character varying", 255, nil, false, nil},
-      "module_id" => {"character varying", 255, nil, false, nil},
-      "module_order" => {"integer", nil, nil, false, nil},
-      "status" => {"character varying", 20, nil, false, "'pending'::character varying"},
-      "attempts" => {"integer", nil, nil, false, "0"},
-      "started_at" => {"timestamp without time zone", nil, 0, true, nil},
-      "completed_at" => {"timestamp without time zone", nil, 0, true, nil},
-      "error_message" => {"text", nil, nil, true, nil},
-      "inserted_at" => {"timestamp without time zone", nil, 0, false, "CURRENT_TIMESTAMP"},
-      "updated_at" => {"timestamp without time zone", nil, 0, false, "CURRENT_TIMESTAMP"}
+    status_index = %{
+      columns: ["status", "module_order", "seed_id"],
+      unique: false,
+      where: nil
     }
 
-    errors =
-      Enum.flat_map(expected, fn {name, {type, length, precision, nullable, default}} ->
-        case Map.fetch(actual, name) do
-          :error ->
-            ["missing column #{name}"]
+    # Before CREATE INDEX, the status index may already be there (a second
+    # run) or not (a fresh table). It is optional on that first check so an
+    # existing correct index is not "unexpected", and required once created.
+    {indexes, optional_indexes} =
+      if Keyword.get(opts, :status_index_optional, false) do
+        {%{"bilimbi_production_seeds_pkey" => pkey},
+         %{"bilimbi_production_seeds_status_order_index" => status_index}}
+      else
+        {%{
+           "bilimbi_production_seeds_pkey" => pkey,
+           "bilimbi_production_seeds_status_order_index" => status_index
+         }, %{}}
+      end
 
-          {:ok, column} ->
-            []
-            |> then(fn acc ->
-              if column.type == type,
-                do: acc,
-                else: ["#{name}: expected #{type}, got #{column.type}" | acc]
-            end)
-            |> then(fn acc ->
-              if column.length == length,
-                do: acc,
-                else: [
-                  "#{name}: expected length #{inspect(length)}, got #{inspect(column.length)}"
-                  | acc
-                ]
-            end)
-            |> then(fn acc ->
-              if column.nullable == nullable,
-                do: acc,
-                else: ["#{name}: expected nullable=#{nullable}, got #{column.nullable}" | acc]
-            end)
-            |> then(fn acc ->
-              if column.precision == precision,
-                do: acc,
-                else: [
-                  "#{name}: expected precision #{inspect(precision)}, got #{inspect(column.precision)}"
-                  | acc
-                ]
-            end)
-            |> then(fn acc ->
-              if column.default == default,
-                do: acc,
-                else: [
-                  "#{name}: expected default #{inspect(default)}, got #{inspect(column.default)}"
-                  | acc
-                ]
-            end)
-        end
-      end)
-
-    unexpected =
-      actual
-      |> Map.keys()
-      |> Enum.reject(&Map.has_key?(expected, &1))
-      |> Enum.map(&"unexpected column #{&1}")
-
-    raise_ledger_drift!(errors ++ unexpected)
-  end
-
-  defp verify_ledger_constraints!(repo, prefix, table) do
-    result =
-      SQL.query!(
-        repo,
-        """
-        SELECT c.conname, c.convalidated, pg_get_constraintdef(c.oid, true)
-        FROM pg_constraint c
-        JOIN pg_class t ON t.oid = c.conrelid
-        JOIN pg_namespace n ON n.oid = t.relnamespace
-        WHERE n.nspname = $1 AND t.relname = $2 AND c.contype = 'c'
-        """,
-        [prefix, table]
-      )
-
-    actual =
-      Map.new(result.rows, fn [name, validated, definition] ->
-        {name, %{validated: validated, definition: definition}}
-      end)
-
-    expected = %{
-      "bilimbi_production_seeds_status_check" => %{
-        validated: true,
-        definition: @status_constraint_definition
+    spec = %{
+      name: @table,
+      columns: %{
+        "seed_id" => column({:varchar, 255}, false),
+        "module_id" => column({:varchar, 255}, false),
+        "module_order" => column(:integer, false),
+        "status" => column({:varchar, 20}, false, {:string, "pending"}),
+        "attempts" => column(:integer, false, {:integer, 0}),
+        "started_at" => column({:timestamp, 0}),
+        "completed_at" => column({:timestamp, 0}),
+        "error_message" => column(:text),
+        "inserted_at" => column({:timestamp, 0}, false, :current_timestamp),
+        "updated_at" => column({:timestamp, 0}, false, :current_timestamp)
+      },
+      indexes: indexes,
+      foreign_keys: %{},
+      checks: %{
+        "bilimbi_production_seeds_status_check" => %{
+          expression: @status_check_expression,
+          validated: true
+        }
       }
     }
 
-    errors =
-      Enum.flat_map(expected, fn {name, spec} ->
-        case Map.fetch(actual, name) do
-          :error ->
-            ["missing constraint #{name}"]
-
-          {:ok, constraint} ->
-            []
-            |> then(fn acc ->
-              if constraint.validated == spec.validated,
-                do: acc,
-                else: [
-                  "#{name}: expected validated=#{spec.validated}, got #{constraint.validated}"
-                  | acc
-                ]
-            end)
-            |> then(fn acc ->
-              if constraint.definition == spec.definition,
-                do: acc,
-                else: ["#{name}: definition does not match the required status domain" | acc]
-            end)
-        end
-      end)
-
-    unexpected =
-      actual
-      |> Map.keys()
-      |> Enum.reject(&Map.has_key?(expected, &1))
-      |> Enum.map(&"unexpected constraint #{&1}")
-
-    raise_ledger_drift!(errors ++ unexpected)
+    if optional_indexes == %{} do
+      spec
+    else
+      Map.put(spec, :optional_indexes, optional_indexes)
+    end
   end
 
-  defp verify_ledger_indexes!(repo, prefix, table) do
-    result =
-      SQL.query!(
-        repo,
-        """
-        SELECT i.relname AS index_name,
-               ix.indisunique AS unique,
-               array_agg(a.attname ORDER BY x.ordinality) AS columns
-        FROM pg_class t
-        JOIN pg_namespace n ON n.oid = t.relnamespace
-        JOIN pg_index ix ON ix.indrelid = t.oid
-        JOIN pg_class i ON i.oid = ix.indexrelid
-        JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS x(attnum, ordinality) ON true
-        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
-        WHERE n.nspname = $1 AND t.relname = $2
-        GROUP BY i.relname, ix.indisunique
-        """,
-        [prefix, table]
-      )
-
-    actual =
-      Map.new(result.rows, fn [name, unique, columns] ->
-        {name, %{unique: unique, columns: columns}}
-      end)
-
-    expected = %{
-      "bilimbi_production_seeds_pkey" => %{unique: true, columns: ["seed_id"]},
-      "bilimbi_production_seeds_status_order_index" => %{
-        unique: false,
-        columns: ["status", "module_order", "seed_id"]
-      }
-    }
-
-    errors =
-      Enum.flat_map(expected, fn {name, spec} ->
-        case Map.fetch(actual, name) do
-          :error ->
-            ["missing index #{name}"]
-
-          {:ok, index} ->
-            []
-            |> then(fn acc ->
-              if index.unique == spec.unique,
-                do: acc,
-                else: ["#{name}: expected unique=#{spec.unique}, got #{index.unique}" | acc]
-            end)
-            |> then(fn acc ->
-              if index.columns == spec.columns,
-                do: acc,
-                else: [
-                  "#{name}: expected columns #{inspect(spec.columns)}, got #{inspect(index.columns)}"
-                  | acc
-                ]
-            end)
-        end
-      end)
-
-    raise_ledger_drift!(errors)
+  defp column(type, nullable \\ true, default \\ nil) do
+    %{type: type, nullable: nullable, default: default}
   end
-
-  defp raise_ledger_drift!([]), do: :ok
 
   defp raise_ledger_drift!(messages) do
     raise ArgumentError,

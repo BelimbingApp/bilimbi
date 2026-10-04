@@ -7,8 +7,8 @@ defmodule Bilimbi.Base.UI.WriteGuardOptOutRegistrationTest do
   `mix compile --warnings-as-errors`.
 
   `#435` registered the LiveView quotes only. This test pins both shapes
-  in both public adapters, and proves a LiveComponent opt-out compiles
-  clean.
+  on `Bilimbi.Base.UI`, the live-view contract host pages use, and proves
+  a LiveComponent opt-out compiles clean.
   """
 
   use ExUnit.Case, async: true
@@ -17,9 +17,7 @@ defmodule Bilimbi.Base.UI.WriteGuardOptOutRegistrationTest do
 
   @adapters [
     {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__),
-     [:live_view, :live_component]},
-    {"apps/web/lib/bilimbi_web.ex", Path.expand("../../../web/lib/bilimbi_web.ex", __DIR__),
-     [:live_view]}
+     [:live_view, :live_component]}
   ]
 
   for {label, path, shapes} <- @adapters do

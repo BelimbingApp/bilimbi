@@ -175,11 +175,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         {dept.id, name}
       end)
 
-    # Supervisors (eligible company employees excluding self)
-    all_employees =
-      case Employee.list_employees(scope, company_id) do
-        {:ok, emps} -> emps
-        _ -> []
+    # One company read covers supervisor options and both subordinate lists.
+    # They are partitions of that list by supervisor_id.
+    {all_employees, subordinates, available_subordinates} =
+      case Employee.supervision_lists(scope, company_id, employee.id) do
+        {:ok, %{employees: employees, subordinates: subordinates, available: available}} ->
+          {employees, subordinates, available}
+
+        _ ->
+          {[], [], []}
       end
 
     supervisors = Enum.reject(all_employees, &(&1.id == employee.id))
@@ -189,19 +193,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     employee_types =
       case Employee.list_employee_types(scope, company_id) do
         {:ok, types} -> types
-        _ -> []
-      end
-
-    # Subordinates
-    subordinates =
-      case Employee.list_subordinates(scope, company_id, employee.id) do
-        {:ok, subs} -> subs
-        _ -> []
-      end
-
-    available_subordinates =
-      case Employee.list_available_subordinates(scope, company_id, employee.id) do
-        {:ok, avail} -> avail
         _ -> []
       end
 

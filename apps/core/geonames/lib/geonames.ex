@@ -115,6 +115,21 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
+  Every country as a `{"Name (ISO)", iso}` select option, ordered like
+  `list_countries/0`. A form that only fills a country select uses this
+  rather than loading each summary and labelling it itself.
+  """
+  @spec country_options() :: [{String.t(), String.t()}]
+  def country_options do
+    from(country in Country,
+      order_by: [asc: country.country, asc: country.iso],
+      select: {country.country, country.iso}
+    )
+    |> Repo.all()
+    |> Enum.map(fn {name, iso} -> {"#{name} (#{iso})", iso} end)
+  end
+
+  @doc """
   Returns a bounded, searchable, sortable page for the read-only Countries index.
 
   Query values may use atom or string keys. Invalid input is normalized to the

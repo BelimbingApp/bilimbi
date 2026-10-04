@@ -93,18 +93,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_employees(%Scope{} = scope, company_id) do
     with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
-      employees =
-        from(employee in Schema,
-          left_join: employee_type in EmployeeType,
-          on: employee_type.code == employee.employee_type,
-          where: employee.company_id == ^company_id,
-          order_by: employee.id,
-          select: {employee, employee_type.label}
-        )
-        |> Repo.all()
-        |> Enum.map(&Summary.from_query_result/1)
-
-      {:ok, employees}
+      {:ok, list_company_summaries(company_id)}
     end
   end
 
@@ -247,6 +236,44 @@ defmodule Bilimbi.Core.Employee do
         |> Enum.map(&Summary.from_schema/1)
 
       {:ok, employees}
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
+  @doc """
+  One company read, partitioned for a supervisor's page.
+
+  Proves the company and the supervisor once. `employees` is that company's
+  list (the supervisor options). `subordinates` report to this employee.
+  `available` are the other employees. `list_subordinates/3` and
+  `list_available_subordinates/3` stay for callers that want one side only.
+  """
+  @spec supervision_lists(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok,
+           %{
+             employees: [Summary.t()],
+             subordinates: [Summary.t()],
+             available: [Summary.t()]
+           }}
+          | {:error, lookup_error()}
+  def supervision_lists(%Scope{} = scope, company_id, employee_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, employee_id) do
+      employees = list_company_summaries(company_id)
+
+      subordinates =
+        employees
+        |> Enum.filter(&(&1.supervisor_id == employee_id))
+        |> Enum.sort_by(&{String.downcase(&1.full_name), &1.id})
+
+      available =
+        employees
+        |> Enum.filter(&(&1.id != employee_id and &1.supervisor_id != employee_id))
+        |> Enum.sort_by(&{String.downcase(&1.full_name), &1.id})
+
+      {:ok, %{employees: employees, subordinates: subordinates, available: available}}
     else
       {:error, :company_not_found} = error -> error
       nil -> {:error, :employee_not_found}
@@ -570,6 +597,19 @@ defmodule Bilimbi.Core.Employee do
       {:error, :forbidden} = error -> error
       {:error, :company_not_found} = error -> error
     end
+  end
+
+  defp list_company_summaries(company_id) do
+    Schema
+    |> EmployeeType.with_resolved_type()
+    |> where([employee], employee.company_id == ^company_id)
+    |> order_by([employee], asc: employee.id)
+    |> select(
+      [employee, company_type, global_type],
+      {employee, coalesce(company_type.label, global_type.label)}
+    )
+    |> Repo.all()
+    |> Enum.map(&Summary.from_query_result/1)
   end
 
   # The delete screens already ask for these capabilities. Seeds, mix tasks,

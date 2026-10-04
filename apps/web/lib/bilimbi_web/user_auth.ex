@@ -33,11 +33,11 @@ defmodule BilimbiWeb.UserAuth do
   For connected-page reauthorization, see `BilimbiWeb.RouteAccess`. Session
   termination transport handling belongs to `BilimbiWeb.SessionDisconnect`.
 
-  Once identity is rehydrated, this edge also resolves Base Locale from the
-  authenticated user's explicit Settings scope and applies its language to the
-  Web and shared-UI Gettext backends. Anonymous requests use the global locale.
-  HTTP requests and LiveViews each apply it in their own process lifecycle, so
-  no user's language remains in another request or LiveView process.
+  Once identity is rehydrated, `BilimbiWeb.RequestContext` applies Base Locale
+  and the audit context for this process. Anonymous requests use the global
+  locale. HTTP requests and LiveViews each apply it in their own process
+  lifecycle, so no user's language remains in another request or LiveView
+  process. Impersonation lives in `BilimbiWeb.Impersonation`.
 
   ## Cross-module seam
 
@@ -55,22 +55,17 @@ defmodule BilimbiWeb.UserAuth do
 
   use BilimbiWeb, :verified_routes
 
-  alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.DateTime, as: BaseDateTime
-  alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Entry
-  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Base.UI.DateTimeDisplay
-  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
+  alias BilimbiWeb.Impersonation
+  alias BilimbiWeb.RequestContext
 
   @session_key "current_user"
   @impersonation_key "impersonation"
@@ -84,7 +79,12 @@ defmodule BilimbiWeb.UserAuth do
   # `Phoenix.LiveView.Router.fetch_live_flash/2` reads this cookie. The
   # session cookie itself is dropped, so the notice has to travel separately.
   @live_flash_cookie "__phoenix_flash__"
-  @gettext_backends [BilimbiWeb.Gettext, Bilimbi.Base.UI.Gettext]
+
+  @doc false
+  def session_key, do: @session_key
+
+  @doc false
+  def impersonation_key, do: @impersonation_key
 
   # ------------------------------------------------------------------
   # Login edge
@@ -196,7 +196,9 @@ defmodule BilimbiWeb.UserAuth do
     |> redirect(to: ~p"/")
   end
 
-  defp persist_durable_session(conn, user_id, company_id, existing_session_id \\ nil) do
+  # Impersonation updates this same durable row in place. Login is the other caller.
+  @doc false
+  def persist_durable_session(conn, user_id, company_id, existing_session_id \\ nil) do
     with {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{id: ^user_id}} <- User.get_user(scope, company_id, user_id) do
@@ -218,7 +220,8 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  defp current_session_id(conn) do
+  @doc false
+  def current_session_id(conn) do
     case get_session(conn, @session_key) do
       %{"session_id" => session_id} when is_binary(session_id) and session_id != "" -> session_id
       _ -> nil
@@ -272,175 +275,6 @@ defmodule BilimbiWeb.UserAuth do
     |> redirect(to: ~p"/")
   end
 
-  @doc """
-  Switches the active session to `target_user` and records the administrator's
-  identity in the `@impersonation_key` cookie payload. Updates the durable session
-  row in place without leaving stranded authentication records.
-
-  The switch is recorded once it has happened: a retained `impersonation.started`
-  action names the operator as the actor and the target as the subject. The
-  record is best-effort, so a trail that cannot be written never undoes a
-  switch that already took effect.
-  """
-  def impersonate_user(
-        conn,
-        %{"user_id" => original_user_id, "name" => original_user_name} = original_user,
-        %Summary{} = target_user
-      )
-      when is_integer(original_user_id) and is_binary(original_user_name) do
-    current_id = current_session_id(conn)
-    scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
-
-    with %Scope{} <- scope,
-         {:ok, _target_session_user} <- session_user(target_user),
-         {:ok, session_id} <-
-           persist_durable_session(conn, target_user.id, target_user.company_id, current_id) do
-      record_impersonation(scope, "impersonation.started", %{
-        operator_id: original_user_id,
-        company_id: original_user["company_id"],
-        target_id: target_user.id,
-        summary: "Started impersonating #{target_user.name}"
-      })
-
-      conn
-      |> configure_session(renew: true)
-      |> put_session(@impersonation_key, %{
-        "original_user_id" => original_user_id,
-        "original_user_name" => original_user_name
-      })
-      |> put_session(@session_key, %{
-        "session_id" => session_id,
-        "user_id" => target_user.id,
-        "company_id" => target_user.company_id
-      })
-      |> redirect(to: ~p"/dashboard")
-    else
-      _ ->
-        conn
-        |> put_flash(:error, "Unable to impersonate that user.")
-        |> redirect(to: ~p"/users")
-    end
-  end
-
-  @doc """
-  Leaves impersonation by clearing `@impersonation_key` and restoring the
-  original administrator's authenticated session in place.
-
-  A retained `impersonation.stopped` action names the operator as the actor
-  once their own session is restored. Leaving must always succeed — an
-  operator is never trapped in a borrowed session — so a failed stop record
-  is logged rather than blocking.
-  """
-  def leave_impersonation(conn) do
-    case get_session(conn, @impersonation_key) do
-      %{"original_user_id" => original_user_id} when is_integer(original_user_id) ->
-        scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
-        current_id = current_session_id(conn)
-        impersonated_user_id = impersonated_user_id(conn)
-
-        with %Scope{} <- scope,
-             {:ok, %Summary{} = original_user} <- User.get_tenant_user(scope, original_user_id),
-             {:ok, session_id} <-
-               persist_durable_session(
-                 conn,
-                 original_user.id,
-                 original_user.company_id,
-                 current_id
-               ) do
-          record_impersonation(scope, "impersonation.stopped", %{
-            operator_id: original_user.id,
-            company_id: original_user.company_id,
-            target_id: impersonated_user_id,
-            summary: "Stopped impersonating"
-          })
-
-          conn
-          |> configure_session(renew: true)
-          |> delete_session(@impersonation_key)
-          |> put_session(@session_key, %{
-            "session_id" => session_id,
-            "user_id" => original_user.id,
-            "company_id" => original_user.company_id
-          })
-          |> redirect(to: ~p"/dashboard")
-        else
-          _ ->
-            log_out_user(conn)
-        end
-
-      _ ->
-        redirect(conn, to: ~p"/dashboard")
-    end
-  end
-
-  defp impersonated_user_id(conn) do
-    case get_session(conn, @session_key) do
-      %{"user_id" => user_id} when is_integer(user_id) -> user_id
-      _ -> nil
-    end
-  end
-
-  # Belimbing's `ImpersonationManager` records both transitions as retained
-  # semantic actions, and its recorder payload shape is mirrored here so both
-  # trails read the same. The operator acts as themselves at each transition,
-  # so `impersonator_id` is an explicit nil rather than inherited from the
-  # request context — which, on stop, still names the operator as impersonator.
-  # Request facts come from that same context, set by `fetch_current_scope/2`.
-  #
-  # Both transitions have already taken effect by the time they are recorded,
-  # so recording is best-effort: a rejected changeset is logged, and a missing
-  # actions table is the pre-canonical state `MutationCapture.insert_capture/1`
-  # also tolerates. Neither ever fails the transition back out to the caller.
-  defp record_impersonation(%Scope{} = scope, event, %{
-         operator_id: operator_id,
-         company_id: company_id,
-         target_id: target_id,
-         summary: summary
-       }) do
-    context = AuditContext.get()
-
-    result =
-      Audit.record_action(scope, %{
-        company_id: company_id,
-        actor_type: "user",
-        actor_id: operator_id,
-        impersonator_id: nil,
-        ip_address: context.ip_address,
-        url: context.url,
-        user_agent: context.user_agent && String.slice(context.user_agent, 0, 80),
-        trace_id: context.trace_id && String.slice(context.trace_id, 0, 12),
-        event: event,
-        payload: %{
-          "semantic" => true,
-          "source" => "Impersonation",
-          "summary" => summary,
-          "surface" => "admin.impersonate",
-          "subject" => %{"name" => "user", "id" => target_id, "label" => "User##{target_id}"},
-          "context" => %{"impersonator_id" => operator_id, "target_id" => target_id},
-          "result" => "succeeded"
-        },
-        is_retained: true,
-        occurred_at: NaiveDateTime.utc_now()
-      })
-
-    case result do
-      {:ok, _action} ->
-        :ok
-
-      {:error, changeset} ->
-        Logger.warning("#{event} audit action was not recorded: #{inspect(changeset.errors)}")
-
-        :ok
-    end
-  rescue
-    error in Postgrex.Error ->
-      if match?(%{postgres: %{code: :undefined_table}}, error) do
-        :ok
-      else
-        reraise error, __STACKTRACE__
-      end
-  end
-
   # ------------------------------------------------------------------
   # Plugs
   # ------------------------------------------------------------------
@@ -448,8 +282,10 @@ defmodule BilimbiWeb.UserAuth do
   @doc """
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
   `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()],
-  impersonator: map | nil, session_identity: map, shell_preferences: map,
-  operator_company_missing: boolean()}` or `nil`. Templates read
+  grant_all: boolean(), impersonator: map | nil, session_identity: map,
+  shell_preferences: map, operator_company_missing: boolean()}` or `nil`.
+  `capabilities` and `grant_all` are one `effective_capabilities/1` result.
+  Templates read
   `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
   `shell_preferences` is the single resolved theme and timestamp display
   snapshot for the request or LiveView process.
@@ -462,8 +298,7 @@ defmodule BilimbiWeb.UserAuth do
     impersonation = get_session(conn, @impersonation_key)
     current_scope = current_scope_from(session_user, impersonation)
 
-    apply_locale(current_scope)
-    put_audit_context(current_scope, conn)
+    RequestContext.apply(current_scope, conn)
 
     case current_scope do
       %{scope: %Scope{}} = current_scope ->
@@ -736,135 +571,7 @@ defmodule BilimbiWeb.UserAuth do
         current_scope_from(session[@session_key], session[@impersonation_key])
       end)
 
-    current_scope = socket.assigns.current_scope
-
-    apply_locale(current_scope)
-    put_audit_context(current_scope, socket)
-
-    follow_page_url(socket, current_scope)
-  end
-
-  # A LiveView process handles many navigations; each one's URL is the
-  # `url` of what is recorded while the page is shown. The hook needs a
-  # routed root socket, which is where `handle_params` runs.
-  defp follow_page_url(%{router: router} = socket, current_scope)
-       when not is_nil(router) and not is_nil(current_scope) do
-    Phoenix.LiveView.attach_hook(socket, :audit_context_url, :handle_params, fn _params,
-                                                                                uri,
-                                                                                socket ->
-      AuditContext.put(%{AuditContext.get() | url: uri})
-      {:cont, socket}
-    end)
-  end
-
-  defp follow_page_url(socket, _current_scope), do: socket
-
-  defp apply_locale(nil) do
-    put_gettext_locale(Locale.resolve(nil, locale_bootstrap()).language)
-    DateTimeDisplay.put(BaseDateTime.display(nil))
-  end
-
-  defp apply_locale(%{
-         user: %{"user_id" => user_id, "company_id" => company_id},
-         scope: %Scope{} = scope,
-         shell_preferences: shell_preferences
-       }) do
-    SettingsScope.user(user_id, company_id, Scope.tenant_id(scope))
-    |> Locale.resolve(locale_bootstrap())
-    |> then(&put_gettext_locale(&1.language))
-
-    # Timestamp display policy resolves in the same per-process lifecycle as
-    # the locale, so no user's mode or company zone leaks into another
-    # request or LiveView process (#459). The scope already carries the one
-    # resolved snapshot; re-resolving it here would read the same rows twice.
-    DateTimeDisplay.put(shell_preferences)
-  end
-
-  # Platform-operator address facts feed one-time locale inference. The
-  # resolver touches Company/Address/Geonames, so it runs only while no
-  # supported global locale row exists; once inference persists, this stays
-  # a single Settings read per request.
-  defp locale_bootstrap do
-    if Locale.overridden?(nil), do: nil, else: Address.platform_operator_locale_bootstrap()
-  rescue
-    error in Postgrex.Error ->
-      if match?(%{postgres: %{code: :undefined_table}}, error) do
-        nil
-      else
-        reraise error, __STACKTRACE__
-      end
-  end
-
-  # Captured mutations and recorded actions record who acted (ADR 0013), and
-  # from where: the trail exists to tell a developer's own work from a
-  # command run through their stolen or hijacked session. Resolved in the
-  # same per-process lifecycle as the locale; an anonymous request records
-  # the guest default rather than a stale actor from a previous request.
-  # Under impersonation the actor is the account acted as and the
-  # impersonator is the operator behind the session, so every row names both.
-  defp put_audit_context(nil, _source), do: AuditContext.put(nil)
-
-  defp put_audit_context(
-         %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor} = current_scope,
-         source
-       ) do
-    AuditContext.put(
-      struct!(
-        %AuditContext{
-          actor_type: Atom.to_string(actor.type),
-          actor_id: actor.id,
-          impersonator_id: impersonator_id(current_scope),
-          company_id: user["company_id"],
-          tenant_id: Scope.tenant_id(scope),
-          trace_id: Logger.metadata()[:request_id]
-        },
-        request_facts(source)
-      )
-    )
-  end
-
-  defp put_audit_context(_current_scope, _source), do: AuditContext.put(nil)
-
-  defp request_facts(%Plug.Conn{} = conn) do
-    %{
-      ip_address: conn.remote_ip |> :inet.ntoa() |> to_string(),
-      url: request_url(conn),
-      user_agent: get_req_header(conn, "user-agent") |> List.first()
-    }
-  end
-
-  # A LiveView process serves no HTTP request. The socket's connect info
-  # names the client's address and agent (the endpoint asks the transport
-  # for both); the page URL arrives per navigation through the
-  # `handle_params` hook attached at mount. There is no request id to
-  # trace once the socket is connected, so `trace_id` is only what the
-  # disconnected render's request left in the Logger metadata.
-  defp request_facts(%Phoenix.LiveView.Socket{} = socket) do
-    %{
-      ip_address: socket |> connect_info(:peer_data) |> peer_ip(connect_info(socket, :x_headers)),
-      user_agent: connect_info(socket, :user_agent)
-    }
-  end
-
-  defp connect_info(%{parent_pid: nil} = socket, key),
-    do: Phoenix.LiveView.get_connect_info(socket, key)
-
-  defp connect_info(_child_socket, _key), do: nil
-
-  defp peer_ip(%{address: address}, headers) when is_tuple(address) do
-    address
-    |> BilimbiWeb.ForwardedFor.client_address(headers || [])
-    |> :inet.ntoa()
-    |> to_string()
-  end
-
-  defp peer_ip(_peer_data, _headers), do: nil
-
-  defp impersonator_id(%{impersonator: %{id: id}}) when is_integer(id) and id > 0, do: id
-  defp impersonator_id(_current_scope), do: nil
-
-  defp put_gettext_locale(language) do
-    Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))
+    RequestContext.apply(socket.assigns.current_scope, socket)
   end
 
   @doc false
@@ -896,7 +603,7 @@ defmodule BilimbiWeb.UserAuth do
          {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
       :ok = Session.refresh_activity(session_id, System.system_time(:second))
-      impersonator = extract_impersonator(impersonation)
+      impersonator = Impersonation.extract_impersonator(impersonation)
 
       # Every fact above is proven, so this edge is where the scope learns who
       # is signed in. Module code reads that from `Scope.actor/1` and cannot
@@ -906,17 +613,18 @@ defmodule BilimbiWeb.UserAuth do
           tenant_scope,
           user.id,
           company_id,
-          impersonation_opts(impersonator, session_id)
+          Impersonation.impersonation_opts(impersonator, session_id)
         )
 
       {:ok, actor} = Authz.scope_actor(scope)
-      %{allowed: allowed} = Authz.effective_capabilities(actor)
+      %{allowed: allowed, grant_all: grant_all} = Authz.effective_capabilities(actor)
 
       %{
         user: presentation_user(user, scope),
         scope: scope,
         actor: actor,
         capabilities: allowed,
+        grant_all: grant_all,
         impersonator: impersonator,
         session_identity: %{
           "session_id" => session_id,
@@ -980,21 +688,6 @@ defmodule BilimbiWeb.UserAuth do
     Scope.platform_operator?(scope) and
       Company.platform_operator_company() == {:error, :not_provisioned}
   end
-
-  defp extract_impersonator(%{
-         "original_user_id" => id,
-         "original_user_name" => name
-       })
-       when is_integer(id) and is_binary(name) do
-    %{id: id, name: name}
-  end
-
-  defp extract_impersonator(_), do: nil
-
-  defp impersonation_opts(nil, _session_id), do: []
-
-  defp impersonation_opts(%{id: impersonator_id}, session_id),
-    do: [impersonator_id: impersonator_id, impersonation_session_id: session_id]
 
   defp presentation_user(%Summary{} = user, %Scope{} = scope) do
     %{
