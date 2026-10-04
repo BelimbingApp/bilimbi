@@ -52,6 +52,13 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
            } in routes()
   end
 
+  test "contributes the notification bell to the shared shell" do
+    assert %{
+             embed: "shell.notifications",
+             live_component: Bilimbi.Core.User.Web.NotificationBellComponent
+           } in routes()
+  end
+
   test "the profile route is deliberately open to any signed-in account" do
     # Not an oversight: Belimbing guards `settings/profile` with authentication
     # alone, because it is the actor's own account. Asserted so that adding a

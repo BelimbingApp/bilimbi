@@ -443,11 +443,6 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   @impl true
-  def handle_info({:notification_event, _payload}, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info(_msg, socket) do
     {:noreply, socket}
   end
@@ -456,13 +451,6 @@ defmodule BilimbiWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <:topbar_actions>
-        <.live_component
-          module={Bilimbi.Core.User.Web.NotificationBellComponent}
-          id="topbar-notification-bell"
-          current_scope={@current_scope}
-        />
-      </:topbar_actions>
       <.page variant={:detail}>
         <.header>
           Dashboard

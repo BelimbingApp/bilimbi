@@ -528,8 +528,8 @@ Two shells exist and each stays minimal:
   workspace. No navigation, no marketing.
 - **`Layouts.app`** — the authenticated workspace shell: a compact full-width
   top bar (sidebar toggle, transparent `size-6` brand mark and Bilimbi
-  wordmark, current timezone selector and light/dark theme selector), a left
-  menu sidebar, and a persistent status bar
+  wordmark, notification bell, current timezone selector and light/dark theme
+  selector), a left menu sidebar, and a persistent status bar
   (application version). In development only, the status bar shows `dev` plus
   the listen address. Wide screens keep the rail; the collapsed rail hides
   labels, leaving the user initials. The bottom-left user circle remains the
@@ -541,6 +541,11 @@ Two shells exist and each stays minimal:
   The bar is `h-7` with no vertical padding, so every control in it is the
   `size-6` inline size the sidebar toggle uses; a `size-7` control fills the
   bar and paints its pressed and hover surfaces onto the bar's border.
+  The notification bell is part of the shell, so it is on every authenticated
+  page and no page adds it: the bell shows the unread count, follows a new
+  notification without a reload, and opens the five most recent with a link
+  to `/notifications`. A page shown inside a workspace tile has no top bar and
+  so no bell; the workspace around it carries the one bell.
 
 Ordinary users do not need company and tenant repeated in the top strip. The
 strip above the workspace is for transient state with an exit: it renders only
