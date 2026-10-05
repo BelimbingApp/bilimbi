@@ -16,9 +16,9 @@ defmodule Bilimbi.Umbrella.MixProject do
       aliases: aliases(),
       releases: releases(),
       # CI runs `mix dialyzer` from this umbrella root, so the PLT is built here.
-      # `mix bilimbi.screenshot` (apps/web) is the first shipped Mix task, and its
-      # `Mix.*` surface needs the Mix application in the PLT to type-check. PLT-only
-      # — this adds :mix to Dialyzer's analysis, not to any app's runtime.
+      # The project's Mix tasks (`mix bilimbi.*`) call a `Mix.*` surface that needs
+      # the Mix application in the PLT to type-check. PLT-only — this adds :mix to
+      # Dialyzer's analysis, not to any app's runtime.
       dialyzer: [plt_add_apps: [:mix]],
       listeners: [Phoenix.CodeReloader]
     ]
