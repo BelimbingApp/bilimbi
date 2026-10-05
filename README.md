@@ -127,10 +127,10 @@ Setup for real tenants, production mail, and the developer commands are in
 - PostgreSQL 18.
 - Node.js 22 or later, only to run the LiveView hook tests in
   `mix precommit`.
-- Linux or macOS. CI runs on Ubuntu 24.04. Windows works through WSL2.
+- Linux or macOS. CI runs on Ubuntu 26.04. Windows works through WSL2.
 
 More documentation is in [`docs/`](./docs/README.md). Bilimbi is released
 under the [MIT License](./LICENSE).
 
-Production installation on Ubuntu 24.04 is covered by the
-[deployment guide](./docs/deploy/ubuntu-24.04.md).
+Production installation on Ubuntu 26.04 is covered by the
+[deployment guide](./docs/deploy/ubuntu-26.04.md).

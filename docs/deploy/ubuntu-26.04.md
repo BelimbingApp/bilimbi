@@ -1,7 +1,7 @@
-# Ubuntu 24.04 production deployment
+# Ubuntu 26.04 production deployment
 
-This runbook installs one Bilimbi release on an Ubuntu 24.04 x86-64 host with
-PostgreSQL 18 and Caddy. Build releases on **Ubuntu 24.04 for the same CPU
+This runbook installs one Bilimbi release on an Ubuntu 26.04 x86-64 host with
+PostgreSQL 18 and Caddy. Build releases on **Ubuntu 26.04 for the same CPU
 architecture** as the server. A release bundles Erlang and native libraries;
 the production server needs no Elixir, Mix, Node, or source checkout.
 
@@ -20,7 +20,7 @@ excluded, but its source is included.
 
 ```bash
 scripts/deploy/build.sh 2026.09.30-1
-scp dist/bilimbi-2026.09.30-1-ubuntu-24.04-amd64.tar.gz* \
+scp dist/bilimbi-2026.09.30-1-ubuntu-26.04-amd64.tar.gz* \
   <ssh-user>@<server>:/tmp/
 ```
 
@@ -30,7 +30,7 @@ composition, builds and digests web assets, then packages
 in `dist/`. The Docker build requires a working Docker daemon and network
 access to Ubuntu packages, mise, Hex, and binary asset downloads.
 
-For CI, use an `ubuntu-24.04` x86-64 runner with the same mounted checkouts,
+For CI, use an `ubuntu-26.04` x86-64 runner with the same mounted checkouts,
 install the pinned `.mise.toml` toolchain, then run the equivalent commands:
 
 ```bash
@@ -41,8 +41,8 @@ MIX_ENV=prod mise exec -- mix deps.get --only prod
 MIX_ENV=prod mise exec -- mix compile
 (cd apps/web && MIX_ENV=prod mise exec -- mix assets.deploy)
 MIX_ENV=prod mise exec -- mix release bilimbi
-tar -C _build/prod/rel -czf "bilimbi-${VERSION}-ubuntu-24.04-amd64.tar.gz" bilimbi
-sha256sum "bilimbi-${VERSION}-ubuntu-24.04-amd64.tar.gz" > "bilimbi-${VERSION}-ubuntu-24.04-amd64.tar.gz.sha256"
+tar -C _build/prod/rel -czf "bilimbi-${VERSION}-ubuntu-26.04-amd64.tar.gz" bilimbi
+sha256sum "bilimbi-${VERSION}-ubuntu-26.04-amd64.tar.gz" > "bilimbi-${VERSION}-ubuntu-26.04-amd64.tar.gz.sha256"
 ```
 
 CI must arrange the Domain and Extension checkouts before dependency resolution;
@@ -130,7 +130,7 @@ client look like the proxy.
 On the server, from a directory containing both uploaded artifacts:
 
 ```bash
-sudo bash deploy.sh /tmp/bilimbi-2026.09.30-1-ubuntu-24.04-amd64.tar.gz 2026.09.30-1 5
+sudo bash deploy.sh /tmp/bilimbi-2026.09.30-1-ubuntu-26.04-amd64.tar.gz 2026.09.30-1 5
 sudo systemctl status bilimbi
 sudo journalctl -u bilimbi -n 100 --no-pager
 curl -fsS -o /dev/null -w '%{http_code}\n' https://<your-domain>/
