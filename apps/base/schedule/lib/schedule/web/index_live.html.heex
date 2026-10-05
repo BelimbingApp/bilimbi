@@ -2,7 +2,9 @@
   <.page id="schedule-board">
     <.header>
       Schedule
-      <:subtitle>Everything scheduled to fire across the system, and how the last runs went.</:subtitle>
+      <:subtitle>
+        Everything scheduled to fire across the system, and how the last runs went.
+      </:subtitle>
     </.header>
 
     <section id="schedule-diagnostics" aria-labelledby="schedule-diagnostics-title" class="mt-2">
@@ -37,7 +39,9 @@
 
     <.tabs id="schedule-tabs" class="mt-5" aria-label="Schedule views">
       <:tab
-        :for={{tab, label} <- [{"tasks", "Tasks"}, {"history", "History"}, {"settings", "Settings"}]}
+        :for={
+          {tab, label} <- [{"tasks", "Tasks"}, {"history", "History"}, {"settings", "Settings"}]
+        }
         id={"schedule-tab-#{tab}"}
         patch={tab_path(@state, tab)}
         current={@state.tab == tab}
@@ -46,7 +50,11 @@
       </:tab>
     </.tabs>
 
-    <section :if={@state.tab == "tasks"} id="schedule-tasks-panel" aria-labelledby="schedule-tab-tasks">
+    <section
+      :if={@state.tab == "tasks"}
+      id="schedule-tasks-panel"
+      aria-labelledby="schedule-tab-tasks"
+    >
       <.form
         for={@task_form}
         id="schedule-task-filters"
@@ -93,7 +101,12 @@
         </div>
       </.form>
 
-      <.alert :if={@task_state == :unavailable} id="schedule-tasks-unavailable" kind={:error} class="mt-4">
+      <.alert
+        :if={@task_state == :unavailable}
+        id="schedule-tasks-unavailable"
+        kind={:error}
+        class="mt-4"
+      >
         Task definitions or their database state are unavailable. No status has been inferred.
       </.alert>
 
@@ -130,7 +143,12 @@
             <code class="whitespace-nowrap text-xs text-ink">{task.expression}</code>
             <p class="text-xs text-ink-muted">{task.timezone}</p>
           </:col>
-          <:col :let={task} label="Next run" sort="next_due" sort_id="schedule-tasks-sort-next_due">
+          <:col
+            :let={task}
+            label="Next run"
+            sort="next_due"
+            sort_id="schedule-tasks-sort-next_due"
+          >
             <.datetime
               id={"#{task_dom_id(task)}-next-due"}
               value={task.next_due_at}
@@ -143,7 +161,12 @@
               {task.overlap} overlap · {task.misfire} misfires
             </p>
           </:col>
-          <:col :let={task} label="Last run" sort="last_run" sort_id="schedule-tasks-sort-last_run">
+          <:col
+            :let={task}
+            label="Last run"
+            sort="last_run"
+            sort_id="schedule-tasks-sort-last_run"
+          >
             <.datetime
               id={"#{task_dom_id(task)}-last-started"}
               value={task.last_started_at}
@@ -263,10 +286,20 @@
         />
       </.filter_toolbar>
 
-      <.alert :if={@run_state == :invalid_filters} id="schedule-history-invalid" kind={:warning} class="mt-4">
+      <.alert
+        :if={@run_state == :invalid_filters}
+        id="schedule-history-invalid"
+        kind={:warning}
+        class="mt-4"
+      >
         The start date must not be after the end date.
       </.alert>
-      <.alert :if={@run_state == :unavailable} id="schedule-history-unavailable" kind={:error} class="mt-4">
+      <.alert
+        :if={@run_state == :unavailable}
+        id="schedule-history-unavailable"
+        kind={:error}
+        class="mt-4"
+      >
         Run history is unavailable. No empty-history conclusion has been inferred.
       </.alert>
 
@@ -280,7 +313,12 @@
           sort_event="sort_runs"
           caption="Schedule run history"
         >
-          <:col :let={run} label="Started" sort="started_at" sort_id="schedule-runs-sort-started_at">
+          <:col
+            :let={run}
+            label="Started"
+            sort="started_at"
+            sort_id="schedule-runs-sort-started_at"
+          >
             <.datetime
               id={"#{run_dom_id(run)}-started-at"}
               value={run.started_at}
@@ -302,9 +340,10 @@
             <span class="text-xs text-ink">{run_result(run)}</span>
           </:col>
           <:empty :if={@run_page.total_entries == 0 and @run_state == :available}>
-            {if @state.run_search == "" and @state.run_status == "" and is_nil(@state.start_date) and is_nil(@state.end_date),
-              do: "No runs recorded yet.",
-              else: "No runs match the current filters."}
+            {if @state.run_search == "" and @state.run_status == "" and is_nil(@state.start_date) and
+                  is_nil(@state.end_date),
+                do: "No runs recorded yet.",
+                else: "No runs match the current filters."}
           </:empty>
         </.table>
       </div>
@@ -319,7 +358,12 @@
       />
     </section>
 
-    <section :if={@state.tab == "settings"} id="schedule-settings-panel" aria-labelledby="schedule-tab-settings" class="mt-4">
+    <section
+      :if={@state.tab == "settings"}
+      id="schedule-settings-panel"
+      aria-labelledby="schedule-tab-settings"
+      class="mt-4"
+    >
       <.card id="schedule-retention" title="Schedule history retention" inner_class="p-4">
         <p class="text-sm text-ink-muted">
           How long completed schedule runs stay in the History tab before the pruner deletes old rows. Set 0 to keep all recorded runs.
@@ -328,7 +372,13 @@
           Current: {retention_label(@retention_days)}
         </p>
 
-        <.form :if={@can_manage} for={@retention_form} id="schedule-retention-form" phx-submit="save_retention" class="mt-4 flex items-end gap-3">
+        <.form
+          :if={@can_manage}
+          for={@retention_form}
+          id="schedule-retention-form"
+          phx-submit="save_retention"
+          class="mt-4 flex items-end gap-3"
+        >
           <div>
             <.input
               field={@retention_form[:days]}
@@ -345,7 +395,11 @@
           <.button id="schedule-retention-save" type="submit" variant="primary">Save retention</.button>
         </.form>
 
-        <p :if={!@can_manage} id="schedule-retention-read-only" class="mt-4 text-xs text-ink-muted">
+        <p
+          :if={!@can_manage}
+          id="schedule-retention-read-only"
+          class="mt-4 text-xs text-ink-muted"
+        >
           Read-only. The schedule manage capability is required to change retention.
         </p>
       </.card>

@@ -775,7 +775,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 key="record.history"
                 id="user-record-history"
                 current_scope={@current_scope}
-                opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id, record: @user}}
+                opts={
+                  %{auditable_types: user_auditable_types(), auditable_id: @user.id, record: @user}
+                }
               />
               <.action_link
                 :if={can_impersonate?(@current_scope, @user, @company_archived?)}
@@ -840,7 +842,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 >
                   <:display>
                     <%= if @company_name do %>
-                      <.link :if={not @can_edit?} navigate={~p"/companies/#{@user.company_id}"} class="text-action hover:underline">
+                      <.link
+                        :if={not @can_edit?}
+                        navigate={~p"/companies/#{@user.company_id}"}
+                        class="text-action hover:underline"
+                      >
                         {@company_name}
                       </.link>
                       <span :if={@can_edit?} class="text-ink">{@company_name}</span>
@@ -850,35 +856,34 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   </:display>
                   <:editor>
                     <form id="user-company-form" phx-change="save_company" class="inline-block">
-                    <select
-                      id="user-company-select"
-                      name="company_id"
-                      aria-label="Company"
-                      aria-describedby="user-company-warning"
-                      phx-mounted={JS.focus()}
-                      phx-blur="cancel_edit_field"
-                      class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                    >
-                      <option
-                        :for={company <- @companies}
-                        value={company.id}
-                        selected={@user.company_id == company.id}
+                      <select
+                        id="user-company-select"
+                        name="company_id"
+                        aria-label="Company"
+                        aria-describedby="user-company-warning"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                       >
-                        {Company.Summary.display_name(company)}
-                      </option>
-                    </select>
+                        <option
+                          :for={company <- @companies}
+                          value={company.id}
+                          selected={@user.company_id == company.id}
+                        >
+                          {Company.Summary.display_name(company)}
+                        </option>
+                      </select>
                     </form>
 
-                  <%!-- The choice commits on change and the write ends the
+                    <%!-- The choice commits on change and the write ends the
                        account's sessions, so the warning stands before the
                        choice, beside the select, where the operator reads it
                        first; it is a note, not a second click. --%>
-                  <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
-                    Changing the company signs {@user.name} out of every session.
-                  </p>
+                    <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
+                      Changing the company signs {@user.name} out of every session.
+                    </p>
                   </:editor>
                 </.inline_choice>
-
               </:item>
               <:item title="Email Verified" id="user-view-email-verified">
                 <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>

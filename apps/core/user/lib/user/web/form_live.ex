@@ -101,16 +101,58 @@ defmodule Bilimbi.Core.User.Web.FormLive do
           </:actions>
         </.header>
 
-        <.form for={@form} id="user-form" phx-change="validate" phx-submit="save" class="rounded-xl border border-line bg-surface px-6 py-5">
-          <.input field={@form[:company_id]} id="user-company" type="select" label="Company" prompt="Choose a company" options={for company <- @companies, do: {Company.Summary.display_name(company), company.id}} />
-          <.input field={@form[:name]} id="user-name" label="Name" autocomplete="name" placeholder="Enter user name" required />
-          <.input field={@form[:email]} id="user-email" type="email" label="Email" autocomplete="email" placeholder="Enter email address" required />
+        <.form
+          for={@form}
+          id="user-form"
+          phx-change="validate"
+          phx-submit="save"
+          class="rounded-xl border border-line bg-surface px-6 py-5"
+        >
+          <.input
+            field={@form[:company_id]}
+            id="user-company"
+            type="select"
+            label="Company"
+            prompt="Choose a company"
+            options={
+              for company <- @companies, do: {Company.Summary.display_name(company), company.id}
+            }
+          />
+          <.input
+            field={@form[:name]}
+            id="user-name"
+            label="Name"
+            autocomplete="name"
+            placeholder="Enter user name"
+            required
+          />
+          <.input
+            field={@form[:email]}
+            id="user-email"
+            type="email"
+            label="Email"
+            autocomplete="email"
+            placeholder="Enter email address"
+            required
+          />
 
-          <.secret_input field={@form[:password]} id="user-password" label="Password" subject="password" autocomplete="new-password" placeholder="Enter password" required />
+          <.secret_input
+            field={@form[:password]}
+            id="user-password"
+            label="Password"
+            subject="password"
+            autocomplete="new-password"
+            placeholder="Enter password"
+            required
+          />
 
           <div class="mt-2 flex items-center gap-4">
             <.button id="user-save" variant="primary" type="submit" phx-disable-with="Saving…">Create User</.button>
-            <.link id="user-cancel" navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Cancel</.link>
+            <.link
+              id="user-cancel"
+              navigate={~p"/users"}
+              class="text-sm font-medium text-ink-muted hover:text-ink"
+            >Cancel</.link>
           </div>
         </.form>
       </.page>

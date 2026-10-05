@@ -211,7 +211,11 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
           </section>
 
           <div class="flex items-center justify-end gap-3">
-            <.link id="role-cancel" navigate={~p"/authz/roles"} class="text-sm font-medium text-ink-muted hover:text-ink">
+            <.link
+              id="role-cancel"
+              navigate={~p"/authz/roles"}
+              class="text-sm font-medium text-ink-muted hover:text-ink"
+            >
               Cancel
             </.link>
             <.button id="role-save" type="submit" variant="primary" phx-disable-with="Creating...">

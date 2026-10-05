@@ -60,7 +60,10 @@
       </div>
     </div>
 
-    <ul class="max-h-80 overflow-y-auto divide-y divide-line py-0.5" aria-label="Recent notifications">
+    <ul
+      class="max-h-80 overflow-y-auto divide-y divide-line py-0.5"
+      aria-label="Recent notifications"
+    >
       <li
         :for={item <- @items}
         id={"bell-item-#{item.id}"}
@@ -73,24 +76,36 @@
           phx-target={@myself}
           class={[
             "w-full flex items-start gap-2.5 px-3 py-2 text-left transition hover:bg-surface-sunken cursor-pointer",
-            if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-surface", else: "bg-surface-muted/30")
+            if(Bilimbi.Core.User.Notification.unread?(item),
+              do: "bg-surface",
+              else: "bg-surface-muted/30"
+            )
           ]}
         >
           <span
             class={[
               "mt-1.5 size-1.5 shrink-0 rounded-full",
-              if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-brand", else: "bg-transparent")
+              if(Bilimbi.Core.User.Notification.unread?(item),
+                do: "bg-brand",
+                else: "bg-transparent"
+              )
             ]}
             aria-hidden="true"
           />
           <div class="min-w-0 flex-1">
             <span class={[
               "block text-xs truncate",
-              if(Bilimbi.Core.User.Notification.unread?(item), do: "font-semibold text-ink", else: "font-normal text-ink-muted")
+              if(Bilimbi.Core.User.Notification.unread?(item),
+                do: "font-semibold text-ink",
+                else: "font-normal text-ink-muted"
+              )
             ]}>
               {Bilimbi.Core.User.Notification.title(item)}
             </span>
-            <span :if={Bilimbi.Core.User.Notification.body(item) != ""} class="block text-[11px] text-ink-subtle line-clamp-2">
+            <span
+              :if={Bilimbi.Core.User.Notification.body(item) != ""}
+              class="block text-[11px] text-ink-subtle line-clamp-2"
+            >
               {Bilimbi.Core.User.Notification.body(item)}
             </span>
           </div>

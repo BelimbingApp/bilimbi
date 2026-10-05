@@ -65,69 +65,69 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
           </h3>
           <.badge>{@users_count}</.badge>
         </div>
-      <.form
-        for={@filters_form}
-        id="company-users-filters"
-        phx-change="users_filters"
-        class="mb-2"
-      >
-        <div class="relative">
-          <.icon
-            name="search"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
-          <.input
-            field={@filters_form[:search]}
-            id="company-users-search"
-            type="search"
-            phx-debounce="300"
-            maxlength="255"
-            label="Search users"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            placeholder="Search by name or email..."
-            class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
-          />
-        </div>
-      </.form>
-      <.table
-        id="company-users-table"
-        rows={@users_page.entries}
-        row_id={fn user -> "company-user-#{user.id}" end}
-        row_item={fn user -> user end}
-        sort_by={@table_state.sort_by}
-        sort_dir={@table_state.sort_dir}
-        sort_event="users_sort"
-        caption="Users"
-      >
-        <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
-          <span class="font-medium">{user.name}</span>
-        </:col>
-        <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
-          {user.email}
-        </:col>
-        <:col
-          :let={user}
-          label="Email verified"
-          sort="email_verified"
-          sort_id="company-users-sort-email-verified"
+        <.form
+          for={@filters_form}
+          id="company-users-filters"
+          phx-change="users_filters"
+          class="mb-2"
         >
-          <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
-            {if user.email_verified_at, do: "verified", else: "unverified"}
-          </.badge>
-        </:col>
-        <:empty :if={@users_page.total_entries == 0}>
-          No users found for this company.
-        </:empty>
-      </.table>
-      <.pagination
-        id="company-users-pagination"
-        page={@users_page}
-        page_sizes={@page_sizes}
-        filters_form={@filters_form}
-        filters_event="users_filters"
-        page_event="users_page"
-      />
+          <div class="relative">
+            <.icon
+              name="search"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              field={@filters_form[:search]}
+              id="company-users-search"
+              type="search"
+              phx-debounce="300"
+              maxlength="255"
+              label="Search users"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              placeholder="Search by name or email..."
+              class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
+            />
+          </div>
+        </.form>
+        <.table
+          id="company-users-table"
+          rows={@users_page.entries}
+          row_id={fn user -> "company-user-#{user.id}" end}
+          row_item={fn user -> user end}
+          sort_by={@table_state.sort_by}
+          sort_dir={@table_state.sort_dir}
+          sort_event="users_sort"
+          caption="Users"
+        >
+          <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
+            <span class="font-medium">{user.name}</span>
+          </:col>
+          <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
+            {user.email}
+          </:col>
+          <:col
+            :let={user}
+            label="Email verified"
+            sort="email_verified"
+            sort_id="company-users-sort-email-verified"
+          >
+            <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
+              {if user.email_verified_at, do: "verified", else: "unverified"}
+            </.badge>
+          </:col>
+          <:empty :if={@users_page.total_entries == 0}>
+            No users found for this company.
+          </:empty>
+        </.table>
+        <.pagination
+          id="company-users-pagination"
+          page={@users_page}
+          page_sizes={@page_sizes}
+          filters_form={@filters_form}
+          filters_event="users_filters"
+          page_event="users_page"
+        />
       </.card>
     </div>
     """

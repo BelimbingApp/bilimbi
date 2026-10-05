@@ -18,7 +18,12 @@
         field={@filters_form[:event]}
         id="mutations-event"
         label="Filter by event"
-        options={[{"All Events", ""}, {"Created", "created"}, {"Updated", "updated"}, {"Deleted", "deleted"}]}
+        options={[
+          {"All Events", ""},
+          {"Created", "created"},
+          {"Updated", "updated"},
+          {"Deleted", "deleted"}
+        ]}
       />
     </.filter_toolbar>
 
@@ -31,7 +36,12 @@
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
       >
-        <:col :let={mutation} label="Occurred" sort="occurred_at" sort_id="mutations-sort-occurred_at">
+        <:col
+          :let={mutation}
+          label="Occurred"
+          sort="occurred_at"
+          sort_id="mutations-sort-occurred_at"
+        >
           <span class="whitespace-nowrap tabular-nums text-xs text-ink-muted">
             <.datetime id={"mutation-occurred-#{mutation.id}"} value={mutation.occurred_at} />
           </span>
@@ -53,7 +63,12 @@
           </.badge>
         </:col>
 
-        <:col :let={mutation} label="Subject" sort="auditable_type" sort_id="mutations-sort-auditable_type">
+        <:col
+          :let={mutation}
+          label="Subject"
+          sort="auditable_type"
+          sort_id="mutations-sort-auditable_type"
+        >
           <div class="font-mono text-xs font-semibold text-ink">
             {subject_label(mutation)}
           </div>

@@ -33,9 +33,7 @@ defmodule Bilimbi.Core.Company.Web.DashboardStatsPanel do
       <.stat_strip
         id="stat-companies"
         title="Companies"
-        navigate={
-          if !@editing and allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"
-        }
+        navigate={if !@editing and allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"}
       >
         <:item label="Total" value={@summary.total} />
         <:item label="Active" value={@summary.active} />

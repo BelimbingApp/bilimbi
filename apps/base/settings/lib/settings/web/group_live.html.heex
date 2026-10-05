@@ -10,23 +10,43 @@
           id="settings-pin"
           data-nav-pin="nav-admin-system-settings"
           aria-pressed="false"
-          />
+        />
       </:title_actions>
       <:subtitle>{@page.subtitle}</:subtitle>
     </.header>
 
-    <.form :if={@can_manage_company} for={@scope_form}
-      id="settings-scope-form" phx-change="switch_scope" phx-submit="switch_scope" class="mt-4">
-      <.input type="select" field={@scope_form[:company_id]} id="settings-company"
+    <.form
+      :if={@can_manage_company}
+      for={@scope_form}
+      id="settings-scope-form"
+      phx-change="switch_scope"
+      phx-submit="switch_scope"
+      class="mt-4"
+    >
+      <.input
+        type="select"
+        field={@scope_form[:company_id]}
+        id="settings-company"
         label="Settings scope"
-        options={[{"Global", "global"} | Enum.map(@companies, &{&1.name, to_string(&1.id)})]} />
+        options={[{"Global", "global"} | Enum.map(@companies, &{&1.name, to_string(&1.id)})]}
+      />
     </.form>
-    <.empty_state :if={!@can_manage_company} id="company-settings-withheld"
-      forbidden="manage company settings" />
-    <.empty_state :if={@can_manage_company && @companies == []} id="company-settings-no-targets"
-      title="No companies are available to manage." reason="Ask an operator to review your company access." />
-    <.empty_state :if={@setting_scope && @page.groups == []} id="company-settings-empty"
-      title="No installed module contributes editable company settings." />
+    <.empty_state
+      :if={!@can_manage_company}
+      id="company-settings-withheld"
+      forbidden="manage company settings"
+    />
+    <.empty_state
+      :if={@can_manage_company && @companies == []}
+      id="company-settings-no-targets"
+      title="No companies are available to manage."
+      reason="Ask an operator to review your company access."
+    />
+    <.empty_state
+      :if={@setting_scope && @page.groups == []}
+      id="company-settings-empty"
+      title="No installed module contributes editable company settings."
+    />
 
     <.tabs
       :if={length(@page.groups) > 1}
@@ -104,11 +124,20 @@
           />
 
           <div class="mt-1.5 flex items-center gap-2 text-xs">
-            <.badge :if={field.overridden?}>{if @setting_scope, do: "Company override", else: "Set here"}</.badge>
-            <.button :if={@setting_scope && field.overridden?} type="button"
+            <.badge :if={field.overridden?}>
+              {if @setting_scope, do: "Company override", else: "Set here"}
+            </.badge>
+            <.button
+              :if={@setting_scope && field.overridden?}
+              type="button"
               id={"clear-#{String.replace(field.key, ".", "-")}"}
-              phx-click="request_clear" phx-value-key={field.key}>Clear override</.button>
-            <span :if={source_note(field, @setting_scope)} class="text-ink-faint">{source_note(field, @setting_scope)}</span>
+              phx-click="request_clear"
+              phx-value-key={field.key}
+            >Clear override</.button>
+            <span :if={source_note(field, @setting_scope)} class="text-ink-faint">{source_note(
+              field,
+              @setting_scope
+            )}</span>
             <span :if={field.encrypted?} class="text-ink-faint">
               Stored encrypted; leave the mask to keep the current value
             </span>
@@ -145,10 +174,26 @@
       </div>
     </form>
 
-    <div :if={@pending_reveal} id="secret-reveal-confirm" class="mt-4 rounded-xl border border-line bg-surface p-4">
+    <div
+      :if={@pending_reveal}
+      id="secret-reveal-confirm"
+      class="mt-4 rounded-xl border border-line bg-surface p-4"
+    >
       <p class="mb-2 text-sm text-ink">Enter your password to show this stored value briefly.</p>
-      <.form for={to_form(%{}, as: :reveal)} id="secret-reveal-form" phx-submit="confirm_secret_reveal">
-        <.secret_input id="secret-reveal-password" name="reveal[password]" label="Your password" subject="password" reveal={false} autocomplete="current-password" required />
+      <.form
+        for={to_form(%{}, as: :reveal)}
+        id="secret-reveal-form"
+        phx-submit="confirm_secret_reveal"
+      >
+        <.secret_input
+          id="secret-reveal-password"
+          name="reveal[password]"
+          label="Your password"
+          subject="password"
+          reveal={false}
+          autocomplete="current-password"
+          required
+        />
         <div class="flex gap-2">
           <.button type="submit" id="secret-reveal-confirm-button">Show value</.button>
           <.button type="button" id="secret-reveal-cancel" phx-click="cancel_secret_reveal">Cancel</.button>

@@ -69,11 +69,13 @@ defmodule Bilimbi.Base.Audit.Web.MutationDetails do
         phx-mounted={JS.focus()}
         class="mt-1 space-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
       >
-        <div :for={diff <- MutationDiff.rows(@mutation)} class="flex items-baseline gap-2 font-mono text-xs">
+        <div
+          :for={diff <- MutationDiff.rows(@mutation)}
+          class="flex items-baseline gap-2 font-mono text-xs"
+        >
           <span class="min-w-[100px] font-semibold text-ink-muted">{diff.field}:</span>
           <code :if={diff.sensitive} class="text-ink-muted italic">
-            <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-old"} value={diff.old} />
-            →
+            <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-old"} value={diff.old} /> →
             <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-new"} value={diff.new} />
           </code>
           <div :if={!diff.sensitive} class="flex items-baseline gap-1.5 flex-wrap">

@@ -109,7 +109,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
               id="admin1-pin"
               data-nav-pin="nav-admin-geonames-admin1-division"
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:subtitle>States, provinces, and top-level administrative divisions</:subtitle>
         </.header>
@@ -132,8 +132,6 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
         </.filter_toolbar>
 
         <.card id="admin1-card" inner_class="p-0">
-
-
           <.table
             id="admin1-table"
             rows={@streams.admin1}
@@ -170,7 +168,11 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             </:col>
             <:col :let={admin1} label="Updated" sort="updated_at" sort_id="admin1-sort-updated">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
-                <.datetime id={"admin1-#{admin1.id}-updated"} value={admin1.updated_at} format={:date} />
+                <.datetime
+                  id={"admin1-#{admin1.id}-updated"}
+                  value={admin1.updated_at}
+                  format={:date}
+                />
               </span>
             </:col>
             <:empty :if={@admin1_page.entries == []}>

@@ -135,20 +135,32 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
           phx-submit="save"
           class="space-y-5"
         >
-          <section class="rounded-xl border border-line bg-surface px-6 py-5" aria-labelledby="address-contact-heading">
+          <section
+            class="rounded-xl border border-line bg-surface px-6 py-5"
+            aria-labelledby="address-contact-heading"
+          >
             <h2 id="address-contact-heading" class="mb-4 text-sm font-semibold text-ink">
               Address details
             </h2>
             <div class="grid gap-x-4 sm:grid-cols-2">
               <.input field={@form[:label]} id="address-label" label="Label" maxlength="255" />
-              <.input field={@form[:phone]} id="address-phone" type="tel" label="Phone" maxlength="255" />
+              <.input
+                field={@form[:phone]}
+                id="address-phone"
+                type="tel"
+                label="Phone"
+                maxlength="255"
+              />
             </div>
             <.input field={@form[:line1]} id="address-line1" label="Address line 1" />
             <.input field={@form[:line2]} id="address-line2" label="Address line 2" />
             <.input field={@form[:line3]} id="address-line3" label="Address line 3" />
           </section>
 
-          <section class="rounded-xl border border-line bg-surface px-6 py-5" aria-labelledby="address-location-heading">
+          <section
+            class="rounded-xl border border-line bg-surface px-6 py-5"
+            aria-labelledby="address-location-heading"
+          >
             <h2 id="address-location-heading" class="mb-4 text-sm font-semibold text-ink">
               Location
             </h2>
@@ -164,14 +176,27 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
             />
           </section>
 
-          <section class="rounded-xl border border-line bg-surface px-6 py-5" aria-labelledby="address-provenance-heading">
+          <section
+            class="rounded-xl border border-line bg-surface px-6 py-5"
+            aria-labelledby="address-provenance-heading"
+          >
             <h2 id="address-provenance-heading" class="mb-4 text-sm font-semibold text-ink">
               Provenance
             </h2>
             <div class="grid gap-x-4 sm:grid-cols-2">
               <.input field={@form[:source]} id="address-source" label="Source" maxlength="255" />
-              <.input field={@form[:source_ref]} id="address-source-ref" label="Source reference" maxlength="255" />
-              <.input field={@form[:parser_version]} id="address-parser-version" label="Parser version" maxlength="255" />
+              <.input
+                field={@form[:source_ref]}
+                id="address-source-ref"
+                label="Source reference"
+                maxlength="255"
+              />
+              <.input
+                field={@form[:parser_version]}
+                id="address-parser-version"
+                label="Parser version"
+                maxlength="255"
+              />
               <.input
                 field={@form[:parse_confidence]}
                 id="address-parse-confidence"
@@ -190,14 +215,23 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
                 required
               />
             </div>
-            <.input field={@form[:raw_input]} id="address-raw-input" type="textarea" label="Raw input" />
+            <.input
+              field={@form[:raw_input]}
+              id="address-raw-input"
+              type="textarea"
+              label="Raw input"
+            />
           </section>
 
           <div class="flex items-center gap-4">
             <.button id="address-save" type="submit" variant="primary" phx-disable-with="Creating…">
               Create Address
             </.button>
-            <.link id="address-cancel" navigate={~p"/addresses"} class="text-sm font-medium text-ink-muted hover:text-ink">
+            <.link
+              id="address-cancel"
+              navigate={~p"/addresses"}
+              class="text-sm font-medium text-ink-muted hover:text-ink"
+            >
               Cancel
             </.link>
           </div>

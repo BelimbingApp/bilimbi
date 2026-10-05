@@ -551,48 +551,50 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           on_cancel={JS.push("close_modal")}
         >
           <:description>
-            Select an available department type to establish in {Company.Summary.display_name(@company)}.
+            Select an available department type to establish in {Company.Summary.display_name(
+              @company
+            )}.
           </:description>
 
-            <.form
-              :if={@form}
-              for={@form}
-              id="department-form"
-              phx-change="validate"
-              phx-submit="save"
-              class="mt-4 space-y-4"
-            >
-              <.input
-                field={@form[:department_type_id]}
-                id="department-type-id"
-                type="select"
-                label="Department Type"
-                options={@type_options}
-                prompt="Select a department type"
-                required
-              />
-              <.input
-                field={@form[:status]}
-                id="department-status"
-                type="select"
-                label="Initial Status"
-                options={@status_options}
-                required
-              />
+          <.form
+            :if={@form}
+            for={@form}
+            id="department-form"
+            phx-change="validate"
+            phx-submit="save"
+            class="mt-4 space-y-4"
+          >
+            <.input
+              field={@form[:department_type_id]}
+              id="department-type-id"
+              type="select"
+              label="Department Type"
+              options={@type_options}
+              prompt="Select a department type"
+              required
+            />
+            <.input
+              field={@form[:status]}
+              id="department-status"
+              type="select"
+              label="Initial Status"
+              options={@status_options}
+              required
+            />
 
-              <div class="mt-6 flex justify-end gap-2">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button
-                  type="submit"
-                  variant="primary"
-                  disabled={@type_options == []}
-                >
-                  Add Department
-                </.button>
-              </div>
-            </.form>
+            <div class="mt-6 flex justify-end gap-2">
+              <.button type="button" phx-click="close_modal">
+                Cancel
+              </.button>
+              <.button
+                type="submit"
+                variant="primary"
+                disabled={@type_options == []}
+              >
+                Add Department
+              </.button>
+            </div>
+          </.form>
         </.modal>
 
         <.modal
@@ -606,31 +608,31 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             Choose the employee responsible for this department, or clear the current head.
           </:description>
 
-            <.form
-              :if={@head_form}
-              for={@head_form}
-              id="department-head-form"
-              phx-submit="save_head"
-              class="mt-4 space-y-4"
-            >
-              <.input
-                field={@head_form[:head_id]}
-                id="department-head-id"
-                type="select"
-                label="Department Head"
-                options={@head_options}
-                prompt="No department head"
-              />
+          <.form
+            :if={@head_form}
+            for={@head_form}
+            id="department-head-form"
+            phx-submit="save_head"
+            class="mt-4 space-y-4"
+          >
+            <.input
+              field={@head_form[:head_id]}
+              id="department-head-id"
+              type="select"
+              label="Department Head"
+              options={@head_options}
+              prompt="No department head"
+            />
 
-              <div class="mt-6 flex justify-end gap-2">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary">
-                  Save Head
-                </.button>
-              </div>
-            </.form>
+            <div class="mt-6 flex justify-end gap-2">
+              <.button type="button" phx-click="close_modal">
+                Cancel
+              </.button>
+              <.button type="submit" variant="primary">
+                Save Head
+              </.button>
+            </div>
+          </.form>
         </.modal>
 
         <.confirm_dialog

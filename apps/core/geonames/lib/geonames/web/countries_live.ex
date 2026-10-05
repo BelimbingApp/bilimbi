@@ -164,7 +164,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
               id="countries-pin"
               data-nav-pin="nav-admin-geonames-country"
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:actions>
             <.button
@@ -196,8 +196,6 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         </.filter_toolbar>
 
         <.card id="countries-card" inner_class="p-0">
-
-
           <.table
             id="countries-table"
             rows={@streams.countries}
@@ -229,11 +227,24 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             <:col :let={country} label="Phone" sort="phone" sort_id="countries-sort-phone">
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.phone || "—"}</span>
             </:col>
-            <:col :let={country} label="Currency" sort="currency_code" sort_id="countries-sort-currency">
+            <:col
+              :let={country}
+              label="Currency"
+              sort="currency_code"
+              sort_id="countries-sort-currency"
+            >
               <span class="whitespace-nowrap text-ink-muted">{country.currency_code || "—"}</span>
             </:col>
-            <:col :let={country} label="Population" sort="population" sort_id="countries-sort-population" align={:right}>
-              <span class="whitespace-nowrap tabular-nums text-ink-muted">{format_integer(country.population)}</span>
+            <:col
+              :let={country}
+              label="Population"
+              sort="population"
+              sort_id="countries-sort-population"
+              align={:right}
+            >
+              <span class="whitespace-nowrap tabular-nums text-ink-muted">{format_integer(
+                country.population
+              )}</span>
             </:col>
             <:col :let={country} label="Updated" sort="updated_at" sort_id="countries-sort-updated">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
