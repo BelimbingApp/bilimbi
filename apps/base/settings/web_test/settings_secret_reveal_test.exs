@@ -17,17 +17,12 @@ defmodule BilimbiWeb.SettingsSecretRevealTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @stored_secret "tests.operator_api_key"
 
   setup do
     BilimbiWeb.RateLimit.reset({:stored_secret_reveal, 41, 91})
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    signed_in_identity!()
     :ok
   end
 

@@ -31,8 +31,6 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @hook Path.expand("../../../web/assets/js/date_time.js", __DIR__)
 
@@ -43,10 +41,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   @utc_text "18/08/2026, 10:00 UTC"
 
   setup do
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    signed_in_identity!()
 
     {:ok, scope} = Tenancy.scope(41)
 
