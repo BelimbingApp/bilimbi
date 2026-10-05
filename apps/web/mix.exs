@@ -1,5 +1,8 @@
+[discovery_file] =
+  Path.wildcard(Path.expand("../../apps/base/*/mix/module_discovery.exs", __DIR__))
+
+Code.require_file(discovery_file)
 Code.require_file(Path.expand("../../mix/composition_lock.exs", __DIR__))
-Code.require_file(Path.expand("../base/module_registry/mix/module_discovery.exs", __DIR__))
 
 Code.require_file("mix/module_hooks.exs", __DIR__)
 

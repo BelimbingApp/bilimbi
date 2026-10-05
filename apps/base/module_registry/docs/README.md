@@ -13,6 +13,12 @@ application resource when composition changes. Mix records each descriptor,
 its resolved order, and that fingerprint in OTP application metadata. The
 compiled runtime registry consumes that approved order without reimplementing
 the dependency graph or depending on source-checkout paths.
+A module's `mix.exs` calls `MixDiscovery.module_project/2` and
+`module_application/2` and passes only what is its own: the OTP app, the
+library `deps` it calls, its aliases, and any `mod:`, `extra_applications:`, or
+extra application `env:`. The shared project shape (workspace `_build`, config,
+deps and lockfile, the graph compiler, `elixirc_paths`) lives in the helper, so
+a shape change is one edit, never one per module.
 The host uses the same graph marker to refresh its OTP dependency list even
 when a mounted container adds no routes. Unmounting must not leave that
 container in the host's generated `.app` file.

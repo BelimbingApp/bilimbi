@@ -216,6 +216,72 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end)
   end
 
+  @project_keys [:app, deps: [], aliases: []]
+  @application_keys [:mod, extra_applications: [:logger], env: []]
+
+  @doc """
+  The `project/0` keyword list every module package shares.
+
+  A module's `mix.exs` passes only what is specific to it: `:app`, the library
+  `:deps` it calls (its descriptor's local dependencies are appended), and its
+  `:aliases`. Everything else is the shared shape: the workspace `_build`,
+  config, deps and composition lockfile, the `:bilimbi_graph` compiler, and
+  `elixirc_paths` (which adds `test/support` in `:test` only when the module
+  has that directory). A shape change is one edit here, not one per module.
+  """
+  @spec module_project(String.t(), keyword()) :: keyword()
+  def module_project(module_root, options) do
+    options = Keyword.validate!(options, @project_keys)
+    module_root = Path.expand(module_root)
+    workspace_root = workspace_root!(module_root)
+    Code.require_file(Path.join(workspace_root, "mix/composition_lock.exs"))
+
+    [
+      app: Keyword.fetch!(options, :app),
+      version: "0.1.0",
+      build_path: Path.join(workspace_root, "_build"),
+      config_path: Path.join(workspace_root, "config/config.exs"),
+      deps_path: Path.join(workspace_root, "deps"),
+      lockfile: Bilimbi.CompositionLock.lockfile!(workspace_root),
+      elixir: "~> 1.20",
+      compilers: [:bilimbi_graph] ++ Mix.compilers(),
+      bilimbi_module_root: module_root,
+      elixirc_paths: module_elixirc_paths(module_root, Mix.env()),
+      start_permanent: Mix.env() == :prod,
+      aliases: Keyword.fetch!(options, :aliases),
+      deps: Keyword.fetch!(options, :deps) ++ module_dependencies(module_root)
+    ]
+  end
+
+  defp module_elixirc_paths(module_root, :test) do
+    if File.dir?(Path.join(module_root, "test/support")),
+      do: ["lib", "test/support"],
+      else: ["lib"]
+  end
+
+  defp module_elixirc_paths(_module_root, _env), do: ["lib"]
+
+  @doc """
+  The `application/0` keyword list every module package shares.
+
+  Options: `:mod` (a `nil` is dropped, so a caller may choose by environment),
+  `:extra_applications` (default `[:logger]`), and `:env`, which is appended to
+  the descriptor-generated `application_env/1`.
+  """
+  @spec module_application(String.t(), keyword()) :: keyword()
+  def module_application(module_root, options \\ []) do
+    options = Keyword.validate!(options, @application_keys)
+
+    Enum.reject(
+      [
+        mod: Keyword.get(options, :mod),
+        extra_applications: Keyword.fetch!(options, :extra_applications),
+        env: application_env(module_root) ++ Keyword.fetch!(options, :env)
+      ],
+      &match?({:mod, nil}, &1)
+    )
+  end
+
   @doc "Resolves a module's declared dependencies to local Mix path dependencies."
   @spec module_dependencies(String.t()) :: [Mix.Project.dependency()]
   def module_dependencies(module_root) do
