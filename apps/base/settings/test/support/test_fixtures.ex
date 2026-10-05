@@ -22,10 +22,9 @@ defmodule Bilimbi.Base.Settings.TestFixtures do
     row
   end
 
-  # Idempotent on purpose: `BilimbiWeb.ConnCase` creates this table for every
+  # Idempotent on purpose. `BilimbiWeb.ConnCase` creates this table for every
   # web test so that a settings call never raises `undefined_table` and gets
-  # swallowed by a caller's rescue (#359), while suites that predate that call
-  # it themselves. Both paths have to be able to run.
+  # swallowed by a caller's rescue (#359); a web test does not call it again.
   def create_settings_table! do
     # Sandbox rollback resets rows, but the node-local cache outlives the test.
     # Clear on exit too, including before a following pre-provisioning test

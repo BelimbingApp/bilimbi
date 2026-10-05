@@ -4,7 +4,6 @@ defmodule BilimbiWeb.AuditLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
@@ -13,7 +12,6 @@ defmodule BilimbiWeb.AuditLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
@@ -878,9 +876,5 @@ defmodule BilimbiWeb.AuditLiveTest do
     end
 
     count
-  end
-
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
   end
 end

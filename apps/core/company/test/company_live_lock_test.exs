@@ -5,25 +5,39 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
   # PostgreSQL connections that can observe each other's row locks.
   use ExUnit.Case, async: false
 
+  import Bilimbi.Base.Database.LockSchema
+
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.LiveCompanyProof
   alias Bilimbi.Core.Company.Schema
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Ecto.Adapters.SQL
-  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
-    :ok = Sandbox.checkout(Repo, sandbox: false)
-    schema = "company_live_lock_#{System.unique_integer([:positive])}"
-    create_lock_schema!(schema)
-    on_exit(fn -> drop_lock_schema!(schema) end)
+    schema = create!("company_live_lock")
 
-    scope =
-      on_schema!(schema, fn ->
-        {:ok, scope} = Tenancy.scope(41)
-        scope
-      end)
+    on_schema!(schema, fn ->
+      TenancyFixtures.create_tenants_table!(persistent: true)
+      CompanyFixtures.create_companies_table!(persistent: true)
+      TenancyFixtures.insert_tenant!(%{id: 41, name: "Owner"})
+      TenancyFixtures.insert_tenant!(%{id: 42, name: "Other", is_platform_operator: false})
+      CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Live", code: "live"})
+
+      CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, name: "Foreign", code: "foreign"})
+
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Deleted",
+        code: "deleted",
+        deleted_at: ~N[2026-08-13 00:00:00]
+      })
+    end)
+
+    scope = on_schema!(schema, fn -> elem(Tenancy.scope(41), 1) end)
 
     %{schema: schema, scope: scope}
   end
@@ -88,9 +102,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
     holder =
       Task.async(fn ->
-        :ok = Sandbox.checkout(Repo, sandbox: false)
-
-        on_schema!(schema, fn ->
+        checkout_on_schema!(schema, fn ->
           Repo.transaction(fn ->
             assert {:ok, %LiveCompanyProof{id: 73}} = Company.lock_live_company(scope, 73)
             send(parent, :holder_locked)
@@ -103,11 +115,8 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
     contender =
       Task.async(fn ->
-        :ok = Sandbox.checkout(Repo, sandbox: false)
-
-        on_schema!(schema, fn ->
-          %{rows: [[backend_pid]]} = SQL.query!(Repo, "SELECT pg_backend_pid()", [])
-          send(parent, {:contender_backend, backend_pid})
+        checkout_on_schema!(schema, fn ->
+          send(parent, {:contender_backend, backend_pid!()})
 
           SQL.query!(
             Repo,
@@ -118,7 +127,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
       end)
 
     assert_receive {:contender_backend, backend_pid}, 5_000
-    await_backend_lock_wait!(backend_pid)
+    await_row_lock!(backend_pid)
     send(holder.pid, :commit_holder)
 
     assert {:ok, :ok} = Task.await(holder, 5_000)
@@ -138,9 +147,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
     holder =
       Task.async(fn ->
-        :ok = Sandbox.checkout(Repo, sandbox: false)
-
-        on_schema!(schema, fn ->
+        checkout_on_schema!(schema, fn ->
           Repo.transaction(fn ->
             %{rows: [[73]]} =
               SQL.query!(Repo, "SELECT id FROM companies WHERE id = 73 FOR UPDATE", [])
@@ -161,146 +168,18 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
     contender =
       Task.async(fn ->
-        :ok = Sandbox.checkout(Repo, sandbox: false)
-
-        on_schema!(schema, fn ->
-          %{rows: [[backend_pid]]} = SQL.query!(Repo, "SELECT pg_backend_pid()", [])
-          send(parent, {:proof_contender_backend, backend_pid})
+        checkout_on_schema!(schema, fn ->
+          send(parent, {:proof_contender_backend, backend_pid!()})
 
           Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
         end)
       end)
 
     assert_receive {:proof_contender_backend, backend_pid}, 5_000
-    await_backend_lock_wait!(backend_pid)
+    await_row_lock!(backend_pid)
     send(holder.pid, :soft_delete_and_commit)
 
     assert {:ok, %{num_rows: 1}} = Task.await(holder, 5_000)
     assert {:ok, {:error, :not_found}} = Task.await(contender, 5_000)
-  end
-
-  defp await_message!(message) do
-    receive do
-      ^message -> :ok
-    after
-      5_000 -> Repo.rollback({:timeout, message})
-    end
-  end
-
-  defp await_backend_lock_wait!(backend_pid), do: await_backend_lock_wait!(backend_pid, 50)
-
-  defp await_backend_lock_wait!(_backend_pid, 0) do
-    flunk("contender never waited on a row lock")
-  end
-
-  defp await_backend_lock_wait!(backend_pid, remaining) do
-    %{rows: rows} =
-      SQL.query!(Repo, "SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [
-        backend_pid
-      ])
-
-    case rows do
-      [["Lock"]] ->
-        :ok
-
-      _other ->
-        receive do
-        after
-          20 -> await_backend_lock_wait!(backend_pid, remaining - 1)
-        end
-    end
-  end
-
-  defp on_schema!(schema, fun) do
-    SQL.query!(Repo, "SET search_path TO #{quote_ident(schema)}", [])
-
-    try do
-      fun.()
-    after
-      SQL.query!(Repo, "SET search_path TO public", [])
-    end
-  end
-
-  defp create_lock_schema!(schema) do
-    quoted_schema = quote_ident(schema)
-    SQL.query!(Repo, "CREATE SCHEMA #{quoted_schema}", [])
-
-    SQL.query!(
-      Repo,
-      """
-      CREATE TABLE #{quoted_schema}.tenants (
-        id bigserial PRIMARY KEY,
-        parent_id bigint,
-        name varchar(255) NOT NULL,
-        status varchar(255) NOT NULL DEFAULT 'active',
-        is_platform_operator boolean NOT NULL DEFAULT false,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone,
-        deleted_at timestamp(0) without time zone
-      )
-      """,
-      []
-    )
-
-    SQL.query!(
-      Repo,
-      """
-      CREATE TABLE #{quoted_schema}.companies (
-        id bigserial PRIMARY KEY,
-        parent_id bigint,
-        tenant_id bigint NOT NULL,
-        name varchar(255) NOT NULL,
-        code varchar(255) NOT NULL UNIQUE,
-        status varchar(255) NOT NULL DEFAULT 'active',
-        legal_name varchar(255),
-        registration_number varchar(255),
-        tax_id varchar(255),
-        legal_entity_type_id bigint,
-        jurisdiction varchar(255),
-        email varchar(255),
-        website varchar(255),
-        scope_activities json,
-        metadata json,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone,
-        deleted_at timestamp(0) without time zone
-      )
-      """,
-      []
-    )
-
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO #{quoted_schema}.tenants (id, name, status, is_platform_operator)
-      VALUES (41, 'Owner', 'active', true), (42, 'Other', 'active', false)
-      """,
-      []
-    )
-
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO #{quoted_schema}.companies (id, tenant_id, name, code, status, deleted_at)
-      VALUES
-        (73, 41, 'Live', 'live', 'active', NULL),
-        (74, 42, 'Foreign', 'foreign', 'active', NULL),
-        (75, 41, 'Deleted', 'deleted', 'active', '2026-08-13 00:00:00')
-      """,
-      []
-    )
-  end
-
-  defp drop_lock_schema!(schema) do
-    :ok = Sandbox.checkout(Repo, sandbox: false)
-    SQL.query!(Repo, "DROP SCHEMA IF EXISTS #{quote_ident(schema)} CASCADE", [])
-  end
-
-  defp quote_ident(name) when is_binary(name) do
-    if name =~ ~r/^[a-z0-9_]+$/ do
-      name
-    else
-      raise "refusing to interpolate #{inspect(name)} as an identifier"
-    end
   end
 end

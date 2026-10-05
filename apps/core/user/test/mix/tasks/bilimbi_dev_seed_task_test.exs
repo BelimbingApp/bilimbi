@@ -11,7 +11,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     # core/company is loaded here, so the task discovers and runs its dev seed;
     # give it the department-types table its sample data needs.
     Bilimbi.Core.Company.TestFixtures.create_department_types_table!()
-    Bilimbi.Core.Company.TestFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
+    Bilimbi.Core.Geonames.TestFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
 
     previous_env = Mix.env()
     previous_shell = Mix.shell()

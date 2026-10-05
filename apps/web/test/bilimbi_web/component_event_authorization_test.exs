@@ -7,7 +7,6 @@ defmodule BilimbiWeb.ComponentEventAuthorizationTest do
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -16,7 +15,6 @@ defmodule BilimbiWeb.ComponentEventAuthorizationTest do
   setup %{conn: conn} do
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_legal_entity_types_table!()
-    AddressFixtures.create_address_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73})

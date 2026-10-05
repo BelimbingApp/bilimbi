@@ -11,7 +11,6 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
 
   alias Bilimbi.Base.UI.Workspace
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @companies "admin.company.list"
@@ -19,7 +18,6 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})

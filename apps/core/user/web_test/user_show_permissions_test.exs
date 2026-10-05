@@ -19,7 +19,6 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
   setup do
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_external_access_tables!()
-    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
     Bilimbi.Core.Employee.ensure_system_types()
 
     CompanyFixtures.insert_tenant!(%{id: 41})

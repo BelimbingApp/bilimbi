@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.AuditTest do
   alias Ecto.Adapters.SQL
 
   import Bilimbi.Base.Audit.TestFixtures
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Base.Tenancy.TestFixtures
 
   setup do
@@ -363,14 +364,6 @@ defmodule Bilimbi.Base.AuditTest do
       },
       overrides
     )
-  end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, options} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        options |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 
   test "paginates and searches mutations by subject, event, and trace" do

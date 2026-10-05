@@ -39,20 +39,6 @@ defmodule Bilimbi.Core.Employee.Web.RouterTest do
     refute Enum.any?(paths, &String.ends_with?(&1, "/edit"))
   end
 
-  test "employee form account linking goes through the discovered seam" do
-    source =
-      Path.expand("../lib/employee/web/form_live.ex", __DIR__)
-      |> File.read!()
-
-    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :employee_account_options"
-    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :replace_employee_account"
-
-    refute source =~ ~S|Module.concat(["Bilimbi", "Core", "User"])|
-    refute source =~ "Code.ensure_loaded?"
-    refute source =~ "function_exported?"
-    refute source =~ "apply(user_mod"
-  end
-
   # The host reads this file through the descriptor. There is no lib module
   # whose only job is to eval it for tests.
   defp routes do

@@ -249,12 +249,12 @@ defmodule Bilimbi.Base.Tenancy.SystemPrincipalTest do
     do: %{descriptor: %{id: id, otp_app: :bilimbi_base_tenancy}, payload: payload}
 
   defp install_principals!(declarations) do
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: nil,
-      consumers: %{
+    ContributionRegistry.put_consumers_for_test!(
+      %{
         system_principals:
           ContributionValidator.validate_contributions!([entry("ext/coating", declarations)])
-      }
-    })
+      },
+      nil
+    )
   end
 end

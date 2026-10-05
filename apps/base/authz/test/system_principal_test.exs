@@ -446,13 +446,12 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "authz-test",
-      consumers:
-        Map.merge(ContributionRegistry.build!([]).consumers, %{
-          authz: authz,
-          system_principals: system_principals
-        })
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{
+        authz: authz,
+        system_principals: system_principals
+      },
+      "authz-test"
+    )
   end
 end

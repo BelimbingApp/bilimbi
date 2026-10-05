@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.GeonamesTest do
 
   alias Bilimbi.Core.Geonames
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Geonames.TestFixtures
 
   setup do
@@ -627,13 +628,5 @@ defmodule Bilimbi.Core.GeonamesTest do
     TenancyFixtures.insert_tenant!()
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     %{scope: scope}
-  end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 end

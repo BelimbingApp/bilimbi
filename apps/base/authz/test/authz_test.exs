@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.AuthzTest do
   alias Bilimbi.Base.Authz.RoleCapability
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -20,7 +21,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "actor construction requires explicit valid tenant and company context" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert %Authz.Actor{type: :user, id: 7, company_id: 10} =
              Authz.actor(:user, 7, tenant_scope, 10)
@@ -34,7 +35,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "unknown capabilities fail closed before stale persisted grants" do
-    actor = Authz.actor(:user, 7, scope(), 10)
+    actor = Authz.actor(:user, 7, TenancyFixtures.scope(), 10)
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     Repo.insert_all(PrincipalCapability, [
@@ -64,7 +65,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "direct deny overrides role grants and grant-all" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     actor = Authz.actor(:user, 7, tenant_scope, 10)
 
     assert {:ok, _summary} = Authz.reconcile_system_roles()
@@ -93,7 +94,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "platform capabilities require the operator tenant even through direct and grant-all grants" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     actor = Authz.actor(:user, 7, tenant_scope, 10)
 
     assert {:ok, _summary} = Authz.reconcile_system_roles()
@@ -114,7 +115,7 @@ defmodule Bilimbi.Base.AuthzTest do
     refute denied.allowed
     assert denied.reason == :denied_platform_scope
 
-    operator_actor = Authz.actor(:user, 7, platform_scope(), 10)
+    operator_actor = Authz.actor(:user, 7, TenancyFixtures.scope(1, true), 10)
     assert Authz.can(operator_actor, "admin.test.platform.manage").allowed
 
     refute "admin.test.platform.manage" in Authz.effective_capabilities(actor).allowed
@@ -122,7 +123,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "custom roles are tenant-scoped and grant their known capabilities" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     actor = Authz.actor(:user, 9, tenant_scope, 10)
 
     assert {:error, :company_not_found} =
@@ -161,13 +162,19 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "resource tenant and company policies reject cross-boundary access" do
-    actor = Authz.actor(:user, 7, scope(), 10)
+    actor = Authz.actor(:user, 7, TenancyFixtures.scope(), 10)
     assert {:ok, _summary} = Authz.reconcile_system_roles()
     all_access = system_role("all_access")
-    assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, 7, all_access.id)
+
+    assert {:ok, :assigned} =
+             Authz.assign_role(TenancyFixtures.scope(), 10, :user, 7, all_access.id)
 
     tenant_decision =
-      Authz.can(actor, "admin.test.record.view", Authz.resource("record", 1, scope: scope(2)))
+      Authz.can(
+        actor,
+        "admin.test.record.view",
+        Authz.resource("record", 1, scope: TenancyFixtures.scope(2))
+      )
 
     company_decision =
       Authz.can(actor, "admin.test.record.view", Authz.resource("record", 1, company_id: 11))
@@ -177,7 +184,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "system-role reconciliation is idempotent and preserves principal grants" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert {:ok, %{roles: 2, capabilities: 1}} = Authz.reconcile_system_roles()
     viewer = system_role("viewer")
@@ -225,7 +232,7 @@ defmodule Bilimbi.Base.AuthzTest do
   end
 
   test "loads grantability for many roles in one scoped query" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     roles =
       for i <- 1..12 do
@@ -258,7 +265,7 @@ defmodule Bilimbi.Base.AuthzTest do
     even = Enum.at(roles, 1)
     assert grants[even.id].capabilities == ["admin.test.record.view"]
     assert grants[even.id].grant_all == false
-    assert Authz.role_grants(scope(2), Enum.map(roles, & &1.id)) == %{}
+    assert Authz.role_grants(TenancyFixtures.scope(2), Enum.map(roles, & &1.id)) == %{}
     assert Authz.role_grants(tenant_scope, []) == %{}
   end
 

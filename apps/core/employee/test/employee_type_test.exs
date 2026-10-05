@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Employee.TestFixtures
 
   setup do
@@ -36,8 +37,8 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
       code: "company_2"
     })
 
-    insert_department!(201, 81)
-    insert_department!(202, 82)
+    CompanyFixtures.insert_department_with_type!(201, 81)
+    CompanyFixtures.insert_department_with_type!(202, 82)
     :ok = Employee.ensure_system_types()
 
     {:ok, scope_1} = Tenancy.scope(51)
@@ -599,14 +600,4 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
       end
     end
   end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, options} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        options |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
-  end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

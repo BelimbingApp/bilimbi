@@ -20,10 +20,10 @@ defmodule Bilimbi.Base.SystemTest do
         }
       ])
 
-    Bilimbi.Base.ModuleRegistry.ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "base-system-test",
-      consumers: %{settings: settings}
-    })
+    Bilimbi.Base.ModuleRegistry.ContributionRegistry.put_consumers_for_test!(
+      %{settings: settings},
+      "base-system-test"
+    )
 
     on_exit(&Bilimbi.Base.ModuleRegistry.ContributionRegistry.clear_for_test!/0)
     :ok

@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Company.TestFixtures
 
   setup do
@@ -333,13 +334,5 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
   defp scope! do
     {:ok, scope} = Tenancy.scope(41)
     scope
-  end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 end

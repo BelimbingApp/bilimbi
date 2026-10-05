@@ -36,10 +36,6 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
     %{ours: ours, theirs: theirs}
   end
 
-  defp patched_params(view) do
-    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-  end
-
   defp open_index(conn) do
     grant_capabilities!("admin.authz.role.list")
     conn |> log_in_as() |> live(~p"/authz/roles")

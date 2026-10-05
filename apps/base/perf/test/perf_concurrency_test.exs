@@ -240,10 +240,10 @@ defmodule Bilimbi.Base.PerfConcurrencyTest do
          })}
       end)
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "perf-concurrency-test",
-      consumers: %{settings: %{definitions: definitions, runtime_claims: []}}
-    })
+    ContributionRegistry.put_consumers_for_test!(
+      %{settings: %{definitions: definitions, runtime_claims: []}},
+      "perf-concurrency-test"
+    )
   end
 
   defp restart_reporter! do

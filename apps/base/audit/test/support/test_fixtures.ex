@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Audit.TestFixtures do
   @moduledoc false
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
@@ -10,11 +11,13 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     ]).rows
   end
 
-  def create_audit_tables! do
+  def create_audit_tables!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_audit_mutations (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_audit_mutations (
         id bigserial PRIMARY KEY,
         company_id bigint,
         tenant_id bigint,
@@ -37,7 +40,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         occurred_at timestamp(0) without time zone NOT NULL,
         impersonator_id bigint,
         system_principal varchar(100)
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -183,7 +186,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS base_audit_actions (
+      #{TestTables.create(persistent)} IF NOT EXISTS base_audit_actions (
         id bigserial PRIMARY KEY,
         company_id bigint,
         tenant_id bigint,
@@ -200,7 +203,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         occurred_at timestamp(0) without time zone NOT NULL,
         impersonator_id bigint,
         system_principal varchar(100)
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )

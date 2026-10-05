@@ -13,7 +13,6 @@ defmodule BilimbiWeb.AuditImpersonationTest do
 
   alias Bilimbi.Base.Audit.ActionSchema
   alias Bilimbi.Base.Audit.MutationSchema
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -28,7 +27,6 @@ defmodule BilimbiWeb.AuditImpersonationTest do
   setup do
     UserFixtures.create_user_tables!()
     UserFixtures.create_user_database_queries_table!()
-    AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
 

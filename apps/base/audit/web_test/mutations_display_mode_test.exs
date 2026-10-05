@@ -27,11 +27,9 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
-  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -46,8 +44,6 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    AuditFixtures.create_audit_tables!()
-    SettingsFixtures.create_settings_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})

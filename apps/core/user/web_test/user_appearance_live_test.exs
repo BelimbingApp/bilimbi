@@ -5,14 +5,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
-  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
     UserFixtures.create_user_tables!()
-    SettingsFixtures.create_settings_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
 
@@ -288,9 +286,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     {:ok, view, _html} =
       conn
       |> log_in_as()
-      |> Plug.Test.init_test_session(%{
-        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
-      })
+      |> impersonating_as(92, "Grace Hopper")
       |> live(~p"/settings/appearance")
 
     view

@@ -181,7 +181,7 @@ apps/core/company/lib/company/schema.ex
 apps/core/company/lib/company/web/index_live.ex   # its UI adapter
 apps/core/company/priv/repo/migrations/
 apps/core/company/test/
-apps/core/company/web_test/company_live_test.exs
+apps/core/company/web_test/company_index_live_test.exs
 ```
 
 Module-owned endpoint and router integration tests live in `web_test/`; the

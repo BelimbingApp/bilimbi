@@ -6,9 +6,14 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
   alias Bilimbi.Base.Locale.Contributions, as: LocaleContributions
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings.ContributionValidator, as: SettingsValidator
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
 
   import Bilimbi.Core.Address.TestFixtures
 
@@ -21,30 +26,44 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "address-bootstrap-test",
-      consumers: %{settings: settings}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{settings: settings}, "address-bootstrap-test")
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
   end
 
   setup do
-    create_owner_identity_tables!()
-    create_geonames_tables!()
+    EmployeeFixtures.create_employee_tables!()
+    GeonamesFixtures.create_geonames_tables!()
     create_address_tables!()
-    create_settings_table!()
+    SettingsFixtures.create_settings_table!()
     :ok = Employee.ensure_system_types()
     :ok
   end
 
   describe "platform_operator_locale_bootstrap/0" do
     test "returns nil when no platform operator tenant exists" do
-      insert_tenant!(%{id: 41, name: "Customer Tenant", is_platform_operator: false})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Customer Co", code: "customer"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Customer Tenant",
+        is_platform_operator: false
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Customer Co",
+        code: "customer"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -61,25 +80,63 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "returns nil when platform operator tenant has no primary company" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
 
       assert Address.platform_operator_locale_bootstrap() == nil
     end
 
     test "returns nil when primary company has no attached addresses" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
 
       assert Address.platform_operator_locale_bootstrap() == nil
     end
 
     test "returns nil when attached address has empty or missing country_iso" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -95,10 +152,27 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "resolves Geonames country metadata for the primary company address" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -119,11 +193,34 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "prioritizes explicit primary address over non-primary address" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
-      insert_country!(%{iso: "FR", country: "France", languages: "fr", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "FR",
+        country: "France",
+        languages: "fr",
+        currency_code: "EUR"
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -150,11 +247,34 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "falls back to first address by priority when none is marked primary" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
-      insert_country!(%{iso: "FR", country: "France", languages: "fr", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "FR",
+        country: "France",
+        languages: "fr",
+        currency_code: "EUR"
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -179,10 +299,27 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "returns bootstrap struct with nil languages when country has no languages in Geonames" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "ZZ", country: "Unknown Land", languages: nil, currency_code: nil})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "ZZ",
+        country: "Unknown Land",
+        languages: nil,
+        currency_code: nil
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -203,10 +340,27 @@ defmodule Bilimbi.Core.Address.PlatformOperatorLocaleBootstrapTest do
     end
 
     test "integrates end-to-end with Locale.resolve/2 to infer and persist installation locale" do
-      insert_tenant!(%{id: 41, name: "Operator Tenant", is_platform_operator: true})
-      insert_company!(%{id: 73, tenant_id: 41, name: "Operator Co", code: "operator"})
-      assign_primary_company!(41, 73)
-      insert_country!(%{iso: "DE", country: "Germany", languages: "de", currency_code: "EUR"})
+      TenancyFixtures.insert_tenant!(%{
+        id: 41,
+        name: "Operator Tenant",
+        is_platform_operator: true
+      })
+
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Operator Co",
+        code: "operator"
+      })
+
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      GeonamesFixtures.insert_country!(%{
+        iso: "DE",
+        country: "Germany",
+        languages: "de",
+        currency_code: "EUR"
+      })
 
       {:ok, scope} = Tenancy.scope(41)
 

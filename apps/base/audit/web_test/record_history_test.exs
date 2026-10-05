@@ -10,7 +10,6 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Audit.Web.RecordHistory
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Tenancy
@@ -25,7 +24,6 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     {:ok, scope} = Tenancy.scope(41)

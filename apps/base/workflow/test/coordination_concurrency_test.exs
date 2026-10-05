@@ -3,6 +3,7 @@ defmodule Bilimbi.Base.Workflow.CoordinationConcurrencyTest do
   alias Bilimbi.Base.{Authz, Repo, Workflow}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
   alias Ecto.Adapters.SQL
   import Bilimbi.Base.Workflow.TestFixtures
 
@@ -59,7 +60,7 @@ defmodule Bilimbi.Base.Workflow.CoordinationConcurrencyTest do
     )
 
     install_registry!()
-    system = Bilimbi.Base.Authz.TestFixtures.scope()
+    system = TenancyFixtures.scope()
     scope = Authentication.sign_in(system, 7, 10)
 
     assert {:ok, :stored} =

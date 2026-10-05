@@ -1,18 +1,21 @@
 defmodule BilimbiWeb.ConnCase do
   @moduledoc """
-  This module defines the test case to be used by
-  tests that require setting up a connection.
+  The case template for every web test (host tests and module `web_test/`).
 
-  Such tests rely on `Phoenix.ConnTest` and also
-  import other functionality to make it easier
-  to build common data structures and query the data layer.
+  Every test gets, without asking:
 
-  Finally, if the test case interacts with the database,
-  we enable the SQL sandbox, so changes done to the database
-  are reverted at the end of every test. If you are using
-  PostgreSQL, you can even run database tests asynchronously
-  by setting `use BilimbiWeb.ConnCase, async: true`, although
-  this option is not recommended for other databases.
+  - a sandbox owner (shared unless the test is `async: true`) and a fresh
+    `conn`;
+  - the temporary tables the shell reads on every page: sessions, authz,
+    settings, audit, perf, notifications, GeoNames and addresses. Do not
+    create them again in a test; a missing table is a `42P01` that a
+    caller's fallback would otherwise swallow.
+
+  The default signed-in identity is tenant 41, company 73, user 91
+  ("Ada Lovelace"), which are the defaults of the owner fixtures
+  (`Tenancy`, `Company` and `User` `TestFixtures`). A test inserts those rows
+  itself. `log_in_as/2` needs user 91 (or the one it is given) to exist,
+  because request rehydration loads the user.
   """
 
   use ExUnit.CaseTemplate
@@ -69,9 +72,8 @@ defmodule BilimbiWeb.ConnCase do
     # 42P01 raised here was caught by a `rescue _ -> []`, so every one of those
     # tests rendered an employee with no addresses and none of them knew.
     # `addresses` has foreign keys into both geonames tables, so those go first.
-    address_fixtures = Module.concat(["Bilimbi.Core.Address.TestFixtures"])
-    apply(address_fixtures, :create_geonames_tables!, [])
-    apply(address_fixtures, :create_address_tables!, [])
+    apply(Module.concat(["Bilimbi.Core.Geonames.TestFixtures"]), :create_geonames_tables!, [])
+    apply(Module.concat(["Bilimbi.Core.Address.TestFixtures"]), :create_address_tables!, [])
   end
 
   @doc """
@@ -113,6 +115,29 @@ defmodule BilimbiWeb.ConnCase do
       },
       "live_socket_id" => BilimbiWeb.UserAuth.live_socket_id(session_id)
     })
+  end
+
+  @doc """
+  Marks a signed-in conn as an operator impersonating the signed-in user, with
+  the session shape `BilimbiWeb.UserAuth` reads. Call it after `log_in_as/2`.
+  """
+  def impersonating_as(conn, original_user_id, original_user_name) do
+    Phoenix.ConnTest.init_test_session(conn, %{
+      BilimbiWeb.UserAuth.impersonation_key() => %{
+        "original_user_id" => original_user_id,
+        "original_user_name" => original_user_name
+      }
+    })
+  end
+
+  @doc """
+  The query parameters of the URL the view just patched to.
+  """
+  def patched_params(view) do
+    Phoenix.LiveViewTest.assert_patch(view)
+    |> URI.parse()
+    |> Map.fetch!(:query)
+    |> URI.decode_query()
   end
 
   @doc """
@@ -161,6 +186,20 @@ defmodule BilimbiWeb.ConnCase do
     end)
 
     :ok
+  end
+
+  @doc """
+  Drops the signed-in user's direct grant of `capability`, so a page that
+  mounted with it must refuse the next write on its own. `scope` is the
+  tenant's, as `Tenancy.scope/1` returns it.
+  """
+  def revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   defp generate_session_id do

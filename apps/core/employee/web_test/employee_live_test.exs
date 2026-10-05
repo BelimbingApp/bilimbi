@@ -3,12 +3,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Address
-  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
@@ -16,8 +14,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
-    AddressFixtures.create_address_tables!()
     GeonamesFixtures.insert_country!()
     GeonamesFixtures.insert_admin1!()
     CompanyFixtures.insert_tenant!(%{id: 41})
@@ -106,9 +102,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
         department_id: 101
       })
 
-    {:ok, view, html} = conn |> log_in_as() |> live(~p"/employees")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
-    assert html =~ "Department"
+    assert has_element?(view, "#employees-card th", "Department")
     assert has_element?(view, "#employees td", "Engineering")
     # John Doe has no department; his cell renders the muted dash.
     assert has_element?(view, "#employees td span", "—")
@@ -290,8 +286,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
     # Initial order is asc by name (Alice Adams -> Bot Baker -> John Doe)
-    html = render(view)
-    assert html =~ ~r/Alice Adams.*Bot Baker.*John Doe/s
+    assert_row_order(view, ["Alice Adams", "Bot Baker", "John Doe"])
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
@@ -299,8 +294,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     # Click sort on full_name to toggle to desc
     view |> element("#employees-sort-name") |> render_click()
     assert_patched(view, ~p"/employees?dir=desc")
-    html = render(view)
-    assert html =~ ~r/John Doe.*Bot Baker.*Alice Adams/s
+    assert_row_order(view, ["John Doe", "Bot Baker", "Alice Adams"])
     assert has_element?(view, "th[aria-sort='descending'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
@@ -308,8 +302,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     # Click sort on status (asc: active -> probation -> terminated)
     view |> element("#employees-sort-status") |> render_click()
     assert_patched(view, ~p"/employees?sort=status")
-    html = render(view)
-    assert html =~ ~r/John Doe.*Bot Baker.*Alice Adams/s
+    assert_row_order(view, ["John Doe", "Bot Baker", "Alice Adams"])
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-status")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
@@ -317,22 +310,19 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     # Click sort on status again (desc: terminated -> probation -> active)
     view |> element("#employees-sort-status") |> render_click()
     assert_patched(view, ~p"/employees?dir=desc&sort=status")
-    html = render(view)
-    assert html =~ ~r/Alice Adams.*Bot Baker.*John Doe/s
+    assert_row_order(view, ["Alice Adams", "Bot Baker", "John Doe"])
     assert has_element?(view, "th[aria-sort='descending'] #employees-sort-status")
 
     # Click sort on type (asc: Agent -> Full Time)
     view |> element("#employees-sort-type") |> render_click()
     assert_patched(view, ~p"/employees?sort=employee_type_label")
-    html = render(view)
-    assert html =~ ~r/Bot Baker.*Alice Adams/s
+    assert has_element?(view, "#employees tr:first-child", "Bot Baker")
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-type")
 
     # Click sort on type again (desc: Full Time -> Agent)
     view |> element("#employees-sort-type") |> render_click()
     assert_patched(view, ~p"/employees?dir=desc&sort=employee_type_label")
-    html = render(view)
-    assert html =~ ~r/Alice Adams.*Bot Baker/s
+    assert has_element?(view, "#employees tr:last-child", "Bot Baker")
     assert has_element?(view, "th[aria-sort='descending'] #employees-sort-type")
   end
 
@@ -468,8 +458,8 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     refute has_element?(view, "#employee-#{employee.id}-delete")
 
-    assert render_click(view, "delete", %{"id" => to_string(employee.id)}) =~
-             LiveAuthorization.denied_message()
+    render_click(view, "delete", %{"id" => to_string(employee.id)})
+    assert has_element?(view, "#flash-error", LiveAuthorization.denied_message())
 
     assert {:ok, _found} = Employee.get_employee(scope, 73, employee.id)
   end
@@ -540,15 +530,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "#flash-success")
     assert has_element?(view, "#employees td", "John Doe")
     assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
-  end
-
-  defp revoke_capability!(scope, capability) do
-    grant =
-      Authz.list_principal_capabilities(scope, page_size: 100)
-      |> Map.fetch!(:entries)
-      |> Enum.find(&(&1.capability == capability))
-
-    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 
   test "the list's Edit action opens the employee's read-first record page", %{
@@ -794,14 +775,14 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#employee-user-form")
       |> render_change(%{"user_id" => "91"})
 
-      assert render(view) =~ "User link updated."
+      assert has_element?(view, "[id$=-notice]", "User link updated.")
 
       # Unlink user
       view
       |> form("#employee-user-form")
       |> render_change(%{"user_id" => ""})
 
-      assert render(view) =~ "User link updated."
+      assert has_element?(view, "[id$=-notice]", "User link updated.")
     end
 
     test "manages direct subordinates with add, sort, and remove", %{
@@ -823,7 +804,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#add-subordinate-form")
       |> render_submit(%{"subordinate_id" => to_string(subordinate.id)})
 
-      assert render(view) =~ "Subordinate assigned."
+      assert has_element?(view, "#flash-success", "Subordinate assigned.")
       assert has_element?(view, "#subordinate-row-#{subordinate.id}", "Subordinate Sam")
 
       # Verify in domain
@@ -842,7 +823,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#remove-subordinate-#{subordinate.id}") |> render_click()
       view |> element("#remove-subordinate-confirm-confirm") |> render_click()
 
-      assert render(view) =~ "no longer reports to"
+      assert has_element?(view, "#flash-success", "no longer reports to")
       refute has_element?(view, "#subordinate-row-#{subordinate.id}")
 
       {:ok, subs_after} = Employee.list_subordinates(scope, 73, employee.id)
@@ -888,7 +869,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
         }
       })
 
-      assert render(view) =~ "Address attached."
+      assert has_element?(view, "#addresses-panel-notice", "Address attached.")
       refute has_element?(view, "#attach-address-modal")
       assert has_element?(view, "#address-row-#{address.id}")
       assert has_element?(view, "#address-row-#{address.id}", "Shipping")
@@ -896,7 +877,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       # Toggle primary
       view |> element("#toggle-primary-#{address.id}") |> render_click()
-      assert render(view) =~ "Address setting updated."
+      assert has_element?(view, "#addresses-panel-notice", "Address setting updated.")
 
       # Priority commits in place through the shared editor — driven through
       # the field itself so the hook event reaches the discovered panel
@@ -908,7 +889,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
         "priority" => "10"
       })
 
-      assert render(view) =~ "Address setting updated."
+      assert has_element?(view, "#addresses-panel-notice", "Address setting updated.")
       assert has_element?(view, "#address-row-#{address.id}", "10")
 
       # Edit kinds — the read state is the trigger, addressed to the component
@@ -924,7 +905,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> element("#save-kinds-#{address.id}")
       |> render_click(%{"address_id" => to_string(address.id)})
 
-      assert render(view) =~ "Address kinds updated."
+      assert has_element?(view, "#addresses-panel-notice", "Address kinds updated.")
 
       # Sort addresses by priority through the shared table's header button
       view |> element("#addresses-table-sort-priority") |> render_click()
@@ -934,7 +915,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#unlink-address-#{address.id}") |> render_click()
       assert_modal_dialog(view, "unlink-address-confirm", "will be unlinked from this employee.")
       view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
-      assert render(view) =~ "Address unlinked."
+      assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")
       refute has_element?(view, "#address-row-#{address.id}")
       assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")
       assert has_element?(view, ~s(#addresses-panel-notice[role="status"][data-kind="success"]))
@@ -977,7 +958,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#employee-delete") |> render_click()
       view |> element("#delete-employee-confirm-confirm") |> render_click()
 
-      assert render(view) =~ "the platform orchestrator cannot be deleted."
+      assert has_element?(view, "#flash-error", "the platform orchestrator cannot be deleted.")
       assert {:ok, _still_exists} = Employee.get_employee(scope, 73, orchestrator.id)
     end
   end
@@ -987,5 +968,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     [_, class_attribute] = Regex.run(~r/class="([^"]*)"/, opening_tag)
 
     String.split(class_attribute, ~r/\s+/, trim: true)
+  end
+
+  # Rows are the stream's children, so the first row is the first line of the table.
+  defp assert_row_order(view, names) do
+    for {name, position} <- Enum.with_index(names, 1) do
+      assert has_element?(view, "#employees tr:nth-child(#{position})", name)
+    end
   end
 end

@@ -240,10 +240,7 @@ defmodule Bilimbi.Core.CompanyAuthzHotPathTest do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "company-authz-hot-path",
-      consumers: Map.merge(ContributionRegistry.build!([]).consumers, %{authz: authz})
-    })
+    ContributionRegistry.put_consumers_for_test!(%{authz: authz}, "company-authz-hot-path")
   end
 
   defp capture_queries(fun) do

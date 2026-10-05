@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Authz.ScopeActorTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.ForgedActorError
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -25,13 +26,20 @@ defmodule Bilimbi.Base.Authz.ScopeActorTest do
     on_exit(&ContributionRegistry.clear_for_test!/0)
 
     assert {:ok, :stored} =
-             Authz.put_principal_capability(scope(), 10, :user, 7, @capability, true)
+             Authz.put_principal_capability(
+               TenancyFixtures.scope(),
+               10,
+               :user,
+               7,
+               @capability,
+               true
+             )
 
     :ok
   end
 
   test "the signed-in user's own grants decide, and the decision log names them" do
-    approver = Authentication.sign_in(scope(), 7, 10)
+    approver = Authentication.sign_in(TenancyFixtures.scope(), 7, 10)
 
     assert {:ok, %Authz.Actor{type: :user, id: 7, company_id: 10}} = Authz.scope_actor(approver)
     assert Authz.can(approver, @capability).allowed
@@ -43,7 +51,7 @@ defmodule Bilimbi.Base.Authz.ScopeActorTest do
   end
 
   test "another signed-in user is judged on their own grants, not the granted user's" do
-    other = Authentication.sign_in(scope(), 9, 10)
+    other = Authentication.sign_in(TenancyFixtures.scope(), 9, 10)
 
     decision = Authz.can(other, @capability)
     refute decision.allowed
@@ -51,18 +59,21 @@ defmodule Bilimbi.Base.Authz.ScopeActorTest do
   end
 
   test "a system scope names nobody and is denied without a principal to log" do
-    assert {:error, :no_authenticated_actor} = Authz.scope_actor(scope())
+    assert {:error, :no_authenticated_actor} = Authz.scope_actor(TenancyFixtures.scope())
 
-    decision = Authz.can(scope(), @capability)
+    decision = Authz.can(TenancyFixtures.scope(), @capability)
     refute decision.allowed
     assert decision.reason == :denied_no_authenticated_actor
 
-    assert_raise AuthorizationDeniedError, fn -> Authz.authorize!(scope(), @capability) end
+    assert_raise AuthorizationDeniedError, fn ->
+      Authz.authorize!(TenancyFixtures.scope(), @capability)
+    end
+
     assert Repo.all(DecisionLog) == []
   end
 
   test "an actor forged onto the scope is refused before any grant is read" do
-    system = scope()
+    system = TenancyFixtures.scope()
     forged = %{system | actor: %{system.actor | type: :user, user_id: 7, company_id: 10}}
 
     assert_raise ForgedActorError, fn -> Authz.can(forged, @capability) end

@@ -12,8 +12,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   alias Bilimbi.Base.Authz.RoleSummary
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -25,7 +24,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "role administration stays scoped and protects system roles" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert {:ok, role} =
              Authz.create_role(tenant_scope, 10, %{
@@ -53,7 +52,9 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert {:error, :role_has_principals} =
              Authz.update_role(tenant_scope, role.id, %{company_id: 11})
 
-    assert {:error, :role_not_found} = Authz.unassign_role(scope(2), role.id, assignment.id)
+    assert {:error, :role_not_found} =
+             Authz.unassign_role(TenancyFixtures.scope(2), role.id, assignment.id)
+
     assert {:ok, :unassigned} = Authz.unassign_role(tenant_scope, role.id, assignment.id)
     assert {:ok, :not_found} = Authz.unassign_role(tenant_scope, role.id, assignment.id)
 
@@ -63,7 +64,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
                "name" => "Renamed"
              })
 
-    assert {:error, :not_found} = Authz.get_role(scope(2), role.id)
+    assert {:error, :not_found} = Authz.get_role(TenancyFixtures.scope(2), role.id)
 
     assert %Page{
              entries: [%RoleSummary{id: listed_id, capability_count: 1, principal_count: 0}],
@@ -101,7 +102,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "direct capability pages distinguish an explicit deny from removal" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     actor = Authz.actor(:user, 7, tenant_scope, 10)
 
     assert {:ok, :stored} =
@@ -150,13 +151,13 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     refute Authz.can(actor, "admin.test.record.view").reason == :denied_explicitly
 
     assert %Page{total_entries: 0, entries: []} =
-             Authz.list_principal_capabilities(scope(2))
+             Authz.list_principal_capabilities(TenancyFixtures.scope(2))
 
     assert %Page{entries: [other_grant]} =
              Authz.list_principal_capabilities(tenant_scope, allowed: true)
 
     assert {:ok, :not_found} =
-             Authz.remove_principal_capability(scope(2), other_grant.id)
+             Authz.remove_principal_capability(TenancyFixtures.scope(2), other_grant.id)
 
     stale_grant =
       Repo.insert!(%PrincipalCapability{
@@ -171,7 +172,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "principal read models are bounded, ordered, and scoped without resolving principal ownership" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert {:ok, custom_role} =
              Authz.create_role(tenant_scope, 10, %{
@@ -215,7 +216,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
              Authz.list_principal_role_assignments(tenant_scope, :agent, 7)
 
     assert %Page{entries: [], total_entries: 0} =
-             Authz.list_principal_role_assignments(scope(2), :user, 7)
+             Authz.list_principal_role_assignments(TenancyFixtures.scope(2), :user, 7)
 
     # Base Authz receives only the opaque principal identity. With no persisted
     # company-scoped rows, it cannot invent tenant context for this user ID.
@@ -258,7 +259,10 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
              )
 
     assert %Page{entries: [], total_entries: 0} =
-             Authz.list_principal_capabilities(scope(2), principal_type: :user, principal_id: 7)
+             Authz.list_principal_capabilities(TenancyFixtures.scope(2),
+               principal_type: :user,
+               principal_id: 7
+             )
 
     assert {:ok, :unassigned} =
              Authz.unassign_role(tenant_scope, custom_role.id, custom_assignment_id)
@@ -268,8 +272,8 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "only platform operators can inspect and remove effective global rows" do
-    tenant_scope = scope()
-    platform_scope = platform_operator_scope()
+    tenant_scope = TenancyFixtures.scope()
+    platform_scope = TenancyFixtures.scope(1, true)
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     assert {:ok, _result} = Authz.reconcile_system_roles()
@@ -372,7 +376,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "decision-log pages are tenant-scoped, filterable, and payload-safe" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     actor = Authz.actor(:user, 7, tenant_scope, 10)
 
     refute Authz.can(
@@ -427,7 +431,8 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     refute Map.has_key?(Map.from_struct(entry), :context)
     refute Map.has_key?(Map.from_struct(entry), :applied_policies)
 
-    assert %Page{entries: [], total_entries: 0} = Authz.list_decision_logs(scope(2))
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_decision_logs(TenancyFixtures.scope(2))
   end
 
   # The directory doubles name users 5, 7 and 9 and agents 5 and 7, and refuse
@@ -449,7 +454,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   defp principal_ids(%Page{entries: entries}), do: Enum.map(entries, & &1.principal_id)
 
   test "the directory names a principal, keyed on the pair, and stays silent otherwise" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
     grant!(tenant_scope, :user, 7)
@@ -472,7 +477,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "a deployment with no directory installed keeps every principal id" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     grant!(tenant_scope, :user, 7)
 
@@ -481,7 +486,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "name ordering is resolved before pagination, so it survives a page boundary" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
     for id <- [5, 7, 9], do: grant!(tenant_scope, :user, id)
@@ -521,7 +526,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "search reaches a principal name the capability key does not contain" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
     grant!(tenant_scope, :user, 7)
@@ -539,7 +544,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "principal capability and role search reach a provider-owned email" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
     grant!(tenant_scope, :user, 7)
@@ -556,7 +561,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "principal roles name and order by the same directory" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
     assert {:ok, role} =
@@ -573,7 +578,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "principal capabilities sort by supplied company_order across pages" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert {:ok, :stored} =
              Authz.put_principal_capability(
@@ -630,7 +635,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "principal roles list searches role name and pages by company_order" do
-    tenant_scope = scope()
+    tenant_scope = TenancyFixtures.scope()
 
     assert {:ok, alpha} =
              Authz.create_role(tenant_scope, 10, %{name: "Alpha clerks", code: "alpha_clerks"})
@@ -670,38 +675,29 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert [%{company_id: 11}] = page_one.entries
     assert [%{company_id: 10}] = page_two.entries
 
-    assert %Page{entries: []} = Authz.list_principal_roles(scope(2))
+    assert %Page{entries: []} = Authz.list_principal_roles(TenancyFixtures.scope(2))
   end
 
   test "administration options reject unbounded or unknown input" do
     # 300 is the top of the §12 page-size ladder (25/50/100/300).
     assert_raise ArgumentError, ~r/page_size/, fn ->
-      Authz.list_decision_logs(scope(), page_size: 301)
+      Authz.list_decision_logs(TenancyFixtures.scope(), page_size: 301)
     end
 
     assert_raise ArgumentError, ~r/sort_by/, fn ->
-      Authz.list_principal_capabilities(scope(), sort_by: :private_schema_field)
+      Authz.list_principal_capabilities(TenancyFixtures.scope(), sort_by: :private_schema_field)
     end
 
     assert_raise ArgumentError, ~r/unknown keys/, fn ->
-      Authz.list_roles(scope(), unsafe_query: true)
+      Authz.list_roles(TenancyFixtures.scope(), unsafe_query: true)
     end
 
     assert_raise ArgumentError, ~r/principal filter/, fn ->
-      Authz.list_principal_capabilities(scope(), principal_type: :user)
+      Authz.list_principal_capabilities(TenancyFixtures.scope(), principal_type: :user)
     end
 
     assert_raise ArgumentError, ~r/principal filter/, fn ->
-      Authz.list_principal_role_assignments(scope(), :service, 7)
+      Authz.list_principal_role_assignments(TenancyFixtures.scope(), :service, 7)
     end
-  end
-
-  defp platform_operator_scope do
-    Scope.for_tenant(%Identity{
-      id: 1,
-      name: "Platform",
-      status: "active",
-      is_platform_operator: true
-    })
   end
 end

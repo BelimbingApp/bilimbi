@@ -9,10 +9,7 @@ defmodule Bilimbi.Base.MenuTest do
   defp entry(owner, items), do: %{descriptor: %{id: owner}, payload: items}
 
   defp install!(items) do
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "test",
-      consumers: %{menu: items}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{menu: items})
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
   end

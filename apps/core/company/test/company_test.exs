@@ -8,7 +8,9 @@ defmodule Bilimbi.Core.CompanyTest do
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.SchemaContract
   alias Bilimbi.Core.Company.Summary
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Company.TestFixtures
 
   setup do
@@ -500,8 +502,8 @@ defmodule Bilimbi.Core.CompanyTest do
   end
 
   test "create_company validates jurisdiction against known geonames countries" do
-    create_geonames_tables!()
-    insert_country!(%{iso: "MY", country: "Malaysia"})
+    GeonamesFixtures.create_geonames_tables!()
+    GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     insert_tenant!()
     {:ok, scope} = Tenancy.scope(41)
 
@@ -518,8 +520,8 @@ defmodule Bilimbi.Core.CompanyTest do
   end
 
   test "updates a company within the scoped tenant" do
-    create_geonames_tables!()
-    insert_country!(%{iso: "MY", country: "Malaysia"})
+    GeonamesFixtures.create_geonames_tables!()
+    GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     insert_tenant!()
     insert_company!(%{id: 73, name: "Initial Name", code: "initial_code"})
     insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
@@ -678,6 +680,4 @@ defmodule Bilimbi.Core.CompanyTest do
       assert {:error, :invalid_options} = Company.list_administration_page(owner, sort_by: :code)
     end
   end
-
-  defp opaque(value), do: :erlang.element(1, {value})
 end

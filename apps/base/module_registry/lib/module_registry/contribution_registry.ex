@@ -92,6 +92,24 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   end
 
   @doc false
+  # Installs `consumers` merged over the empty snapshot, so a test names only
+  # the consumers it exercises and a consumer added later does not make every
+  # such test raise `KeyError` from `consumer!/1` (#496).
+  @spec put_consumers_for_test!(%{optional(atom()) => term()}, String.t() | nil) :: snapshot()
+  def put_consumers_for_test!(consumers, graph_fingerprint \\ "test") when is_map(consumers) do
+    unknown_keys = Map.keys(consumers) -- @consumer_keys
+
+    if unknown_keys != [] do
+      raise ArgumentError, "unknown test consumers: " <> inspect(Enum.sort(unknown_keys))
+    end
+
+    put_snapshot_for_test!(%{
+      graph_fingerprint: graph_fingerprint,
+      consumers: Map.merge(build!([]).consumers, consumers)
+    })
+  end
+
+  @doc false
   def clear_for_test! do
     :persistent_term.erase(@snapshot_key)
     :ok

@@ -6,86 +6,41 @@ defmodule Bilimbi.Base.UI.WriteGuardOptOutRegistrationTest do
   the first LiveView or LiveComponent that sets the attribute fails
   `mix compile --warnings-as-errors`.
 
-  `#435` registered the LiveView quotes only. This test pins both shapes
-  on `Bilimbi.Base.UI`, the live-view contract host pages use, and proves
-  a LiveComponent opt-out compiles clean.
+  This compiles a probe of each shape on `Bilimbi.Base.UI`, the contract
+  every module page uses, and proves neither warns.
   """
 
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureIO
 
-  @adapters [
-    {"apps/base/ui/lib/ui.ex", Path.expand("../lib/ui.ex", __DIR__),
-     [:live_view, :live_component]}
-  ]
+  for shape <- [:live_view, :live_component] do
+    @shape shape
 
-  for {label, path, shapes} <- @adapters do
-    @label label
-    @path path
-    @shapes shapes
+    test "a #{@shape} may set @write_guard_opt_out without an unused-attribute warning" do
+      unique = System.unique_integer([:positive])
 
-    test "#{@label} registers write_guard_opt_out on #{inspect(@shapes)}" do
-      source = File.read!(@path)
-      assert {:ok, ast} = Code.string_to_quoted(source, file: @path)
+      code = """
+      defmodule Bilimbi.Base.UI.WriteGuardOptOutProbe#{unique} do
+        use Bilimbi.Base.UI, #{inspect(@shape)}
 
-      for shape <- @shapes do
-        assert registers_write_guard_opt_out?(ast, shape),
-               "#{@label} #{shape}/0 must call Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)"
+        # UI-state toggle — write-shaped by name only (#437 compile probe).
+        @write_guard_opt_out ~w(toggle_dropdown)
+
+        @impl true
+        def render(assigns), do: ~H\"\"\"
+        <div id="write-guard-opt-out-probe" />
+        \"\"\"
       end
+      """
+
+      warnings =
+        capture_io(:stderr, fn ->
+          assert [_ | _] = Code.compile_string(code)
+        end)
+
+      refute warnings =~ "write_guard_opt_out"
+      refute warnings =~ "never used"
     end
-  end
-
-  test "a LiveComponent may set @write_guard_opt_out without an unused-attribute warning" do
-    unique = System.unique_integer([:positive])
-
-    code = """
-    defmodule Bilimbi.Base.UI.WriteGuardOptOutLiveComponentProbe#{unique} do
-      use Bilimbi.Base.UI, :live_component
-
-      # UI-state toggle — write-shaped by name only (#437 compile probe).
-      @write_guard_opt_out ~w(toggle_dropdown)
-
-      @impl true
-      def render(assigns), do: ~H\"\"\"
-      <div id="write-guard-opt-out-probe" />
-      \"\"\"
-    end
-    """
-
-    warnings =
-      capture_io(:stderr, fn ->
-        assert [_ | _] = Code.compile_string(code)
-      end)
-
-    refute warnings =~ "write_guard_opt_out"
-    refute warnings =~ "never used"
-  end
-
-  defp registers_write_guard_opt_out?(ast, shape) do
-    ast
-    |> Macro.prewalk(false, fn
-      {:def, _, [{^shape, _, _}, [do: body]]}, false ->
-        {body, quote_registers_opt_out?(body)}
-
-      node, found ->
-        {node, found}
-    end)
-    |> elem(1)
-  end
-
-  defp quote_registers_opt_out?(body) do
-    body
-    |> Macro.prewalk(false, fn
-      {{:., _, [{:__aliases__, _, [:Module]}, :register_attribute]}, _,
-       [{:__MODULE__, _, _}, :write_guard_opt_out, opts]},
-      false
-      when is_list(opts) ->
-        {nil, Keyword.get(opts, :persist) == true}
-
-      node, found ->
-        {node, found}
-    end)
-    |> elem(1)
   end
 end

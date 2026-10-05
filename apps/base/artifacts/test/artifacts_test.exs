@@ -19,10 +19,7 @@ defmodule Bilimbi.Base.ArtifactsTest do
         }
       ])
 
-    registry.put_snapshot_for_test!(%{
-      graph_fingerprint: "test",
-      consumers: %{settings: settings}
-    })
+    registry.put_consumers_for_test!(%{settings: settings})
 
     on_exit(&registry.clear_for_test!/0)
     create_tenants_table!()

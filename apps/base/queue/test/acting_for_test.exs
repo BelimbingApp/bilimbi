@@ -147,9 +147,6 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
   defp perform(job), do: ActingFor.__queue_worker__().adapter.perform(job)
 
   defp install_verifier!(verifier) do
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: nil,
-      consumers: %{actor_verifier: verifier}
-    })
+    ContributionRegistry.put_consumers_for_test!(%{actor_verifier: verifier}, nil)
   end
 end

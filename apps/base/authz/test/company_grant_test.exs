@@ -13,6 +13,7 @@ defmodule Bilimbi.Base.Authz.CompanyGrantTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -25,13 +26,20 @@ defmodule Bilimbi.Base.Authz.CompanyGrantTest do
 
     # User 7 signs in at company 10 and holds the capability only in company 11.
     assert {:ok, :stored} =
-             Authz.put_principal_capability(scope(), 11, :user, 7, @capability, true)
+             Authz.put_principal_capability(
+               TenancyFixtures.scope(),
+               11,
+               :user,
+               7,
+               @capability,
+               true
+             )
 
-    %{admin: Authentication.sign_in(scope(), 7, 10)}
+    %{admin: Authentication.sign_in(TenancyFixtures.scope(), 7, 10)}
   end
 
   test "a grant in another company of the tenant decides there, not at sign-in", %{admin: admin} do
-    resource = Authz.resource("record", 1, scope: scope(), company_id: 11)
+    resource = Authz.resource("record", 1, scope: TenancyFixtures.scope(), company_id: 11)
 
     assert Authz.can(admin, @capability, resource).reason == :denied_company_scope
     refute Authz.can(admin, @capability).allowed
@@ -58,7 +66,7 @@ defmodule Bilimbi.Base.Authz.CompanyGrantTest do
   end
 
   test "another user gains nothing from the grant", %{admin: _admin} do
-    other = Authentication.sign_in(scope(), 9, 10)
+    other = Authentication.sign_in(TenancyFixtures.scope(), 9, 10)
 
     assert Authz.can_in_company(other, 11, @capability).reason == :denied_missing_capability
   end
@@ -70,7 +78,7 @@ defmodule Bilimbi.Base.Authz.CompanyGrantTest do
   end
 
   test "a resource of another tenant is refused", %{admin: admin} do
-    resource = Authz.resource("record", 1, scope: scope(2), company_id: 11)
+    resource = Authz.resource("record", 1, scope: TenancyFixtures.scope(2), company_id: 11)
 
     assert Authz.can_in_company(admin, 11, @capability, resource).reason == :denied_tenant_scope
   end
@@ -98,13 +106,13 @@ defmodule Bilimbi.Base.Authz.CompanyGrantTest do
       %{company_id: 11, principal_type: "user", principal_id: 8, capability_key: @capability}
     ])
 
-    outsider = Authentication.sign_in(scope(2), 8, 20)
+    outsider = Authentication.sign_in(TenancyFixtures.scope(2), 8, 20)
 
     assert Authz.can_in_company(outsider, 11, @capability).reason == :denied_company_scope
   end
 
   test "an anonymous system scope names nobody and is denied", %{admin: _admin} do
-    decision = Authz.can_in_company(scope(), 11, @capability)
+    decision = Authz.can_in_company(TenancyFixtures.scope(), 11, @capability)
 
     assert decision.reason == :denied_no_authenticated_actor
     assert Repo.all(DecisionLog) == []

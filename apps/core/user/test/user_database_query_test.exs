@@ -6,6 +6,7 @@ defmodule Bilimbi.Core.UserDatabaseQueryTest do
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.DatabaseQuery
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.User.TestFixtures
 
   setup do
@@ -245,14 +246,6 @@ defmodule Bilimbi.Core.UserDatabaseQueryTest do
       assert copy.description == original.description
       assert copy.prompt == original.prompt
     end
-  end
-
-  defp errors_on(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {message, options} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        options |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 
   defp as(scope, user_id) do

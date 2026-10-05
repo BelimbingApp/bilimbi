@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.User.TestFixtures do
   the module that owns it and reused through that module's fixtures.
   """
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
   alias Bilimbi.Core.User.Password
@@ -31,37 +32,12 @@ defmodule Bilimbi.Core.User.TestFixtures do
 
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
-  alias Bilimbi.Base.Tenancy.Identity
-  alias Bilimbi.Base.Tenancy.Scope
 
   def create_user_tables! do
     apply(EmployeeFixtures, :create_employee_tables!, [])
     apply(Bilimbi.Core.Company.TestFixtures, :create_external_access_tables!, [])
 
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE users (
-        id bigserial PRIMARY KEY,
-        company_id bigint,
-        employee_id bigint,
-        name varchar(255) NOT NULL,
-        email varchar(255) NOT NULL,
-        email_verified_at timestamp(0) without time zone,
-        password varchar(255) NOT NULL,
-        remember_token varchar(100),
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
-
-    # Named explicitly, not an inline UNIQUE. PostgreSQL would name that
-    # `users_email_key`, but the migration creates `users_email_unique` and the
-    # changeset maps that name to a field error. A fixture that invents its own
-    # constraint name turns a caught error into a raised ConstraintError.
-    SQL.query!(Repo, "CREATE UNIQUE INDEX users_email_unique ON users (email)", [])
+    create_users_table!()
 
     SQL.query!(
       Repo,
@@ -78,29 +54,33 @@ defmodule Bilimbi.Core.User.TestFixtures do
     create_notifications_table!()
   end
 
-  def create_sessions_table! do
+  def create_users_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE sessions (
-        id varchar(255) PRIMARY KEY,
-        user_id bigint,
-        ip_address varchar(45),
-        user_agent text,
-        payload text NOT NULL,
-        last_activity integer NOT NULL
-      ) ON COMMIT PRESERVE ROWS
+      #{TestTables.create(persistent)} users (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        employee_id bigint,
+        name varchar(255) NOT NULL,
+        email varchar(255) NOT NULL,
+        email_verified_at timestamp(0) without time zone,
+        password varchar(255) NOT NULL,
+        remember_token varchar(100),
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
 
-    SQL.query!(Repo, "CREATE INDEX sessions_user_id_index ON sessions (user_id)", [])
-
-    SQL.query!(
-      Repo,
-      "CREATE INDEX sessions_last_activity_index ON sessions (last_activity)",
-      []
-    )
+    # Named explicitly, not an inline UNIQUE. PostgreSQL would name that
+    # `users_email_key`, but the migration creates `users_email_unique` and the
+    # changeset maps that name to a field error. A fixture that invents its own
+    # constraint name turns a caught error into a raised ConstraintError.
+    SQL.query!(Repo, "CREATE UNIQUE INDEX users_email_unique ON users (email)", [])
   end
 
   def create_user_database_queries_table! do
@@ -171,72 +151,9 @@ defmodule Bilimbi.Core.User.TestFixtures do
         }
       ])
 
-    ContributionRegistry.put_snapshot_for_test!(%{
-      graph_fingerprint: "user-test",
-      consumers: %{settings: [], authz: authz, menu: []}
-    })
-  end
-
-  def operator_scope(tenant_id \\ 1) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Operator Tenant",
-      status: "active",
-      is_platform_operator: true
-    })
-  end
-
-  def tenant_scope(tenant_id \\ 2) do
-    Scope.for_tenant(%Identity{
-      id: tenant_id,
-      name: "Tenant #{tenant_id}",
-      status: "active",
-      is_platform_operator: false
-    })
-  end
-
-  def grant_role!(company_id, user_id, role_code, grant_all \\ false) do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-
-    %{rows: [[role_id]]} =
-      SQL.query!(
-        Repo,
-        """
-        INSERT INTO base_authz_roles (company_id, name, code, is_system, grant_all, created_at, updated_at)
-        VALUES ($1, $2, $3, false, $4, $5, $6)
-        ON CONFLICT (company_id, code) DO UPDATE SET grant_all = EXCLUDED.grant_all
-        RETURNING id
-        """,
-        [company_id, role_code, role_code, grant_all, now, now]
-      )
-
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO base_authz_principal_roles (company_id, principal_type, principal_id, role_id, created_at, updated_at)
-      VALUES ($1, 'user', $2, $3, $4, $5)
-      ON CONFLICT (company_id, principal_type, principal_id, role_id) DO NOTHING
-      """,
-      [company_id, user_id, role_id, now, now]
-    )
-
-    role_id
-  end
-
-  def grant_capability!(company_id, user_id, capability_key, is_allowed \\ true) do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO base_authz_principal_capabilities (
-        company_id, principal_type, principal_id, capability_key, is_allowed, created_at, updated_at
-      )
-      VALUES ($1, 'user', $2, $3, $4, $5, $6)
-      ON CONFLICT (company_id, principal_type, principal_id, capability_key)
-      DO UPDATE SET is_allowed = EXCLUDED.is_allowed
-      """,
-      [company_id, user_id, capability_key, is_allowed, now, now]
+    ContributionRegistry.put_consumers_for_test!(
+      %{settings: [], authz: authz, menu: []},
+      "user-test"
     )
   end
 

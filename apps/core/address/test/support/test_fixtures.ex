@@ -3,46 +3,7 @@ defmodule Bilimbi.Core.Address.TestFixtures do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Address.Addressable
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyTestFixtures
-  alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeTestFixtures
-  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
   alias Ecto.Adapters.SQL
-
-  def create_company_identity_tables! do
-    apply(CompanyTestFixtures, :create_company_identity_tables!, [])
-  end
-
-  def create_owner_identity_tables! do
-    apply(EmployeeTestFixtures, :create_employee_tables!, [])
-  end
-
-  def insert_tenant!(attributes \\ %{}) do
-    apply(CompanyTestFixtures, :insert_tenant!, [attributes])
-  end
-
-  def insert_company!(attributes \\ %{}) do
-    apply(CompanyTestFixtures, :insert_company!, [attributes])
-  end
-
-  def assign_primary_company!(tenant_id \\ 41, company_id \\ 73) do
-    apply(CompanyTestFixtures, :assign_primary_company!, [tenant_id, company_id])
-  end
-
-  def create_geonames_tables! do
-    apply(GeonamesTestFixtures, :create_geonames_tables!, [])
-  end
-
-  def create_settings_table! do
-    apply(Bilimbi.Base.Settings.TestFixtures, :create_settings_table!, [])
-  end
-
-  def insert_country!(attributes \\ %{}) do
-    apply(GeonamesTestFixtures, :insert_country!, [attributes])
-  end
-
-  def insert_admin1!(attributes \\ %{}) do
-    apply(GeonamesTestFixtures, :insert_admin1!, [attributes])
-  end
 
   def create_address_tables! do
     SQL.query!(
@@ -121,13 +82,5 @@ defmodule Bilimbi.Core.Address.TestFixtures do
     Addressable
     |> struct!(attributes)
     |> Repo.insert!()
-  end
-
-  def soft_delete_address!(address_id) do
-    SQL.query!(
-      Repo,
-      "UPDATE addresses SET deleted_at = '2026-08-12 12:00:00' WHERE id = $1",
-      [address_id]
-    )
   end
 end

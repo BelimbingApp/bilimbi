@@ -1,21 +1,24 @@
 defmodule Bilimbi.Base.Session.TestFixtures do
   @moduledoc false
 
+  alias Bilimbi.Base.Database.TestTables
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
-  def create_sessions_table! do
+  def create_sessions_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE IF NOT EXISTS sessions (
+      #{TestTables.create(persistent)} IF NOT EXISTS sessions (
         id varchar(255) PRIMARY KEY,
         user_id bigint,
         ip_address varchar(45),
         user_agent text,
         payload text NOT NULL,
         last_activity integer NOT NULL
-      ) ON COMMIT DROP
+      ) #{TestTables.on_commit(persistent, "DROP")}
       """,
       []
     )

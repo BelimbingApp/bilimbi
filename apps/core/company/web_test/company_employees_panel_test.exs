@@ -3,7 +3,7 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
   The company show page renders its Employees section through the
   `core/employee`-owned `"company.employees"` discovered embed (#595), so this
   covers the populated case the module boundary now owns. The empty case lives
-  with the rest of the page in `company_live_test.exs`.
+  with the rest of the page in `company_show_live_test.exs`.
   """
   use BilimbiWeb.ConnCase, async: false
 
@@ -12,12 +12,10 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
     UserFixtures.create_user_tables!()
-    GeonamesFixtures.create_geonames_tables!()
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
 

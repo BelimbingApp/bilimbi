@@ -1,11 +1,9 @@
-defmodule BilimbiWeb.DatabaseQueriesLiveTest do
+defmodule BilimbiWeb.DatabaseQueriesShowTest do
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
-  alias Bilimbi.Base.Database
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
@@ -14,7 +12,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
   setup do
     UserFixtures.create_user_tables!()
     UserFixtures.create_user_database_queries_table!()
-    AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
 
@@ -37,264 +34,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
     %{scope: scope}
   end
 
-  describe "Index LiveView (/admin/system/database-queries)" do
-    test "requires authentication", %{conn: conn} do
-      assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/admin/system/database-queries")
-    end
-
-    test "redirects away when user lacks capability", %{conn: conn} do
-      assert {:error, {:redirect, %{to: "/dashboard"}}} =
-               conn |> log_in_as() |> live(~p"/admin/system/database-queries")
-    end
-
-    test "lists user database queries and allows search, and hides write actions without edit capability",
-         %{
-           conn: conn,
-           scope: scope
-         } do
-      grant_capabilities!("admin.system.database-table.list")
-
-      # Create queries for Ada (91)
-      {:ok, q1} =
-        User.create_database_query(as(scope, 91), %{
-          name: "Active Users",
-          description: "List of active users in system",
-          sql_query: "SELECT id, name, email FROM users;"
-        })
-
-      {:ok, q2} =
-        User.create_database_query(as(scope, 91), %{
-          name: "Company Directory",
-          description: "All companies",
-          sql_query: "SELECT id, name FROM companies;"
-        })
-
-      # Create query for Grace (92)
-      {:ok, _q3} =
-        User.create_database_query(as(scope, 92), %{
-          name: "Secret Query",
-          description: "Not Ada's query",
-          sql_query: "SELECT 1;"
-        })
-
-      {:ok, view, html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
-
-      assert html =~ "Database Queries"
-      assert html =~ "Active Users"
-      assert html =~ "Company Directory"
-      refute html =~ "Secret Query"
-      table_html = view |> element("#database-queries-card") |> render()
-      assert has_element?(view, "#database-queries-table")
-      assert html =~ ~s(id="database-queries-table-sort-updated_at")
-      assert html =~ ~s(aria-sort="descending")
-      refute table_html =~ "uppercase"
-
-      # Refute create button and row action buttons for read-only user
-      refute has_element?(view, "#btn-create-query")
-      refute has_element?(view, "#duplicate-query-#{q1.id}")
-      refute has_element?(view, "#delete-query-#{q2.id}")
-
-      # Unauthorized event attempts fail server-side
-      assert render_click(view, "delete", %{"id" => to_string(q2.id)}) =~
-               "You are not authorized to modify queries."
-
-      assert {:ok, _} = User.get_database_query(as(scope, 91), q2.slug)
-
-      assert render_click(view, "duplicate", %{"id" => to_string(q1.id)}) =~
-               "You are not authorized to modify queries."
-
-      # Test search
-      search_html =
-        view
-        |> form("#database-queries-filters", %{"filters" => %{"search" => "Directory"}})
-        |> render_change()
-
-      assert search_html =~ "Company Directory"
-      refute search_html =~ "Active Users"
-
-      patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-      assert patched["search"] == "Directory"
-      assert patched["page"] == "1"
-      assert patched["page_size"] == "25"
-    end
-
-    test "search and page size round-trip through the URL", %{conn: conn, scope: scope} do
-      grant_capabilities!("admin.system.database-table.list")
-
-      for index <- 1..26 do
-        {:ok, _query} =
-          User.create_database_query(as(scope, 91), %{
-            name: "Query #{String.pad_leading(Integer.to_string(index), 2, "0")}",
-            sql_query: "SELECT #{index};"
-          })
-      end
-
-      {:ok, view, _html} =
-        conn
-        |> log_in_as()
-        |> live(
-          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page_size=25"
-        )
-
-      assert has_element?(
-               view,
-               "#database-queries-pagination-summary",
-               "Showing 1 to 25 of 26 results"
-             )
-
-      assert has_element?(view, "#search-input[value='Query']")
-
-      assert has_element?(
-               view,
-               "#database-queries-pagination-page-size option[value='25'][selected]"
-             )
-
-      assert has_element?(view, "#database-queries-table", "Query 01")
-      refute has_element?(view, "#database-queries-table", "Query 26")
-
-      view |> element("#database-queries-pagination-next") |> render_click()
-
-      page_two = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-      assert page_two["search"] == "Query"
-      assert page_two["sort_by"] == "name"
-      assert page_two["page"] == "2"
-      assert page_two["page_size"] == "25"
-      assert has_element?(view, "#database-queries-table", "Query 26")
-      refute has_element?(view, "#database-queries-table", "Query 01")
-
-      {:ok, reloaded, _html} =
-        conn
-        |> log_in_as()
-        |> live(
-          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page=2&page_size=25"
-        )
-
-      assert has_element?(
-               reloaded,
-               "#database-queries-pagination-summary",
-               "Showing 26 to 26 of 26 results"
-             )
-
-      assert has_element?(reloaded, "#search-input[value='Query']")
-      assert has_element?(reloaded, "#database-queries-table", "Query 26")
-      refute has_element?(reloaded, "#database-queries-table", "Query 01")
-
-      reloaded
-      |> form("#database-queries-pagination-page-size-form", %{
-        "filters" => %{"perPage" => "50"}
-      })
-      |> render_change()
-
-      sized = assert_patch(reloaded) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
-      assert sized["search"] == "Query"
-      assert sized["sort_by"] == "name"
-      assert sized["page"] == "1"
-      assert sized["page_size"] == "50"
-
-      {:ok, widened, _html} =
-        conn
-        |> log_in_as()
-        |> live(
-          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page=1&page_size=50"
-        )
-
-      assert has_element?(
-               widened,
-               "#database-queries-pagination-summary",
-               "Showing 1 to 26 of 26 results"
-             )
-
-      assert has_element?(
-               widened,
-               "#database-queries-pagination-page-size option[value='50'][selected]"
-             )
-
-      assert has_element?(widened, "#database-queries-table", "Query 01")
-      assert has_element?(widened, "#database-queries-table", "Query 26")
-    end
-
-    test "allows duplicate and delete on index when user has edit capability", %{
-      conn: conn,
-      scope: scope
-    } do
-      grant_capabilities!([
-        "admin.system.database-table.list",
-        "admin.system.database-table.edit"
-      ])
-
-      {:ok, q1} =
-        User.create_database_query(as(scope, 91), %{
-          name: "Active Users",
-          description: "List of active users in system",
-          sql_query: "SELECT id, name, email FROM users;"
-        })
-
-      {:ok, q2} =
-        User.create_database_query(as(scope, 91), %{
-          name: "Company Directory",
-          description: "All companies",
-          sql_query: "SELECT id, name FROM companies;"
-        })
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
-
-      assert has_element?(view, "#btn-create-query")
-      assert has_element?(view, "#duplicate-query-#{q1.id} .hero-document-duplicate")
-      assert has_element?(view, "#delete-query-#{q2.id}")
-
-      # Test duplicate
-      dup_slug = "#{q1.slug}-copy"
-      render_click(view, "duplicate", %{"id" => to_string(q1.id)})
-      assert_redirect(view, ~p"/admin/system/database-queries/#{dup_slug}")
-      assert {:ok, _dup} = User.get_database_query(as(scope, 91), dup_slug)
-
-      # Deleting confirms through the shared dialog, which names the query and
-      # says what is lost; no native confirm remains.
-      {:ok, view2, _} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
-
-      # A confirm with nothing held is a stale click and deletes nothing.
-      render_click(view2, "delete", %{"id" => to_string(q2.id)})
-      assert {:ok, _} = User.get_database_query(as(scope, 91), q2.slug)
-
-      refute has_element?(view2, "#delete-query-#{q2.id}[data-confirm]")
-      view2 |> element("#delete-query-#{q2.id}") |> render_click()
-
-      assert_modal_dialog(
-        view2,
-        "delete-query-confirm",
-        "Query “Company Directory” will be deleted."
-      )
-
-      assert has_element?(view2, "dialog#delete-query-confirm[role='alertdialog']")
-
-      assert has_element?(
-               view2,
-               "#delete-query-confirm-description",
-               "Its saved SQL and parameters are removed. This cannot be undone."
-             )
-
-      # Cancelling keeps the query.
-      view2 |> element("#delete-query-confirm-cancel", "Cancel") |> render_click()
-      refute has_element?(view2, "#delete-query-confirm")
-      assert render(view2) =~ "Company Directory"
-
-      # Confirming deletes it and reports the completed write as a success.
-      view2 |> element("#delete-query-#{q2.id}") |> render_click()
-
-      assert has_element?(
-               view2,
-               "#delete-query-confirm-confirm[phx-disable-with='Deleting…']",
-               "Delete"
-             )
-
-      view2 |> element("#delete-query-confirm-confirm") |> render_click()
-      refute has_element?(view2, "#delete-query-confirm")
-      assert has_element?(view2, "#flash-success", "Query “Company Directory” was deleted.")
-      refute has_element?(view2, "#database-queries-table", "Company Directory")
-      assert {:error, :not_found} = User.get_database_query(as(scope, 91), q2.slug)
-    end
-  end
-
   describe "Show LiveView (/admin/system/database-queries/:slug)" do
     test "requires authentication", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/"}}} =
@@ -314,10 +53,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT id, name FROM users;"
         })
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "Read Only Query"
+      assert has_element?(view, "#query-name-input[value='Read Only Query']")
       refute has_element?(view, "#btn-save-query")
       refute has_element?(view, "#btn-duplicate-query")
       refute has_element?(view, "#btn-delete-query")
@@ -331,9 +70,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "button#database-query-back")
 
       # Server-side event authorization rejection
-      assert render_click(view, "save") =~ "You are not authorized to modify queries."
-      assert render_click(view, "duplicate") =~ "You are not authorized to modify queries."
-      assert render_click(view, "delete") =~ "You are not authorized to modify queries."
+      for event <- ["save", "duplicate", "delete"] do
+        render_click(view, event)
+        assert has_element?(view, "#flash-error", "You are not authorized to modify queries.")
+      end
     end
 
     test "warns, where SQL runs, that the console reads across every company", %{
@@ -375,10 +115,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
         "admin.system.database-table.edit"
       ])
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
 
-      assert html =~ "New Query"
+      assert page_title(view) =~ "New Query"
       assert has_element?(view, "#btn-save-query")
 
       # Fill in fields
@@ -418,14 +158,14 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT id, name FROM users WHERE name = :user_name;"
         })
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         conn
         |> put_req_header("user-agent", "ConsoleTest/1.0 (needle-agent)")
         |> log_in_as()
         |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "Find User By Name"
-      assert html =~ ":user_name"
+      assert has_element?(view, "#query-name-input[value='Find User By Name']")
+      assert has_element?(view, "#param-input-user_name")
 
       # The page ran the saved query on each of its two mounts (the
       # disconnected render, then the socket): both are commands, recorded
@@ -440,10 +180,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> render_change()
 
       # Run query
-      result_html = view |> element("#btn-run-query") |> render_click()
+      view |> element("#btn-run-query") |> render_click()
 
-      assert result_html =~ "Ada Lovelace"
-      assert result_html =~ "1 total rows"
+      assert has_element?(view, "#query-results-table", "Ada Lovelace")
+      assert has_element?(view, "#query-results-summary", "1 total rows")
 
       # One record per command, naming who ran it, from where, what they
       # typed, and what it did — and never the row it returned.
@@ -482,8 +222,13 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "DELETE FROM users"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "Only SELECT or WITH queries are permitted."
+      view |> element("#btn-run-query") |> render_click()
+
+      assert has_element?(
+               view,
+               "#query-execution-error",
+               "Only SELECT or WITH queries are permitted."
+             )
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -513,8 +258,13 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT 1; DELETE FROM users"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "Write or DDL statements are not permitted in queries."
+      view |> element("#btn-run-query") |> render_click()
+
+      assert has_element?(
+               view,
+               "#query-execution-error",
+               "Write or DDL statements are not permitted in queries."
+             )
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -538,8 +288,8 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT setval('__blb_console_page_probe', 42)"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "read-only transaction"
+      view |> element("#btn-run-query") |> render_click()
+      assert has_element?(view, "#query-execution-error", "read-only transaction")
 
       assert [refused] = console_actions(scope)
       assert refused.event == "database_query.refused"
@@ -563,8 +313,8 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       |> form("#query-sql-form", %{sql_query: "SELECT * FROM __blb_absent_console_table"})
       |> render_change()
 
-      html = view |> element("#btn-run-query") |> render_click()
-      assert html =~ "does not exist"
+      view |> element("#btn-run-query") |> render_click()
+      assert has_element?(view, "#query-execution-error", "does not exist")
 
       assert [failed] = console_actions(scope)
       assert failed.event == "database_query.failed"
@@ -811,10 +561,10 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
           sql_query: "SELECT invalid_column_xyz FROM non_existent_table;"
         })
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      assert html =~ "does not exist" or html =~ "error"
+      assert has_element?(view, "#query-execution-error", "does not exist")
     end
 
     test "deletes existing query when user has edit capability", %{conn: conn, scope: scope} do
@@ -863,81 +613,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert_redirect(view, ~p"/admin/system/database-queries")
 
       assert {:error, :not_found} = User.get_database_query(as(scope, 91), query.slug)
-    end
-  end
-
-  describe "operator-only gate (#650)" do
-    setup do
-      # A second tenant that is NOT the platform operator, with its own company
-      # and user, so the console can be probed by a fully-capable non-operator.
-      CompanyFixtures.insert_tenant!(%{
-        id: 51,
-        name: "Ordinary tenant",
-        is_platform_operator: false
-      })
-
-      CompanyFixtures.insert_company!(%{
-        id: 83,
-        tenant_id: 51,
-        name: "Ordinary Co",
-        code: "ordinary_co"
-      })
-
-      UserFixtures.insert_user!(%{
-        id: 95,
-        company_id: 83,
-        name: "Nadia Non-Operator",
-        email: "nadia@example.com"
-      })
-
-      # Grant BOTH capabilities to the non-operator so the capability gate passes
-      # and any refusal is isolated to the platform-operator tenant gate.
-      grant_capabilities!(
-        ["admin.system.database-table.list", "admin.system.database-table.edit"],
-        tenant_id: 51,
-        company_id: 83,
-        user_id: 95
-      )
-
-      %{non_operator: session_user(%{"user_id" => 95, "company_id" => 83})}
-    end
-
-    test "a fully-capable non-operator is refused at the Index mount", %{
-      conn: conn,
-      non_operator: non_operator
-    } do
-      assert {:error, {:redirect, %{to: "/dashboard"}}} =
-               conn |> log_in_as(non_operator) |> live(~p"/admin/system/database-queries")
-    end
-
-    test "a fully-capable non-operator is refused at the Show mount", %{
-      conn: conn,
-      non_operator: non_operator
-    } do
-      # The gate halts in on_mount, before the slug is ever looked up.
-      assert {:error, {:redirect, %{to: "/dashboard"}}} =
-               conn
-               |> log_in_as(non_operator)
-               |> live(~p"/admin/system/database-queries/any-query")
-    end
-
-    test "the executor fails closed on a forged execute, before touching the store" do
-      # A query that would raise at the database if the guard ever let it run.
-      sql = "SELECT * FROM __blb_absent_table_650"
-
-      # Absent opt fails closed with the operator error — never a DB error, so
-      # the store was not reached.
-      assert {:error, msg} = Database.execute_readonly(sql, %{}, [])
-      assert msg =~ "platform operator"
-
-      # Explicit false is identical.
-      assert {:error, ^msg} = Database.execute_readonly(sql, %{}, operator: false)
-
-      # With the operator tenant asserted, the guard passes and the store IS
-      # reached — proven by the error now coming from Postgres, not the gate.
-      assert {:error, db_msg} = Database.execute_readonly(sql, %{}, operator: true)
-      refute db_msg =~ "platform operator"
-      assert db_msg =~ "does not exist"
     end
   end
 
