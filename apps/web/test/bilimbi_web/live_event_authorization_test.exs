@@ -18,18 +18,13 @@ defmodule BilimbiWeb.LiveEventAuthorizationTest do
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias BilimbiWeb.RouteAccess
 
   @route_capability "admin.employee.view"
 
   setup %{conn: conn} do
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    signed_in_identity!()
     :ok = Employee.ensure_system_types()
     {:ok, scope} = Tenancy.scope(41)
 

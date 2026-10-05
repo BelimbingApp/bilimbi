@@ -14,8 +14,8 @@ defmodule BilimbiWeb.ConnCase do
   The default signed-in identity is tenant 41, company 73, user 91
   ("Ada Lovelace"), which are the defaults of the owner fixtures
   (`Tenancy`, `Company` and `User` `TestFixtures`). A test inserts those rows
-  itself. `log_in_as/2` needs user 91 (or the one it is given) to exist,
-  because request rehydration loads the user.
+  with `signed_in_identity!/0`. `log_in_as/2` needs user 91 (or the one it is
+  given) to exist, because request rehydration loads the user.
   """
 
   use ExUnit.CaseTemplate
@@ -74,6 +74,27 @@ defmodule BilimbiWeb.ConnCase do
     # `addresses` has foreign keys into both geonames tables, so those go first.
     apply(Module.concat(["Bilimbi.Core.Geonames.TestFixtures"]), :create_geonames_tables!, [])
     apply(Module.concat(["Bilimbi.Core.Address.TestFixtures"]), :create_address_tables!, [])
+  end
+
+  @doc """
+  Creates the user tables and inserts the default signed-in identity: tenant
+  41, company 73 and user 91 ("Ada Lovelace"), every value being the owner
+  fixture's default. A test that needs a different identity calls the owner
+  fixtures itself.
+  """
+  def signed_in_identity! do
+    apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :create_user_tables!, [])
+    apply(Module.concat(["Bilimbi.Core.Company.TestFixtures"]), :insert_tenant!, [%{id: 41}])
+
+    apply(Module.concat(["Bilimbi.Core.Company.TestFixtures"]), :insert_company!, [
+      %{id: 73, tenant_id: 41}
+    ])
+
+    apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :insert_user!, [
+      %{id: 91, company_id: 73}
+    ])
+
+    :ok
   end
 
   @doc """

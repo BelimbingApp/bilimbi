@@ -31,8 +31,6 @@ defmodule BilimbiWeb.ScheduleLiveTest do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Crontab.CronExpression.Parser
 
   @view "admin.system.schedule.view"
@@ -41,10 +39,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
   setup do
     ScheduleFixtures.create_schedule_tables!()
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    signed_in_identity!()
 
     original_snapshot = ContributionRegistry.snapshot!()
     definition = definition()

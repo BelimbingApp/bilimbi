@@ -6,14 +6,9 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLiveTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Workflow.{ReferenceFlow, TestFixtures, TestSubjectSchema}
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup %{conn: conn} do
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+    signed_in_identity!()
     TestFixtures.create_reference_tables!()
     installed = ContributionRegistry.snapshot!()
     install_reference_registry!()
