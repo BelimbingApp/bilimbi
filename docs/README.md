@@ -6,7 +6,7 @@ install it. These pages hold the detail.
 | Topic | Link |
 |---|---|
 | Development setup, provisioning, commands, architecture map, production mail | [Development guide](./development.md) |
-| Ubuntu 24.04 production build and deployment | [Production deployment](./deploy/ubuntu-24.04.md) |
+| Ubuntu 26.04 production build and deployment | [Production deployment](./deploy/ubuntu-26.04.md) |
 | Moving an existing Belimbing database to Bilimbi | [Migrating from Belimbing](./migrating-from-belimbing.md) |
 | Agent and coding rules | [AGENTS.md](../AGENTS.md) |
 | Product and interface design | [DESIGN.md](../DESIGN.md) |

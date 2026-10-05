@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,4 +20,4 @@ RUN test -n "$RELEASE_VERSION" && \
     (cd apps/web && MIX_ENV=prod mise exec -- mix assets.deploy) && \
     MIX_ENV=prod mise exec -- mix release bilimbi && \
     mkdir -p /out && \
-    tar -C _build/prod/rel -czf "/out/bilimbi-${RELEASE_VERSION}-ubuntu-24.04-amd64.tar.gz" bilimbi
+    tar -C _build/prod/rel -czf "/out/bilimbi-${RELEASE_VERSION}-ubuntu-26.04-amd64.tar.gz" bilimbi

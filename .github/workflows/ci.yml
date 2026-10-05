@@ -31,7 +31,7 @@ env:
 jobs:
   quality:
     name: Elixir quality
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     steps:
@@ -98,7 +98,7 @@ jobs:
 
   types:
     name: Elixir types
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     env:
@@ -132,7 +132,7 @@ jobs:
 
   tests:
     name: Elixir tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     env:
@@ -227,7 +227,7 @@ jobs:
 
   first_build:
     name: Elixir first-build routes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     env:

@@ -130,7 +130,7 @@ allows design freedom, not shortcuts.
   Secrets are stored encrypted and never displayed back or logged. Only
   bootstrap values needed before the settings store is reachable stay in the
   runtime environment; see the environment-file guidance in
-  `docs/deploy/ubuntu-24.04.md` for the deployment contract and current exceptions.
+  `docs/deploy/ubuntu-26.04.md` for the deployment contract and current exceptions.
 
 ## 4. Application ownership and dependency direction
 

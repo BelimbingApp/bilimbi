@@ -11,7 +11,7 @@ if ! [[ "$keep" =~ ^[0-9]+$ ]] || ((keep < 2)); then
 fi
 [[ -f "$archive" && -f "$archive.sha256" ]] || { echo "Tarball and .sha256 required" >&2; exit 2; }
 [[ -f /etc/bilimbi/bilimbi.env ]] || { echo "Missing /etc/bilimbi/bilimbi.env" >&2; exit 2; }
-expected="bilimbi-$version-ubuntu-24.04-amd64.tar.gz"
+expected="bilimbi-$version-ubuntu-26.04-amd64.tar.gz"
 [[ "$(basename -- "$archive")" == "$expected" ]] || { echo "Tarball name/version mismatch" >&2; exit 2; }
 (cd -- "$(dirname -- "$archive")" && sha256sum -c -- "$(basename -- "$archive").sha256")
 
