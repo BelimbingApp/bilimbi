@@ -80,7 +80,10 @@ defmodule Bilimbi.Base.PrincipalDirectory.ContributionValidator do
       |> List.flatten()
 
     unless Provider in behaviours do
-      invalid!(descriptor.id, "provider #{inspect(provider)} does not implement #{inspect(Provider)}")
+      invalid!(
+        descriptor.id,
+        "provider #{inspect(provider)} does not implement #{inspect(Provider)}"
+      )
     end
 
     # The owning package must be the contributing one. Without this a module
@@ -98,7 +101,10 @@ defmodule Bilimbi.Base.PrincipalDirectory.ContributionValidator do
     kind = provider.principal_kind()
 
     unless kind in @kinds do
-      invalid!(descriptor.id, "provider #{inspect(provider)} declares unknown kind #{inspect(kind)}")
+      invalid!(
+        descriptor.id,
+        "provider #{inspect(provider)} declares unknown kind #{inspect(kind)}"
+      )
     end
 
     kind

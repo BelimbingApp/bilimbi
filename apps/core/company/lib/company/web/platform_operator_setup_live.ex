@@ -119,7 +119,11 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
             Designate the primary company of the tenant operating this deployment
           </:subtitle>
           <:actions>
-            <.back_link id="platform-operator-back" navigate={~p"/companies"} title="Back to companies" />
+            <.back_link
+              id="platform-operator-back"
+              navigate={~p"/companies"}
+              title="Back to companies"
+            />
           </:actions>
         </.header>
 
@@ -144,7 +148,11 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
             Only companies already belonging to the platform-operator tenant can be selected.
           </p>
 
-          <form id="platform-operator-designate-form" phx-submit="designate" class="mt-4 max-w-md space-y-4">
+          <form
+            id="platform-operator-designate-form"
+            phx-submit="designate"
+            class="mt-4 max-w-md space-y-4"
+          >
             <label class="block text-sm font-medium text-ink">
               Company
               <select
@@ -193,15 +201,31 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
             class="mt-4 space-y-4"
           >
             <div class="grid gap-x-4 sm:grid-cols-2">
-              <.input field={@form[:name]} id="platform-operator-name" label="Name" required maxlength="255" />
-              <.input field={@form[:legal_name]} id="platform-operator-legal-name" label="Legal Name" maxlength="255" />
+              <.input
+                field={@form[:name]}
+                id="platform-operator-name"
+                label="Name"
+                required
+                maxlength="255"
+              />
+              <.input
+                field={@form[:legal_name]}
+                id="platform-operator-legal-name"
+                label="Legal Name"
+                maxlength="255"
+              />
               <.input
                 field={@form[:registration_number]}
                 id="platform-operator-registration-number"
                 label="Registration Number"
                 maxlength="255"
               />
-              <.input field={@form[:tax_id]} id="platform-operator-tax-id" label="Tax ID" maxlength="255" />
+              <.input
+                field={@form[:tax_id]}
+                id="platform-operator-tax-id"
+                label="Tax ID"
+                maxlength="255"
+              />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.input
@@ -210,8 +234,19 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 label="Jurisdiction"
                 maxlength="2"
               />
-              <.input field={@form[:email]} id="platform-operator-email" type="email" label="Email" maxlength="255" />
-              <.input field={@form[:website]} id="platform-operator-website" label="Website" maxlength="255" />
+              <.input
+                field={@form[:email]}
+                id="platform-operator-email"
+                type="email"
+                label="Email"
+                maxlength="255"
+              />
+              <.input
+                field={@form[:website]}
+                id="platform-operator-website"
+                label="Website"
+                maxlength="255"
+              />
             </div>
             <.button id="platform-operator-save" type="submit" variant="primary">
               Create Primary Company

@@ -759,7 +759,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               data-nav-pin-label={"Administration / Companies / #{@company.name}"}
               data-nav-pin-url={~p"/companies/#{@company.id}"}
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:subtitle>
             <%!-- Belimbing: title=name, subtitle=legal_name. Repeating the
@@ -783,11 +783,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 key="record.history"
                 id="company-record-history"
                 current_scope={@current_scope}
-                opts={%{
-                  auditable_types: company_auditable_types(),
-                  auditable_id: @company.id,
-                  record: @company
-                }}
+                opts={
+                  %{
+                    auditable_types: company_auditable_types(),
+                    auditable_id: @company.id,
+                    record: @company
+                  }
+                }
               />
               <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
             </div>
@@ -1423,36 +1425,36 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       <:display>{render_slot(@inner_block)}</:display>
       <:editor>
         <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
-        <.combobox
-          :if={@name in ["jurisdiction", "timezone"]}
-          id={"#{@id}-select"}
-          name={@name}
-          value={@value}
-          aria-label={@label}
-          placeholder={@prompt || "Choose a country"}
-          options={@options}
-          cancel_event="cancel_edit_field"
-          autofocus
-          wrapper_class="mb-0 inline-block min-w-56"
-        />
-        <select
-          :if={@name not in ["jurisdiction", "timezone"]}
-          id={"#{@id}-select"}
-          name={@name}
-          aria-label={@label}
-          phx-mounted={JS.focus()}
-          phx-blur="cancel_edit_field"
-          class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-        >
-          <option :if={@prompt} value="" selected={@current == ""}>{@prompt}</option>
-          <option
-            :for={{label, option} <- @options}
-            value={option}
-            selected={to_string(option) == @current}
+          <.combobox
+            :if={@name in ["jurisdiction", "timezone"]}
+            id={"#{@id}-select"}
+            name={@name}
+            value={@value}
+            aria-label={@label}
+            placeholder={@prompt || "Choose a country"}
+            options={@options}
+            cancel_event="cancel_edit_field"
+            autofocus
+            wrapper_class="mb-0 inline-block min-w-56"
+          />
+          <select
+            :if={@name not in ["jurisdiction", "timezone"]}
+            id={"#{@id}-select"}
+            name={@name}
+            aria-label={@label}
+            phx-mounted={JS.focus()}
+            phx-blur="cancel_edit_field"
+            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
           >
-            {label}
-          </option>
-        </select>
+            <option :if={@prompt} value="" selected={@current == ""}>{@prompt}</option>
+            <option
+              :for={{label, option} <- @options}
+              value={option}
+              selected={to_string(option) == @current}
+            >
+              {label}
+            </option>
+          </select>
         </form>
       </:editor>
     </.inline_choice>

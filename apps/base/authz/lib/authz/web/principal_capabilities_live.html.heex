@@ -14,7 +14,7 @@
           id="principal-capabilities-pin"
           data-nav-pin="nav-admin-authz-principal-capability"
           aria-pressed="false"
-          />
+        />
       </:title_actions>
       <:subtitle>
         Capabilities granted or denied directly, outside any role. A direct denial outranks a role's grant.
@@ -51,8 +51,6 @@
     </p>
 
     <.card id="principal-capabilities-card" inner_class="p-0">
-
-
       <.table
         id="principal-capabilities"
         rows={@streams.grants}

@@ -10,7 +10,7 @@
           id="decision-logs-pin"
           data-nav-pin="nav-admin-authz-decision-log"
           aria-pressed="false"
-          />
+        />
       </:title_actions>
       <:subtitle>Every authorization decision this tenant has recorded, newest first</:subtitle>
     </.header>
@@ -45,8 +45,6 @@
     </p>
 
     <.card id="decision-logs-card" inner_class="p-0">
-
-
       <.table
         id="decision-logs"
         rows={@streams.logs}
@@ -57,7 +55,10 @@
         framed={false}
       >
         <:col :let={log} label="When" sort="occurred_at" sort_id="logs-sort-occurred_at">
-          <span class="whitespace-nowrap tabular-nums text-ink-muted"><.datetime id={"log-occurred-#{log.id}"} value={log.occurred_at} /></span>
+          <span class="whitespace-nowrap tabular-nums text-ink-muted"><.datetime
+            id={"log-occurred-#{log.id}"}
+            value={log.occurred_at}
+          /></span>
         </:col>
 
         <:col :let={log} label="Actor" sort="actor_type" sort_id="logs-sort-actor_type">

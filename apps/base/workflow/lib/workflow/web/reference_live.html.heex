@@ -45,7 +45,11 @@
       </div>
     </section>
     <section id="workflow-reference-work" class="mt-8">
-      <.section_heading id="workflow-reference-work-heading" title="Pending work" count={length(@work)} />
+      <.section_heading
+        id="workflow-reference-work-heading"
+        title="Pending work"
+        count={length(@work)}
+      />
       <.table
         id="workflow-reference-work-rows"
         rows={@work}

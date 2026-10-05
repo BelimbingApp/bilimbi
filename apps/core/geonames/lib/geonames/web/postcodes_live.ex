@@ -180,7 +180,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
               id="postcodes-pin"
               data-nav-pin="nav-admin-geonames-postcode"
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:actions>
             <.button
@@ -212,14 +212,27 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             sort_event="sort-summary"
             framed={false}
           >
-            <:col :let={summary} label="Country" sort="country_name" sort_id="postcodes-summary-sort-country">
+            <:col
+              :let={summary}
+              label="Country"
+              sort="country_name"
+              sort_id="postcodes-summary-sort-country"
+            >
               <span class="whitespace-nowrap text-ink">{summary.country_name}</span>
             </:col>
             <:col :let={summary} label="ISO" sort="country_iso" sort_id="postcodes-summary-sort-iso">
               <span class="whitespace-nowrap font-mono text-xs text-ink-muted">{summary.country_iso}</span>
             </:col>
-            <:col :let={summary} label="Records" sort="record_count" sort_id="postcodes-summary-sort-count" align={:right}>
-              <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(summary.record_count)}</span>
+            <:col
+              :let={summary}
+              label="Records"
+              sort="record_count"
+              sort_id="postcodes-summary-sort-count"
+              align={:right}
+            >
+              <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(
+                summary.record_count
+              )}</span>
             </:col>
           </.table>
         </.card>
@@ -235,8 +248,6 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
         </.filter_toolbar>
 
         <.card id="postcodes-card" inner_class="p-0">
-
-
           <.table
             id="postcodes-table"
             rows={@streams.postcodes}
@@ -278,12 +289,21 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                 {postcode.place_name}
               </span>
             </:col>
-            <:col :let={postcode} label="Admin1 Code" sort="admin1_code" sort_id="postcodes-sort-admin1">
+            <:col
+              :let={postcode}
+              label="Admin1 Code"
+              sort="admin1_code"
+              sort_id="postcodes-sort-admin1"
+            >
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{postcode.admin1_code || "—"}</span>
             </:col>
             <:col :let={postcode} label="Updated" sort="updated_at" sort_id="postcodes-sort-updated">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
-                <.datetime id={"postcode-#{postcode.id}-updated"} value={postcode.updated_at} format={:date} />
+                <.datetime
+                  id={"postcode-#{postcode.id}-updated"}
+                  value={postcode.updated_at}
+                  format={:date}
+                />
               </span>
             </:col>
             <:action :let={postcode} :if={@can_update?}>
@@ -318,84 +338,84 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
         >
           <:description>Local corrections survive future GeoNames country refreshes.</:description>
 
-            <.form
-              :if={@postcode_form}
-              for={@postcode_form}
-              id="postcode-form"
-              phx-change="validate-postcode"
-              phx-submit="save-postcode"
-              class="mt-4 space-y-4"
-            >
-              <div class="grid gap-x-4 sm:grid-cols-2">
-                <.input
-                  field={@postcode_form[:country_iso]}
-                  id="postcode-country"
-                  type="select"
-                  label="Country"
-                  prompt="Select country..."
-                  options={Geonames.country_options(@countries)}
-                  required
-                />
-                <.input
-                  field={@postcode_form[:postcode]}
-                  id="postcode-code"
-                  label="Postcode"
-                  maxlength="20"
-                  required
-                />
-                <.input
-                  field={@postcode_form[:place_name]}
-                  id="postcode-place-name"
-                  label="Place Name"
-                  maxlength="180"
-                  required
-                />
-                <.input
-                  field={@postcode_form[:admin1_code]}
-                  id="postcode-admin1"
-                  type="select"
-                  label="Admin1 Division"
-                  prompt="None"
-                  options={@admin1_options}
-                />
-                <.input
-                  field={@postcode_form[:latitude]}
-                  id="postcode-latitude"
-                  type="number"
-                  step="0.0000001"
-                  label="Latitude"
-                />
-                <.input
-                  field={@postcode_form[:longitude]}
-                  id="postcode-longitude"
-                  type="number"
-                  step="0.0000001"
-                  label="Longitude"
-                />
-                <.input
-                  field={@postcode_form[:accuracy]}
-                  id="postcode-accuracy"
-                  type="select"
-                  label="Accuracy"
-                  prompt="Unknown"
-                  options={Enum.map(1..6, &{Integer.to_string(&1), &1})}
-                />
-              </div>
+          <.form
+            :if={@postcode_form}
+            for={@postcode_form}
+            id="postcode-form"
+            phx-change="validate-postcode"
+            phx-submit="save-postcode"
+            class="mt-4 space-y-4"
+          >
+            <div class="grid gap-x-4 sm:grid-cols-2">
+              <.input
+                field={@postcode_form[:country_iso]}
+                id="postcode-country"
+                type="select"
+                label="Country"
+                prompt="Select country..."
+                options={Geonames.country_options(@countries)}
+                required
+              />
+              <.input
+                field={@postcode_form[:postcode]}
+                id="postcode-code"
+                label="Postcode"
+                maxlength="20"
+                required
+              />
+              <.input
+                field={@postcode_form[:place_name]}
+                id="postcode-place-name"
+                label="Place Name"
+                maxlength="180"
+                required
+              />
+              <.input
+                field={@postcode_form[:admin1_code]}
+                id="postcode-admin1"
+                type="select"
+                label="Admin1 Division"
+                prompt="None"
+                options={@admin1_options}
+              />
+              <.input
+                field={@postcode_form[:latitude]}
+                id="postcode-latitude"
+                type="number"
+                step="0.0000001"
+                label="Latitude"
+              />
+              <.input
+                field={@postcode_form[:longitude]}
+                id="postcode-longitude"
+                type="number"
+                step="0.0000001"
+                label="Longitude"
+              />
+              <.input
+                field={@postcode_form[:accuracy]}
+                id="postcode-accuracy"
+                type="select"
+                label="Accuracy"
+                prompt="Unknown"
+                options={Enum.map(1..6, &{Integer.to_string(&1), &1})}
+              />
+            </div>
 
-              <div class="mt-6 flex justify-end gap-2">
-                <.button id="postcode-cancel" type="button" phx-click="close-postcode-modal">
-                  Cancel
-                </.button>
-                <.button
-                  id="postcode-save"
-                  type="submit"
-                  variant="primary"
-                  phx-disable-with="Saving…"
-                >
-                  Save
-                </.button>
-              </div>
-            </.form>
+            <div class="mt-6 flex justify-end gap-2">
+              <.button id="postcode-cancel" type="button" phx-click="close-postcode-modal">
+                Cancel
+              </.button>
+              <.button
+                id="postcode-save"
+                type="submit"
+                variant="primary"
+                phx-disable-with="Saving…"
+              >
+                Save
+              </.button>
+            </div>
+          </.form>
         </.modal>
       </.page>
     </Layouts.app>

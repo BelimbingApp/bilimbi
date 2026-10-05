@@ -152,5 +152,4 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
     assert {:error, :selection_unavailable} =
              PrincipalDirectory.choices(scope, :agent, :anything, providers: @providers)
   end
-
 end

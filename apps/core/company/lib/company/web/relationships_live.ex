@@ -447,64 +447,66 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         >
           <:description>
             {if @modal_action == :new,
-              do: "Establish a corporate relationship between #{Company.Summary.display_name(@company)} and another company.",
-              else: "Update effective date range for relationship with #{@editing_rel.other_company.name}."}
+              do:
+                "Establish a corporate relationship between #{Company.Summary.display_name(@company)} and another company.",
+              else:
+                "Update effective date range for relationship with #{@editing_rel.other_company.name}."}
           </:description>
 
-            <.form
-              :if={@form}
-              for={@form}
-              id="relationship-form"
-              phx-change="validate"
-              phx-submit="save"
-              class="mt-4 space-y-4"
-            >
-              <.input
-                :if={@modal_action == :new}
-                field={@form[:related_company_id]}
-                id="relationship-related-company-id"
-                type="select"
-                label="Related Company"
-                options={@company_options}
-                prompt="Select a company"
-                required
-              />
-              <.input
-                :if={@modal_action == :new}
-                field={@form[:relationship_type_id]}
-                id="relationship-type-id"
-                type="select"
-                label="Relationship Type"
-                options={@type_options}
-                prompt="Select relationship type"
-                required
-              />
-              <.input
-                field={@form[:effective_from]}
-                id="relationship-effective-from"
-                type="date"
-                label="Effective From"
-              />
-              <.input
-                field={@form[:effective_to]}
-                id="relationship-effective-to"
-                type="date"
-                label="Effective To"
-              />
+          <.form
+            :if={@form}
+            for={@form}
+            id="relationship-form"
+            phx-change="validate"
+            phx-submit="save"
+            class="mt-4 space-y-4"
+          >
+            <.input
+              :if={@modal_action == :new}
+              field={@form[:related_company_id]}
+              id="relationship-related-company-id"
+              type="select"
+              label="Related Company"
+              options={@company_options}
+              prompt="Select a company"
+              required
+            />
+            <.input
+              :if={@modal_action == :new}
+              field={@form[:relationship_type_id]}
+              id="relationship-type-id"
+              type="select"
+              label="Relationship Type"
+              options={@type_options}
+              prompt="Select relationship type"
+              required
+            />
+            <.input
+              field={@form[:effective_from]}
+              id="relationship-effective-from"
+              type="date"
+              label="Effective From"
+            />
+            <.input
+              field={@form[:effective_to]}
+              id="relationship-effective-to"
+              type="date"
+              label="Effective To"
+            />
 
-              <div class="mt-6 flex justify-end gap-2">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button
-                  type="submit"
-                  variant="primary"
-                  disabled={@modal_action == :new and (@company_options == [] or @type_options == [])}
-                >
-                  Save
-                </.button>
-              </div>
-            </.form>
+            <div class="mt-6 flex justify-end gap-2">
+              <.button type="button" phx-click="close_modal">
+                Cancel
+              </.button>
+              <.button
+                type="submit"
+                variant="primary"
+                disabled={@modal_action == :new and (@company_options == [] or @type_options == [])}
+              >
+                Save
+              </.button>
+            </div>
+          </.form>
         </.modal>
 
         <.confirm_dialog

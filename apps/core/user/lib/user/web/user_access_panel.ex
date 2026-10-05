@@ -735,437 +735,445 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
   def render(assigns) do
     ~H"""
     <div id="user-access-panel">
-          <%!-- Section 2: Roles & Permissions. Roles are a fact of the shared
+      <%!-- Section 2: Roles & Permissions. Roles are a fact of the shared
                list; the pickers and the effective-permission disclosure keep
                their own controls below it. --%>
-          <.card
-            id="user-roles-card"
-            inner_class="p-5 sm:p-6"
-            role="region"
-            aria-labelledby="user-roles-heading"
-          >
-            <.section_heading
-              id="user-roles-heading"
-              title="Roles & Permissions"
-              count={length(@assigned_roles)}
-            >
-              <:description>
-                Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
-              </:description>
-            </.section_heading>
+      <.card
+        id="user-roles-card"
+        inner_class="p-5 sm:p-6"
+        role="region"
+        aria-labelledby="user-roles-heading"
+      >
+        <.section_heading
+          id="user-roles-heading"
+          title="Roles & Permissions"
+          count={length(@assigned_roles)}
+        >
+          <:description>
+            Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
+          </:description>
+        </.section_heading>
 
-            <div class="mb-4">
-              <.list id="assigned-roles-container">
-                <:item title="Roles" id="assigned-roles">
-                  <%= if @assigned_roles == [] do %>
-                    <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
-                  <% else %>
-                    <div class="flex flex-wrap gap-2" id="assigned-roles-list">
-                      <span
-                        :for={assignment <- @assigned_roles}
-                        id={"assigned-role-#{assignment.id}"}
-                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                      >
-                        <span>{assignment.role_name}</span>
-                        <.icon_button
-                          :if={@can_edit?}
-                          icon="close"
-                          label={"Remove the #{assignment.role_name} role"}
-                          context={:inline}
-                          kind={:danger}
-                          id={"remove-role-#{assignment.id}"}
-                          phx-click={
-                            JS.push("lv:clear-flash")
-                            |> JS.push("request_remove_role", target: @myself)
-                          }
-                          phx-value-assignment-id={assignment.id}
-                          class="-mr-1"
-                        />
-                      </span>
-                    </div>
-                  <% end %>
-                </:item>
-              </.list>
-            </div>
+        <div class="mb-4">
+          <.list id="assigned-roles-container">
+            <:item title="Roles" id="assigned-roles">
+              <%= if @assigned_roles == [] do %>
+                <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
+              <% else %>
+                <div class="flex flex-wrap gap-2" id="assigned-roles-list">
+                  <span
+                    :for={assignment <- @assigned_roles}
+                    id={"assigned-role-#{assignment.id}"}
+                    class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                  >
+                    <span>{assignment.role_name}</span>
+                    <.icon_button
+                      :if={@can_edit?}
+                      icon="close"
+                      label={"Remove the #{assignment.role_name} role"}
+                      context={:inline}
+                      kind={:danger}
+                      id={"remove-role-#{assignment.id}"}
+                      phx-click={
+                        JS.push("lv:clear-flash")
+                        |> JS.push("request_remove_role", target: @myself)
+                      }
+                      phx-value-assignment-id={assignment.id}
+                      class="-mr-1"
+                    />
+                  </span>
+                </div>
+              <% end %>
+            </:item>
+          </.list>
+        </div>
 
-            <%!-- The Roles control, or the one sentence that says why it is absent.
+        <%!-- The Roles control, or the one sentence that says why it is absent.
                  The sentence stands where the control would be, so a reader who
                  finds no button is not left wondering; it names the most
                  actionable condition (permission first, then whether a role
                  could add anything, then the roles themselves). --%>
-            <%= if @roles_control == :available do %>
-              <div class="mb-6">
-                <div :if={not @show_assign_roles}>
+        <%= if @roles_control == :available do %>
+          <div class="mb-6">
+            <div :if={not @show_assign_roles}>
+              <.button
+                type="button"
+                id="toggle-assign-roles-btn"
+                phx-click="toggle_assign_roles"
+                phx-target={@myself}
+                class="text-xs font-medium"
+              >
+                <.icon name="create" class="size-3.5" />
+                <span>Roles</span>
+              </.button>
+            </div>
+            <div
+              :if={@show_assign_roles}
+              id="assign-roles-picker"
+              class="rounded-xl border border-line bg-surface p-3 space-y-3 shadow-xs"
+            >
+              <form
+                phx-change="search_roles"
+                phx-submit="search_roles"
+                id="role-search-form"
+                phx-target={@myself}
+              >
+                <label for="role-search-input" class="sr-only">Search roles</label>
+                <input
+                  type="search"
+                  id="role-search-input"
+                  name="value"
+                  phx-debounce="300"
+                  autocomplete="off"
+                  placeholder="Search roles..."
+                  value={@role_search}
+                  class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                />
+              </form>
+              <form
+                phx-change="select_roles"
+                phx-submit="assign_selected_roles"
+                id="assign-roles-form"
+                phx-target={@myself}
+              >
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
+                  id="available-roles-list"
+                >
+                  <label
+                    :for={role <- @filtered_available_roles}
+                    id={"available-role-label-#{role.id}"}
+                    class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
+                  >
+                    <input
+                      type="checkbox"
+                      name="role_ids[]"
+                      value={role.id}
+                      checked={to_string(role.id) in @selected_role_ids}
+                      class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
+                    />
+                    <span class="truncate" title={role.name}>{role.name}</span>
+                  </label>
+                </div>
+                <.empty_state
+                  :if={@filtered_available_roles == []}
+                  id="available-roles-empty"
+                  class="py-2"
+                  title={"No roles match “#{String.trim(@role_search)}”"}
+                  reason="Roles are matched by name. Clear the search to see every role you can assign."
+                />
+                <div class="flex items-center gap-2 mt-2">
+                  <.button
+                    :if={@selected_role_ids != []}
+                    type="submit"
+                    variant="primary"
+                    id="confirm-assign-roles-btn"
+                    class="text-xs"
+                  >
+                    Assign ({length(@selected_role_ids)})
+                  </.button>
                   <.button
                     type="button"
-                    id="toggle-assign-roles-btn"
-                    phx-click="toggle_assign_roles" phx-target={@myself}
-                    class="text-xs font-medium"
+                    phx-click="toggle_assign_roles"
+                    phx-target={@myself}
+                    class="text-xs"
                   >
-                    <.icon name="create" class="size-3.5" />
-                    <span>Roles</span>
+                    Cancel
                   </.button>
                 </div>
-                <div
-                  :if={@show_assign_roles}
-                  id="assign-roles-picker"
-                  class="rounded-xl border border-line bg-surface p-3 space-y-3 shadow-xs"
+              </form>
+            </div>
+          </div>
+        <% else %>
+          <div id="assign-roles-unavailable" class="mb-6">
+            <%= case @roles_control do %>
+              <% :archived -> %>
+                <.empty_state
+                  title="Roles can't be changed"
+                  reason="This user's company is archived, so no role can be assigned or removed."
+                />
+              <% :forbidden -> %>
+                <.empty_state forbidden={"assign roles to this user, which needs #{manage_capability()}"} />
+              <% :grant_all -> %>
+                <.empty_state
+                  title="A role would add nothing"
+                  reason={"#{@grant_all_subject} already grants every capability, so this user holds everything a role could add."}
+                />
+              <% :no_roles -> %>
+                <.empty_state
+                  title="No roles exist yet"
+                  reason={no_roles_reason(@can_create_roles?)}
                 >
-                  <form phx-change="search_roles" phx-submit="search_roles" id="role-search-form" phx-target={@myself}>
-                    <label for="role-search-input" class="sr-only">Search roles</label>
-                    <input
-                      type="search"
-                      id="role-search-input"
-                      name="value"
-                      phx-debounce="300"
-                      autocomplete="off"
-                      placeholder="Search roles..."
-                      value={@role_search}
-                      class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
-                    />
-                  </form>
-                  <form
-                    phx-change="select_roles"
-                    phx-submit="assign_selected_roles"
-                    id="assign-roles-form"
-                    phx-target={@myself}
-                  >
-                    <div
-                      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
-                      id="available-roles-list"
+                  <:action :if={@can_create_roles?}>
+                    <.action_link
+                      id="assign-roles-create-link"
+                      icon="create"
+                      navigate={~p"/authz/roles/create"}
+                      title="Create a role"
                     >
-                      <label
-                        :for={role <- @filtered_available_roles}
-                        id={"available-role-label-#{role.id}"}
-                        class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
-                      >
-                        <input
-                          type="checkbox"
-                          name="role_ids[]"
-                          value={role.id}
-                          checked={to_string(role.id) in @selected_role_ids}
-                          class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
-                        />
-                        <span class="truncate" title={role.name}>{role.name}</span>
-                      </label>
-                    </div>
-                    <.empty_state
-                      :if={@filtered_available_roles == []}
-                      id="available-roles-empty"
-                      class="py-2"
-                      title={"No roles match “#{String.trim(@role_search)}”"}
-                      reason="Roles are matched by name. Clear the search to see every role you can assign."
-                    />
-                    <div class="flex items-center gap-2 mt-2">
-                      <.button
-                        :if={@selected_role_ids != []}
-                        type="submit"
-                        variant="primary"
-                        id="confirm-assign-roles-btn"
-                        class="text-xs"
-                      >
-                        Assign ({length(@selected_role_ids)})
-                      </.button>
-                      <.button
-                        type="button"
-                        phx-click="toggle_assign_roles" phx-target={@myself}
-                        class="text-xs"
-                      >
-                        Cancel
-                      </.button>
-                    </div>
-                  </form>
-                </div>
-              </div>
+                      Create a role
+                    </.action_link>
+                  </:action>
+                  <:action :if={not @can_create_roles? and @can_list_roles?}>
+                    <.action_link
+                      id="assign-roles-index-link"
+                      icon="manage"
+                      navigate={~p"/authz/roles"}
+                      title="Open the Roles page"
+                    >
+                      Roles
+                    </.action_link>
+                  </:action>
+                </.empty_state>
+              <% :all_assigned -> %>
+                <.empty_state
+                  title="No roles left to assign"
+                  reason="This user already holds every role that exists in this workspace."
+                />
+              <% :none_grantable -> %>
+                <.empty_state
+                  title="No roles your account can assign"
+                  reason="Assigning a role needs every capability it grants, and each remaining role grants one your account does not hold. Ask an operator to review your role."
+                />
+            <% end %>
+          </div>
+        <% end %>
+
+        <!-- Effective Permissions Disclosure -->
+        <div id="effective-permissions-section" class="border-t border-line pt-4">
+          <button
+            type="button"
+            id="toggle-permissions-btn"
+            phx-click="toggle_effective_permissions"
+            phx-target={@myself}
+            class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
+          >
+            <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
+              <.icon
+                name={
+                  if @show_effective_permissions,
+                    do: "collapse",
+                    else: "expand"
+                }
+                class="size-3"
+              />
+            </span>
+            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+              Effective Permissions
+              <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                {length(@effective_keys)}
+              </span>
+            </h3>
+          </button>
+
+          <div :if={@show_effective_permissions} id="effective-permissions-content" class="mt-3">
+            <p class="text-xs text-ink-muted mb-3">
+              Green = from roles. Blue = direct grant. Red = denied. Click ✕ to remove or deny.
+            </p>
+
+            <%= if @grouped_effective_permissions == %{} do %>
+              <p class="text-sm text-ink-muted">No permissions.</p>
             <% else %>
-              <div id="assign-roles-unavailable" class="mb-6">
-                <%= case @roles_control do %>
-                  <% :archived -> %>
-                    <.empty_state
-                      title="Roles can't be changed"
-                      reason="This user's company is archived, so no role can be assigned or removed."
-                    />
-                  <% :forbidden -> %>
-                    <.empty_state forbidden={"assign roles to this user, which needs #{manage_capability()}"} />
-                  <% :grant_all -> %>
-                    <.empty_state
-                      title="A role would add nothing"
-                      reason={"#{@grant_all_subject} already grants every capability, so this user holds everything a role could add."}
-                    />
-                  <% :no_roles -> %>
-                    <.empty_state
-                      title="No roles exist yet"
-                      reason={no_roles_reason(@can_create_roles?)}
-                    >
-                      <:action :if={@can_create_roles?}>
-                        <.action_link
-                          id="assign-roles-create-link"
-                          icon="create"
-                          navigate={~p"/authz/roles/create"}
-                          title="Create a role"
-                        >
-                          Create a role
-                        </.action_link>
-                      </:action>
-                      <:action :if={not @can_create_roles? and @can_list_roles?}>
-                        <.action_link
-                          id="assign-roles-index-link"
-                          icon="manage"
-                          navigate={~p"/authz/roles"}
-                          title="Open the Roles page"
-                        >
-                          Roles
-                        </.action_link>
-                      </:action>
-                    </.empty_state>
-                  <% :all_assigned -> %>
-                    <.empty_state
-                      title="No roles left to assign"
-                      reason="This user already holds every role that exists in this workspace."
-                    />
-                  <% :none_grantable -> %>
-                    <.empty_state
-                      title="No roles your account can assign"
-                      reason="Assigning a role needs every capability it grants, and each remaining role grants one your account does not hold. Ask an operator to review your role."
-                    />
-                <% end %>
-              </div>
+              <.list id="effective-permissions-list">
+                <:item
+                  :for={{domain, caps} <- @grouped_effective_permissions}
+                  title={domain}
+                  id={"permissions-domain-#{domain}"}
+                >
+                  <div class="flex flex-wrap gap-1">
+                    <%= for cap <- caps do %>
+                      <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
+                      <span
+                        id={"cap-badge-#{String.replace(cap, ".", "-")}"}
+                        class={[
+                          "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                          if(is_direct,
+                            do: "bg-info-surface text-info-ink border-info-line",
+                            else: "bg-success-surface text-success-ink border-success-line"
+                          )
+                        ]}
+                      >
+                        <span>{cap}</span>
+                        <%= if @can_edit? do %>
+                          <%= if is_direct do %>
+                            <.icon_button
+                              icon="close"
+                              label={"Remove the direct grant of #{cap}"}
+                              context={:inline}
+                              kind={:danger}
+                              id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
+                              phx-click={
+                                JS.push("lv:clear-flash")
+                                |> JS.push("request_remove_capability", target: @myself)
+                              }
+                              phx-value-grant-id={@direct_grant_ids[cap]}
+                            />
+                          <% else %>
+                            <.icon_button
+                              icon="close"
+                              label={"Deny #{cap}"}
+                              context={:inline}
+                              kind={:danger}
+                              id={"deny-cap-#{String.replace(cap, ".", "-")}"}
+                              phx-click={
+                                JS.push("lv:clear-flash")
+                                |> JS.push("request_deny_capability", target: @myself)
+                              }
+                              phx-value-capability-key={cap}
+                            />
+                          <% end %>
+                        <% end %>
+                      </span>
+                    <% end %>
+                  </div>
+                </:item>
+              </.list>
             <% end %>
 
-            <!-- Effective Permissions Disclosure -->
-            <div id="effective-permissions-section" class="border-t border-line pt-4">
-              <button
-                type="button"
-                id="toggle-permissions-btn"
-                phx-click="toggle_effective_permissions" phx-target={@myself}
-                class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
+            <!-- Denied Capabilities Grouped by Domain (Red) -->
+            <div
+              :if={@grouped_denied_permissions != %{}}
+              id="denied-permissions-section"
+              class="mt-4 pt-4 border-t border-line"
+            >
+              <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
+                Denied
+              </div>
+              <.list id="denied-permissions-list">
+                <:item
+                  :for={{domain, caps} <- @grouped_denied_permissions}
+                  title={domain}
+                  id={"denied-domain-#{domain}"}
+                >
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      :for={cap <- caps}
+                      id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
+                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
+                    >
+                      <span>{cap}</span>
+                      <.icon_button
+                        :if={@can_edit?}
+                        icon="close"
+                        label={"Remove the deny rule for #{cap}"}
+                        context={:inline}
+                        kind={:danger}
+                        id={"remove-denial-#{String.replace(cap, ".", "-")}"}
+                        phx-click={
+                          JS.push("lv:clear-flash")
+                          |> JS.push("request_remove_capability", target: @myself)
+                        }
+                        phx-value-grant-id={@direct_deny_ids[cap]}
+                      />
+                    </span>
+                  </div>
+                </:item>
+              </.list>
+            </div>
+
+            <!-- Add Capabilities Picker -->
+            <div
+              :if={@capabilities_control == :available}
+              id="add-capabilities-section"
+              class="mt-4 pt-4 border-t border-line"
+            >
+              <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
+                Add Capabilities
+              </div>
+              <form
+                phx-change="search_capabilities"
+                phx-submit="search_capabilities"
+                id="capability-search-form"
+                phx-target={@myself}
+                class="mb-2"
               >
-                <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
-                  <.icon
-                    name={
-                      if @show_effective_permissions,
-                        do: "collapse",
-                        else: "expand"
-                    }
-                    class="size-3"
-                  />
-                </span>
-                <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Effective Permissions
-                  <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
-                    {length(@effective_keys)}
-                  </span>
-                </h3>
-              </button>
-
-              <div :if={@show_effective_permissions} id="effective-permissions-content" class="mt-3">
-                <p class="text-xs text-ink-muted mb-3">
-                  Green = from roles. Blue = direct grant. Red = denied. Click ✕ to remove or deny.
-                </p>
-
-                <%= if @grouped_effective_permissions == %{} do %>
-                  <p class="text-sm text-ink-muted">No permissions.</p>
-                <% else %>
-                  <.list id="effective-permissions-list">
-                    <:item
-                      :for={{domain, caps} <- @grouped_effective_permissions}
-                      title={domain}
-                      id={"permissions-domain-#{domain}"}
-                    >
-                      <div class="flex flex-wrap gap-1">
-                        <%= for cap <- caps do %>
-                          <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
-                          <span
-                            id={"cap-badge-#{String.replace(cap, ".", "-")}"}
-                            class={[
-                              "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border",
-                              if(is_direct,
-                                do: "bg-info-surface text-info-ink border-info-line",
-                                else: "bg-success-surface text-success-ink border-success-line"
-                              )
-                            ]}
-                          >
-                            <span>{cap}</span>
-                            <%= if @can_edit? do %>
-                              <%= if is_direct do %>
-                                <.icon_button
-                                  icon="close"
-                                  label={"Remove the direct grant of #{cap}"}
-                                  context={:inline}
-                                  kind={:danger}
-                                  id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
-                                  phx-click={
-                                    JS.push("lv:clear-flash")
-                                    |> JS.push("request_remove_capability", target: @myself)
-                                  }
-                                  phx-value-grant-id={@direct_grant_ids[cap]}
-                                />
-                              <% else %>
-                                <.icon_button
-                                  icon="close"
-                                  label={"Deny #{cap}"}
-                                  context={:inline}
-                                  kind={:danger}
-                                  id={"deny-cap-#{String.replace(cap, ".", "-")}"}
-                                  phx-click={
-                                    JS.push("lv:clear-flash")
-                                    |> JS.push("request_deny_capability", target: @myself)
-                                  }
-                                  phx-value-capability-key={cap}
-                                />
-                              <% end %>
-                            <% end %>
-                          </span>
-                        <% end %>
-                      </div>
-                    </:item>
-                  </.list>
-                <% end %>
-
-                <!-- Denied Capabilities Grouped by Domain (Red) -->
+                <label for="capability-search-input" class="sr-only">Search capabilities</label>
+                <input
+                  type="search"
+                  id="capability-search-input"
+                  name="value"
+                  phx-debounce="300"
+                  autocomplete="off"
+                  placeholder="Search capabilities..."
+                  value={@capability_search}
+                  class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                />
+              </form>
+              <form
+                phx-change="select_capabilities"
+                phx-submit="add_selected_capabilities"
+                id="add-capabilities-form"
+                phx-target={@myself}
+              >
                 <div
-                  :if={@grouped_denied_permissions != %{}}
-                  id="denied-permissions-section"
-                  class="mt-4 pt-4 border-t border-line"
+                  class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
+                  id="available-capabilities-list"
                 >
-                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
-                    Denied
-                  </div>
-                  <.list id="denied-permissions-list">
-                    <:item
-                      :for={{domain, caps} <- @grouped_denied_permissions}
-                      title={domain}
-                      id={"denied-domain-#{domain}"}
+                  <%= for {_domain, caps} <- @filtered_available_capabilities, cap <- caps do %>
+                    <label
+                      id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
+                      class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
                     >
-                      <div class="flex flex-wrap gap-1">
-                        <span
-                          :for={cap <- caps}
-                          id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
-                          class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
-                        >
-                          <span>{cap}</span>
-                          <.icon_button
-                            :if={@can_edit?}
-                            icon="close"
-                            label={"Remove the deny rule for #{cap}"}
-                            context={:inline}
-                            kind={:danger}
-                            id={"remove-denial-#{String.replace(cap, ".", "-")}"}
-                            phx-click={
-                              JS.push("lv:clear-flash")
-                              |> JS.push("request_remove_capability", target: @myself)
-                            }
-                            phx-value-grant-id={@direct_deny_ids[cap]}
-                          />
-                        </span>
-                      </div>
-                    </:item>
-                  </.list>
-                </div>
-
-                <!-- Add Capabilities Picker -->
-                <div
-                  :if={@capabilities_control == :available}
-                  id="add-capabilities-section"
-                  class="mt-4 pt-4 border-t border-line"
-                >
-                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
-                    Add Capabilities
-                  </div>
-                  <form
-                    phx-change="search_capabilities"
-                    phx-submit="search_capabilities"
-                    id="capability-search-form"
-                    phx-target={@myself}
-                    class="mb-2"
-                  >
-                    <label for="capability-search-input" class="sr-only">Search capabilities</label>
-                    <input
-                      type="search"
-                      id="capability-search-input"
-                      name="value"
-                      phx-debounce="300"
-                      autocomplete="off"
-                      placeholder="Search capabilities..."
-                      value={@capability_search}
-                      class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
-                    />
-                  </form>
-                  <form
-                    phx-change="select_capabilities"
-                    phx-submit="add_selected_capabilities"
-                    id="add-capabilities-form"
-                    phx-target={@myself}
-                  >
-                    <div
-                      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
-                      id="available-capabilities-list"
-                    >
-                      <%= for {_domain, caps} <- @filtered_available_capabilities, cap <- caps do %>
-                        <label
-                          id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
-                          class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
-                        >
-                          <input
-                            type="checkbox"
-                            name="capability_keys[]"
-                            value={cap}
-                            checked={cap in @selected_capability_keys}
-                            class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
-                          />
-                          <span class="truncate" title={cap}>{cap}</span>
-                        </label>
-                      <% end %>
-                    </div>
-                    <.empty_state
-                      :if={@filtered_available_capabilities == %{}}
-                      id="available-capabilities-empty"
-                      class="py-2"
-                      title={"No capabilities match “#{String.trim(@capability_search)}”"}
-                      reason="Capabilities are matched by key, which starts with the domain (such as admin.). Clear the search to see every capability you can add."
-                    />
-                    <div :if={@selected_capability_keys != []} class="mt-2">
-                      <.button
-                        type="submit"
-                        variant="primary"
-                        id="confirm-add-capabilities-btn"
-                        class="text-xs"
-                      >
-                        Add ({length(@selected_capability_keys)})
-                      </.button>
-                    </div>
-                  </form>
-                </div>
-                <%!-- The same rule as the Roles control: a hidden picker states
-                     its own reason where the picker would be. --%>
-                <div
-                  :if={@capabilities_control != :available}
-                  id="add-capabilities-unavailable"
-                  class="mt-4 pt-4 border-t border-line"
-                >
-                  <%= case @capabilities_control do %>
-                    <% :archived -> %>
-                      <.empty_state
-                        title="Capabilities can't be changed"
-                        reason="This user's company is archived, so no capability can be added, denied or removed."
+                      <input
+                        type="checkbox"
+                        name="capability_keys[]"
+                        value={cap}
+                        checked={cap in @selected_capability_keys}
+                        class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
                       />
-                    <% :forbidden -> %>
-                      <.empty_state forbidden={"add capabilities to this user, which needs #{manage_capability()}"} />
-                    <% :all_in_effect -> %>
-                      <.empty_state
-                        title="No capabilities left to add"
-                        reason="Every installed capability is already in effect or denied for this user."
-                      />
-                    <% :none_grantable -> %>
-                      <.empty_state
-                        title="No capabilities your account can add"
-                        reason="You can only add capabilities you hold, and every remaining capability is one your account does not. Ask an operator to review your role."
-                      />
+                      <span class="truncate" title={cap}>{cap}</span>
+                    </label>
                   <% end %>
                 </div>
-              </div>
+                <.empty_state
+                  :if={@filtered_available_capabilities == %{}}
+                  id="available-capabilities-empty"
+                  class="py-2"
+                  title={"No capabilities match “#{String.trim(@capability_search)}”"}
+                  reason="Capabilities are matched by key, which starts with the domain (such as admin.). Clear the search to see every capability you can add."
+                />
+                <div :if={@selected_capability_keys != []} class="mt-2">
+                  <.button
+                    type="submit"
+                    variant="primary"
+                    id="confirm-add-capabilities-btn"
+                    class="text-xs"
+                  >
+                    Add ({length(@selected_capability_keys)})
+                  </.button>
+                </div>
+              </form>
             </div>
-          </.card>
+            <%!-- The same rule as the Roles control: a hidden picker states
+                     its own reason where the picker would be. --%>
+            <div
+              :if={@capabilities_control != :available}
+              id="add-capabilities-unavailable"
+              class="mt-4 pt-4 border-t border-line"
+            >
+              <%= case @capabilities_control do %>
+                <% :archived -> %>
+                  <.empty_state
+                    title="Capabilities can't be changed"
+                    reason="This user's company is archived, so no capability can be added, denied or removed."
+                  />
+                <% :forbidden -> %>
+                  <.empty_state forbidden={"add capabilities to this user, which needs #{manage_capability()}"} />
+                <% :all_in_effect -> %>
+                  <.empty_state
+                    title="No capabilities left to add"
+                    reason="Every installed capability is already in effect or denied for this user."
+                  />
+                <% :none_grantable -> %>
+                  <.empty_state
+                    title="No capabilities your account can add"
+                    reason="You can only add capabilities you hold, and every remaining capability is one your account does not. Ask an operator to review your role."
+                  />
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </.card>
 
       <.confirm_dialog
         :if={@pending_authz}

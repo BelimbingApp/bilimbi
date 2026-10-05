@@ -403,12 +403,14 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 key="record.history"
                 id="address-record-history"
                 current_scope={@current_scope}
-                opts={%{
-                  auditable_types: address_auditable_types(),
-                  auditable_id: @address.id,
-                  record: @address,
-                  title: "History for address ##{@address.id}"
-                }}
+                opts={
+                  %{
+                    auditable_types: address_auditable_types(),
+                    auditable_id: @address.id,
+                    record: @address,
+                    title: "History for address ##{@address.id}"
+                  }
+                }
               />
               <.back_link
                 :if={@company_context_id}
@@ -459,9 +461,26 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 >
                   <:display><.verification_badge status={@address.verification_status} /></:display>
                   <:editor>
-                    <form id="address-verification-status-form" phx-change="save_verification_status" class="inline-block">
-                      <select id="address-verification-status-select" name="verification_status" aria-label="Verification status" phx-mounted={JS.focus()} phx-blur="cancel_edit_field" class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong">
-                        <option :for={{label, value} <- verification_status_options()} value={value} selected={@address.verification_status == value}>{label}</option>
+                    <form
+                      id="address-verification-status-form"
+                      phx-change="save_verification_status"
+                      class="inline-block"
+                    >
+                      <select
+                        id="address-verification-status-select"
+                        name="verification_status"
+                        aria-label="Verification status"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option
+                          :for={{label, value} <- verification_status_options()}
+                          value={value}
+                          selected={@address.verification_status == value}
+                        >
+                          {label}
+                        </option>
                       </select>
                     </form>
                   </:editor>
@@ -636,77 +655,77 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
               framed={false}
               caption="Linked entities"
             >
-                <:col :let={owner} label="Entity Type" sort="type" sort_id="sort-type">
-                  <span class="whitespace-nowrap font-medium text-ink">
-                    {format_owner_type(owner.owner_type)}
-                  </span>
-                </:col>
+              <:col :let={owner} label="Entity Type" sort="type" sort_id="sort-type">
+                <span class="whitespace-nowrap font-medium text-ink">
+                  {format_owner_type(owner.owner_type)}
+                </span>
+              </:col>
 
-                <:col :let={owner} label="Name" sort="name" sort_id="sort-name">
-                  <span class="whitespace-nowrap font-medium">
-                    <%= if owner.owner_type == :company do %>
+              <:col :let={owner} label="Name" sort="name" sort_id="sort-name">
+                <span class="whitespace-nowrap font-medium">
+                  <%= if owner.owner_type == :company do %>
+                    <.link
+                      navigate={~p"/companies/#{owner.owner_id}"}
+                      id={"linked-company-#{owner.owner_id}"}
+                      class="text-action hover:underline"
+                    >
+                      {owner.name}
+                    </.link>
+                  <% else %>
+                    <%= if owner.owner_type == :employee do %>
                       <.link
-                        navigate={~p"/companies/#{owner.owner_id}"}
-                        id={"linked-company-#{owner.owner_id}"}
+                        navigate={~p"/employees/#{owner.owner_id}"}
+                        id={"linked-employee-#{owner.owner_id}"}
                         class="text-action hover:underline"
                       >
                         {owner.name}
                       </.link>
                     <% else %>
-                      <%= if owner.owner_type == :employee do %>
-                        <.link
-                          navigate={~p"/employees/#{owner.owner_id}"}
-                          id={"linked-employee-#{owner.owner_id}"}
-                          class="text-action hover:underline"
-                        >
-                          {owner.name}
-                        </.link>
-                      <% else %>
-                        <span>{owner.name}</span>
-                      <% end %>
+                      <span>{owner.name}</span>
                     <% end %>
-                  </span>
-                </:col>
+                  <% end %>
+                </span>
+              </:col>
 
-                <:col :let={owner} label="Kind" sort="kind" sort_id="sort-kind">
-                  <div class="flex flex-wrap gap-1">
-                    <%= if owner.kind != [] do %>
-                      <.badge :for={kind <- owner.kind} kind={:neutral}>
-                        {String.capitalize(kind)}
-                      </.badge>
-                    <% else %>
-                      <span class="text-ink-muted">—</span>
-                    <% end %>
-                  </div>
-                </:col>
+              <:col :let={owner} label="Kind" sort="kind" sort_id="sort-kind">
+                <div class="flex flex-wrap gap-1">
+                  <%= if owner.kind != [] do %>
+                    <.badge :for={kind <- owner.kind} kind={:neutral}>
+                      {String.capitalize(kind)}
+                    </.badge>
+                  <% else %>
+                    <span class="text-ink-muted">—</span>
+                  <% end %>
+                </div>
+              </:col>
 
-                <:col :let={owner} label="Primary" sort="is_primary" sort_id="sort-is-primary">
-                  <span class="whitespace-nowrap text-sm text-ink-muted">
-                    {if owner.is_primary, do: "Yes", else: "No"}
-                  </span>
-                </:col>
+              <:col :let={owner} label="Primary" sort="is_primary" sort_id="sort-is-primary">
+                <span class="whitespace-nowrap text-sm text-ink-muted">
+                  {if owner.is_primary, do: "Yes", else: "No"}
+                </span>
+              </:col>
 
-                <:col :let={owner} label="Priority" sort="priority" sort_id="sort-priority">
-                  <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
-                    {owner.priority || "—"}
-                  </span>
-                </:col>
+              <:col :let={owner} label="Priority" sort="priority" sort_id="sort-priority">
+                <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
+                  {owner.priority || "—"}
+                </span>
+              </:col>
 
-                <:col :let={owner} label="Valid From" sort="valid_from" sort_id="sort-valid-from">
-                  <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
-                    {owner.valid_from || "—"}
-                  </span>
-                </:col>
+              <:col :let={owner} label="Valid From" sort="valid_from" sort_id="sort-valid-from">
+                <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
+                  {owner.valid_from || "—"}
+                </span>
+              </:col>
 
-                <:col :let={owner} label="Valid To" sort="valid_to" sort_id="sort-valid-to">
-                  <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
-                    {owner.valid_to || "—"}
-                  </span>
-                </:col>
+              <:col :let={owner} label="Valid To" sort="valid_to" sort_id="sort-valid-to">
+                <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
+                  {owner.valid_to || "—"}
+                </span>
+              </:col>
 
-                <:empty :if={@address.linked_owners == []}>
-                  No linked entities.
-                </:empty>
+              <:empty :if={@address.linked_owners == []}>
+                No linked entities.
+              </:empty>
             </.table>
           </.card>
         </div>

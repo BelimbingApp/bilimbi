@@ -128,66 +128,73 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
         phx-mounted={JS.focus()}
         class="absolute right-0 z-40 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-3 text-left shadow-xl shadow-ink/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
       >
-          <div class="flex items-start justify-between gap-3 border-b border-line pb-2">
-            <div>
-              <h2 id={"#{@id}-heading"} class="text-sm font-semibold text-ink">{@title}</h2>
-              <p class="text-xs text-ink-muted">{history_count(@entries)}</p>
-            </div>
+        <div class="flex items-start justify-between gap-3 border-b border-line pb-2">
+          <div>
+            <h2 id={"#{@id}-heading"} class="text-sm font-semibold text-ink">{@title}</h2>
+            <p class="text-xs text-ink-muted">{history_count(@entries)}</p>
           </div>
-
-          <ol :if={@entries != []} class="mt-2 max-h-96 space-y-2 overflow-y-auto">
-            <li
-              :for={entry <- @entries}
-              id={"#{@id}-entry-#{entry.id}"}
-              class="rounded-lg border border-line bg-surface px-3 py-2"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <% {badge_kind, badge_label} = event_badge(entry.event) %>
-                <.badge kind={badge_kind}>{badge_label}</.badge>
-                <.datetime
-                  id={"#{@id}-entry-#{entry.id}-occurred"}
-                  value={entry.occurred_at}
-                  class="text-xs text-ink-muted"
-                />
-              </div>
-
-              <div class="mt-1 text-xs text-ink-muted">
-                {actor_label(entry)}
-              </div>
-
-              <% field_diffs = MutationDiff.rows(entry) %>
-              <div :if={field_diffs != []} class="mt-2 space-y-1">
-                <div :for={diff <- field_diffs} class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 font-mono text-xs">
-                  <span class="truncate font-semibold text-ink-muted">{diff.field}</span>
-                  <span class="min-w-0 truncate text-ink">
-                    <%= if diff.sensitive do %>
-                      redacted
-                    <% else %>
-                      <.diff_value
-                        id={"#{@id}-entry-#{entry.id}-#{diff.field}-old"}
-                        value={diff.old}
-                        class="text-danger-ink"
-                      />
-                      <span class="px-1 text-ink-muted">-></span>
-                      <.diff_value
-                        id={"#{@id}-entry-#{entry.id}-#{diff.field}-new"}
-                        value={diff.new}
-                        class="text-success-ink"
-                      />
-                    <% end %>
-                  </span>
-                </div>
-              </div>
-              <p :if={field_diffs == []} class="mt-2 text-xs italic text-ink-muted">
-                No field changes recorded.
-              </p>
-            </li>
-          </ol>
-
-          <p :if={@entries == []} id={"#{@id}-empty"} class="mt-3 rounded-lg bg-surface-sunken px-3 py-6 text-center text-sm text-ink-muted">
-            No record history found.
-          </p>
         </div>
+
+        <ol :if={@entries != []} class="mt-2 max-h-96 space-y-2 overflow-y-auto">
+          <li
+            :for={entry <- @entries}
+            id={"#{@id}-entry-#{entry.id}"}
+            class="rounded-lg border border-line bg-surface px-3 py-2"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <% {badge_kind, badge_label} = event_badge(entry.event) %>
+              <.badge kind={badge_kind}>{badge_label}</.badge>
+              <.datetime
+                id={"#{@id}-entry-#{entry.id}-occurred"}
+                value={entry.occurred_at}
+                class="text-xs text-ink-muted"
+              />
+            </div>
+
+            <div class="mt-1 text-xs text-ink-muted">
+              {actor_label(entry)}
+            </div>
+
+            <% field_diffs = MutationDiff.rows(entry) %>
+            <div :if={field_diffs != []} class="mt-2 space-y-1">
+              <div
+                :for={diff <- field_diffs}
+                class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 font-mono text-xs"
+              >
+                <span class="truncate font-semibold text-ink-muted">{diff.field}</span>
+                <span class="min-w-0 truncate text-ink">
+                  <%= if diff.sensitive do %>
+                    redacted
+                  <% else %>
+                    <.diff_value
+                      id={"#{@id}-entry-#{entry.id}-#{diff.field}-old"}
+                      value={diff.old}
+                      class="text-danger-ink"
+                    />
+                    <span class="px-1 text-ink-muted">-></span>
+                    <.diff_value
+                      id={"#{@id}-entry-#{entry.id}-#{diff.field}-new"}
+                      value={diff.new}
+                      class="text-success-ink"
+                    />
+                  <% end %>
+                </span>
+              </div>
+            </div>
+            <p :if={field_diffs == []} class="mt-2 text-xs italic text-ink-muted">
+              No field changes recorded.
+            </p>
+          </li>
+        </ol>
+
+        <p
+          :if={@entries == []}
+          id={"#{@id}-empty"}
+          class="mt-3 rounded-lg bg-surface-sunken px-3 py-6 text-center text-sm text-ink-muted"
+        >
+          No record history found.
+        </p>
+      </div>
     </div>
     """
   end

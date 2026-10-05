@@ -257,7 +257,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               id="companies-pin"
               data-nav-pin="nav-admin-company"
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
           <:actions>
@@ -315,7 +315,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
         <.card id="companies-card" inner_class="p-0">
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
-
 
           <.table
             id="companies"

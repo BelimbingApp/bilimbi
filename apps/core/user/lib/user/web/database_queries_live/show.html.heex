@@ -43,17 +43,14 @@
               id="btn-duplicate-query"
               phx-click="duplicate"
             >
-              <.icon name="duplicate" class="size-4 mr-1.5" />
-              Duplicate
+              <.icon name="duplicate" class="size-4 mr-1.5" /> Duplicate
             </.button>
             <.button variant="danger" id="btn-delete-query" phx-click="request_delete">
-              <.icon name="delete" class="size-4 mr-1.5" />
-              Delete
+              <.icon name="delete" class="size-4 mr-1.5" /> Delete
             </.button>
           <% else %>
             <.button id="btn-discard-query" phx-click="delete">
-              <.icon name="close" class="size-4 mr-1.5" />
-              Discard
+              <.icon name="close" class="size-4 mr-1.5" /> Discard
             </.button>
           <% end %>
 
@@ -62,8 +59,7 @@
             phx-click="save"
             variant="primary"
           >
-            <.icon name="save" class="size-4 mr-1.5" />
-            Save
+            <.icon name="save" class="size-4 mr-1.5" /> Save
           </.button>
         <% end %>
       </:actions>
@@ -72,7 +68,12 @@
     <div class="space-y-6">
       <%!-- Every section is a card opened by the shared heading, as on every
            record page (DESIGN.md "Detail sections and facts"). --%>
-      <.card id="prompt-card" inner_class="p-5 sm:p-6" role="region" aria-labelledby="prompt-heading">
+      <.card
+        id="prompt-card"
+        inner_class="p-5 sm:p-6"
+        role="region"
+        aria-labelledby="prompt-heading"
+      >
         <.section_heading id="prompt-heading" title="Prompt" />
         <form id="query-prompt-form" phx-change="change_field">
           <textarea
@@ -99,8 +100,7 @@
               variant="primary"
               class="px-3 py-1 text-xs"
             >
-              <.icon name="play" class="size-3.5 mr-1" />
-              Run Query
+              <.icon name="play" class="size-3.5 mr-1" /> Run Query
             </.button>
           </:actions>
         </.section_heading>
@@ -137,7 +137,10 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 <%= for param <- @detected_params do %>
                   <div>
-                    <label for={"param-input-#{param}"} class="block text-xs font-mono text-ink mb-1">
+                    <label
+                      for={"param-input-#{param}"}
+                      class="block text-xs font-mono text-ink mb-1"
+                    >
                       :{param}
                     </label>
                     <input
@@ -192,7 +195,7 @@
             caption="Query results"
             framed={false}
           >
-            <:col :for={col <- @results.columns} :let={row} label={col} sort={col}>
+            <:col :let={row} :for={col <- @results.columns} label={col} sort={col}>
               <% val = Map.get(row, col) %>
               <span class="block max-w-sm truncate whitespace-nowrap font-mono text-xs">
                 <%= if is_nil(val) do %>
