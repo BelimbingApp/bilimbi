@@ -44,7 +44,7 @@ Bilimbi already has two relevant precedents:
 - `bilimbi.module.exs` owns installed-module facts. Its exact key set is
   validated during Mix graph discovery, then copied into the owning OTP
   application's `:bilimbi_module` metadata
-  (`apps/base/module_registry/mix/module_discovery.exs:13-36,92-110,235-247`).
+  (`apps/base/module_registry/mix/module_discovery.exs`: `application_env/1`).
 - Production seeds register behavior modules through per-application OTP
   environment and validate provider behavior, owning application, installed
   descriptor, and returned module ID at execution time
