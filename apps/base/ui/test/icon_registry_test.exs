@@ -25,11 +25,28 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
     assert hero_icon == icon
   end
 
+  test "provides the two filled row-height preset glyphs" do
+    for name <- ~w(rows-compact rows-normal) do
+      assert {:ok, icon} = IconRegistry.fetch(name)
+      assert icon.view_box == "0 0 24 24"
+      # Filled glyphs: the renderer strokes only an icon whose fill is none.
+      assert icon.fill == "currentColor"
+      assert [path] = icon.paths
+      assert String.starts_with?(path, "M")
+    end
+  end
+
   test "the catalogue lists every custom glyph and action name once, each resolving" do
     [glyphs, actions] = IconRegistry.catalog()
 
     assert Enum.map(glyphs.icons, & &1.name) ==
-             Enum.sort(["bilimbi-pin", "bilimbi-impersonate", "hero-impersonate"])
+             Enum.sort([
+               "bilimbi-pin",
+               "bilimbi-impersonate",
+               "hero-impersonate",
+               "rows-compact",
+               "rows-normal"
+             ])
 
     assert Map.new(actions.icons, &{&1.name, &1.heroicon}) == IconRegistry.actions()
 
@@ -95,7 +112,9 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "fullscreen" => "hero-arrows-pointing-out",
              "fullscreen-exit" => "hero-arrows-pointing-in",
              "inspect" => "hero-document-magnifying-glass",
-             "compact" => "hero-bars-4",
+             "zoom-in" => "hero-plus",
+             "zoom-out" => "hero-minus",
+             "customize" => "hero-adjustments-horizontal",
              "dashboard" => "hero-squares-2x2",
              "status" => "hero-signal"
            }

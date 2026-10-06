@@ -46,7 +46,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     }
   ]
 
-  # Column, lens and density operations rearrange the reading of the list. What
+  # Column, lens and zoom operations rearrange the reading of the list. What
   # they keep is the signed-in account's own arrangement of this page, a
   # self-service setting as the dashboard layout is, not an administration
   # write.

@@ -38,7 +38,7 @@ defmodule Bilimbi.Base.Grid.PageViewsTest do
         table: table,
         columns: ~w(name company.name employees:count),
         lenses: %{"employees:count" => "bar"},
-        density: :compact,
+        zoom: 24,
         since: ~D[2026-08-01]
       },
       overrides
@@ -53,12 +53,12 @@ defmodule Bilimbi.Base.Grid.PageViewsTest do
     assert :ok = PageViews.remember(@own, view("users"))
 
     assert :ok =
-             PageViews.remember(@own, view("companies", %{columns: ~w(name), density: :normal}))
+             PageViews.remember(@own, view("companies", %{columns: ~w(name), zoom: 36}))
 
     assert PageViews.fetch(@own, "users") == {:ok, view("users")}
 
     assert PageViews.fetch(@own, "companies") ==
-             {:ok, view("companies", %{columns: ~w(name), density: :normal})}
+             {:ok, view("companies", %{columns: ~w(name), zoom: 36})}
 
     # Another account of the same company arranged nothing.
     assert PageViews.fetch(@other, "users") == :error
@@ -101,7 +101,7 @@ defmodule Bilimbi.Base.Grid.PageViewsTest do
         [
           %{"page" => "users"},
           "nonsense",
-          %{"page" => "companies", "view" => %{"density" => "x"}}
+          %{"page" => "companies", "view" => %{"zoom" => "x"}}
         ],
         @own
       )

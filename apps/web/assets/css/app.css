@@ -502,25 +502,6 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 }
 
-/* A panel a control opens beneath itself, such as table customization on
- * `flex_table`. It shares the scope and the anchor of a field's list; it
- * differs in lining up with the control's far edge and keeping its own
- * width. */
-@utility floating-panel {
-  position: absolute;
-  top: 100%;
-  right: 0;
-
-  @supports (anchor-scope: --floating-list) {
-    position: fixed;
-    position-anchor: --floating-list;
-    top: anchor(bottom);
-    right: anchor(right);
-    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
-    position-visibility: anchors-visible;
-  }
-}
-
 /* Menu typography & font colors matching Belimbing */
 .app-nav-rail {
   font-family: var(--font-sans);

@@ -18,7 +18,7 @@ defmodule Bilimbi.Base.Grid.Contributions do
             default: [],
             label: "List columns",
             help:
-              "The columns, lenses and row density this account last arranged on each list page, one entry per page.",
+              "The columns, lenses and row height this account last arranged on each list page, one entry per page.",
             capability: "base.settings.user.manage"
           }
         },

@@ -131,26 +131,109 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     assert URI.decode_query(URI.parse(path).query)["cols"] == "name"
   end
 
-  test "one toggle switches the list between normal and compact rows", %{conn: conn} do
+  # A press on a zoom control is pushed by the `FlexTable` hook, as its
+  # `data-zoom-op` says, so the test pushes what the hook would.
+  defp press(view, control) do
+    assert has_element?(view, control)
+    [op] = view |> element(control) |> render() |> attribute("data-zoom-op")
+
+    payload =
+      %{"op" => op}
+      |> put_attribute(view, control, "data-dir", "dir")
+      |> put_attribute(view, control, "data-preset", "preset")
+
+    render_hook(view, "grid", payload)
+  end
+
+  defp put_attribute(payload, view, control, attribute, key) do
+    case view |> element(control) |> render() |> attribute(attribute) do
+      [value] -> Map.put(payload, key, value)
+      [] -> payload
+    end
+  end
+
+  defp attribute(html, name) do
+    case Regex.run(~r/\s#{name}="([^"]*)"/, html, capture: :all_but_first) do
+      [value] -> [value]
+      nil -> []
+    end
+  end
+
+  defp query(view), do: URI.decode_query(URI.parse(assert_patch(view)).query || "")
+
+  test "Compact and Normal are two row heights of the same list", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
-    assert has_element?(view, "#users[data-mode='normal']")
-    assert has_element?(view, "#users-density[aria-pressed='false']")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+    assert has_element?(view, "#users-zoom-normal[aria-pressed='true']")
 
-    view |> element("#users-density") |> render_click()
-    path = assert_patch(view)
-    assert URI.decode_query(URI.parse(path).query)["density"] == "compact"
+    press(view, "#users-zoom-compact")
+    assert query(view)["z"] == "24"
 
     # Compact is the same table: the rows, their links and the sort stay.
-    assert has_element?(view, "#users[data-mode='compact']")
-    assert has_element?(view, "#users-density[aria-pressed='true']")
+    assert has_element?(view, "#users[data-mode='compact'][data-zoom='24']")
+    assert has_element?(view, "#users-zoom-compact[aria-pressed='true']")
     assert has_element?(view, "#user-91 #user-91-show", "Ada Lovelace")
     assert has_element?(view, "#users-sort-name")
     assert has_element?(view, "#users-pagination")
 
-    view |> element("#users-density") |> render_click()
-    path = assert_patch(view)
-    refute Map.has_key?(URI.decode_query(URI.parse(path).query || ""), "density")
+    press(view, "#users-zoom-normal")
+    refute Map.has_key?(query(view), "z")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+  end
+
+  test "the zoom steps one height at a time and stops at the ends of its range", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users?z=40")
+
+    press(view, "#users-zoom-in")
+    assert query(view)["z"] == "44"
+    assert has_element?(view, "#users-zoom-level", "44 px")
+    assert has_element?(view, "#users-zoom-in[disabled]")
+
+    # Down from the tallest: 40, 36, then the tallest compact height.
+    for expected <- ["40", nil, "28"] do
+      press(view, "#users-zoom-out")
+      assert query(view)["z"] == expected
+    end
+
+    assert has_element?(view, "#users[data-mode='compact']")
+
+    {:ok, shortest, _html} = conn |> log_in_as() |> live(~p"/users?z=20")
+    assert has_element?(shortest, "#users-zoom-out[disabled]")
+    refute has_element?(shortest, "#users-zoom-in[disabled]")
+  end
+
+  test "a press on Normal lands at once on a list remembered as compact", %{conn: conn} do
+    conn = log_in_as(conn)
+    {:ok, first, _html} = live(conn, ~p"/users")
+    press(first, "#users-zoom-compact")
+    assert_patch(first)
+
+    # A later visit: the address names nothing and the rows are compact,
+    # because that is what was kept.
+    {:ok, view, _html} = live(conn, ~p"/users")
+    assert has_element?(view, "#users[data-mode='compact']")
+
+    # Normal is the page's own, so the address it patches to names nothing
+    # either. The rows must follow the press, not what was kept before it:
+    # this is the press that used to snap back to compact.
+    press(view, "#users-zoom-normal")
+    refute Map.has_key?(query(view), "z")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+    assert has_element?(view, "#users-zoom-normal[aria-pressed='true']")
+
+    # And it stays through the page's own controls, with nothing kept now.
+    view |> element("#users-sort-email") |> render_click()
+    assert_patch(view)
+    assert has_element?(view, "#users[data-mode='normal']")
+
+    # Compact twice is compact; Normal straight after is normal.
+    press(view, "#users-zoom-compact")
+    assert_patch(view)
+    press(view, "#users-zoom-compact")
+    assert has_element?(view, "#users[data-mode='compact']")
+    press(view, "#users-zoom-normal")
+    assert_patch(view)
     assert has_element?(view, "#users[data-mode='normal']")
   end
 
@@ -162,11 +245,11 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     view |> form("#users-add-column", %{add: "parent"}) |> render_change()
     view |> element("#users-suggest-company-parent-name") |> render_click()
     assert_patch(view)
-    view |> element("#users-density") |> render_click()
+    press(view, "#users-zoom-compact")
     assert_patch(view)
 
-    # A later visit to the bare address: the walked column and the density
-    # are back without the address saying so.
+    # A later visit to the bare address: the walked column and the row
+    # height are back without the address saying so.
     {:ok, later, _html} = live(conn, ~p"/users")
     assert has_element?(later, "#users-chip-company-parent-name")
     assert has_element?(later, "#users-cell-92-company-parent-name", "Bilimbi Industries")
@@ -174,8 +257,8 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
 
     # The page's own controls carry the arrangement into the address.
     later |> element("#users-sort-name") |> render_click()
-    query = URI.decode_query(URI.parse(assert_patch(later)).query)
-    assert query["cols"] =~ "company.parent.name" and query["density"] == "compact"
+    carried = query(later)
+    assert carried["cols"] =~ "company.parent.name" and carried["z"] == "24"
 
     # A shared link says what to show, and opening it changes nothing kept.
     {:ok, linked, _html} = live(conn, ~p"/users?cols=name")
@@ -187,23 +270,78 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     {:ok, again, _html} = live(conn, ~p"/users")
     assert has_element?(again, "#users-chip-company-parent-name")
     assert has_element?(again, "#users[data-mode='compact']")
+  end
 
-    # Going back to the page's own columns and rows forgets the arrangement.
-    again |> element("#users-remove-company-parent-name") |> render_click()
-    assert_patch(again)
-    again |> element("#users-density") |> render_click()
-    query = URI.decode_query(URI.parse(assert_patch(again)).query)
-    refute Map.has_key?(query, "cols") or Map.has_key?(query, "density")
+  test "reset returns the list to its own columns and rows and forgets what was kept", %{
+    conn: conn
+  } do
+    conn = log_in_as(conn)
+    {:ok, view, _html} = live(conn, ~p"/users")
 
-    {:ok, reset, _html} = live(conn, ~p"/users")
-    refute has_element?(reset, "#users-chip-company-parent-name")
-    assert has_element?(reset, "#users-chip-email")
-    assert has_element?(reset, "#users[data-mode='normal']")
+    view |> form("#users-add-column", %{add: "parent"}) |> render_change()
+    view |> element("#users-suggest-company-parent-name") |> render_click()
+    assert_patch(view)
+    view |> element("#users-remove-email") |> render_click()
+    assert_patch(view)
+    press(view, "#users-zoom-compact")
+    assert_patch(view)
+
+    view |> element("#users-reset", "Reset to default columns") |> render_click()
+    reset = query(view)
+    refute Enum.any?(~w(cols lens z since), &Map.has_key?(reset, &1))
+    assert has_element?(view, "#users-chip-email")
+    refute has_element?(view, "#users-chip-company-parent-name")
+    assert has_element?(view, "#users[data-mode='normal']")
+
+    # Nothing is kept any more: a fresh visit is the page's own list.
+    {:ok, fresh, _html} = live(conn, ~p"/users")
+    assert has_element?(fresh, "#users-chip-email")
+    refute has_element?(fresh, "#users-chip-company-parent-name")
+    assert has_element?(fresh, "#users[data-mode='normal']")
+  end
+
+  test "a removed column of the page's own can always be added back", %{conn: conn} do
+    conn = log_in_as(conn)
+    {:ok, view, _html} = live(conn, ~p"/users")
+
+    # Roles is drawn by the page and is no field of the catalog.
+    view |> element("#users-remove-roles") |> render_click()
+    assert_patch(view)
+    refute has_element?(view, "#users-chip-roles")
+
+    # The removal is kept.
+    {:ok, later, _html} = live(conn, ~p"/users")
+    refute has_element?(later, "#users-chip-roles")
+    refute has_element?(later, "#users-head-roles")
+
+    # The add box offers it by its label, beside what the catalog offers.
+    later |> form("#users-add-column", %{add: "rol"}) |> render_change()
+    assert has_element?(later, "#users-suggest-roles", "Roles")
+
+    later |> element("#users-suggest-roles") |> render_click()
+    assert query(later)["cols"] == "name,email,company_name,created_at,roles"
+    assert has_element?(later, "#users-chip-roles")
+    assert has_element?(later, "#users-head-roles")
+
+    # And typing its label and pressing Enter does the same.
+    later |> element("#users-remove-company_name") |> render_click()
+    assert_patch(later)
+
+    later
+    |> form("#users-add-column", %{add: "Company"})
+    |> render_submit(%{"op" => "add_typed"})
+
+    assert query(later)["cols"] == "name,email,created_at,roles,company_name"
+
+    # Both are kept as arranged.
+    {:ok, again, _html} = live(conn, ~p"/users")
+    assert has_element?(again, "#users-chip-roles")
+    assert has_element?(again, "#users-chip-company_name")
   end
 
   test "an arrangement belongs to the account that made it", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-    view |> element("#users-density") |> render_click()
+    press(view, "#users-zoom-compact")
     assert_patch(view)
 
     UserFixtures.insert_user!(%{

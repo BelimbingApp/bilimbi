@@ -8,6 +8,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   # and a rollup expands to the lines the set carries for that row. Nothing
   # is simulated: every gesture changes what the specimen shows.
 
+  alias Bilimbi.Base.UI.FlexTable
+
   @rows 60
   @regions ~w(North South East West Central)
   @statuses ~w(active pending suspended)
@@ -154,12 +156,15 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
       columns: @columns,
       sort_by: "region",
       sort_dir: :asc,
-      density: :normal,
+      zoom: FlexTable.default_zoom(),
       suggestions: [],
       add_query: "",
       expanded: %{}
     }
   end
+
+  @doc "Whether the specimen's rows are drawn compact or normal at its zoom."
+  def mode(state), do: FlexTable.mode(state.zoom)
 
   @doc "The columns the add bar can still offer."
   def extra, do: @extra
@@ -240,10 +245,21 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   def apply(%{"op" => "sort", "sort" => spec}, state),
     do: %{state | sort_by: spec, sort_dir: :asc}
 
-  def apply(%{"op" => "density", "density" => "compact"}, state),
-    do: %{state | density: :compact}
+  def apply(%{"op" => "zoom", "dir" => dir}, state) when dir in ["in", "out"] do
+    direction = if dir == "in", do: :in, else: :out
+    %{state | zoom: FlexTable.step_zoom(state.zoom, direction)}
+  end
 
-  def apply(%{"op" => "density"}, state), do: %{state | density: :normal}
+  def apply(%{"op" => "zoom_preset", "preset" => preset}, state) do
+    case Enum.find(FlexTable.zoom_presets(), fn {name, _zoom} ->
+           Atom.to_string(name) == preset
+         end) do
+      {_name, zoom} -> %{state | zoom: zoom}
+      nil -> state
+    end
+  end
+
+  def apply(%{"op" => "reset"}, _state), do: initial()
 
   def apply(%{"op" => "expand", "spec" => spec, "key" => key}, state) do
     with {id, ""} <- Integer.parse(to_string(key)),

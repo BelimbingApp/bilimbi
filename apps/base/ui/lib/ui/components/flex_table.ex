@@ -30,18 +30,23 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   caller's `<:col>` of the same id, so a list page keeps its own links and
   badges while gaining walked columns beside them.
 
-  There is no toolbar. Two icon buttons sit in the corner of the table's
-  header: the density toggle, and a settings icon that opens table
-  customization, the panel holding a chip per column (drag to reorder,
-  remove, choose a lens), the add-a-column box and, while a change-since
-  lens is worn, its date. The panel is closed until asked for and closes
-  on a click outside it or Escape.
+  Nothing stands above the table but a small lip on the top-left edge of
+  its frame, named "Customize table". It opens table customization, a bar
+  inline above the table holding a chip per column (drag to reorder,
+  remove, choose a lens), the add-a-column box, the zoom, the reset to the
+  page's own columns and, while a change-since lens is worn, its date. The
+  lip is then the way to close it, as is Escape. The bar is closed until
+  asked for and stays open while columns come and go.
 
-  `mode` is `:normal` or `:compact`, the host's decision and what the
-  density toggle switches. Compact is the same table with tighter rows that
-  do not wrap, so more rows and more columns fit a screen and the table
-  scrolls sideways; every link, sort and rollup works in both. A caller
-  that draws a second line in a `<:col>` leaves it out in compact.
+  `zoom` is the height of a row and `mode` whether rows that tall are drawn
+  `:normal` or `:compact`; both are the host's, from the steps in
+  `Bilimbi.Base.UI.FlexTable`. Compact is the same table with tighter rows
+  that do not wrap, so more rows and more columns fit a screen and the
+  table scrolls sideways; every link, sort and rollup works in both. A
+  caller that draws a second line in a `<:col>` leaves it out in compact.
+  The bar steps the zoom one height at a time and jumps to its two named
+  heights, Compact and Normal; a step past either end is disabled rather
+  than offered.
 
   Bars and bands: a `:band` cell carries `data-band` and `data-scale` and is
   painted by `app.css`; a `:bar` cell carries `data-bar` and the hook writes
@@ -54,6 +59,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
         columns={@columns.column_views}
         rows={@columns.rows}
         mode={@columns.mode}
+        zoom={@columns.zoom}
         sort_by={@index_state.sort_by}
         sort_dir={@index_state.sort_dir}
         suggestions={@columns.suggestions}
@@ -77,6 +83,11 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
     values: [:normal, :compact],
     default: :normal,
     doc: "`:compact` tightens the rows and keeps each on one line"
+  )
+
+  attr(:zoom, :integer,
+    default: 36,
+    doc: "the height of a row in pixels, one of `Bilimbi.Base.UI.FlexTable.zoom_steps/0`"
   )
 
   attr(:event, :string,
@@ -137,6 +148,12 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       |> assign(:slots_by_id, Map.new(assigns.col, &{&1.id, &1}))
       |> assign(:compact?, assigns.mode == :compact)
       |> assign(:delta?, Enum.any?(assigns.columns, &(Map.get(&1, :lens) == :delta)))
+      |> assign(:row_class, Bilimbi.Base.UI.FlexTable.row_class(assigns.zoom))
+      |> assign(:zoom_steps, Bilimbi.Base.UI.FlexTable.zoom_steps())
+      |> assign(:presets, [
+        {:compact, gettext("Compact"), "rows-compact"},
+        {:normal, gettext("Normal"), "rows-normal"}
+      ])
       |> assign_customization()
       |> assign_new(:row_dom_id, fn %{id: id, row_id: row_id} ->
         row_id || fn key -> "#{id}-row-#{Bilimbi.Base.UI.FlexTable.key_id(key)}" end
@@ -149,6 +166,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       data-event={@event}
       data-target={@target}
       data-mode={@mode}
+      data-zoom={@zoom}
       class="flex-table"
     >
       <p
@@ -162,311 +180,346 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
           cost: trunc(@cost.estimate)
         )}
       </p>
-      <div class="relative">
-        <%!-- The table's two controls sit in the corner of its header and
-             stay there when the table scrolls sideways. The density toggle
-             is always in reach; table customization is a panel that opens
-             from the settings icon, closed until asked for. `aria-expanded`
-             on that icon is the one record of open, as on `multi_select/1`,
-             and the panel leaves the scrolling table through
-             `floating-panel` so nothing clips it. It stays open while its
-             chips and suggestions come and go, and closes on a click
-             outside it or Escape, which returns focus to the icon. --%>
-        <div
-          id={"#{@id}-controls"}
-          phx-hook="DisclosureDismiss"
-          data-dismiss={@close}
-          data-escape={@escape}
-          data-keep-on-blur
-          phx-click-away={@close}
-          class={[
-            "floating-scope absolute right-px top-px z-10 flex items-center gap-0.5 bg-surface-sunken px-1",
-            if(@compact?, do: "h-6", else: "h-8")
-          ]}
+      <%!-- Table customization. The lip is the one thing above the table
+           until it is asked for: a tab on the frame's top-left edge that
+           opens the bar and then closes it. `aria-expanded` on the lip is
+           the one record of open, as on `multi_select/1`, so a patch that
+           redraws the chips leaves the bar as the person had it. It closes
+           on the lip or Escape, never because focus left: removing the chip
+           that held focus is focus leaving with nowhere to go. --%>
+      <div
+        id={"#{@id}-customizing"}
+        phx-hook="DisclosureDismiss"
+        data-dismiss={@close}
+        data-escape={@escape}
+        data-keep-on-blur
+      >
+        <button
+          id={"#{@id}-customize"}
+          type="button"
+          aria-expanded="false"
+          aria-controls={"#{@id}-customization"}
+          aria-label={gettext("Customize table")}
+          title={gettext("Customize table")}
+          phx-click={@toggle}
+          class="peer group -mb-px flex h-5 w-10 items-center justify-center rounded-t-md border border-b-0 border-line bg-surface-sunken text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 aria-expanded:bg-surface aria-expanded:text-ink"
         >
-          <%!-- One toggle, two densities. The name stays "Compact rows" and
-               `aria-pressed` says whether it is on; the tooltip names the
-               density the press switches to. --%>
-          <.icon_button
-            icon="compact"
-            context={:inline}
-            id={"#{@id}-density"}
-            label={gettext("Compact rows")}
-            title={
-              if @compact?,
-                do: gettext("Compact rows are on. Switch to normal rows."),
-                else: gettext("Normal rows are on. Switch to compact rows.")
-            }
-            aria-pressed={to_string(@compact?)}
+          <.icon name="customize" class="size-3.5 group-aria-expanded:hidden" />
+          <.icon name="close" class="hidden size-3.5 group-aria-expanded:block" />
+        </button>
+        <div
+          id={"#{@id}-customization"}
+          role="group"
+          aria-label={gettext("Table customization")}
+          class="hidden flex-wrap items-center gap-x-3 gap-y-2 border border-b-0 border-line bg-surface p-2 peer-aria-expanded:flex"
+        >
+          <ul
+            id={"#{@id}-chips"}
+            role="list"
+            aria-label={gettext("Columns")}
+            class="flex flex-wrap items-center gap-1"
+          >
+            <li
+              :for={column <- @columns}
+              id={"#{@id}-chip-#{column.id}"}
+              data-chip={column.spec}
+              draggable="true"
+              title={column.label}
+              class="group flex h-6 cursor-grab items-center gap-0.5 rounded-md border border-line bg-surface pl-2 pr-0.5 text-xs text-ink"
+            >
+              <span class="max-w-40 truncate">{column.short_label}</span>
+              <.flex_table_lens_menu
+                :if={length(Map.get(column, :lenses, [:value])) > 1}
+                table_id={@id}
+                column={column}
+                event={@event}
+                target={@target}
+              />
+              <.icon_button
+                :if={Map.get(column, :removable, true)}
+                icon="close"
+                context={:inline}
+                label={gettext("Remove column %{name}", name: column.label)}
+                id={"#{@id}-remove-#{column.id}"}
+                phx-click={@event}
+                phx-target={@target}
+                phx-value-op="remove"
+                phx-value-spec={column.spec}
+                class="size-5"
+              />
+            </li>
+          </ul>
+          <form
+            id={"#{@id}-add-column"}
+            phx-change={@event}
+            phx-submit={JS.push(@event, value: %{op: "add_typed"})}
+            phx-target={@target}
+            class="relative min-w-52"
+            role="search"
+          >
+            <input type="hidden" name="op" value="suggest" />
+            <label for={"#{@id}-add-column-input"} class="sr-only">{gettext("Add a column")}</label>
+            <.icon
+              name="create"
+              class="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-faint"
+            />
+            <input
+              id={"#{@id}-add-column-input"}
+              name="add"
+              type="search"
+              value={@add_query}
+              placeholder={gettext("Add a column, e.g. company name…")}
+              autocomplete="off"
+              phx-debounce="200"
+              role="combobox"
+              aria-expanded={to_string(@suggestions != [])}
+              aria-controls={"#{@id}-suggestions"}
+              aria-autocomplete="list"
+              class="h-7 w-full rounded-md border border-line bg-surface pl-7 pr-2 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+            />
+            <ul
+              :if={@suggestions != []}
+              id={"#{@id}-suggestions"}
+              role="listbox"
+              class="absolute left-0 top-full z-30 mt-1 max-h-72 w-96 max-w-[90vw] overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-lg"
+            >
+              <li :for={suggestion <- @suggestions} role="option" aria-selected="false">
+                <button
+                  type="button"
+                  id={"#{@id}-suggest-#{suggestion.id}"}
+                  phx-click={@event}
+                  phx-target={@target}
+                  phx-value-op="add"
+                  phx-value-spec={suggestion.spec}
+                  class="flex w-full items-baseline justify-between gap-2 rounded-sm px-2 py-1 text-left text-xs text-ink hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
+                >
+                  <span class="truncate">{suggestion.label}</span>
+                  <span class="shrink-0 font-mono text-[0.65rem] text-ink-faint">{suggestion.spec}</span>
+                </button>
+              </li>
+            </ul>
+          </form>
+          <%!-- The zoom is the row height. It steps through the heights
+               that draw a different table and no others, so the end of the
+               range is a disabled step, not one that does nothing. Compact
+               and Normal each name the height they set, so a second press
+               changes nothing. None of these carries `phx-click`: the
+               `FlexTable` hook pushes each press, because LiveView drops a
+               click on a control still waiting for its last reply, and a
+               dropped press here is a table that looks stuck. --%>
+          <div
+            id={"#{@id}-zoom"}
+            role="group"
+            aria-label={gettext("Row height")}
+            class="flex items-center gap-0.5"
+          >
+            <.icon_button
+              icon="zoom-out"
+              context={:inline}
+              label={gettext("Shorter rows")}
+              id={"#{@id}-zoom-out"}
+              disabled={@zoom <= List.first(@zoom_steps)}
+              data-zoom-op="zoom"
+              data-dir="out"
+            />
+            <span
+              id={"#{@id}-zoom-level"}
+              class="min-w-12 text-center text-xs tabular-nums text-ink-muted"
+              title={gettext("Rows %{px} px tall", px: @zoom)}
+            >
+              {@zoom} px
+            </span>
+            <.icon_button
+              icon="zoom-in"
+              context={:inline}
+              label={gettext("Taller rows")}
+              id={"#{@id}-zoom-in"}
+              disabled={@zoom >= List.last(@zoom_steps)}
+              data-zoom-op="zoom"
+              data-dir="in"
+            />
+            <button
+              :for={{preset, label, icon} <- @presets}
+              type="button"
+              id={"#{@id}-zoom-#{preset}"}
+              data-zoom-op="zoom_preset"
+              data-preset={preset}
+              aria-pressed={to_string(@mode == preset)}
+              class={[
+                "ml-1 inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-xs transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+                @mode == preset && "border-selection-line bg-brand-surface text-brand-ink",
+                @mode != preset &&
+                  "border-line bg-surface text-ink-muted hover:bg-surface-sunken hover:text-ink"
+              ]}
+            >
+              <.icon name={icon} class="size-3.5" />
+              {label}
+            </button>
+          </div>
+          <form
+            :if={@delta?}
+            id={"#{@id}-since"}
+            phx-change={JS.push(@event, value: %{op: "since"})}
+            phx-submit={JS.push(@event, value: %{op: "since"})}
+            phx-target={@target}
+            class="flex items-center gap-1.5 text-xs text-ink-muted"
+          >
+            <label for={"#{@id}-since-input"}>{gettext("Change since")}</label>
+            <input
+              id={"#{@id}-since-input"}
+              name="since"
+              type="date"
+              value={@since && Date.to_iso8601(@since)}
+              required
+              class="h-7 rounded-md border border-line bg-surface px-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+            />
+          </form>
+          <%!-- What a person arranges is kept without asking, so there has to
+               be one press that takes it all back. --%>
+          <button
+            type="button"
+            id={"#{@id}-reset"}
             phx-click={@event}
             phx-target={@target}
-            phx-value-op="density"
-            phx-value-density={if @compact?, do: "normal", else: "compact"}
-            class="aria-pressed:bg-brand-surface aria-pressed:text-brand-ink"
-          />
-          <.icon_button
-            icon="settings"
-            context={:inline}
-            id={"#{@id}-customize"}
-            label={gettext("Customize table")}
-            aria-expanded="false"
-            aria-controls={"#{@id}-customization"}
-            phx-click={@toggle}
-            class="peer floating-anchor aria-expanded:bg-brand-surface aria-expanded:text-brand-ink"
-          />
-          <div
-            id={"#{@id}-customization"}
-            role="group"
-            aria-label={gettext("Table customization")}
-            class="floating-panel z-30 mt-1 hidden max-h-[min(32rem,calc(100dvh-6rem))] w-80 max-w-[calc(100vw-1.5rem)] space-y-3 overflow-y-auto rounded-xl border border-line bg-surface p-3 text-left shadow-lg peer-aria-expanded:block"
+            phx-value-op="reset"
+            class="rounded-sm text-xs text-ink-muted underline underline-offset-2 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
           >
-            <div>
-              <p class="text-sm font-medium text-ink-strong">{gettext("Customize table")}</p>
-              <p class="text-xs font-normal text-ink-subtle">
-                {gettext(
-                  "Drag a column to reorder it. Changes are kept for your account on this page."
-                )}
-              </p>
-            </div>
-            <ul
-              id={"#{@id}-chips"}
-              role="list"
-              aria-label={gettext("Columns")}
-              class="flex flex-wrap items-center gap-1"
-            >
-              <li
+            {gettext("Reset to default columns")}
+          </button>
+        </div>
+      </div>
+      <div
+        id={"#{@id}-viewport"}
+        data-viewport
+        class="relative overflow-auto border border-line bg-surface"
+        tabindex="0"
+      >
+        <table class={["w-full text-left", if(@compact?, do: "text-xs", else: "text-sm")]}>
+          <caption :if={@caption} class="sr-only">{@caption}</caption>
+          <thead class="border-b border-line bg-surface-sunken">
+            <tr>
+              <th
                 :for={column <- @columns}
-                id={"#{@id}-chip-#{column.id}"}
-                data-chip={column.spec}
+                id={"#{@id}-head-#{column.id}"}
+                scope="col"
                 draggable="true"
+                data-header={column.spec}
+                aria-sort={table_aria_sort(column.spec, @sort_by, @sort_dir)}
                 title={column.label}
-                class="group flex h-6 cursor-grab items-center gap-0.5 rounded-md border border-line bg-surface pl-2 pr-0.5 text-xs font-normal text-ink"
+                class={[
+                  "cursor-grab text-xs font-semibold text-ink-subtle",
+                  if(@compact?, do: "whitespace-nowrap px-1.5 py-0.5", else: "px-2 py-1.5"),
+                  Map.get(column, :align) == :right && "text-right"
+                ]}
               >
-                <span class="max-w-40 truncate">{column.short_label}</span>
-                <.flex_table_lens_menu
-                  :if={length(Map.get(column, :lenses, [:value])) > 1}
+                <.table_sort_heading
+                  :if={Map.get(column, :sortable, true)}
+                  col={
+                    %{
+                      sort: column.spec,
+                      sort_id: Map.get(column, :sort_id) || "#{@id}-sort-#{column.id}",
+                      label: column.short_label,
+                      align: Map.get(column, :align)
+                    }
+                  }
+                  table_id={@id}
+                  sort_by={@sort_by}
+                  sort_dir={@sort_dir}
+                  sort_event={JS.push(@event, value: %{op: "sort"})}
+                  sort_target={@target}
+                />
+                <span :if={!Map.get(column, :sortable, true)}>{column.short_label}</span>
+              </th>
+              <th
+                :if={@action != []}
+                scope="col"
+                class={if(@compact?, do: "px-1.5", else: "px-2 py-1.5")}
+              >
+                <span class="sr-only">{gettext("Actions")}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id={"#{@id}-rows"} class="divide-y divide-low-contrast-line">
+            <%= for row <- @rows do %>
+              <tr id={@row_dom_id.(row.key)} class="hover:bg-surface-sunken">
+                <.flex_table_cell
+                  :for={column <- @columns}
                   table_id={@id}
                   column={column}
+                  row={row}
+                  cell={Map.get(row.cells, column.id)}
+                  slot={Map.get(@slots_by_id, column.id)}
+                  compact={@compact?}
+                  row_class={@row_class}
+                  expanded={@expanded |> Map.get(row.key, %{}) |> Map.has_key?(column.id)}
                   event={@event}
                   target={@target}
                 />
-                <.icon_button
-                  :if={Map.get(column, :removable, true)}
-                  icon="close"
-                  context={:inline}
-                  label={gettext("Remove column %{name}", name: column.label)}
-                  id={"#{@id}-remove-#{column.id}"}
-                  phx-click={@event}
-                  phx-target={@target}
-                  phx-value-op="remove"
-                  phx-value-spec={column.spec}
-                  class="size-5"
-                />
-              </li>
-            </ul>
-            <form
-              id={"#{@id}-add-column"}
-              phx-change={@event}
-              phx-submit={JS.push(@event, value: %{op: "add_typed"})}
-              phx-target={@target}
-              role="search"
-            >
-              <input type="hidden" name="op" value="suggest" />
-              <label for={"#{@id}-add-column-input"} class="sr-only">{gettext("Add a column")}</label>
-              <div class="relative">
-                <.icon
-                  name="create"
-                  class="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-faint"
-                />
-                <input
-                  id={"#{@id}-add-column-input"}
-                  name="add"
-                  type="search"
-                  value={@add_query}
-                  placeholder={gettext("Add a column, e.g. company name…")}
-                  autocomplete="off"
-                  phx-debounce="200"
-                  role="combobox"
-                  aria-expanded={to_string(@suggestions != [])}
-                  aria-controls={"#{@id}-suggestions"}
-                  aria-autocomplete="list"
-                  class="h-7 w-full rounded-md border border-line bg-surface pl-7 pr-2 text-xs font-normal text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-                />
-              </div>
-              <%!-- The suggestions are part of the panel, not a list floating
-                   over it: the panel is already the thing that floats. --%>
-              <ul
-                :if={@suggestions != []}
-                id={"#{@id}-suggestions"}
-                role="listbox"
-                class="mt-1 rounded-md border border-line bg-surface p-1"
-              >
-                <li :for={suggestion <- @suggestions} role="option" aria-selected="false">
-                  <button
-                    type="button"
-                    id={"#{@id}-suggest-#{suggestion.id}"}
-                    phx-click={@event}
-                    phx-target={@target}
-                    phx-value-op="add"
-                    phx-value-spec={suggestion.spec}
-                    class="flex w-full items-baseline justify-between gap-2 rounded-sm px-2 py-1 text-left text-xs font-normal text-ink hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
-                  >
-                    <span class="truncate">{suggestion.label}</span>
-                    <span class="shrink-0 font-mono text-[0.65rem] text-ink-faint">{suggestion.spec}</span>
-                  </button>
-                </li>
-              </ul>
-            </form>
-            <form
-              :if={@delta?}
-              id={"#{@id}-since"}
-              phx-change={JS.push(@event, value: %{op: "since"})}
-              phx-submit={JS.push(@event, value: %{op: "since"})}
-              phx-target={@target}
-              class="flex items-center gap-1.5 text-xs font-normal text-ink-muted"
-            >
-              <label for={"#{@id}-since-input"}>{gettext("Change since")}</label>
-              <input
-                id={"#{@id}-since-input"}
-                name="since"
-                type="date"
-                value={@since && Date.to_iso8601(@since)}
-                required
-                class="h-7 rounded-md border border-line bg-surface px-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-              />
-            </form>
-          </div>
-        </div>
-        <div
-          id={"#{@id}-viewport"}
-          data-viewport
-          class="relative overflow-auto border border-line bg-surface"
-          tabindex="0"
-        >
-          <table class={["w-full text-left", if(@compact?, do: "text-xs", else: "text-sm")]}>
-            <caption :if={@caption} class="sr-only">{@caption}</caption>
-            <thead class="border-b border-line bg-surface-sunken">
-              <tr>
-                <th
-                  :for={column <- @columns}
-                  id={"#{@id}-head-#{column.id}"}
-                  scope="col"
-                  draggable="true"
-                  data-header={column.spec}
-                  aria-sort={table_aria_sort(column.spec, @sort_by, @sort_dir)}
-                  title={column.label}
+                <%!-- A compact row is shorter than a table icon button, so
+                     the row's own controls take the inline size there. --%>
+                <td
+                  :if={@action != []}
                   class={[
-                    "cursor-grab text-xs font-semibold text-ink-subtle",
-                    if(@compact?, do: "whitespace-nowrap px-1.5 py-1", else: "px-2 py-1.5"),
-                    Map.get(column, :align) == :right && "text-right"
+                    "w-0 font-semibold",
+                    @row_class,
+                    if(@compact?,
+                      do: "px-1.5 py-0 [&_a]:size-5 [&_button]:size-5",
+                      else: "px-2 py-0.5"
+                    )
                   ]}
                 >
-                  <.table_sort_heading
-                    :if={Map.get(column, :sortable, true)}
-                    col={
-                      %{
-                        sort: column.spec,
-                        sort_id: Map.get(column, :sort_id) || "#{@id}-sort-#{column.id}",
-                        label: column.short_label,
-                        align: Map.get(column, :align)
-                      }
-                    }
-                    table_id={@id}
-                    sort_by={@sort_by}
-                    sort_dir={@sort_dir}
-                    sort_event={JS.push(@event, value: %{op: "sort"})}
-                    sort_target={@target}
-                  />
-                  <span :if={!Map.get(column, :sortable, true)}>{column.short_label}</span>
-                </th>
-                <%!-- The last heading keeps room for the two controls that sit
-                   over this corner, whether or not the rows carry actions. --%>
-                <th scope="col" class="w-16 min-w-16">
-                  <span :if={@action != []} class="sr-only">{gettext("Actions")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody id={"#{@id}-rows"} class="divide-y divide-low-contrast-line">
-              <%= for row <- @rows do %>
-                <tr id={@row_dom_id.(row.key)} class="hover:bg-surface-sunken">
-                  <.flex_table_cell
-                    :for={column <- @columns}
-                    table_id={@id}
-                    column={column}
-                    row={row}
-                    cell={Map.get(row.cells, column.id)}
-                    slot={Map.get(@slots_by_id, column.id)}
-                    compact={@compact?}
-                    expanded={@expanded |> Map.get(row.key, %{}) |> Map.has_key?(column.id)}
-                    event={@event}
-                    target={@target}
-                  />
-                  <%!-- A compact row is shorter than a table icon button, so
-                     the row's own controls take the inline size there. --%>
-                  <td
-                    :if={@action != []}
-                    class={[
-                      "w-0 font-semibold",
-                      if(@compact?,
-                        do: "px-1.5 py-0 [&_a]:size-5 [&_button]:size-5",
-                        else: "px-2 py-0.5"
-                      )
-                    ]}
-                  >
-                    <div class="flex items-center justify-end gap-1">
-                      <%= for action <- @action do %>
-                        {render_slot(action, row)}
-                      <% end %>
-                    </div>
-                  </td>
-                  <td :if={@action == []}></td>
-                </tr>
-                <tr
-                  :for={{column_id, opened} <- Map.get(@expanded, row.key, %{})}
-                  id={"#{@row_dom_id.(row.key)}-#{column_id}"}
-                  class="bg-surface-muted"
-                >
-                  <td
-                    colspan={length(@columns) + 1}
-                    class="px-6 py-1.5"
-                  >
-                    <.flex_table_expansion rows={opened} />
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-            <tbody :if={@empty != [] and @rows == []}>
-              <tr id={"#{@id}-empty"}>
-                <td
-                  colspan={length(@columns) + 1}
-                  class="px-2 py-8 text-center text-sm text-ink-muted"
-                >
-                  <%= for empty <- @empty do %>
-                    <%= if empty[:title] || empty[:forbidden] do %>
-                      <.empty_state
-                        title={empty[:title]}
-                        reason={empty[:reason]}
-                        forbidden={empty[:forbidden]}
-                      >
-                        <:action :if={empty[:inner_block]}>{render_slot(empty)}</:action>
-                      </.empty_state>
-                    <% else %>
-                      {render_slot(empty)}
+                  <div class="flex items-center justify-end gap-1">
+                    <%= for action <- @action do %>
+                      {render_slot(action, row)}
                     <% end %>
-                  <% end %>
+                  </div>
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
+              <tr
+                :for={{column_id, opened} <- Map.get(@expanded, row.key, %{})}
+                id={"#{@row_dom_id.(row.key)}-#{column_id}"}
+                class="bg-surface-muted"
+              >
+                <td
+                  colspan={length(@columns) + if(@action != [], do: 1, else: 0)}
+                  class="px-6 py-1.5"
+                >
+                  <.flex_table_expansion id={"#{@row_dom_id.(row.key)}-#{column_id}"} rows={opened} />
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tbody :if={@empty != [] and @rows == []}>
+            <tr id={"#{@id}-empty"}>
+              <td
+                colspan={length(@columns) + if(@action != [], do: 1, else: 0)}
+                class="px-2 py-8 text-center text-sm text-ink-muted"
+              >
+                <%= for empty <- @empty do %>
+                  <%= if empty[:title] || empty[:forbidden] do %>
+                    <.empty_state
+                      title={empty[:title]}
+                      reason={empty[:reason]}
+                      forbidden={empty[:forbidden]}
+                    >
+                      <:action :if={empty[:inner_block]}>{render_slot(empty)}</:action>
+                    </.empty_state>
+                  <% else %>
+                    {render_slot(empty)}
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     """
   end
 
   # The commands that open and close table customization. Each writes only
-  # the settings icon's `aria-expanded`; the panel's visibility is CSS
-  # derived from it, so a patch that redraws the chips leaves it open.
+  # the lip's `aria-expanded`; the bar's visibility is CSS derived from it,
+  # so a patch that redraws the chips leaves it open.
   defp assign_customization(%{id: id} = assigns) do
     close = JS.set_attribute({"aria-expanded", "false"}, to: "##{id}-customize")
 
@@ -485,6 +538,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   attr(:cell, :any, default: nil)
   attr(:slot, :any, default: nil)
   attr(:compact, :boolean, default: false)
+  attr(:row_class, :string, default: nil)
   attr(:expanded, :boolean, default: false)
   attr(:event, :string, required: true)
   attr(:target, :any, default: nil)
@@ -500,6 +554,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       id={@cell_id}
       class={[
         "text-ink",
+        @row_class,
         cell_density(@compact),
         Map.get(@column, :align) == :right && "text-right"
       ]}
@@ -515,7 +570,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
     ~H"""
     <td
       id={@cell_id}
-      class={["text-ink tabular-nums", cell_density(@compact)]}
+      class={["text-ink tabular-nums", @row_class, cell_density(@compact)]}
       data-band={band_attr(@column, @cell)}
       data-scale={scale_attr(@column, @cell)}
     >
@@ -548,6 +603,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       id={@cell_id}
       class={[
         "text-ink",
+        @row_class,
         cell_density(@compact),
         Map.get(@column, :align) == :right && "text-right",
         @column.type in [:integer, :float, :decimal, :date, :datetime] && "tabular-nums"
@@ -725,10 +781,13 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   defp lens_icon(:delta), do: "hero-calendar-days"
   defp lens_icon(_lens), do: "hero-bars-3-bottom-left"
 
+  attr(:id, :string, required: true)
   attr(:rows, :list, required: true)
 
   # The rows a rollup collapsed, shown beneath their parent as a compact
-  # inner table whose headings are the target's field ids.
+  # inner table whose headings are the target's field labels. A timestamp
+  # arrives typed and is drawn by `datetime/1`, so it follows the reader's
+  # clock here as it does in a cell.
   defp flex_table_expansion(%{rows: []} = assigns) do
     ~H"""
     <p class="text-xs text-ink-muted">{gettext("Nothing linked.")}</p>
@@ -748,9 +807,17 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
         </tr>
       </thead>
       <tbody class="divide-y divide-low-contrast-line">
-        <tr :for={row <- @rows}>
-          <td :for={heading <- @headings} class="px-2 py-0.5 text-ink tabular-nums">
-            {flex_table_plain(Map.get(row, heading))}
+        <tr :for={{row, r} <- Enum.with_index(@rows)}>
+          <td
+            :for={{heading, c} <- Enum.with_index(@headings)}
+            class="px-2 py-0.5 text-ink tabular-nums"
+          >
+            <%= case Map.get(row, heading) do %>
+              <% %NaiveDateTime{} = at -> %>
+                <.datetime id={"#{@id}-#{r}-#{c}"} value={at} />
+              <% value -> %>
+                {flex_table_plain(value)}
+            <% end %>
           </td>
         </tr>
       </tbody>
@@ -758,8 +825,8 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
     """
   end
 
-  # The host hands expansion rows as text already; only nil and booleans
-  # need a word here.
+  # The host hands every other expansion value as text already; only nil
+  # and booleans need a word here.
   defp flex_table_plain(nil), do: "—"
   defp flex_table_plain(true), do: "Yes"
   defp flex_table_plain(false), do: "No"

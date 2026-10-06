@@ -126,7 +126,8 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
     assert has_element?(view, "#companies-76", "Bilimbi Laboratories Sdn. Bhd.")
 
-    view |> element("#companies-density") |> render_click()
+    assert has_element?(view, "#companies-zoom-compact[data-zoom-op='zoom_preset']")
+    render_hook(view, "grid", %{"op" => "zoom_preset", "preset" => "compact"})
     assert_patch(view)
     assert has_element?(view, "#companies-76", "Bilimbi Labs")
     refute has_element?(view, "#companies-76", "Bilimbi Laboratories Sdn. Bhd.")

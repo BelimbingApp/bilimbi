@@ -1,11 +1,18 @@
 // FlexTable: the browser half of `Bilimbi.Base.UI.Components.FlexTable.flex_table/1`.
 //
-// The server renders the whole table; this hook owns the three things only
-// a browser can do: dragging a chip or a heading onto another to reorder
-// the columns, walking the add-a-column box's suggestions with the arrow keys, and
-// the bar widths the CSP refuses to take from a style attribute. A reorder
-// is pushed to the host as the one `data-event` with `op: "move"`; nothing
-// here is the source of truth.
+// The server renders the whole table; this hook owns what only a browser
+// can do: dragging a chip or a heading onto another to reorder the columns,
+// walking the add-a-column box's suggestions with the arrow keys, the bar
+// widths the CSP refuses to take from a style attribute, and sending every
+// press on a zoom control. Each is pushed to the host as the one
+// `data-event` with an `op`; nothing here is the source of truth.
+//
+// The zoom controls are pushed from here and carry no `phx-click`, because
+// LiveView ignores a click on an element still waiting for the reply to its
+// last one. That guard is right for a control that must not fire twice and
+// wrong for these: three presses on "Taller rows" are three steps, and a
+// press on Normal straight after one on Compact has to land. Dropped, the
+// table looked stuck on whichever press got through.
 
 const FlexTable = {
   mounted() {
@@ -18,6 +25,7 @@ const FlexTable = {
     this.onDrop = (event) => this.drop(event)
     this.onDragEnd = () => this.dragEnd()
     this.onKeyDown = (event) => this.addBarKeys(event)
+    this.onClick = (event) => this.zoomPress(event)
 
     this.el.addEventListener("dragstart", this.onDragStart)
     this.el.addEventListener("dragover", this.onDragOver)
@@ -25,6 +33,7 @@ const FlexTable = {
     this.el.addEventListener("drop", this.onDrop)
     this.el.addEventListener("dragend", this.onDragEnd)
     this.el.addEventListener("keydown", this.onKeyDown)
+    this.el.addEventListener("click", this.onClick)
 
     this.applyBars()
   },
@@ -41,6 +50,7 @@ const FlexTable = {
     this.el.removeEventListener("drop", this.onDrop)
     this.el.removeEventListener("dragend", this.onDragEnd)
     this.el.removeEventListener("keydown", this.onKeyDown)
+    this.el.removeEventListener("click", this.onClick)
   },
 
   readDataset() {
@@ -51,6 +61,17 @@ const FlexTable = {
   push(payload) {
     if (this.target) this.pushEventTo(this.target, this.event, payload)
     else this.pushEvent(this.event, payload)
+  },
+
+  // --- zoom ------------------------------------------------------------
+
+  // A step carries its direction and a preset its name, as data attributes
+  // the server rendered. A disabled step is the end of the range.
+  zoomPress(event) {
+    const control = event.target.closest("[data-zoom-op]")
+    if (!control || control.disabled) return
+    const {zoomOp: op, dir, preset} = control.dataset
+    this.push({op, ...(dir && {dir}), ...(preset && {preset})})
   },
 
   // --- bars (CSSOM, because the CSP refuses inline style) ---------------

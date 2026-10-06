@@ -16,6 +16,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   alias Bilimbi.Base.Grid.Lens
   alias Bilimbi.Base.Grid.Table
   alias Bilimbi.Base.Grid.View
+  alias Bilimbi.Base.UI.FlexTable
 
   @heavy_cost 20_000.0
 
@@ -122,7 +123,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   def cost(nil), do: nil
   def cost(cost) when is_float(cost), do: %{estimate: cost, heavy?: cost > @heavy_cost}
 
-  @doc "The rows a rollup collapsed, with every value as text for the expansion table."
+  @doc "The rows a rollup collapsed, as the expansion table draws them: text, and timestamps typed."
   @spec expansion(Catalog.t(), Table.t(), term(), Column.t()) :: [map()]
   def expansion(%Catalog{} = catalog, %Table{} = root, key, %Column{} = column) do
     labels =
@@ -135,7 +136,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
       {:ok, rows} ->
         Enum.map(rows, fn row ->
           Map.new(row, fn {field, value} ->
-            {Map.get(labels, field, field), Lens.text(value, column)}
+            {Map.get(labels, field, field), expansion_value(value, column)}
           end)
         end)
 
@@ -143,6 +144,11 @@ defmodule Bilimbi.Base.Grid.Web.Host do
         []
     end
   end
+
+  # A timestamp stays typed so the component can draw it on the reader's
+  # clock; everything else is the text a cell would show.
+  defp expansion_value(%NaiveDateTime{} = at, _column), do: at
+  defp expansion_value(value, column), do: Lens.text(value, column)
 
   @type outcome ::
           {:patch, View.t()}
@@ -186,8 +192,23 @@ defmodule Bilimbi.Base.Grid.Web.Host do
     end
   end
 
-  def apply(%{"op" => "density"} = params, view, _columns),
-    do: {:patch, View.put_density(view, params["density"])}
+  def apply(%{"op" => "zoom", "dir" => dir}, view, _columns) when dir in ["in", "out"] do
+    direction = if dir == "in", do: :in, else: :out
+    {:patch, View.put_zoom(view, FlexTable.step_zoom(view.zoom, direction))}
+  end
+
+  # A preset names the height it sets, so pressing one twice, or pressing it
+  # while the last press is still on its way back, lands on the same rows.
+  def apply(%{"op" => "zoom_preset", "preset" => preset}, view, _columns) do
+    case Enum.find(FlexTable.zoom_presets(), fn {name, _zoom} ->
+           Atom.to_string(name) == preset
+         end) do
+      {_name, zoom} -> {:patch, View.put_zoom(view, zoom)}
+      nil -> :noop
+    end
+  end
+
+  def apply(%{"op" => "reset"}, view, _columns), do: {:patch, View.reset(view)}
 
   def apply(%{"op" => "since"} = params, view, _columns),
     do: {:patch, View.put_since(view, params["since"])}

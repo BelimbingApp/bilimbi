@@ -18,6 +18,14 @@ function table(suggestions = "") {
           <input id="grid-add-column-input" name="add" type="search" />
           ${suggestions}
         </form>
+        <div id="grid-zoom" role="group">
+          <button type="button" id="grid-zoom-out" data-zoom-op="zoom" data-dir="out" disabled><span class="icon"></span></button>
+          <span id="grid-zoom-level">20 px</span>
+          <button type="button" id="grid-zoom-in" data-zoom-op="zoom" data-dir="in"><span class="icon"></span></button>
+          <button type="button" id="grid-zoom-compact" data-zoom-op="zoom_preset" data-preset="compact" aria-pressed="true"><svg></svg>Compact</button>
+          <button type="button" id="grid-zoom-normal" data-zoom-op="zoom_preset" data-preset="normal" aria-pressed="false"><svg></svg>Normal</button>
+        </div>
+        <button type="button" id="grid-reset" phx-click="grid" phx-value-op="reset">Reset to default columns</button>
       </div>
       <div id="grid-viewport" data-viewport tabindex="0">
         <table><thead><tr>
@@ -78,6 +86,47 @@ test("dropping a column on itself pushes nothing", () => {
   control = mountHook(FlexTable, render(table(), "grid"))
   const chip = document.getElementById("grid-chip-name")
   drag(chip, chip, 1)
+  assert.equal(control.pushes.length, 0)
+})
+
+test("every press on a zoom step is pushed, however fast, with its direction", () => {
+  control = mountHook(FlexTable, render(table(), "grid"))
+  const taller = document.getElementById("grid-zoom-in")
+  // LiveView's own `phx-click` drops a click on a control still waiting for
+  // its last reply; three presses here are three steps, none acknowledged.
+  taller.click()
+  taller.click()
+  taller.querySelector(".icon").click()
+  assert.deepEqual(control.pushes.map((push) => push.payload), [
+    {op: "zoom", dir: "in"},
+    {op: "zoom", dir: "in"},
+    {op: "zoom", dir: "in"},
+  ])
+})
+
+test("a press on a preset lands straight after a press on the other one", () => {
+  control = mountHook(FlexTable, render(table(), "grid"))
+  const compact = document.getElementById("grid-zoom-compact")
+  const normal = document.getElementById("grid-zoom-normal")
+  compact.click()
+  compact.click()
+  normal.click()
+  compact.querySelector("svg").dispatchEvent(new Event("click", {bubbles: true}))
+  assert.deepEqual(control.pushes.map((push) => push.payload), [
+    {op: "zoom_preset", preset: "compact"},
+    {op: "zoom_preset", preset: "compact"},
+    {op: "zoom_preset", preset: "normal"},
+    {op: "zoom_preset", preset: "compact"},
+  ])
+})
+
+test("the step at the end of the range pushes nothing, and neither does any other control", () => {
+  control = mountHook(FlexTable, render(table(), "grid"))
+  document.getElementById("grid-zoom-out").click()
+  document.getElementById("grid-zoom-out").querySelector(".icon").dispatchEvent(new Event("click", {bubbles: true}))
+  document.getElementById("grid-zoom-level").click()
+  // The reset is the server's own `phx-click`; the hook leaves it alone.
+  document.getElementById("grid-reset").click()
   assert.equal(control.pushes.length, 0)
 })
 

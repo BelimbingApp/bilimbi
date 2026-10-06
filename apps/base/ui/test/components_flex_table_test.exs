@@ -43,9 +43,10 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     assigns =
       assigns
       |> assign_new(:columns, fn -> @columns end)
-      |> assign_new(:mode, fn -> :normal end)
+      |> assign_new(:zoom, fn -> 36 end)
       |> assign_new(:cost, fn -> nil end)
       |> assign_new(:since, fn -> nil end)
+      |> assign_new(:expanded, fn -> %{} end)
       |> assign(:rows, @rows)
 
     ~H"""
@@ -53,9 +54,11 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
       id="costed-grid"
       columns={@columns}
       rows={@rows}
-      mode={@mode}
+      mode={Bilimbi.Base.UI.FlexTable.mode(@zoom)}
+      zoom={@zoom}
       cost={@cost}
       since={@since}
+      expanded={@expanded}
     >
       <:action :let={row}>
         <.icon_button icon="view" id={"open-#{row.key}"} label="Open" />
@@ -106,69 +109,101 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     end
   end
 
-  test "one toggle switches between normal and compact rows, and says which is on" do
-    normal = render_component(&grid/1, %{})
-    toggle = tag(normal, "costed-grid-density")
-
-    assert tag(normal, "costed-grid") =~ ~s(data-mode="normal")
-    assert toggle =~ ~s(aria-label="Compact rows")
-    assert toggle =~ ~s(aria-pressed="false")
-    assert toggle =~ ~s(title="Normal rows are on. Switch to compact rows.")
-    assert toggle =~ ~s(phx-value-op="density")
-    assert toggle =~ ~s(phx-value-density="compact")
-
-    compact = render_component(&grid/1, %{mode: :compact})
-    toggle = tag(compact, "costed-grid-density")
-
-    assert tag(compact, "costed-grid") =~ ~s(data-mode="compact")
-    assert toggle =~ ~s(aria-label="Compact rows")
-    assert toggle =~ ~s(aria-pressed="true")
-    assert toggle =~ ~s(title="Compact rows are on. Switch to normal rows.")
-    assert toggle =~ ~s(phx-value-density="normal")
-  end
-
-  test "table customization is a panel behind a settings icon, closed until asked for" do
+  test "a lip on the table's edge opens table customization, closed until asked for" do
     html = render_component(&grid/1, %{})
-    customize = tag(html, "costed-grid-customize")
-    controls = tag(html, "costed-grid-controls")
-    panel = tag(html, "costed-grid-customization")
+    lip = tag(html, "costed-grid-customize")
+    wrap = tag(html, "costed-grid-customizing")
+    bar = tag(html, "costed-grid-customization")
 
-    assert customize =~ ~s(aria-label="Customize table")
-    assert customize =~ ~s(title="Customize table")
-    assert customize =~ ~s(aria-expanded="false")
-    assert customize =~ ~s(aria-controls="costed-grid-customization")
+    assert lip =~ ~s(aria-label="Customize table")
+    assert lip =~ ~s(title="Customize table")
+    assert lip =~ ~s(aria-expanded="false")
+    assert lip =~ ~s(aria-controls="costed-grid-customization")
+    assert lip =~ ~s(type="button")
 
-    # Open is the icon's `aria-expanded` and nothing else: the panel shows
-    # by reading it, so a patch that redraws the chips cannot close it.
+    # Open is the lip's `aria-expanded` and nothing else: the bar shows by
+    # reading it, so a patch that redraws the chips cannot close it.
     assert [["toggle_attr", %{"attr" => ["aria-expanded", "true", "false"]}]] =
-             js(customize, "phx-click")
+             js(lip, "phx-click")
 
-    assert panel =~ ~s(aria-label="Table customization")
-    assert "hidden" in classes(panel)
-    assert "peer-aria-expanded:block" in classes(panel)
-    assert "floating-panel" in classes(panel)
+    assert bar =~ ~s(aria-label="Table customization")
+    assert "hidden" in classes(bar)
+    assert "peer-aria-expanded:flex" in classes(bar)
 
-    # A click outside closes it; Escape closes it and returns focus to the
-    # icon; focus leaving alone does not, since removing a chip is that.
-    assert [["set_attr", %{"to" => "#costed-grid-customize"}]] = js(controls, "phx-click-away")
-
+    # Escape closes it and returns focus to the lip. Focus leaving does not,
+    # since removing a chip is that, and neither does a click elsewhere: the
+    # bar is part of the page, not a popover over it.
     assert [["set_attr", _], ["focus", %{"to" => "#costed-grid-customize"}]] =
-             js(controls, "data-escape")
+             js(wrap, "data-escape")
 
-    assert controls =~ "data-keep-on-blur"
-    assert controls =~ ~s(phx-hook="DisclosureDismiss")
+    assert wrap =~ "data-keep-on-blur"
+    assert wrap =~ ~s(phx-hook="DisclosureDismiss")
+    refute wrap =~ "phx-click-away"
 
-    # The chips and the add box live in the panel; the density toggle does not.
-    [_, inside] = String.split(html, ~s(id="costed-grid-customization"), parts: 2)
-    [inside, _table] = String.split(inside, ~s(id="costed-grid-viewport"), parts: 2)
+    # The lip and the bar come before the table, and the bar holds the chips,
+    # the add box, the zoom and the reset.
+    [before_table, _table] = String.split(html, ~s(id="costed-grid-viewport"), parts: 2)
+    [_lip, inside] = String.split(before_table, ~s(id="costed-grid-customization"), parts: 2)
     assert inside =~ ~s(id="costed-grid-chip-code")
     assert inside =~ ~s(id="costed-grid-add-column-input")
-    refute inside =~ ~s(id="costed-grid-density")
+    assert inside =~ ~s(id="costed-grid-zoom")
+    assert tag(html, "costed-grid-reset") =~ ~s(phx-value-op="reset")
+  end
+
+  test "the zoom steps only through heights that change the table, and names two of them" do
+    normal = render_component(&grid/1, %{})
+
+    assert tag(normal, "costed-grid") =~ ~s(data-zoom="36")
+    assert tag(normal, "costed-grid") =~ ~s(data-mode="normal")
+    assert normal =~ ~r/id="costed-grid-zoom-level"[^>]*>\s*36 px\s*</
+    assert tag(normal, "costed-grid-zoom-normal") =~ ~s(aria-pressed="true")
+    assert tag(normal, "costed-grid-zoom-compact") =~ ~s(aria-pressed="false")
+    assert "h-9" in classes(tag(normal, "costed-grid-cell-1-code"))
+
+    # Each press is pushed by the hook from these, never dropped by LiveView's
+    # guard on a click still awaiting its reply.
+    assert tag(normal, "costed-grid-zoom-in") =~ ~s(data-zoom-op="zoom")
+    assert tag(normal, "costed-grid-zoom-in") =~ ~s(data-dir="in")
+    assert tag(normal, "costed-grid-zoom-compact") =~ ~s(data-zoom-op="zoom_preset")
+    assert tag(normal, "costed-grid-zoom-compact") =~ ~s(data-preset="compact")
+    refute tag(normal, "costed-grid-zoom-in") =~ "phx-click"
+    refute tag(normal, "costed-grid-zoom-compact") =~ "phx-click"
+
+    # The ends of the range are disabled steps, not steps that do nothing.
+    shortest = render_component(&grid/1, %{zoom: 20})
+    assert tag(shortest, "costed-grid-zoom-out") =~ ~r/\sdisabled[\s>]/
+    refute tag(shortest, "costed-grid-zoom-in") =~ ~r/\sdisabled[\s>]/
+    assert tag(shortest, "costed-grid-zoom-compact") =~ ~s(aria-pressed="true")
+    assert "h-5" in classes(tag(shortest, "costed-grid-cell-1-code"))
+
+    tallest = render_component(&grid/1, %{zoom: 44})
+    assert tag(tallest, "costed-grid-zoom-in") =~ ~r/\sdisabled[\s>]/
+    refute tag(tallest, "costed-grid-zoom-out") =~ ~r/\sdisabled[\s>]/
+  end
+
+  test "every offered height has a row class of its own and a mode" do
+    steps = Bilimbi.Base.UI.FlexTable.zoom_steps()
+
+    assert steps == Enum.sort(steps)
+
+    assert steps |> Enum.map(&Bilimbi.Base.UI.FlexTable.row_class/1) |> Enum.uniq() |> length() ==
+             length(steps)
+
+    assert Enum.map(steps, &Bilimbi.Base.UI.FlexTable.mode/1) ==
+             [:compact, :compact, :compact, :normal, :normal, :normal]
+
+    # A height nothing is drawn at is the nearest one that is.
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(31) == 28
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom("33") == 36
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(nil) == 36
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(28, :in) == 36
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(44, :in) == 44
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(20, :out) == 20
   end
 
   test "compact is the same table with tighter rows that stay on one line" do
     normal = render_component(&grid/1, %{})
-    compact = render_component(&grid/1, %{mode: :compact})
+    compact = render_component(&grid/1, %{zoom: 24})
 
     # Both are a table of the same rows, cells and row actions.
     for html <- [normal, compact] do
@@ -179,9 +214,10 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
       refute html =~ "<canvas"
     end
 
-    assert tag(compact, "costed-grid-cell-1-code") =~ "whitespace-nowrap"
-    assert tag(compact, "costed-grid-cell-1-code") =~ "py-0 "
-    refute tag(normal, "costed-grid-cell-1-code") =~ "whitespace-nowrap"
+    assert tag(compact, "costed-grid") =~ ~s(data-mode="compact")
+    assert "whitespace-nowrap" in classes(tag(compact, "costed-grid-cell-1-code"))
+    assert "py-0" in classes(tag(compact, "costed-grid-cell-1-code"))
+    refute "whitespace-nowrap" in classes(tag(normal, "costed-grid-cell-1-code"))
   end
 
   test "the comparison date shows only while a column wears the change-since lens" do
@@ -192,5 +228,23 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     assert tag(html, "costed-grid-since-input") =~ ~s(type="date")
 
     refute render_component(&grid/1, %{since: ~D[2026-08-01]}) =~ "costed-grid-since"
+  end
+
+  test "a timestamp among a rollup's expanded rows follows the reader's clock" do
+    opened = %{
+      1 => %{
+        "code" => [%{"Name" => "Ada", "Created" => ~N[2026-10-05 13:22:10], "Active" => true}]
+      }
+    }
+
+    html = render_component(&grid/1, %{expanded: opened})
+
+    # Drawn by `datetime/1`, as a walked cell's timestamp is, never as the
+    # raw UTC text of the value.
+    assert html =~ ~s(<time)
+    assert html =~ ~s(id="costed-grid-row-1-code-0-)
+    refute html =~ "2026-10-05 13:22:10"
+    assert html =~ "Ada"
+    assert html =~ "Yes"
   end
 end

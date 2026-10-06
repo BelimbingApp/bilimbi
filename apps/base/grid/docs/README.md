@@ -55,28 +55,30 @@ planner's cost estimate for that one whole-table statement.
 
 `Bilimbi.Base.UI.Components.FlexTable.flex_table/1` is the component; it
 is presentation only and pushes one event with an `op`. It is one real
-table in two densities, `:normal` and `:compact`, switched by an icon
-toggle in the corner of its header; compact is the same table with tighter
-rows that never wrap. Beside the toggle a settings icon opens table
-customization, the panel that holds the column chips, their lenses and
-the add-a-column box.
-`Bilimbi.Base.Grid.Lens` prepares a cell for every lens at once: text, its
-position on the column's range, the band that position falls in, a trend's
-series and a change since a date.
+table whose zoom is the height of a row: `Bilimbi.Base.UI.FlexTable` owns
+the heights offered, short ones drawn compact (tighter rows that never
+wrap) and tall ones normal. A lip on the table's top-left edge opens table
+customization, the bar inline above the table that holds the column
+chips, their lenses, the add-a-column box, the zoom with its two named
+heights and the reset. `Bilimbi.Base.Grid.Lens` prepares a cell for every
+lens at once: text, its position on the column's range, the band that
+position falls in, a trend's series and a change since a date.
 
 `Bilimbi.Base.Grid.Web.PageColumns` is the host a list page uses: the page
 keeps its own query and declares the columns it draws itself as built-ins,
 and `PageColumns` adds the walked columns for exactly the listed rows. The
 users and companies lists use it. `Bilimbi.Base.Grid.View` is what a
-person arranged (columns, lenses, density, the comparison date); its
-module doc lists the URL keys.
+person arranged (columns, lenses, zoom, the comparison date); its module
+doc lists the URL keys.
 
 `Bilimbi.Base.Grid.PageViews` keeps that arrangement per account and per
 page in the account's `ui.grid.page_columns` setting, written on every
-change. A list opens the way its reader left it; an address that carries
-`cols`, `lens`, `density` or `since` wins, so a shared link shows what its
-sender saw and changes nobody's memory until the reader arranges
-something.
+change and read afresh whenever the address names none. A list opens the
+way its reader left it; an address that carries `cols`, `lens`, `z` or
+`since` wins, so a shared link shows what its sender saw and changes
+nobody's memory until the reader arranges something. A removed column of
+the page's own is offered again by the add-a-column box, and the reset op
+returns the page to its own columns and rows and forgets what was kept.
 
 Lenses are `value`, `bar`, `band`, and, for a count or sum over a dated
 many-link, `trend` (the aggregate per calendar month over the last twelve,
@@ -93,10 +95,9 @@ A walked column does not sort: the page owns the order of its rows.
   table would be a second, weaker way into the same records.
 - **No named or shared views.** An account's arrangement is remembered,
   not saved under a name; the address is how one is shared.
-- **Two densities, one table.** Compact is a real table like normal, so
-  links, sorting and rollups work in both. There is no canvas mode and no
-  row-height control: a height between the two changes nothing a reader
-  can see.
+- **One table at every zoom.** Compact rows are a real table like normal
+  ones, so links, sorting and rollups work in both. There is no canvas
+  mode, and the zoom offers only heights that draw a different table.
 - **No grouping or pivot.** The page's own sort and filters order the
   rows; the catalog only adds columns to them.
 

@@ -2,8 +2,8 @@ defmodule Bilimbi.Base.Grid.View do
   @moduledoc """
   What a person arranged on a list's columns, as one value that round-trips
   through the URL and through the account's saved setting: the table, the
-  column specs in order, the lens of each column, the density of the rows,
-  and the date a `delta` lens compares against.
+  column specs in order, the lens of each column, the zoom (the height of a
+  row), and the date a `delta` lens compares against.
 
   The page keeps its own sort, search, filters and pagination; this is only
   what the flexible table adds. Every field parses leniently from text and
@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Grid.View do
 
       cols=name,company.name,employees:count
       lens=employees:count|bar
-      density=compact  since=2026-01-01
+      z=24  since=2026-01-01
 
   An address that carries any of those keys says what to show. One that
   carries none leaves it to what the account last arranged
@@ -20,19 +20,21 @@ defmodule Bilimbi.Base.Grid.View do
   account arranged nothing.
   """
 
-  @keys ~w(cols lens density since)
+  alias Bilimbi.Base.UI.FlexTable
+
+  @keys ~w(cols lens z since)
 
   defstruct table: nil,
             columns: [],
             lenses: %{},
-            density: :normal,
+            zoom: 36,
             since: nil
 
   @type t :: %__MODULE__{
           table: String.t() | nil,
           columns: [String.t()],
           lenses: %{String.t() => String.t()},
-          density: :normal | :compact,
+          zoom: pos_integer(),
           since: Date.t() | nil
         }
 
@@ -47,7 +49,7 @@ defmodule Bilimbi.Base.Grid.View do
       table: table,
       columns: split_list(Map.get(params, "cols")),
       lenses: parse_lenses(Map.get(params, "lens")),
-      density: density(Map.get(params, "density")),
+      zoom: FlexTable.normalize_zoom(Map.get(params, "z")),
       since: params |> Map.get("since") |> parse_date()
     }
   end
@@ -58,7 +60,7 @@ defmodule Bilimbi.Base.Grid.View do
     %{}
     |> put_unless(:cols, Enum.join(view.columns, ","), "")
     |> put_unless(:lens, encode_lenses(view.lenses), "")
-    |> put_unless(:density, Atom.to_string(view.density), "normal")
+    |> put_unless(:z, view.zoom, FlexTable.default_zoom())
     |> put_unless(:since, view.since && Date.to_iso8601(view.since), nil)
   end
 
@@ -72,7 +74,7 @@ defmodule Bilimbi.Base.Grid.View do
     %{
       "columns" => view.columns,
       "lenses" => view.lenses,
-      "density" => Atom.to_string(view.density),
+      "zoom" => view.zoom,
       "since" => view.since && Date.to_iso8601(view.since)
     }
   end
@@ -84,7 +86,7 @@ defmodule Bilimbi.Base.Grid.View do
       table: table,
       columns: map |> Map.get("columns") |> split_list(),
       lenses: map |> Map.get("lenses") |> stored_lenses(),
-      density: density(Map.get(map, "density")),
+      zoom: FlexTable.normalize_zoom(Map.get(map, "zoom")),
       since: map |> Map.get("since") |> parse_date()
     }
   end
@@ -97,14 +99,13 @@ defmodule Bilimbi.Base.Grid.View do
 
   defp stored_lenses(_other), do: %{}
 
-  # Two densities and no more: anything that is not "compact" is the normal
-  # table.
-  defp density("compact"), do: :compact
-  defp density(_other), do: :normal
+  @doc "Sets the row height to the offered one nearest `value`."
+  @spec put_zoom(t(), term()) :: t()
+  def put_zoom(%__MODULE__{} = view, value), do: %{view | zoom: FlexTable.normalize_zoom(value)}
 
-  @doc "Sets the density of the rows; anything that is not `compact` is normal."
-  @spec put_density(t(), term()) :: t()
-  def put_density(%__MODULE__{} = view, value), do: %{view | density: density(value)}
+  @doc "The page's own view of this table: nothing walked, no lens, normal rows."
+  @spec reset(t()) :: t()
+  def reset(%__MODULE__{table: table}), do: %__MODULE__{table: table}
 
   defp parse_date(%Date{} = date), do: date
 

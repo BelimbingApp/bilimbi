@@ -689,17 +689,17 @@ word as the heading, so a wide table still scans. The page keeps its own
 search, filters, sort and pagination; the flexible table is the list
 itself, not a page beside it.
 
-The table carries no bar. Two small icon buttons sit side by side in the
-corner of its header and stay there when the table scrolls sideways: the
-density toggle, and a settings icon named "Customize table" that opens
-**table customization**. That panel holds a chip per column, dragged to
-reorder and removed with its ✕, each with its lens; the add-a-column box,
-which suggests paths (`Company › Parent company › Name`) as the person
-types; and the comparison date while a change-since lens is worn. It is
-closed until asked for, stays open while columns are added and removed,
-and closes on a click outside it or Escape, which returns focus to the
-icon. Arranging columns is done once and then left alone, so it does not
-take a row of the page.
+Nothing stands above the table but a small lip on the top-left edge of
+its frame, a tab named "Customize table". It is part of the frame, so it
+never sits over the page title, the search row or a heading. It opens
+**table customization**, a bar inline above the table that holds a chip
+per column, dragged to reorder and removed with its ✕, each with its lens;
+the add-a-column box, which suggests paths (`Company › Parent company ›
+Name`) as the person types; the zoom; and the comparison date while a
+change-since lens is worn. The lip then closes the bar, as does Escape,
+which returns focus to the lip. The bar is closed until asked for and stays
+open while columns are added and removed. Arranging columns is done once
+and then left alone, so it does not take a row of the page.
 
 The same column is read through a lens: the value, a bar scaled to the
 column's range across the whole table, a colour band, and, for a count or
@@ -711,16 +711,24 @@ warning or danger, so a coloured cell never reads as status; a categorical
 band paints a left edge, a sequential band the cell. A bar's width is
 written by the hook, because the CSP refuses inline style.
 
-Rows are **Normal** or **Compact**, switched by the density toggle, whose
-name stays "Compact rows" and whose pressed state says which is on. Compact is the same table with tighter rows that never wrap, so
-more rows and columns fit and the table scrolls sideways; every link, sort,
-rollup and row action works in both, and a cell's second line is left out.
-There is no third density and no row-height stepper: a height between the
-two changes nothing a reader can see.
+The zoom is the height of a row. The bar steps it one height at a time
+and jumps to its two named heights, **Compact** and **Normal**. Compact is
+the same table with tighter rows that never wrap, so more rows and columns
+fit and the table scrolls sideways; every link, sort, rollup and row
+action works in both, and a cell's second line is left out. Only heights
+that draw a different table are offered: the short ones are compact rows,
+the tall ones normal rows, and nothing between them, where a row would look
+like its neighbour. A step past either end is disabled, never a control
+that does nothing. Every press on the zoom lands, however quickly it
+follows the last.
 
-What a person arranges, the columns, their lenses and the density, is
+What a person arranges, the columns, their lenses and the zoom, is
 remembered for their account on that page with no save step, so a list
-opens the way they left it. The address says the same thing when it carries it, and wins: a
+opens the way they left it. Because nothing asks before keeping it, a
+removed column can always come back: the add-a-column box offers the
+page's own removed columns by their label beside the ones it can walk to,
+and "Reset to default columns" returns the page to its own columns and
+rows and forgets what was kept. The address says the same thing when it carries it, and wins: a
 shared link shows what its sender saw, and changes nobody's memory until
 the reader arranges something. Scaling a bar or a band reads the whole
 table; when the planner estimates that as heavy a line above the table

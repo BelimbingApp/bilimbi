@@ -170,10 +170,10 @@ test("a press released away from the field does not swallow a later departure", 
   assert.equal(expanded(), "false")
 })
 
-test("a panel marked to keep on blur stays open when focus leaves, and still closes on Escape", async () => {
+test("a bar marked to keep on blur stays open when focus leaves, and still closes on Escape", async () => {
   field.hook.destroyed()
   // Table customization on `flex_table/1`: removing the chip that held focus
-  // is focus leaving with nowhere to go, and must not close the panel.
+  // is focus leaving with nowhere to go, and must not close the bar.
   const wrapper = render(
     `<div id="grid-controls" phx-hook="DisclosureDismiss" data-keep-on-blur
           data-dismiss='[["set_attr",{"to":"#grid-customize","attr":["aria-expanded","false"]}]]'

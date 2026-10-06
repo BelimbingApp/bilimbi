@@ -5,29 +5,37 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   A list page keeps its query, filters, sort and pagination, and declares
   the columns it draws itself as built-ins. This struct adds everything the
   grid brings on top: columns a person walks to through the catalog (added,
-  removed, reordered and read through lenses), compact or normal rows, and
-  rollups that expand in place. The page's rows stay the rows; the walked
+  removed, reordered and read through lenses), the zoom from compact to
+  normal rows, and rollups that expand in place. The page's rows stay the rows; the walked
   columns are fetched for exactly those rows with `Grid.attach/5`.
 
   The page holds one `%PageColumns{}` in its assigns and:
 
     1. builds it at mount with `mount/3`, from the session's
        `current_scope`;
-    2. reads `cols`, `lens`, `density` and `since` from the URL with
+    2. reads `cols`, `lens`, `z` and `since` from the URL with
        `from_params/2` and merges `params/1` back into every path it
        patches to;
     3. after loading its page, calls `load/3` with the entries and a key
        function;
-    4. renders `flex_table/1` from `column_views`, `rows`, `mode`, `cost`
-       and `since`, with a `<:col>` slot per built-in id;
+    4. renders `flex_table/1` from `column_views`, `rows`, `mode`, `zoom`,
+       `cost` and `since`, with a `<:col>` slot per built-in id;
     5. delegates its `"grid"` event to `handle/2`.
 
   What a person arranges is remembered for their account and this page
   (`Bilimbi.Base.Grid.PageViews`): `handle/2` keeps it on every change, and
-  an address that says nothing about columns, lenses or density opens the page
+  an address that says nothing about columns, lenses or zoom opens the page
   the way the account left it. An address that carries any of them wins,
   so a shared link shows what its sender saw and changes nobody's memory
-  until the reader arranges something.
+  until the reader arranges something. What was kept is read each time the
+  address says nothing, never from a copy held in the page: a copy goes
+  stale the moment the account arranges something, and a stale one is how
+  a press on Normal once snapped back to compact rows.
+
+  A column a person removed can always come back: the add-a-column box
+  offers the page's removed built-ins by their label beside the catalog's
+  columns, and the reset op returns the page to its own columns and rows
+  and forgets what was kept.
 
   A page whose table is not in the account's catalog still works: the
   built-ins render and the add-a-column box offers nothing.
@@ -39,6 +47,7 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   alias Bilimbi.Base.Grid.View
   alias Bilimbi.Base.Grid.Web.Host
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.UI.FlexTable
 
   @enforce_keys [:catalog, :table, :builtins, :view, :account]
   defstruct catalog: nil,
@@ -46,7 +55,7 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
             builtins: [],
             view: %View{},
             account: nil,
-            remembered: nil,
+            zoom: 36,
             cost: nil,
             since: nil,
             extras: [],
@@ -70,8 +79,7 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
 
   @doc """
   Builds the state for a page whose rows are `table_id` rows, with its
-  built-in columns, for the signed-in `current_scope`. Reads what the
-  account last arranged on this page.
+  built-in columns, for the signed-in `current_scope`.
   """
   @spec mount(map(), String.t(), [builtin()]) :: t()
   def mount(%{scope: scope} = current_scope, table_id, builtins)
@@ -92,34 +100,33 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         scope.tenant.id
       )
 
-    remembered =
-      case PageViews.fetch(account, table_id) do
-        {:ok, view} -> view
-        :error -> nil
-      end
-
     %__MODULE__{
       catalog: catalog,
       table: table,
       builtins: builtins,
       view: %View{table: table_id},
-      account: account,
-      remembered: remembered
+      account: account
     }
   end
 
   @doc """
-  Reads the walked columns, lenses, density and comparison date. The URL says
-  them when it carries any of them; otherwise the account's remembered
-  arrangement does, and the page's own columns when there is none.
+  Reads the walked columns, lenses, zoom and comparison date. The URL says
+  them when it carries any of them; otherwise what the account last
+  arranged on this page does, and the page's own columns when it arranged
+  nothing.
   """
   @spec from_params(t(), map()) :: t()
   def from_params(%__MODULE__{} = state, params) do
+    table = state.view.table
+
     view =
-      cond do
-        View.carried?(params) -> View.from_params(params, state.view.table)
-        state.remembered -> state.remembered
-        true -> %View{table: state.view.table}
+      if View.carried?(params) do
+        View.from_params(params, table)
+      else
+        case PageViews.fetch(state.account, table) do
+          {:ok, kept} -> kept
+          :error -> %View{table: table}
+        end
       end
 
     %{state | view: view, suggestions: [], add_query: "", expanded: %{}}
@@ -193,7 +200,8 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         extras: extras,
         column_views: column_views,
         rows: rows,
-        mode: view.density,
+        mode: FlexTable.mode(view.zoom),
+        zoom: view.zoom,
         cost: Host.cost(cost),
         since: View.since(view)
     }
@@ -276,46 +284,80 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     {:patch, remember(state)}
   end
 
+  # Kept or not, the page goes on to show what was arranged; a write the
+  # store refused costs the memory of it, not the arrangement.
   defp remember(%__MODULE__{account: account, view: view} = state) do
-    case PageViews.remember(account, view) do
-      :ok -> %{state | remembered: if(View.default?(view), do: nil, else: view)}
-      {:error, _changeset} -> state
-    end
+    _result = PageViews.remember(account, view)
+    state
   end
 
-  defp suggest(%{table: nil} = state, text, _shown),
-    do: %{state | add_query: text, suggestions: []}
+  # A removed built-in comes first, by its label: it is the page's own
+  # column, and the catalog may hold nothing by that name to bring it back.
+  defp suggest(state, "", _shown), do: %{state | add_query: "", suggestions: []}
 
   defp suggest(state, text, shown) do
-    suggestions =
-      if text == "",
-        do: [],
-        else: Grid.suggest(state.catalog, state.table, text, exclude: shown)
+    builtins = state |> removed_builtins(shown, text) |> Enum.map(&builtin_view/1)
 
-    %{state | add_query: text, suggestions: Host.column_views(suggestions, state.view)}
+    # A catalog field the page draws itself is the page's column, shown or
+    # removed, so the catalog never offers it a second time under its id.
+    taken = Enum.uniq(shown ++ Enum.map(state.builtins, & &1.id))
+
+    walked =
+      if state.table,
+        do:
+          state.catalog
+          |> Grid.suggest(state.table, text, exclude: taken)
+          |> Host.column_views(state.view),
+        else: []
+
+    %{state | add_query: text, suggestions: builtins ++ walked}
   end
 
-  defp add_typed(%{table: nil}, _text, _builtin_ids), do: :noop
+  defp removed_builtins(state, shown, text) do
+    wanted = String.downcase(text)
 
+    Enum.filter(state.builtins, fn builtin ->
+      builtin.id not in shown and
+        (String.contains?(String.downcase(builtin.label), wanted) or
+           String.contains?(builtin.id, wanted))
+    end)
+  end
+
+  # What was typed and submitted: a removed built-in named by its label or
+  # id, a spec the catalog resolves, or the first thing the box would offer.
   defp add_typed(state, text, builtin_ids) do
-    resolved =
-      case Grid.resolve(state.catalog, state.table, [text]) do
-        {:ok, [column]} ->
-          column.spec
+    shown = state.view.columns
 
-        {:error, _reason} ->
-          state.catalog
-          |> Grid.suggest(state.table, text, exclude: state.view.columns, limit: 1)
-          |> Enum.map(& &1.spec)
-          |> List.first()
+    resolved =
+      case Enum.find(removed_builtins(state, shown, text), &exact?(&1, text)) do
+        %{id: id} -> id
+        nil -> resolve_typed(state, text) || first_suggestion(state, text, shown)
       end
 
     case resolved do
-      nil ->
-        :noop
+      nil -> :noop
+      spec -> arrange(state, View.add_column(state.view, spec), builtin_ids)
+    end
+  end
 
-      spec ->
-        arrange(state, View.add_column(state.view, spec), builtin_ids)
+  defp exact?(builtin, text) do
+    wanted = String.downcase(text)
+    String.downcase(builtin.label) == wanted or builtin.id == wanted
+  end
+
+  defp resolve_typed(%{table: nil}, _text), do: nil
+
+  defp resolve_typed(state, text) do
+    case Grid.resolve(state.catalog, state.table, [text]) do
+      {:ok, [column]} -> column.spec
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp first_suggestion(state, text, shown) do
+    case suggest(state, text, shown).suggestions do
+      [first | _rest] -> first.spec
+      [] -> nil
     end
   end
 

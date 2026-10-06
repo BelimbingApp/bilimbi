@@ -35,11 +35,12 @@
 // even when the click never does -- dragged off the field, a right-click, or
 // a touch that became a scroll.
 //
-// A wrapper marked `data-keep-on-blur` is a panel a person works in rather
+// A wrapper marked `data-keep-on-blur` is a bar a person works in rather
 // than a list they pick from: table customization removes the chip that
 // held focus and redraws its suggestions, and each of those is focus
-// leaving with nowhere to go. Such a panel closes on a click outside it and
-// on Escape only.
+// leaving with nowhere to go. Such a bar closes on its own control and on
+// Escape, and on a click outside it only if its wrapper asks for that with
+// `phx-click-away`.
 const DisclosureDismiss = {
   mounted() {
     this.pressing = false

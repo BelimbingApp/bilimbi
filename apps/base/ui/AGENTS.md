@@ -93,15 +93,18 @@ A table whose columns a person adds, removes or reorders is
 `Bilimbi.Base.Grid.Web.PageColumns`. It is presentation only: it never
 touches a catalog or a query, and its one event carries an `op`. Bars and
 bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
-refuses inline style; the `FlexTable` hook writes the bar width). It has
-two densities, `:normal` and `:compact`, and both are the same real table:
-do not add a canvas, a third density or a row-height control. Its column
-chips and add box live in table customization, the panel behind the
-settings icon in the header corner; do not put a toolbar back above the
-table. A page that
-draws a second line in a `<:col>` leaves it out when the mode is
-`:compact`. See the component comment in `lib/ui/components/flex_table.ex`
-and `Bilimbi.Base.UI.FlexTable`.
+refuses inline style; the `FlexTable` hook writes the bar width). It is
+one real table at every zoom: do not add a canvas, and do not offer a row
+height that looks like its neighbour (`Bilimbi.Base.UI.FlexTable` owns the
+steps). Its chips, add box, zoom and reset live in table customization,
+the bar the lip on the table's top-left edge opens; do not put a toolbar
+or an icon group back above the table or in its heading row. A zoom
+control carries `data-zoom-op` and no `phx-click`: LiveView drops a click
+on a control still waiting for its last reply, which is how the first
+density toggle came to look stuck, so the hook pushes each press. A page
+that draws a second line or an avatar in a `<:col>` leaves it out when the
+mode is `:compact`. See the component comment in
+`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries
 
