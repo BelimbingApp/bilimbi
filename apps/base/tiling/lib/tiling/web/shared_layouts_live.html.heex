@@ -1,4 +1,8 @@
-<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.system.workspace.shared">
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.system.workspace.shared"
+>
   <.page variant={:list}>
     <h1 class="text-xl font-semibold text-action">{gettext("Shared workspaces")}</h1>
     <p class="mt-1 text-sm text-muted">
