@@ -1951,8 +1951,8 @@ defmodule Bilimbi.Base.UI.Components do
   and closing the tile. Everything else the workspace can do to a tile
   (fill the workspace, swap, move, follow, make master, open alone) is a
   key in the `Ctrl+.` tiling mode, listed in the key table of
-  `apps/base/tiling/docs/README.md`; do not grow this menu back into a second list of them.
-  It is a disclosure: its trigger's `aria-expanded` is the one record of
+  `apps/base/tiling/docs/README.md`; do not grow this menu back into a second
+  list of them. It is a disclosure: its trigger's `aria-expanded` is the one record of
   open, the list derives its visibility from it, and the `DisclosureDismiss`
   hook closes it when focus leaves or Escape is pressed, exactly as
   `<.multi_select>` does. Either entry runs the caller's command and closes

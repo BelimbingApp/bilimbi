@@ -649,8 +649,8 @@ move focus (`h j k l` or arrows), move tiles (`H J K L`), swap (`s`), resize
 mounted (`f`), flip the split (`t`), make master (`m`), follow selections
 (`w`), open the tile's page alone (`o`), add (`n`) or close (`q`) a tile, and
 open a saved layout (`1` to `9`); Escape leaves. An open menu takes Escape
-first. The keys are listed in the tiling module's README. Focus follows a click, never
-the pointer, and nothing animates.
+first. The keys are listed in the tiling module's README. Focus follows a
+click, never the pointer, and nothing animates.
 
 There is no cap on tiles: the operator decides, and a control-room wall
 holds more than a laptop. Every tile is a live page with its own connection,
