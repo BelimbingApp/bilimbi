@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
 
   alias Bilimbi.Base.Menu.Item
   alias Bilimbi.Base.UI.IconRegistry
+  alias Bilimbi.Base.UI.Web.DesignLibraryFlexSample, as: FlexSample
 
   # The Navigation entry renders `Layouts.nav_menu/1` -- the shell's own menu
   # -- over a fixed tree, so the card cannot drift from what the sidebar does.
@@ -161,6 +162,10 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:sample_sort, sort_state(@sample_default_sort))
      |> assign(:sample_filter_form, to_form(%{"search" => ""}, as: :sample_filters))
      |> assign(:sample_id_rows, Enum.take(@sample_rows, 5))
+     |> assign(:flex_sample, FlexSample.initial())
+     |> assign(:flex_rows, FlexSample.rows(FlexSample.initial(), 12))
+     |> assign(:flex_plain, FlexSample.initial())
+     |> assign(:flex_plain_rows, FlexSample.rows(FlexSample.initial(), 4))
      |> assign_preview_page(:sample, 1, 25)
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
@@ -195,6 +200,26 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   end
 
   @impl true
+  # The flexible-table specimen: every op changes the sample's state and
+  # re-prepares its rows.
+  def handle_event("sample-flex", params, socket) do
+    state = FlexSample.apply(params, socket.assigns.flex_sample)
+
+    {:noreply,
+     socket
+     |> assign(:flex_sample, state)
+     |> assign(:flex_rows, FlexSample.rows(state, 12))}
+  end
+
+  def handle_event("sample-flex-plain", params, socket) do
+    state = FlexSample.apply(params, socket.assigns.flex_plain)
+
+    {:noreply,
+     socket
+     |> assign(:flex_plain, state)
+     |> assign(:flex_plain_rows, FlexSample.rows(state, 4))}
+  end
+
   def handle_event("open-modal", params, socket) do
     width = if params["width"] == "wide", do: :wide, else: :narrow
     {:noreply, assign(socket, :modal_width, width)}

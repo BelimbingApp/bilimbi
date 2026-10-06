@@ -5,7 +5,14 @@
   required: true,
   otp_app: :bilimbi_core_geonames,
   namespace: Bilimbi.Core.Geonames,
-  dependencies: ["base/authz", "base/database", "base/module_registry", "base/tenancy", "base/ui"],
+  dependencies: [
+    "base/authz",
+    "base/database",
+    "base/grid",
+    "base/module_registry",
+    "base/tenancy",
+    "base/ui"
+  ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{
     20_260_812_103_801 => :compatible_baseline,

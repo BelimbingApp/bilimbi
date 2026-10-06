@@ -4,7 +4,7 @@ Read the component comment before fighting a default. `DESIGN.md` is the design 
 
 ## Component modules
 
-Shared components live in four modules: `lib/ui/components.ex`, and `icon.ex`, `forms.ex` and `lists.ex` under `lib/ui/components/`. Take them with `use Bilimbi.Base.UI.Components`, not `import`: a plain import brings only what `components.ex` still defines, so `<.icon>`, `<.input>` and `<.table>` are undefined. A new group joins `Components.modules/0` and the `__using__` there, or the Design Library guards never measure it. The moduledoc of `Bilimbi.Base.UI.Components` owns the import order.
+Shared components live in five modules: `lib/ui/components.ex`, and `icon.ex`, `forms.ex`, `lists.ex` and `flex_table.ex` under `lib/ui/components/`. Take them with `use Bilimbi.Base.UI.Components`, not `import`: a plain import brings only what `components.ex` still defines, so `<.icon>`, `<.input>` and `<.table>` are undefined. A new group joins `Components.modules/0` and the `__using__` there, or the Design Library guards never measure it. The moduledoc of `Bilimbi.Base.UI.Components` owns the import order.
 
 ## Defaults the component owns
 
@@ -20,6 +20,10 @@ A table is flat. `table/1` takes no radius, so a rounded table is hand-written m
 A caller's `inner_class` padding wins over the card's `p-2`. `inner_padding/1` resolves that before the classes reach the markup; two utilities of equal specificity are decided by stylesheet order, where a caller's `p-0` would lose.
 
 Rendered text carries no catalog identifier. A Design Spec number may be the element's `id` and nothing the person reads. See `DESIGN.md` "Write for humans".
+
+A list a form field opens beneath itself carries `floating-list`, its control `floating-anchor` and the field wrapper `floating-scope`, as `multi_select/1` and `combobox/1` do. Do not give such a list `absolute`: inside `<.modal>` or any box that scrolls or clips it was cut off and grew a scrollbar. The comment above the three utilities in `apps/web/assets/css/app.css` owns the rule, and happy-dom cannot show it, so check a new one in a browser.
+
+`<.modal>` scrolls its body, never the rounded dialog; do not put `overflow-y-auto` or padding on the dialog through `class`. See the comment on `modal/1`.
 
 ## Design Library
 
@@ -72,7 +76,7 @@ The notification bell is the shell's: `Layouts.app/1` renders the `shell.notific
 
 A page shown inside a workspace tile renders chromeless through the `framed` branch of `Layouts.app/1`; the flag comes from `BilimbiWeb.FramedRender` through the LiveView session, never from a page. Do not add a tile special case to a page: if a page needs to know it is in a tile beyond that branch, that is the signal to design a tile contract, not a special case. A tile has no bar: its chrome is `<.tile_controls>`, a grip and a two-entry menu floating over its top right corner, and the divider is `<.split_handle>`. Do not add an operation to that menu; a new tile operation is a key of the tiling mode, added to `tiling.js` and the key table in `apps/base/tiling/docs/README.md` together, and the comment on `tile_controls/1` says why. The tree, the host page and its hook are `apps/base/tiling` and `apps/web/assets/js/tiling.js`. See `DESIGN.md` "Tiled workspace".
 
-A tile has one vertical scrollbar. Do not give a page or a component a height of its own (`h-screen`, a `max-h` scroll box around a list) to get a sticky heading or a pinned pager: build the list from `<.page>`, `<.card>`, `<.table>` and `<.pagination>`, and the "list fill" rules in `apps/web/assets/css/app.css` do it inside a tile for the shapes named there. A scroll box needs a positioned ancestor inside it or around it, as the comment on the framed `main` in `layouts.ex` explains: an `sr-only` label under an unpositioned scroll box is laid out against the document and gave every tile a second scrollbar.
+A tile has one vertical scrollbar. Do not give a page or a component a height of its own (`h-screen`, a `max-h` scroll box around a list) to get a sticky heading or a pinned pager: build the list from `<.page>`, `<.card>`, `<.table>` or `<.flex_table>`, and `<.pagination>`, and the "list fill" rules in `apps/web/assets/css/app.css` do it inside a tile for the shapes named there. A scroll box needs a positioned ancestor inside it or around it, as the comment on the framed `main` in `layouts.ex` explains: an `sr-only` label under an unpositioned scroll box is laid out against the document and gave every tile a second scrollbar.
 
 The one tile contract so far is the follow channel, `Bilimbi.Base.UI.Workspace`. A list row that opens a record is `<.record_link workspace={@workspace} kind="core/company" record_id={id} navigate={...}>`, and a record page calls `Workspace.announce/2` once it has loaded the record; both are inert outside a workspace. Pass `@workspace` to the component; do not branch a page template on it, and do not decide from the followed kinds at render time: rows are streamed and re-render only when re-streamed, so the component decides when the row is clicked. `kind` is the record's owning module id, which for `/users/:id` is `core/user`, not the list's module. The comment on `record_link/1` and the moduledoc of `Workspace` own the rest.
 
@@ -81,6 +85,26 @@ Opening a page in a tile from anywhere is a link to `/workspace` with `open=<the
 ## Lists
 
 Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced. The moduledocs own the contract; `<.filter_toolbar>` and `<.pagination>` in `lib/ui/components/lists.ex` still own the framing.
+
+## Flexible tables
+
+A table whose columns a person adds, removes or reorders is
+`<.flex_table>`, hosted by a list page through
+`Bilimbi.Base.Grid.Web.PageColumns`. It is presentation only: it never
+touches a catalog or a query, and its one event carries an `op`. Bars and
+bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
+refuses inline style; the `FlexTable` hook writes the bar width). It is
+one real table at every zoom: do not add a canvas, and do not offer a row
+height that looks like its neighbour (`Bilimbi.Base.UI.FlexTable` owns the
+steps). Its chips, add box, zoom and reset live in table customization,
+the bar the lip on the table's top-left edge opens; do not put a toolbar
+or an icon group back above the table or in its heading row. A zoom
+control carries `data-zoom-op` and no `phx-click`: LiveView drops a click
+on a control still waiting for its last reply, which is how the first
+density toggle came to look stuck, so the hook pushes each press. A page
+that draws a second line or an avatar in a `<:col>` leaves it out when the
+mode is `:compact`. See the component comment in
+`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries
 

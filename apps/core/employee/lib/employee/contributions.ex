@@ -68,6 +68,7 @@ defmodule Bilimbi.Core.Employee.Contributions do
         Bilimbi.Core.Employee.PrincipalDirectoryProvider,
         Bilimbi.Core.Employee.EmployeeDirectoryProvider
       ],
+      grid: Bilimbi.Core.Employee.GridTables.tables(),
       authz: %{
         capabilities: @owned_capabilities,
         roles: %{

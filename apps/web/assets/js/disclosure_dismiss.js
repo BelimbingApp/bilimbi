@@ -34,11 +34,19 @@
 // could never close it there. The press ends on the release, which arrives
 // even when the click never does -- dragged off the field, a right-click, or
 // a touch that became a scroll.
+//
+// A wrapper marked `data-keep-on-blur` is a bar a person works in rather
+// than a list they pick from: table customization removes the chip that
+// held focus and redraws its suggestions, and each of those is focus
+// leaving with nowhere to go. Such a bar closes on its own control and on
+// Escape, and on a click outside it only if its wrapper asks for that with
+// `phx-click-away`.
 const DisclosureDismiss = {
   mounted() {
     this.pressing = false
     this.listening = false
     this.trigger = this.el.querySelector("[aria-expanded]")
+    this.keepOnBlur = this.el.hasAttribute("data-keep-on-blur")
 
     this.onPointerDown = () => (this.pressing = true)
     this.onPressEnd = () => (this.pressing = false)
@@ -52,6 +60,8 @@ const DisclosureDismiss = {
     }
 
     this.onFocusOut = (e) => {
+      if (this.keepOnBlur) return
+
       if (this.pressing) {
         this.pressing = false
         return

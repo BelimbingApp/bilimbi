@@ -115,6 +115,24 @@
   --color-danger-surface: var(--color-red-50);
   --color-danger-line: var(--color-red-200);
   --color-danger-ink: var(--color-red-900);
+
+  /* Data colour for the grid's lenses. A sequential scale for values that
+     order on a number line (small to large), a categorical palette for
+     values that only differ. Neither uses brand, success, warning or danger,
+     so a coloured cell never reads as status. */
+  --color-scale-1: var(--color-sky-100);
+  --color-scale-2: var(--color-sky-200);
+  --color-scale-3: var(--color-sky-400);
+  --color-scale-4: var(--color-sky-600);
+  --color-scale-5: var(--color-sky-800);
+  --color-cat-1: var(--color-teal-500);
+  --color-cat-2: var(--color-orange-400);
+  --color-cat-3: var(--color-violet-500);
+  --color-cat-4: var(--color-cyan-500);
+  --color-cat-5: var(--color-fuchsia-500);
+  --color-cat-6: var(--color-lime-500);
+  --color-cat-7: var(--color-indigo-500);
+  --color-cat-8: var(--color-rose-400);
 }
 
 /*
@@ -172,6 +190,19 @@
     --color-danger-surface: var(--color-red-950);
     --color-danger-line: var(--color-red-800);
     --color-danger-ink: var(--color-red-200);
+    --color-scale-1: var(--color-sky-950);
+    --color-scale-2: var(--color-sky-900);
+    --color-scale-3: var(--color-sky-700);
+    --color-scale-4: var(--color-sky-500);
+    --color-scale-5: var(--color-sky-300);
+    --color-cat-1: var(--color-teal-400);
+    --color-cat-2: var(--color-orange-400);
+    --color-cat-3: var(--color-violet-400);
+    --color-cat-4: var(--color-cyan-400);
+    --color-cat-5: var(--color-fuchsia-400);
+    --color-cat-6: var(--color-lime-400);
+    --color-cat-7: var(--color-indigo-400);
+    --color-cat-8: var(--color-rose-400);
   }
 }
 
@@ -219,6 +250,19 @@
   --color-danger-surface: var(--color-red-950);
   --color-danger-line: var(--color-red-800);
   --color-danger-ink: var(--color-red-200);
+  --color-scale-1: var(--color-sky-950);
+  --color-scale-2: var(--color-sky-900);
+  --color-scale-3: var(--color-sky-700);
+  --color-scale-4: var(--color-sky-500);
+  --color-scale-5: var(--color-sky-300);
+  --color-cat-1: var(--color-teal-400);
+  --color-cat-2: var(--color-orange-400);
+  --color-cat-3: var(--color-violet-400);
+  --color-cat-4: var(--color-cyan-400);
+  --color-cat-5: var(--color-fuchsia-400);
+  --color-cat-6: var(--color-lime-400);
+  --color-cat-7: var(--color-indigo-400);
+  --color-cat-8: var(--color-rose-400);
 }
 
 [data-phx-session],
@@ -292,18 +336,22 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 /* List fill. A page shown in a workspace tile (`Layouts.app/1`, the
  * `data-framed` shell) has one vertical scrollbar, and on a list page it is
  * the table's: the page takes the tile's height, the table's scroll box
- * (`data-table-region`, `table/1`) takes the room left under the heading and
- * filters, its heading row sticks, and the pager stays at the foot of the
- * tile below it.
+ * (`data-table-region`, `table/1` and `flex_table/1`) takes the room left
+ * under the heading and filters, its heading row sticks, and the pager stays
+ * at the foot of the tile below it.
  *
  * The chain from the page to the scroll box has to be flex columns that may
- * shrink, so the rules name the two shapes a list page (`page/1`,
+ * shrink, so the rules name the shapes a list page (`page/1`,
  * `data-page="list"`) has: the table in a card (`data-card`), or in a plain
- * wrapper. Only the last such block on the page takes the room; a smaller
- * table above it keeps its height. A table nested any other way, a record
- * or form page, and every page with no table are left alone and scroll in
- * `#app-content` as before. So does every page in a tile under 24rem tall,
- * where a heading and filters leave no useful room for rows.
+ * wrapper. In either, the scroll box may sit one level further in, inside a
+ * `data-table-frame`: that is `flex_table/1`, whose frame also holds the lip
+ * and the customization bar above the table, and they keep their height
+ * while the table takes the rest. Only the last such block on the page
+ * takes the room; a smaller table above it keeps its height. A table nested
+ * any other way, a record or form page, and every page with no table are
+ * left alone and scroll in `#app-content` as before. So does every page in
+ * a tile under 24rem tall, where a heading and filters leave no useful room
+ * for rows.
  *
  * The scroll box has a floor, because a page with a great deal above its
  * table would otherwise squeeze the table to a slit: a heading and one row
@@ -315,7 +363,12 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
  * a whole. */
 @media (min-height: 24rem) {
   #app-shell[data-framed="true"] #app-content > [data-page="list"] {
-    &:has(> * > [data-table-region], > [data-card] > * > [data-table-region]) {
+    &:has(
+      > * > [data-table-region],
+      > * > [data-table-frame] > [data-table-region],
+      > [data-card] > * > [data-table-region],
+      > [data-card] > * > [data-table-frame] > [data-table-region]
+    ) {
       display: flex;
       flex-direction: column;
       height: 100%;
@@ -323,14 +376,19 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 
     & > :nth-last-child(
       1 of :has(> [data-table-region]),
-      [data-card]:has(> * > [data-table-region])
+      :has(> [data-table-frame] > [data-table-region]),
+      [data-card]:has(> * > [data-table-region]),
+      [data-card]:has(> * > [data-table-frame] > [data-table-region])
     ) {
       display: flex;
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
 
-      &[data-card] > :has(> [data-table-region]) {
+      &[data-card] > :has(> [data-table-region]),
+      &[data-card] > :has(> [data-table-frame] > [data-table-region]),
+      & > [data-table-frame]:has(> [data-table-region]),
+      &[data-card] > * > [data-table-frame]:has(> [data-table-region]) {
         display: flex;
         flex-direction: column;
         flex: 1 1 auto;
@@ -338,7 +396,9 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
       }
 
       & > [data-table-region],
-      &[data-card] > * > [data-table-region] {
+      & > [data-table-frame] > [data-table-region],
+      &[data-card] > * > [data-table-region],
+      &[data-card] > * > [data-table-frame] > [data-table-region] {
         flex: 1 1 auto;
         min-height: max(4.5rem, 100vh - 24rem);
         overflow: auto;
@@ -414,6 +474,47 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
     cursor: not-allowed;
     color: var(--color-ink-faint);
     opacity: 50%;
+  }
+}
+
+/* The list a form field opens beneath itself: `multi_select` and `combobox`.
+ * The field wrapper is the `floating-scope`, the control the list hangs from
+ * is the `floating-anchor`, and the list is the `floating-list`.
+ *
+ * The list is fixed to the viewport and placed by its anchor, so no ancestor
+ * that scrolls or clips (a modal dialog, a card, a tile) can cut it off or
+ * grow a scrollbar to hold it. It still follows the control when something
+ * scrolls, flips above the control when there is no room below, lines up
+ * with the control's other edge when it would run past the side of the
+ * screen, and hides when the control itself scrolls out of view. The scope keeps one field's
+ * anchor from answering for another's list, which is what lets every field
+ * use the same name.
+ *
+ * A browser without anchor positioning keeps the list absolute inside the
+ * wrapper: it opens in the same place and a clipping ancestor scrolls to
+ * show it. Do not give a field list `absolute` of its own; that is the
+ * clipped list this replaced. */
+@utility floating-scope {
+  anchor-scope: --floating-list;
+}
+
+@utility floating-anchor {
+  anchor-name: --floating-list;
+}
+
+@utility floating-list {
+  position: absolute;
+  left: 0;
+  width: 100%;
+
+  @supports (anchor-scope: --floating-list) {
+    position: fixed;
+    position-anchor: --floating-list;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    position-visibility: anchors-visible;
   }
 }
 
@@ -600,3 +701,27 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
     transition-timing-function: ease-out;
   }
 }
+
+/* Grid lenses. A band is painted by a data attribute the server renders,
+   because the CSP refuses inline style; the bar's width is the one value
+   the FlexTable hook writes through CSSOM. Sequential bands run light to
+   strong; categorical bands take the palette in order. */
+.flex-table [data-band='0'][data-scale='sequential'] { background-color: var(--color-scale-1); }
+.flex-table [data-band='1'][data-scale='sequential'] { background-color: var(--color-scale-2); }
+.flex-table [data-band='2'][data-scale='sequential'] { background-color: var(--color-scale-3); }
+.flex-table [data-band='3'][data-scale='sequential'] { background-color: var(--color-scale-4); color: var(--color-ink-inverse); }
+.flex-table [data-band='4'][data-scale='sequential'] { background-color: var(--color-scale-5); color: var(--color-ink-inverse); }
+.flex-table [data-band='0'][data-scale='binary'] { background-color: var(--color-surface-sunken); }
+.flex-table [data-band='4'][data-scale='binary'] { background-color: var(--color-scale-4); color: var(--color-ink-inverse); }
+.flex-table [data-band='0'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-1); }
+.flex-table [data-band='1'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-2); }
+.flex-table [data-band='2'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-3); }
+.flex-table [data-band='3'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-4); }
+.flex-table [data-band='4'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-5); }
+.flex-table [data-band='5'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-6); }
+.flex-table [data-band='6'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-7); }
+.flex-table [data-band='7'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-8); }
+.flex-table [data-bar] { background-color: var(--color-scale-4); }
+.flex-table [data-dragging='true'] { opacity: 0.5; }
+.flex-table [data-drop='before'] { box-shadow: inset 2px 0 0 var(--color-brand-strong); }
+.flex-table [data-drop='after'] { box-shadow: inset -2px 0 0 var(--color-brand-strong); }

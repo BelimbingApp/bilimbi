@@ -66,6 +66,28 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     assert html =~ ~s(phx-click="close_attach">Cancel</button>)
   end
 
+  test "the rounded dialog never scrolls; the body inside it does" do
+    html = render_modal(%{described: true})
+
+    # A scrollbar on the rounded surface itself squares its corners off, so
+    # the dialog clips and its body scrolls. Title, description and content
+    # all sit inside that body.
+    assert [dialog_class] =
+             Regex.run(~r/<dialog[^>]*\sclass="([^"]*)"/, html, capture: :all_but_first)
+
+    assert "overflow-hidden" in String.split(dialog_class)
+    refute "overflow-y-auto" in String.split(dialog_class)
+
+    assert [body_class] =
+             Regex.run(~r/<div id="attach-modal-body" class="([^"]*)">/, html,
+               capture: :all_but_first
+             )
+
+    assert "overflow-y-auto" in String.split(body_class)
+    assert html =~ ~r/<div id="attach-modal-body"[^>]*>\s*<h2 id="attach-modal-title"/
+    assert html =~ ~r/Cancel<\/button>\s*<\/div>\s*<\/dialog>/
+  end
+
   test "omits the description reference when no description is given" do
     html = render_modal(%{described: false})
 

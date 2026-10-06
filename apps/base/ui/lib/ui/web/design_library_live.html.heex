@@ -1966,6 +1966,101 @@
                   </:col>
                 </.table>
               </div>
+              <div id="component-flex-table" class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-ink">Flexible table</h3>
+                  <p class="text-xs text-ink-muted">
+                    Example companies with columns walked to their people and orders.
+                    The lip on the table's top-left edge opens table customization
+                    inline above it: add a column from its box, drag a chip or a
+                    heading to reorder, remove a column, switch a column's lens, step
+                    the row height or jump to Compact or Normal, and reset. The lip
+                    then closes it, as does Escape. Expand a rollup and sort from the
+                    table itself. Changes stay in this preview.
+                  </p>
+                </div>
+                <%!-- One specimen, drawn by whichever call matches its row height,
+                     so each `mode` the component takes is spelled out and is the
+                     one on screen. --%>
+                <%= if FlexSample.mode(@flex_sample) == :compact do %>
+                  <.flex_table
+                    id="sample-flex-table"
+                    columns={@flex_sample.columns}
+                    rows={@flex_rows}
+                    mode={:compact}
+                    zoom={@flex_sample.zoom}
+                    event="sample-flex"
+                    sort_by={@flex_sample.sort_by}
+                    sort_dir={@flex_sample.sort_dir}
+                    suggestions={@flex_sample.suggestions}
+                    add_query={@flex_sample.add_query}
+                    cost={%{estimate: 32_000.0, heavy?: true}}
+                    expanded={@flex_sample.expanded}
+                    caption="Example companies as a flexible table"
+                  >
+                    <:col :let={row} id="name">
+                      <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
+                    </:col>
+                    <:action :let={row}>
+                      <.icon_button
+                        icon="view"
+                        id={"sample-flex-preview-#{row.key}"}
+                        label={"Preview #{row.cells["name"].text}"}
+                        phx-click="preview-company"
+                        phx-value-id={row.key}
+                      />
+                    </:action>
+                    <:empty title="No example companies" reason="The example set is empty." />
+                  </.flex_table>
+                <% else %>
+                  <.flex_table
+                    id="sample-flex-table"
+                    columns={@flex_sample.columns}
+                    rows={@flex_rows}
+                    mode={:normal}
+                    zoom={@flex_sample.zoom}
+                    event="sample-flex"
+                    sort_by={@flex_sample.sort_by}
+                    sort_dir={@flex_sample.sort_dir}
+                    suggestions={@flex_sample.suggestions}
+                    add_query={@flex_sample.add_query}
+                    cost={%{estimate: 32_000.0, heavy?: true}}
+                    expanded={@flex_sample.expanded}
+                    caption="Example companies as a flexible table"
+                  >
+                    <:col :let={row} id="name">
+                      <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
+                    </:col>
+                    <:action :let={row}>
+                      <.icon_button
+                        icon="view"
+                        id={"sample-flex-preview-#{row.key}"}
+                        label={"Preview #{row.cells["name"].text}"}
+                        phx-click="preview-company"
+                        phx-value-id={row.key}
+                      />
+                    </:action>
+                    <:empty title="No example companies" reason="The example set is empty." />
+                  </.flex_table>
+                <% end %>
+                <p class="text-xs text-ink-muted">
+                  The plainest shape: every column drawn from its cell, with no row
+                  actions and no caption. It keeps its own columns and row height.
+                </p>
+                <.flex_table
+                  id="sample-flex-plain"
+                  columns={@flex_plain.columns}
+                  rows={@flex_plain_rows}
+                  mode={FlexSample.mode(@flex_plain)}
+                  zoom={@flex_plain.zoom}
+                  event="sample-flex-plain"
+                  sort_by={@flex_plain.sort_by}
+                  sort_dir={@flex_plain.sort_dir}
+                  suggestions={@flex_plain.suggestions}
+                  add_query={@flex_plain.add_query}
+                  expanded={@flex_plain.expanded}
+                />
+              </div>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-card" title="Card" inner_class="space-y-4 p-4">

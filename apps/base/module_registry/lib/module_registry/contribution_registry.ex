@@ -21,7 +21,8 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     schedule: Bilimbi.Base.Schedule.ContributionValidator,
     workflow: Bilimbi.Base.Workflow.ContributionValidator,
     actor_verifier: Bilimbi.Base.Tenancy.ActorVerifier.ContributionValidator,
-    system_principals: Bilimbi.Base.Tenancy.SystemPrincipals.ContributionValidator
+    system_principals: Bilimbi.Base.Tenancy.SystemPrincipals.ContributionValidator,
+    grid: Bilimbi.Base.Grid.ContributionValidator
   }
   @consumer_keys @consumer_validators |> Map.keys() |> Enum.sort()
 

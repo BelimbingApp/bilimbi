@@ -5,12 +5,14 @@ defmodule Bilimbi.Base.UI.Components do
   The components are split by stable group. This module holds feedback,
   actions, page structure, inline editing and the tile chrome;
   `Bilimbi.Base.UI.Components.Icon` holds the icon,
-  `Bilimbi.Base.UI.Components.Forms` the form controls and
-  `Bilimbi.Base.UI.Components.Lists` the operational-list surface. A caller
+  `Bilimbi.Base.UI.Components.Forms` the form controls,
+  `Bilimbi.Base.UI.Components.Lists` the operational-list surface and
+  `Bilimbi.Base.UI.Components.FlexTable` the flexible table. A caller
   takes all of them with `use Bilimbi.Base.UI.Components`; `modules/0` is the
   list anything that enumerates components reads. A group imports only the
   groups below it (Icon, then Forms, then Lists), and this module imports
-  Icon alone, so the compiler refuses a cycle.
+  Icon alone, so the compiler refuses a cycle. FlexTable sits above them all:
+  it imports this module and Lists, and nothing imports it.
 
   The components consist mostly of markup and are well-documented with doc
   strings and declarative assigns.
@@ -39,6 +41,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   import Bilimbi.Base.UI.Components.Icon
 
+  alias Bilimbi.Base.UI.Components.FlexTable
   alias Bilimbi.Base.UI.Components.Forms
   alias Bilimbi.Base.UI.Components.Icon
   alias Bilimbi.Base.UI.Components.Lists
@@ -57,6 +60,7 @@ defmodule Bilimbi.Base.UI.Components do
       import Bilimbi.Base.UI.Components.Icon
       import Bilimbi.Base.UI.Components.Forms, except: [field_base_class: 1, field_base_class: 2]
       import Bilimbi.Base.UI.Components.Lists
+      import Bilimbi.Base.UI.Components.FlexTable
     end
   end
 
@@ -67,7 +71,7 @@ defmodule Bilimbi.Base.UI.Components do
   still measured.
   """
   @spec modules() :: [module()]
-  def modules, do: [__MODULE__, Icon, Forms, Lists]
+  def modules, do: [__MODULE__, Icon, Forms, Lists, FlexTable]
 
   @doc """
   Renders one flash message.
@@ -980,6 +984,12 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:description, doc: "one short line under the title, announced with the dialog")
   slot(:inner_block, required: true)
 
+  # The dialog is the rounded surface and never scrolls; `#<id>-body` inside
+  # it does. A scrollbar on the dialog itself runs into the rounded corners
+  # and squares them off. The body's track stops a corner radius short of
+  # each end, which is what the dialog's own `py-3` is for. A field's list
+  # (`floating-list` in `app.css`) leaves this box instead of lengthening it,
+  # so opening one neither scrolls the dialog nor is cut off by it.
   def modal(assigns) do
     ~H"""
     <dialog
@@ -993,8 +1003,8 @@ defmodule Bilimbi.Base.UI.Components do
       aria-describedby={@description != [] && "#{@id}-description"}
       tabindex="-1"
       class={[
-        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] overflow-y-auto",
-        "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
+        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] flex-col overflow-hidden open:flex",
+        "rounded-xl border border-line bg-surface py-3 text-ink shadow-lg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
         "backdrop:bg-ink/40",
         @width == :compact && "max-w-md",
@@ -1003,16 +1013,18 @@ defmodule Bilimbi.Base.UI.Components do
       ]}
       {@rest}
     >
-      <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
-        {@title}
-      </h2>
-      <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
-      <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
-      <.connection_banners id={@id} />
-      <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
-        {render_slot(@description)}
-      </p>
-      {render_slot(@inner_block)}
+      <div id={"#{@id}-body"} class="min-h-0 overflow-y-auto px-6 py-3">
+        <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
+          {@title}
+        </h2>
+        <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
+        <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
+        <.connection_banners id={@id} />
+        <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
+          {render_slot(@description)}
+        </p>
+        {render_slot(@inner_block)}
+      </div>
     </dialog>
     """
   end

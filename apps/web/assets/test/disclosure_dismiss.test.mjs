@@ -170,6 +170,39 @@ test("a press released away from the field does not swallow a later departure", 
   assert.equal(expanded(), "false")
 })
 
+test("a bar marked to keep on blur stays open when focus leaves, and still closes on Escape", async () => {
+  field.hook.destroyed()
+  // Table customization on `flex_table/1`: removing the chip that held focus
+  // is focus leaving with nowhere to go, and must not close the bar.
+  const wrapper = render(
+    `<div id="grid-controls" phx-hook="DisclosureDismiss" data-keep-on-blur
+          data-dismiss='[["set_attr",{"to":"#grid-customize","attr":["aria-expanded","false"]}]]'
+          data-escape='[["set_attr",{"to":"#grid-customize","attr":["aria-expanded","false"]}],["focus",{"to":"#grid-customize"}]]'>
+       <button id="grid-customize" type="button" aria-expanded="true">Customize table</button>
+       <div id="grid-customization"><button id="grid-remove-name" type="button">Remove</button></div>
+     </div>
+     <button id="elsewhere" type="button">Elsewhere</button>`,
+    "grid-controls"
+  )
+  field = mountHook(DisclosureDismiss, wrapper)
+  const customize = () => byId("grid-customize").getAttribute("aria-expanded")
+
+  byId("grid-remove-name").focus()
+  byId("grid-remove-name").dispatchEvent(new FocusEvent("focusout", {bubbles: true, relatedTarget: null}))
+  await settle()
+  assert.equal(customize(), "true")
+
+  byId("elsewhere").focus()
+  await settle()
+  assert.equal(customize(), "true", "moving focus out is not a click outside")
+
+  byId("grid-remove-name").focus()
+  window.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}))
+  await settle()
+  assert.equal(customize(), "false")
+  assert.equal(focused(), "grid-customize")
+})
+
 test("a destroyed field stops listening to the page", async () => {
   await open()
   field.hook.destroyed()

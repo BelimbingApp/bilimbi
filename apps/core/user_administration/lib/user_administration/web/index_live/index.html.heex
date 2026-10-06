@@ -47,18 +47,32 @@
     <.card id="users-card" inner_class="p-0">
       <h2 id="users-table-title" class="sr-only">Workspace users</h2>
 
-      <.table
+      <.flex_table
+        class="p-2"
         id="users"
-        rows={@streams.users}
-        row_id={fn {dom_id, _} -> dom_id end}
-        row_item={fn {_, user} -> user end}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
         sort_by={@index_state.sort_by}
         sort_dir={@index_state.sort_dir}
-        framed={false}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        expanded={@columns.expanded}
+        cost={@columns.cost}
+        since={@columns.since}
+        row_id={&"user-#{&1}"}
+        caption="Workspace users"
       >
-        <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
+        <:col :let={%{key: id}} id="name">
+          <% user = listed(@users_page, id) %>
+          <%!-- The initials are taller than a compact row, so they stay with
+                 the normal one. --%>
           <div class="flex items-center gap-3">
-            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
+            <span
+              :if={@columns.mode == :normal}
+              class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink"
+            >
               {initials(user.name)}
             </span>
             <.record_link
@@ -80,10 +94,12 @@
             </span>
           </div>
         </:col>
-        <:col :let={user} label="Email" sort="email" sort_id="users-sort-email">
+        <:col :let={%{key: id}} id="email">
+          <% user = listed(@users_page, id) %>
           <span class="whitespace-nowrap text-ink-muted">{user.email}</span>
         </:col>
-        <:col :let={user} label="Company" sort="company_name" sort_id="users-sort-company">
+        <:col :let={%{key: id}} id="company_name">
+          <% user = listed(@users_page, id) %>
           <div class="flex items-center gap-2">
             <.link
               :if={
@@ -105,7 +121,8 @@
             <.badge :if={user.company_archived} kind={:warning}>archived</.badge>
           </div>
         </:col>
-        <:col :let={user} label="Roles">
+        <:col :let={%{key: id}} id="roles">
+          <% user = listed(@users_page, id) %>
           <div class="flex flex-wrap gap-1.5">
             <.badge
               :for={role <- user.roles}
@@ -116,12 +133,14 @@
             <span :if={user.roles == []} class="text-ink-faint">—</span>
           </div>
         </:col>
-        <:col :let={user} label="Created" sort="created_at" sort_id="users-sort-created">
+        <:col :let={%{key: id}} id="created_at">
+          <% user = listed(@users_page, id) %>
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
             <.datetime id={"user-created-#{user.id}"} value={user.created_at} />
           </span>
         </:col>
-        <:action :let={user}>
+        <:action :let={%{key: id}}>
+          <% user = listed(@users_page, id) %>
           <div class="flex items-center justify-end">
             <.icon_button
               :if={
@@ -199,7 +218,7 @@
         <:empty :if={@users_page.entries == []}>
           No users found.
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="users-pagination"

@@ -562,7 +562,7 @@ defmodule BilimbiWeb.UserLiveTest do
     ids
     |> Enum.with_index(1)
     |> Enum.each(fn {id, position} ->
-      assert has_element?(view, "#users > tr:nth-child(#{position})#user-#{id}")
+      assert has_element?(view, "#users-rows > tr:nth-child(#{position})#user-#{id}")
     end)
   end
 end
