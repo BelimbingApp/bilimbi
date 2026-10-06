@@ -5,7 +5,8 @@ defmodule Bilimbi.Base.Tiling.Contributions do
 
   # Any signed-in account may open the workspace: the page itself shows
   # nothing, and each tile enforces its own route capability exactly as the
-  # page does when opened alone. There is no capability to declare here.
+  # page does when opened alone. It has no menu entry; the sidebar tile button
+  # opens it. Only the shared-layouts admin page is listed, under System.
   @impl true
   def contributions do
     %{
@@ -46,19 +47,13 @@ defmodule Bilimbi.Base.Tiling.Contributions do
       },
       menu: [
         %{
-          id: "workspace",
-          label: "Workspace",
-          icon: "squares-2x2",
-          route: "/workspace",
-          order: 100
-        },
-        %{
-          id: "workspace.shared",
+          id: "admin.system.workspace.shared",
           label: "Shared workspaces",
           icon: "squares-2x2",
+          parent: "admin.system",
           route: "/workspace/shared-layouts",
           capability: "ui.workspace.publish",
-          order: 101
+          order: 50
         }
       ]
     }

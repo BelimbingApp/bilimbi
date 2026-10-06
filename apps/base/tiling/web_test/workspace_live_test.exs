@@ -40,9 +40,9 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "an empty workspace stays usable until the picker is requested", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    assert has_element?(view, "#nav-workspace[aria-current='page']")
-    # Every navigable row carries "Open in a tile" beside its pin, except
-    # the workspace's own row.
+    # The workspace has no menu entry of its own; the tile buttons open it.
+    refute has_element?(view, "#nav-workspace")
+    # Every navigable row carries "Open in a tile" beside its pin.
     assert has_element?(
              view,
              "#nav-tile-admin-company[data-nav-tile='/companies'][href='/companies'][aria-label='Open Companies in a tile']"
@@ -837,6 +837,19 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
     peer |> element("#workspace-open-layouts") |> render_click()
     refute has_element?(peer, "#workspace-shared-review")
+  end
+
+  test "Shared workspaces sits under Administration > System and is current on its page",
+       %{conn: conn} do
+    grant_capabilities!("ui.workspace.publish")
+    {:ok, view, _html} = conn |> log_in_as() |> live("/workspace/shared-layouts")
+
+    assert has_element?(
+             view,
+             "#nav-children-admin-system #nav-admin-system-workspace-shared[href='/workspace/shared-layouts'][aria-current='page']"
+           )
+
+    refute has_element?(view, "#nav-workspace-shared")
   end
 
   test "publishing and the shared workspace list require the publish capability", %{conn: conn} do

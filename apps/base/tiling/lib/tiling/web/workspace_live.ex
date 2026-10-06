@@ -89,7 +89,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     {:ok,
      socket
      |> assign(:page_title, gettext("Workspace"))
-     |> assign(:active_nav, "workspace")
+     |> assign(:active_nav, nil)
      |> assign(:framed?, current_scope[:framed] == true)
      |> assign(:settings_scope, settings_scope(current_scope))
      |> assign(:company_scope, company_scope(current_scope))
