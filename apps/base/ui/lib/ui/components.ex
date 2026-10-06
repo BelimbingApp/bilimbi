@@ -851,6 +851,9 @@ defmodule Bilimbi.Base.UI.Components do
   frame around it. This is the only place that decision is made, which is
   why no list screen passes a corner class of its own. Any other card keeps
   its radius.
+
+  `data-card` marks the card for the "list fill" rules in `app.css`, which
+  let a card that frames a table shrink with a workspace tile.
   """
   attr(:id, :string, default: nil)
   attr(:title, :string, default: nil)
@@ -870,6 +873,7 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div
       id={@id}
+      data-card
       class={[!@flat && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
       {@rest}
     >
@@ -1147,6 +1151,11 @@ defmodule Bilimbi.Base.UI.Components do
       <.page variant={:form}>
         ...
       </.page>
+
+  `data-page` names the variant for the stylesheet. Inside a workspace tile
+  a `:list` page whose table would run past the tile keeps its heading and
+  pager in sight and scrolls the table instead; the "list fill" rules in
+  `apps/web/assets/css/app.css` own that, and they start from this element.
   """
   attr(:id, :string, default: nil)
   attr(:variant, :atom, default: :list, values: [:list, :form, :detail])
@@ -1157,7 +1166,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   def page(assigns) do
     ~H"""
-    <div id={@id} class={["mx-auto", page_width(@variant), @class]} {@rest}>
+    <div id={@id} data-page={@variant} class={["mx-auto", page_width(@variant), @class]} {@rest}>
       {render_slot(@inner_block)}
     </div>
     """
@@ -1174,6 +1183,10 @@ defmodule Bilimbi.Base.UI.Components do
   the `sm` breakpoint and stack — title first, actions below — on a phone,
   as Belimbing's `x-ui.page-header` does, so a labelled actions row never
   squeezes the title into one word per line or clips at the viewport edge.
+
+  Inside a workspace tile the header leaves its top right corner to the
+  tile's floating controls (`tile_controls/1`): `app.css` pads the element
+  marked `data-page-header` there, so an action never sits under them.
   """
   slot(:inner_block, required: true)
   slot(:subtitle)
@@ -1182,10 +1195,14 @@ defmodule Bilimbi.Base.UI.Components do
 
   def header(assigns) do
     ~H"""
-    <header class={[
-      @actions != [] && "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6",
-      "pb-4"
-    ]}>
+    <header
+      data-page-header
+      class={[
+        @actions != [] &&
+          "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6",
+        "pb-4"
+      ]}
+    >
       <div>
         <div :if={@title_actions != []} class="flex items-center gap-1.5">
           <h1 class="text-lg font-semibold leading-8 tracking-tight text-action">
@@ -1919,83 +1936,70 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders the compact title bar of one workspace tile: the page's title and
-  a menu of every operation the tiling keyboard mode offers, so no operation
-  exists only as a key. The bar is `h-6`, the status bar's height, and the
-  focused tile's title takes `text-brand-strong` so focus is not shown by
-  colour of the ring alone.
+  Renders the controls of one workspace tile, floating over the tile's top
+  right corner: a grip and a menu. A tile has no title bar. The page's own
+  heading is the title, and a bar that repeated it cost every tile a row.
 
-  The title is a button that focuses the tile, so a click on the bar and a
-  click inside the page do the same thing. The bar is also the grip for
-  dragging the tile onto another to swap them; the host's hook reads
-  `data-tile-header` for the grip and leaves the parts marked
-  `data-tile-menu` to the menu, and the keyboard mode and the menu's "Swap
-  with neighbour" stay the pointer-free path. The menu is a disclosure: its
-  trigger's `aria-expanded` is the one record of open, the list derives its
-  visibility from it, and the `DisclosureDismiss` hook closes it when focus
-  leaves or Escape is pressed, exactly as `<.multi_select>` does. Every
-  entry runs the caller's command and closes the menu. "Open alone" is a
-  plain navigation to the tile's own URL, because a tile is a page that
-  stays reachable by itself.
+  The caller's tile element is `relative` and carries the `group` class.
+  The grip and the menu trigger stay out of sight until the pointer is over
+  the tile, focus is inside these controls, or the tile is focused, so an
+  unfocused tile shows only its page. `app.css` pads the framed page
+  header, marked `data-page-header` by `header/1`, so the controls never
+  cover a page's own action.
 
-  A tile showing a record's page can follow selections: `on_follow` adds
-  the menu entry that marks it, and `following` shows the link icon before
-  the title and turns the entry into "Stop following". Pass no `on_follow`
-  for a page with no record to follow, and the entry is absent, as
-  `apps/AGENTS.md` "Withheld controls" allows for an operation that does not
-  apply. The channel is `Bilimbi.Base.UI.Workspace`.
+  The menu offers the two operations a pointer needs, flipping the split
+  and closing the tile. Everything else the workspace can do to a tile
+  (fill the workspace, swap, move, follow, make master, open alone) is a
+  key in the `Ctrl+.` tiling mode, listed in the key table of
+  `apps/base/tiling/docs/README.md`; do not grow this menu back into a second
+  list of them. It is a disclosure: its trigger's `aria-expanded` is the one record of
+  open, the list derives its visibility from it, and the `DisclosureDismiss`
+  hook closes it when focus leaves or Escape is pressed, exactly as
+  `<.multi_select>` does. Either entry runs the caller's command and closes
+  the menu; the flip hands focus back to the trigger, since the tile is
+  still there to act on. `title` names the trigger for assistive
+  technology, because nothing else on the tile's chrome says which page it
+  belongs to.
 
-  Hyprland draws no title bars; this one exists because the mouse and touch
-  path, the screen-reader name of the frame below it, and `DESIGN.md`'s rule
-  against withheld controls all need it.
+  The grip is the handle for dragging the tile onto another to swap them.
+  The host's hook reads `data-tile-grip`; it is a pointer affordance only
+  and takes no focus, because the mode's `s` and `H J K L` are the
+  pointer-free way.
 
-  In master mode the bar marks the master tile, offers "Make master" for a
-  stack tile, and names the layout-wide orientation control accordingly.
+  Two states stay visible whether or not the tile is focused: the link icon
+  of a tile that follows selections (`Bilimbi.Base.UI.Workspace`), and the
+  "Master" mark of the master tile in master mode, where the menu names the
+  layout-wide orientation control accordingly.
 
   ## Examples
 
-      <.tile_header
-        id="tile-t1-header"
+      <.tile_controls
+        id="tile-t1-controls"
         title="Companies"
         focused
-        open_alone="/companies"
-        on_focus={JS.push("focus-tile", value: %{id: "t1"})}
-        on_close={JS.push("close-tile", value: %{id: "t1"})}
-        on_monocle={JS.push("toggle-monocle")}
         on_split={JS.push("toggle-split", value: %{id: "t1"})}
-        on_swap={JS.push("swap-tile", value: %{id: "t1"})}
+        on_close={JS.push("close-tile", value: %{id: "t1"})}
       />
   """
   attr(:id, :string, required: true)
-  attr(:title, :string, required: true, doc: "the page's own title, read from its document")
-  attr(:focused, :boolean, default: false)
-  attr(:monocle, :boolean, default: false, doc: "whether this tile currently fills the workspace")
 
-  attr(:open_alone, :string,
+  attr(:title, :string,
     required: true,
-    doc: "the tile's own URL, opened with the full shell"
+    doc: "the page's own title, read from its document; names the menu"
   )
 
-  attr(:on_focus, JS, required: true, doc: "focuses the tile; a click on the title runs it")
-  attr(:on_close, JS, required: true)
-  attr(:on_monocle, JS, required: true, doc: "toggles monocle for this tile")
+  attr(:focused, :boolean, default: false, doc: "a focused tile keeps its controls in sight")
   attr(:on_split, JS, required: true, doc: "flips the split holding this tile")
-  attr(:on_swap, JS, required: true, doc: "swaps this tile with its neighbour")
+  attr(:on_close, JS, required: true)
   attr(:master_layout, :boolean, default: false)
   attr(:master_tile, :boolean, default: false)
-  attr(:on_make_master, JS, default: %JS{}, doc: "promotes this tile in master mode")
 
   attr(:following, :boolean,
     default: false,
     doc: "whether this tile opens the records other tiles select"
   )
 
-  attr(:on_follow, JS,
-    default: nil,
-    doc: "marks or unmarks the tile as following; nil when its page has no record to follow"
-  )
-
-  def tile_header(assigns) do
+  def tile_controls(assigns) do
     menu = "#{assigns.id}-menu"
     dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{menu}")
 
@@ -2007,7 +2011,7 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:toggle, JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{menu}"))
       |> assign(
         :entry_class,
-        "block w-full rounded-sm px-2 py-1 text-left text-xs text-ink hover:bg-surface-muted focus-visible:outline-none focus-visible:bg-surface-muted"
+        "block w-full rounded-sm px-2 py-1 text-left text-xs focus-visible:outline-none"
       )
 
     ~H"""
@@ -2017,100 +2021,86 @@ defmodule Bilimbi.Base.UI.Components do
       data-dismiss={@dismiss}
       data-escape={@escape}
       phx-click-away={@dismiss}
-      data-tile-header
-      class={[
-        "relative flex h-6 shrink-0 items-center gap-1 border-b border-line bg-surface pl-2 pr-0.5 text-xs",
-        @focused && "text-brand-strong",
-        !@focused && "text-ink-muted"
-      ]}
+      data-tile-controls
+      class="absolute right-1 top-1 z-20 flex flex-col items-end gap-0.5 text-xs"
     >
-      <span :if={@following} id={"#{@id}-following"} title={gettext("Follows selections")}>
-        <.icon name="hero-link" class="size-3" />
-        <span class="sr-only">{gettext("Follows selections")}</span>
-      </span>
-      <button
-        type="button"
-        id={"#{@id}-title"}
-        phx-click={@on_focus}
-        title={gettext("%{title}. Drag onto another tile to swap.", title: @title)}
-        class="min-w-0 flex-1 cursor-grab truncate text-left font-medium focus-visible:outline-none focus-visible:underline active:cursor-grabbing"
-      >
-        {@title}
-      </button>
-      <span :if={@master_tile} class="text-[10px] text-ink-muted">{gettext("Master")}</span>
-      <button
-        id={@menu}
-        type="button"
-        aria-expanded="false"
-        aria-controls={"#{@menu}-items"}
-        aria-label={"Tile menu: " <> @title}
-        title="Tile menu"
-        data-tile-menu
-        phx-click={@toggle}
-        class="peer grid size-5 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-      >
-        <.icon name="hero-ellipsis-horizontal" class="size-3.5" />
-      </button>
-      <div
-        id={"#{@menu}-items"}
-        data-tile-menu
-        class="hidden peer-aria-expanded:block absolute right-0.5 top-full z-30 mt-0.5 min-w-44 rounded-md border border-line bg-surface p-1 shadow-lg"
-      >
-        <button
-          type="button"
-          id={"#{@id}-monocle"}
-          phx-click={dismiss_after(@on_monocle, @dismiss)}
-          class={@entry_class}
+      <%!-- One group, so the grip and the trigger appear together. It stays
+      in sight while the menu is open, wherever the pointer is. --%>
+      <div class={[
+        "relative flex items-center rounded-md border border-line bg-surface shadow-xs transition-opacity",
+        "group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100",
+        !@focused && "opacity-0"
+      ]}>
+        <span
+          id={"#{@id}-grip"}
+          data-tile-grip
+          title={gettext("Drag onto another tile to swap")}
+          class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-muted hover:bg-surface-sunken hover:text-ink active:cursor-grabbing"
         >
-          {if @monocle, do: gettext("Show every tile"), else: gettext("Monocle: fill the workspace")}
-        </button>
+          <.icon name="hero-bars-2" class="size-3.5" />
+        </span>
         <button
+          id={@menu}
           type="button"
-          id={"#{@id}-swap"}
-          phx-click={dismiss_after(@on_swap, @dismiss)}
-          class={@entry_class}
+          aria-expanded="false"
+          aria-controls={"#{@menu}-items"}
+          aria-label={gettext("Tile menu: %{title}", title: @title)}
+          title={gettext("Tile menu")}
+          data-tile-menu
+          phx-click={@toggle}
+          class="peer grid size-5 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
         >
-          {gettext("Swap with neighbour")}
+          <.icon name="hero-ellipsis-horizontal" class="size-3.5" />
         </button>
-        <button
-          :if={@master_layout and not @master_tile}
-          type="button"
-          id={"#{@id}-make-master"}
-          phx-click={dismiss_after(@on_make_master, @dismiss)}
-          class={@entry_class}
+        <div
+          id={"#{@menu}-items"}
+          data-tile-menu
+          class="hidden peer-aria-expanded:block absolute right-0 top-full z-30 mt-0.5 min-w-40 rounded-md border border-line bg-surface p-1 shadow-lg"
         >
-          {gettext("Make master")}
-        </button>
-        <button
-          type="button"
-          id={"#{@id}-split"}
-          phx-click={dismiss_after(@on_split, @dismiss)}
-          class={@entry_class}
+          <button
+            type="button"
+            id={"#{@id}-split"}
+            phx-click={dismiss_after(@on_split, @escape)}
+            class={[
+              @entry_class,
+              "text-ink hover:bg-surface-muted focus-visible:bg-surface-muted"
+            ]}
+          >
+            {if @master_layout,
+              do: gettext("Flip master direction"),
+              else: gettext("Flip split direction")}
+          </button>
+          <button
+            type="button"
+            id={"#{@id}-close"}
+            phx-click={dismiss_after(@on_close, @dismiss)}
+            class={[
+              @entry_class,
+              "text-danger hover:bg-danger-surface hover:text-danger-ink focus-visible:bg-danger-surface focus-visible:text-danger-ink"
+            ]}
+          >
+            {gettext("Close tile")}
+          </button>
+        </div>
+      </div>
+      <%!-- Under the buttons, inside the corner a page header leaves free. --%>
+      <div :if={@master_tile or @following} class="flex items-center gap-0.5">
+        <span
+          :if={@following}
+          id={"#{@id}-following"}
+          title={gettext("Follows selections")}
+          class="grid size-4 place-items-center rounded-sm bg-surface text-brand-strong"
         >
-          {if @master_layout,
-            do: gettext("Flip master direction"),
-            else: gettext("Flip split direction")}
-        </button>
-        <button
-          :if={@on_follow}
-          type="button"
-          id={"#{@id}-follow"}
-          phx-click={dismiss_after(@on_follow, @dismiss)}
-          class={@entry_class}
+          <.icon name="hero-link" class="size-3" />
+          <span class="sr-only">{gettext("Follows selections")}</span>
+        </span>
+        <span
+          :if={@master_tile}
+          id={"#{@id}-master"}
+          class="rounded-sm bg-surface px-1 text-[10px] leading-4 text-ink-muted"
         >
-          {if @following, do: gettext("Stop following"), else: gettext("Follow selections")}
-        </button>
-        <.link navigate={@open_alone} id={"#{@id}-open-alone"} class={@entry_class}>
-          {gettext("Open alone")}
-        </.link>
-        <button
-          type="button"
-          id={"#{@id}-close"}
-          phx-click={dismiss_after(@on_close, @dismiss)}
-          class={[@entry_class, "text-danger hover:bg-danger-surface hover:text-danger-ink"]}
-        >
-          {gettext("Close tile")}
-        </button>
+          {gettext("Master")}
+        </span>
       </div>
     </div>
     """

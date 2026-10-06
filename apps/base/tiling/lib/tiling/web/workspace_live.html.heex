@@ -107,39 +107,36 @@
         <%!-- Geometry travels in `data-place`, never a `style` attribute:
         the host's Content-Security-Policy allows no inline style, so the
         hook writes the position through the CSSOM after every patch. A tile
-        being dragged onto this one sets `data-drop-target`. --%>
+        being dragged onto this one sets `data-drop-target`. A tile has no
+        bar: `data-title` is the name the hook announces and gives the
+        frame, and `data-follow` tells the mode's `w` whether to stop. --%>
         <div
           :for={tile <- @tiles}
           id={"tile-#{tile.id}"}
           class="workspace-tile group absolute p-0.5"
           data-place={tile.place}
           data-tile={tile.id}
+          data-title={tile.title}
+          data-follow={tile.follow}
           data-focused={to_string(tile.focused?)}
           hidden={@monocle and not tile.focused?}
         >
           <div class={[
-            "flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-surface",
+            "relative flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-surface",
             "group-data-[drop-target=true]:ring-2 group-data-[drop-target=true]:ring-brand-strong",
             "group-data-[dragging=true]:opacity-60",
             tile.focused? && "border-brand-strong ring-1 ring-brand-strong",
             !tile.focused? && "border-line"
           ]}>
-            <.tile_header
-              id={"tile-#{tile.id}-header"}
+            <.tile_controls
+              id={"tile-#{tile.id}-controls"}
               title={tile.title}
               focused={tile.focused?}
-              monocle={@monocle and tile.focused?}
               master_layout={@layout_mode == "master"}
               master_tile={tile.master?}
-              open_alone={tile.path}
-              on_focus={JS.push("focus-tile", value: %{id: tile.id})}
-              on_close={JS.push("close-tile", value: %{id: tile.id})}
-              on_monocle={JS.push("toggle-monocle", value: %{id: tile.id})}
+              following={tile.follow == "on"}
               on_split={JS.push("toggle-split", value: %{id: tile.id})}
-              on_swap={JS.push("swap-tile", value: %{id: tile.id})}
-              following={tile.following?}
-              on_follow={tile.on_follow}
-              on_make_master={JS.push("make-master", value: %{id: tile.id})}
+              on_close={JS.push("close-tile", value: %{id: tile.id})}
             />
             <%= case tile.access do %>
               <% :ok -> %>

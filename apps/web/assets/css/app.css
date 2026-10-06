@@ -289,6 +289,79 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 }
 
+/* List fill. A page shown in a workspace tile (`Layouts.app/1`, the
+ * `data-framed` shell) has one vertical scrollbar, and on a list page it is
+ * the table's: the page takes the tile's height, the table's scroll box
+ * (`data-table-region`, `table/1`) takes the room left under the heading and
+ * filters, its heading row sticks, and the pager stays at the foot of the
+ * tile below it.
+ *
+ * The chain from the page to the scroll box has to be flex columns that may
+ * shrink, so the rules name the two shapes a list page (`page/1`,
+ * `data-page="list"`) has: the table in a card (`data-card`), or in a plain
+ * wrapper. Only the last such block on the page takes the room; a smaller
+ * table above it keeps its height. A table nested any other way, a record
+ * or form page, and every page with no table are left alone and scroll in
+ * `#app-content` as before. So does every page in a tile under 24rem tall,
+ * where a heading and filters leave no useful room for rows.
+ *
+ * The scroll box has a floor, because a page with a great deal above its
+ * table would otherwise squeeze the table to a slit: a heading and one row
+ * in the shortest tile, and all but 24rem of a taller one. When the floor
+ * does not fit, the page overflows the tile height and `#app-content`
+ * scrolls it, so nothing becomes unreachable.
+ *
+ * Nothing here applies outside a tile: a page of its own keeps scrolling as
+ * a whole. */
+@media (min-height: 24rem) {
+  #app-shell[data-framed="true"] #app-content > [data-page="list"] {
+    &:has(> * > [data-table-region], > [data-card] > * > [data-table-region]) {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    & > :nth-last-child(
+      1 of :has(> [data-table-region]),
+      [data-card]:has(> * > [data-table-region])
+    ) {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+
+      &[data-card] > :has(> [data-table-region]) {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      & > [data-table-region],
+      &[data-card] > * > [data-table-region] {
+        flex: 1 1 auto;
+        min-height: max(4.5rem, 100vh - 24rem);
+        overflow: auto;
+
+        & thead {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          /* A collapsed border scrolls away with the rows; a shadow stays. */
+          box-shadow: 0 1px 0 var(--color-line);
+        }
+      }
+    }
+  }
+}
+
+/* The top right corner of a tile belongs to its floating controls
+ * (`tile_controls/1`), so a framed page header keeps its actions clear of
+ * them. */
+#app-shell[data-framed="true"] [data-page-header] {
+  padding-inline-end: 3rem;
+}
+
 /* Until the Tiling hook has placed them (it writes `data-placed`), tiles and
  * handles have no position, so they stay out of sight rather than stacking
  * at the origin during the dead render. */

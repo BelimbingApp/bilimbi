@@ -49,7 +49,6 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
     token = Workspace.host_token(view.id)
 
     assert has_element?(view, "#tile-t1-page[src='/companies?ws=#{token}']")
-    assert has_element?(view, "#tile-t1-header-open-alone[href='/companies']")
 
     render_hook(view, "tile-navigated", %{
       "id" => "t1",
@@ -58,7 +57,9 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
     })
 
     assert_patch(view, "/workspace?t=%2Fcompanies%3Fpage%3D2")
-    assert has_element?(view, "#tile-t1-header-open-alone[href='/companies?page=2']")
+
+    render_hook(view, "open-alone", %{"id" => "t1"})
+    assert_redirect(view, "/companies?page=2")
   end
 
   test "a record tile follows selections, and a selected record moves it", %{conn: conn} do
@@ -68,23 +69,30 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
     {token, topic} = join(view)
 
     # Only the tile showing one record can follow.
-    refute has_element?(view, "#tile-t1-header-follow")
-    assert has_element?(view, "#tile-t2-header-follow", "Follow selections")
-    refute has_element?(view, "#tile-t2-header-following")
+    assert has_element?(view, "#tile-t1:not([data-follow])")
+    assert has_element?(view, "#tile-t2[data-follow='off']")
+    refute has_element?(view, "#tile-t2-controls-following")
+
+    # Asking anyway is answered in words, since the key is the only way to ask.
+    render_hook(view, "follow-tile", %{"id" => "t9"})
+    refute has_element?(view, "#flash-info")
+    render_hook(view, "follow-tile", %{"id" => "t1"})
+    assert has_element?(view, "#tile-t1:not([data-follow])")
+    assert has_element?(view, "#flash-info", "nothing for it to follow")
 
     # A page joining the workspace learns that nothing is followed yet.
     :ok = Workspace.broadcast(topic, {:workspace_joined})
     assert_receive {:workspace_follows, []}
 
-    view |> element("#tile-t2-header-follow") |> render_click()
+    render_hook(view, "follow-tile", %{"id" => "t2"})
 
     assert_patch(
       view,
       "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%2F73%3E%2Fcompanies%2F%3Aid%29"
     )
 
-    assert has_element?(view, "#tile-t2-header-following[title='Follows selections']")
-    assert has_element?(view, "#tile-t2-header-follow", "Stop following")
+    assert has_element?(view, "#tile-t2-controls-following[title='Follows selections']")
+    assert has_element?(view, "#tile-t2[data-follow='on']")
     assert_receive {:workspace_follows, ["core/company"]}
 
     # A company selected elsewhere moves the following tile there, once.
@@ -97,22 +105,22 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
       "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%2F74%3E%2Fcompanies%2F%3Aid%29"
     )
 
-    assert has_element?(view, "#tile-t2-header-title", "/companies/74")
+    assert has_element?(view, "#tile-t2[data-title='/companies/74']")
 
     :ok = Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/company", id: 74}})
     :ok = Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/user", id: 91}})
     :ok = Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/company", id: "../x"}})
     _ = render(view)
     refute_receive {_ref, {:push_event, "tile-navigate", _payload}}
-    assert has_element?(view, "#tile-t2-header-title", "/companies/74")
+    assert has_element?(view, "#tile-t2[data-title='/companies/74']")
 
     # The following tile keeps its place through a swap, and stops on request.
-    view |> element("#tile-t2-header-swap") |> render_click()
-    assert has_element?(view, "#tile-t2-header-following")
+    render_hook(view, "swap-tile", %{"id" => "t2"})
+    assert has_element?(view, "#tile-t2-controls-following")
 
-    view |> element("#tile-t2-header-follow") |> render_click()
+    render_hook(view, "unfollow-tile", %{"id" => "t2"})
     assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2F74%2C%2Fcompanies%29")
-    refute has_element?(view, "#tile-t2-header-following")
+    refute has_element?(view, "#tile-t2-controls-following")
     assert_receive {:workspace_follows, []}
   end
 
@@ -122,7 +130,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
       |> log_in_as()
       |> live("/workspace?t=h.5(/companies,/companies/73>/companies/:id)")
 
-    assert has_element?(view, "#tile-t2-header-following")
+    assert has_element?(view, "#tile-t2-controls-following")
     assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
 
     view |> element("#workspace-open-layouts") |> render_click()
@@ -134,7 +142,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
     assert_patch(view, "/workspace/company-desk")
 
     {:ok, reopened, _html} = conn |> log_in_as() |> live("/workspace/company-desk")
-    assert has_element?(reopened, "#tile-t2-header-following")
+    assert has_element?(reopened, "#tile-t2-controls-following")
   end
 
   test "a framed Company list opens a row alone and selects it once a tile follows companies", %{

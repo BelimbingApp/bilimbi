@@ -9,17 +9,23 @@
 //   * the `Ctrl+.` tiling mode, a Hyprland submap: single-key commands with
 //     Escape to leave, so nothing collides with what Windows or the browser
 //     reserves. The mode names itself in the shell's `#app-mode` status
-//     region and every command is also on the tile menu or a split handle;
+//     region. A tile's own menu holds only the split flip and close, so the
+//     mode is where the other tile operations live; each key is documented
+//     in apps/base/tiling/docs/README.md, and a key added here is added there;
 //   * moving real focus into the tile the server has focused after a
 //     keyboard move, so the ring and the caret agree;
 //   * dragging a split handle. A pointer over a frame is the frame's, so
 //     frames stop receiving pointer events for the length of a drag; the
 //     handle follows the pointer locally and the ratio is pushed once on
 //     release;
-//   * dragging a tile by its title bar onto another tile. The tile under
-//     the pointer is marked as the drop target, and the swap is pushed once
-//     on release; a press that never travels stays the title's own click.
-//     The tile menu and the mode's `s` remain the pointer-free way to swap;
+//   * dragging a tile by its grip onto another tile. A tile has no bar; the
+//     grip floats beside its menu (`data-tile-grip`). The tile under the
+//     pointer is marked as the drop target, and the swap is pushed once on
+//     release; a press that never travels does nothing. The mode's `s`
+//     remains the pointer-free way to swap;
+//   * focusing a tile when its own chrome is pressed. A press inside the
+//     page reaches the frame's document instead, which reports it the same
+//     way;
 //   * reporting each frame's URL and title after it loads or navigates, and
 //     the workspace area's size, which decides a split's direction;
 //   * sending a frame to the page the server names in a `tile-navigate`
@@ -49,8 +55,7 @@ const ARROWS = {ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown
 const MODE_LABELS = {tiling: "Tiling", resize: "Resize"}
 const MIN_RATIO = 0.1
 const MAX_RATIO = 0.9
-// Pointer travel before a press on a title bar becomes a drag rather than
-// a click, in CSS pixels.
+// Pointer travel before a press on a grip becomes a drag, in CSS pixels.
 const DRAG_THRESHOLD = 6
 
 const Tiling = {
@@ -98,6 +103,7 @@ const Tiling = {
     this.el.dataset.mode = this.mode
     this.place()
     this.bindFrames()
+    this.nameFrames()
     this.applyFocus()
   },
 
@@ -151,6 +157,17 @@ const Tiling = {
       this.bound.add(frame)
       frame.addEventListener("load", () => this.attachFrame(frame))
       if (this.frameReady(frame)) this.attachFrame(frame)
+    }
+  },
+
+  // A frame's `title` is its accessible name, and with no bar above the
+  // tile it is the only one. The server renders the frame once, before the
+  // page has reported its title, so the name is kept in step here from the
+  // tile's `data-title`.
+  nameFrames() {
+    for (const frame of this.frames()) {
+      const title = this.tileElement(frame.dataset.tileFrame)?.dataset.title
+      if (title && frame.title !== title) frame.title = title
     }
   },
 
@@ -228,12 +245,13 @@ const Tiling = {
     this.pendingFocus = false
     this.appliedFocus = focused
 
+    // A tile with no frame shows a refusal; its menu is what it has to focus.
     const frame = this.el.querySelector(`iframe[data-tile-frame="${focused}"]`)
     if (frame) {
       frame.focus()
       frame.contentWindow?.focus?.()
     } else {
-      document.getElementById(`tile-${focused}-header-title`)?.focus()
+      this.tileElement(focused)?.querySelector("button[data-tile-menu]")?.focus()
     }
   },
 
@@ -313,6 +331,15 @@ const Tiling = {
       case "t":
         if (focused) this.pushEvent("toggle-split", {id: focused})
         return true
+      case "m":
+        if (focused) this.pushEvent("make-master", {id: focused})
+        return true
+      case "w":
+        if (focused) this.toggleFollow(focused)
+        return true
+      case "o":
+        if (focused) this.pushEvent("open-alone", {id: focused})
+        return true
       case "n":
         this.openPicker()
         return true
@@ -332,6 +359,13 @@ const Tiling = {
     if (!side || !this.el.dataset.focused) return false
     this.pushEvent("resize-step", {side})
     return true
+  },
+
+  // The server renders `data-follow="on"` on a tile that follows. Asking a
+  // page with no record to follow is the server's to answer, in words.
+  toggleFollow(id) {
+    const following = this.tileElement(id)?.dataset.follow === "on"
+    this.pushEvent(following ? "unfollow-tile" : "follow-tile", {id})
   },
 
   // The picker is a dialog the person types into, so the mode ends first.
@@ -455,12 +489,14 @@ const Tiling = {
   // ---------------------------------------------------------------
 
   pressTile(event) {
-    const header = event.target.closest?.("[data-tile-header]")
-    if (!header || event.button !== 0 || event.target.closest("[data-tile-menu]")) return
+    const tile = event.target.closest?.("[data-tile]")
+    if (!tile || event.button !== 0) return
 
-    const tile = header.closest("[data-tile]")
-    if (!tile) return
+    this.focusTile(tile.dataset.tile)
+    if (!event.target.closest("[data-tile-grip]")) return
 
+    // The grip is not a control, so the browser would start a text selection.
+    event.preventDefault()
     this.tileDrag = {id: tile.dataset.tile, x: event.clientX, y: event.clientY, active: false, over: null}
     window.addEventListener("pointermove", this.onTilePointerMove)
     window.addEventListener("pointerup", this.onTilePointerUp)
@@ -494,9 +530,9 @@ const Tiling = {
     window.removeEventListener("pointerup", this.onTilePointerUp)
     if (!drag.active) return
 
-    // The click that follows the release would focus the tile the pointer
-    // is over, which after a swap is not the tile that was pressed. A
-    // release outside the workspace sends no click here, so the flag
+    // The click that follows the release would press whatever control the
+    // pointer ended over, on a tile that is not the one that was pressed.
+    // A release outside the workspace sends no click here, so the flag
     // clears itself once the click had its chance.
     this.swallowNextClick = true
     setTimeout(() => (this.swallowNextClick = false), 0)
@@ -533,7 +569,7 @@ const Tiling = {
   },
 
   tileTitle(id) {
-    return document.getElementById(`tile-${id}-header-title`)?.textContent?.trim() || id
+    return this.tileElement(id)?.dataset.title?.trim() || id
   },
 
   // ---------------------------------------------------------------

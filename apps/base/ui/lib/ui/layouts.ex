@@ -112,6 +112,15 @@ defmodule Bilimbi.Base.UI.Layouts do
   # `app-shell` id and `data-display-mode` because `<.datetime>` reads the
   # live clock from there. No impersonation strip: the workspace page around
   # the tile already shows it.
+  #
+  # `main` is the tile's one vertical scroll box, and it is `relative` so
+  # that it is also the containing block of everything inside it. Without
+  # that, an absolutely positioned descendant (every `sr-only` label is one)
+  # is laid out against the document, which then grows past the tile and
+  # shows a second scrollbar beside this one. A list page does not scroll
+  # here at all while the tile has room: the "list fill" rules in
+  # `apps/web/assets/css/app.css` give the page the tile's height and let
+  # its table scroll instead.
   def app(%{current_scope: %{framed: true}} = assigns) do
     assigns = assign(assigns, :preferences, assigns.current_scope.shell_preferences)
 
@@ -122,7 +131,10 @@ defmodule Bilimbi.Base.UI.Layouts do
       data-display-mode={@preferences.mode}
       class="flex h-screen flex-col overflow-hidden bg-canvas"
     >
-      <main id="app-content" class="min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-2 sm:px-3">
+      <main
+        id="app-content"
+        class="relative min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-2 sm:px-3"
+      >
         {render_slot(@inner_block)}
       </main>
     </div>
