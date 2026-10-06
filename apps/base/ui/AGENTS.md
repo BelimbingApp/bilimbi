@@ -21,6 +21,10 @@ A caller's `inner_class` padding wins over the card's `p-2`. `inner_padding/1` r
 
 Rendered text carries no catalog identifier. A Design Spec number may be the element's `id` and nothing the person reads. See `DESIGN.md` "Write for humans".
 
+A list a form field opens beneath itself carries `floating-list`, its control `floating-anchor` and the field wrapper `floating-scope`, as `multi_select/1` and `combobox/1` do. Do not give such a list `absolute`: inside `<.modal>` or any box that scrolls or clips it was cut off and grew a scrollbar. The comment above the three utilities in `apps/web/assets/css/app.css` owns the rule, and happy-dom cannot show it, so check a new one in a browser.
+
+`<.modal>` scrolls its body, never the rounded dialog; do not put `overflow-y-auto` or padding on the dialog through `class`. See the comment on `modal/1`.
+
 ## Design Library
 
 A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`. Its guards, `design_library_coverage_test.exs` and `design_library_imitation_test.exs`, run in every `mix test`, and `design_library_rules_test.exs` proves on fixtures that the rules still match. When one fails, fix the specimen or the component, never the guard.

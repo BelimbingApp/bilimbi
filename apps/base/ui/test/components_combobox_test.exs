@@ -47,6 +47,27 @@ defmodule Bilimbi.Base.UI.ComponentsComboboxTest do
     refute html =~ ~s(<select)
   end
 
+  test "the listbox floats from the input, so a dialog or a card cannot cut it off" do
+    html =
+      render_component(&combobox_field/1,
+        value: nil,
+        options: [{"Malaysia (MY)", "MY"}],
+        errors: []
+      )
+
+    # The same three parts as `multi_select/1`: scope, anchor, list.
+    assert html =~ ~r/id="country-wrapper"[^>]*\sclass="relative floating-scope /
+    assert html =~ ~r/<div class="relative floating-anchor">\s*<input id="country"/
+
+    assert [list_class] =
+             Regex.run(~r/id="country-options"[^>]*\sclass="([^"]*)"/, html,
+               capture: :all_but_first
+             )
+
+    assert "floating-list" in String.split(list_class)
+    refute "absolute" in String.split(list_class)
+  end
+
   test "renders empty and validation states in the listbox field" do
     html =
       render_component(&combobox_field/1,

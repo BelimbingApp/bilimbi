@@ -461,6 +461,46 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 }
 
+/* The list a form field opens beneath itself: `multi_select` and `combobox`.
+ * The field wrapper is the `floating-scope`, the control the list hangs from
+ * is the `floating-anchor`, and the list is the `floating-list`.
+ *
+ * The list is fixed to the viewport and placed by its anchor, so no ancestor
+ * that scrolls or clips (a modal dialog, a card, a tile) can cut it off or
+ * grow a scrollbar to hold it. It still follows the control when something
+ * scrolls, flips above the control when there is no room below, and hides
+ * when the control itself scrolls out of view. The scope keeps one field's
+ * anchor from answering for another's list, which is what lets every field
+ * use the same name.
+ *
+ * A browser without anchor positioning keeps the list absolute inside the
+ * wrapper: it opens in the same place and a clipping ancestor scrolls to
+ * show it. Do not give a field list `absolute` of its own; that is the
+ * clipped list this replaced. */
+@utility floating-scope {
+  anchor-scope: --floating-list;
+}
+
+@utility floating-anchor {
+  anchor-name: --floating-list;
+}
+
+@utility floating-list {
+  position: absolute;
+  left: 0;
+  width: 100%;
+
+  @supports (anchor-scope: --floating-list) {
+    position: fixed;
+    position-anchor: --floating-list;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    position-try-fallbacks: flip-block;
+    position-visibility: anchors-visible;
+  }
+}
+
 /* Menu typography & font colors matching Belimbing */
 .app-nav-rail {
   font-family: var(--font-sans);

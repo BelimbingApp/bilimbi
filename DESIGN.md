@@ -402,6 +402,12 @@ A short workflow that must finish or be abandoned before the screen continues
 - **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form,
   `max-w-2xl` for two columns or `max-w-md` for a confirmation, over an
   `ink/40` dimmer.
+- **Scrolling:** The rounded surface never scrolls. When the content is
+  taller than the screen allows, the body inside it scrolls, and its
+  scrollbar stops short of the corners instead of squaring them off. A list a
+  field opens — a multi-select's options, a combobox's matches — is not part
+  of that body: it floats from its control over the dialog's edge and the
+  dimmer, so opening one neither grows a scrollbar nor is cut off.
 
 ### Confirmation dialogs
 

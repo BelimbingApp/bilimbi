@@ -30,7 +30,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
     assert html =~ "All roles"
     assert html =~ ~s(id="roles-filter-options")
-    assert html =~ "hidden peer-aria-expanded:block absolute"
+    assert html =~ "hidden peer-aria-expanded:block floating-list"
     assert html =~ ~s(id="roles-filter-option-1")
     assert html =~ ~s(id="roles-filter-option-2")
     refute html =~ "checked"
@@ -86,6 +86,31 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
                %{"attr" => ["aria-expanded", "true", "false"], "to" => "#roles-filter"}
              ]
            ] = js_ops(html, "phx-click", "roles-filter")
+  end
+
+  test "the list floats from the trigger, so a dialog or a card cannot cut it off" do
+    html =
+      render_component(&multi_select_field/1,
+        placeholder: "All roles",
+        selection_label: "1 role selected|:count roles selected",
+        options: [{"Auditor", "1"}],
+        value: []
+      )
+
+    # The wrapper scopes the anchor name, the trigger is the anchor and the
+    # list is placed by it (`floating-list` in app.css). An `absolute` list
+    # is laid out inside whichever ancestor scrolls or clips, which is how
+    # a dialog came to cut the role list off and grow a scrollbar for it.
+    assert html =~ ~r/id="roles-filter-wrapper"[^>]*\sclass="relative floating-scope /
+    assert html =~ ~r/id="roles-filter"[^>]*\sclass="peer group floating-anchor /
+
+    assert [list_class] =
+             Regex.run(~r/id="roles-filter-options"[^>]*\sclass="([^"]*)"/, html,
+               capture: :all_but_first
+             )
+
+    assert "floating-list" in String.split(list_class)
+    refute "absolute" in String.split(list_class)
   end
 
   test "open is one record: the list and the chevron derive from it, nothing else toggles" do

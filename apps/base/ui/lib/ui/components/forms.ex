@@ -532,7 +532,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       phx-hook="Combobox"
       data-value-id={"#{@id}-value"}
       data-cancel-event={@cancel_event}
-      class={["relative", @wrapper_class || "mb-4"]}
+      class={["relative floating-scope", @wrapper_class || "mb-4"]}
     >
       <%!-- `hidden` keeps the committed value out of the visual UI while leaving
       the field fillable by Phoenix.LiveViewTest like a browser text input. --%>
@@ -547,7 +547,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         {@label}
       </label>
 
-      <div class="relative">
+      <div class="relative floating-anchor">
         <input
           id={@id}
           type="text"
@@ -581,7 +581,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         aria-label={@label || "Options"}
         tabindex="-1"
         hidden
-        class="absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg focus:outline-none"
+        class="floating-list z-30 mt-1 max-h-60 min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg focus:outline-none"
       >
         <div
           :if={@normalized_options == []}
@@ -685,6 +685,10 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   Displays a button showing the selection summary (e.g. "All roles", "1 role selected",
   or "3 roles selected") with a chevron icon, and toggles a floating menu containing
   checkboxes for each option.
+
+  The list floats from the trigger (`floating-list` in `app.css`): it is
+  placed by the trigger rather than laid out inside the wrapper, so a modal
+  dialog, a card or a tile that scrolls or clips cannot cut it off.
 
   The trigger's `aria-expanded` follows the menu. Clicking the trigger again,
   clicking outside, or moving focus out of the field closes it. While it is
@@ -852,7 +856,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       data-dismiss={@dismiss}
       data-escape={@escape}
       phx-click-away={@dismiss}
-      class={["relative", @wrapper_class || "mb-4"]}
+      class={["relative floating-scope", @wrapper_class || "mb-4"]}
     >
       <input type="hidden" name={@input_name} value="" />
       <label
@@ -874,7 +878,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         aria-describedby={described_by(@id, @hint, @errors)}
         phx-click={@toggle}
         class={[
-          "peer group flex w-full items-center justify-between gap-3 rounded-md border bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:outline-none focus:ring-2",
+          "peer group floating-anchor flex w-full items-center justify-between gap-3 rounded-md border bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:outline-none focus:ring-2",
           field_state_class(
             @errors,
             "border-line focus:border-brand-strong focus:ring-brand-strong/30"
@@ -899,7 +903,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       <div
         id={"#{@id}-options"}
         tabindex="-1"
-        class="hidden peer-aria-expanded:block absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
+        class="hidden peer-aria-expanded:block floating-list z-30 mt-1 max-h-60 min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
           :for={{opt_label, opt_value} <- @normalized_options}

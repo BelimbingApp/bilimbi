@@ -984,6 +984,12 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:description, doc: "one short line under the title, announced with the dialog")
   slot(:inner_block, required: true)
 
+  # The dialog is the rounded surface and never scrolls; `#<id>-body` inside
+  # it does. A scrollbar on the dialog itself runs into the rounded corners
+  # and squares them off. The body's track stops a corner radius short of
+  # each end, which is what the dialog's own `py-3` is for. A field's list
+  # (`floating-list` in `app.css`) leaves this box instead of lengthening it,
+  # so opening one neither scrolls the dialog nor is cut off by it.
   def modal(assigns) do
     ~H"""
     <dialog
@@ -997,8 +1003,8 @@ defmodule Bilimbi.Base.UI.Components do
       aria-describedby={@description != [] && "#{@id}-description"}
       tabindex="-1"
       class={[
-        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] overflow-y-auto",
-        "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
+        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] flex-col overflow-hidden open:flex",
+        "rounded-xl border border-line bg-surface py-3 text-ink shadow-lg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
         "backdrop:bg-ink/40",
         @width == :compact && "max-w-md",
@@ -1007,16 +1013,18 @@ defmodule Bilimbi.Base.UI.Components do
       ]}
       {@rest}
     >
-      <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
-        {@title}
-      </h2>
-      <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
-      <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
-      <.connection_banners id={@id} />
-      <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
-        {render_slot(@description)}
-      </p>
-      {render_slot(@inner_block)}
+      <div id={"#{@id}-body"} class="min-h-0 overflow-y-auto px-6 py-3">
+        <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
+          {@title}
+        </h2>
+        <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
+        <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
+        <.connection_banners id={@id} />
+        <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
+          {render_slot(@description)}
+        </p>
+        {render_slot(@inner_block)}
+      </div>
     </dialog>
     """
   end
