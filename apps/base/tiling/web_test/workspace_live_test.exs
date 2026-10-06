@@ -40,9 +40,9 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "an empty workspace stays usable until the picker is requested", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    assert has_element?(view, "#nav-workspace[aria-current='page']")
-    # Every navigable row carries "Open in a tile" beside its pin, except
-    # the workspace's own row.
+    # The workspace has no menu entry of its own; the tile buttons open it.
+    refute has_element?(view, "#nav-workspace")
+    # Every navigable row carries "Open in a tile" beside its pin.
     assert has_element?(
              view,
              "#nav-tile-admin-company[data-nav-tile='/companies'][href='/companies'][aria-label='Open Companies in a tile']"
