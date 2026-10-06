@@ -95,6 +95,20 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     assert URI.decode_query(URI.parse(path).query)["cols"] =~ "company.parent.name"
   end
 
+  test "the table sits straight in its card, where a workspace tile can fill it", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    # The shape the "list fill" rules in app.css name: card, its inner
+    # block, the table frame, the scroll box, with the pager beside the
+    # frame. A wrapper between any two hides the table from them.
+    assert has_element?(
+             view,
+             "#users-index[data-page='list'] > #users-card[data-card] > * > #users[data-table-frame] > #users-viewport[data-table-region]"
+           )
+
+    assert has_element?(view, "#users-card > * > #users-pagination")
+  end
+
   test "the add box offers columns to walk to, never one the page already shows", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 

@@ -48,6 +48,14 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   heights, Compact and Normal; a step past either end is disabled rather
   than offered.
 
+  The frame (`data-table-frame`) and its scroll box (`data-table-region`)
+  are what the "list fill" rules in `app.css` look for, so inside a
+  workspace tile the table takes the room the tile has left, scrolls its
+  rows under a heading row that sticks, and the lip and bar stay above it.
+  Put the component straight into the card or the page, with `class` for
+  any padding: a wrapper of the caller's own between them hides the table
+  from those rules.
+
   Bars and bands: a `:band` cell carries `data-band` and `data-scale` and is
   painted by `app.css`; a `:bar` cell carries `data-bar` and the hook writes
   its width, because the CSP refuses an inline style.
@@ -125,6 +133,11 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
 
   attr(:caption, :string, default: nil, doc: "sr-only caption naming the table")
 
+  attr(:class, :any,
+    default: nil,
+    doc: "classes for the frame, such as the padding a card with `inner_class=\"p-0\"` leaves out"
+  )
+
   attr(:row_id, :any,
     default: nil,
     doc: "a function from a row key to the row's DOM id; defaults to `<id>-row-<key>`"
@@ -167,7 +180,8 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       data-target={@target}
       data-mode={@mode}
       data-zoom={@zoom}
-      class="flex-table"
+      data-table-frame
+      class={["flex-table", @class]}
     >
       <p
         :if={@cost && @cost.heavy?}
@@ -391,6 +405,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       <div
         id={"#{@id}-viewport"}
         data-viewport
+        data-table-region
         class="relative overflow-auto border border-line bg-surface"
         tabindex="0"
       >

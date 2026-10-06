@@ -150,6 +150,24 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     assert tag(html, "costed-grid-reset") =~ ~s(phx-value-op="reset")
   end
 
+  test "the frame and its scroll box carry the marks a workspace tile fills from" do
+    html = render_component(&grid/1, %{})
+
+    # The "list fill" rules in app.css give a `data-table-region` the room a
+    # tile has left and stick its heading row; the frame around it is how
+    # they find one that has the lip and the bar above it.
+    assert tag(html, "costed-grid") =~ "data-table-frame"
+    assert tag(html, "costed-grid-viewport") =~ "data-table-region"
+
+    # The scroll box is the frame's own child, after the lip and the bar.
+    assert html =~
+             ~r/id="costed-grid-customization".*<\/div>\s*<\/div>\s*<div[^>]*id="costed-grid-viewport"/s
+
+    # A positioned scroll box: an `sr-only` caption inside it would otherwise
+    # be laid out against the document and grow a second scrollbar.
+    assert "relative" in classes(tag(html, "costed-grid-viewport"))
+  end
+
   test "the zoom steps only through heights that change the table, and names two of them" do
     normal = render_component(&grid/1, %{})
 
