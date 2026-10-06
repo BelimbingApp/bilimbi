@@ -1,15 +1,15 @@
 defmodule Bilimbi.Base.Grid.PageViews do
   @moduledoc """
   What each account last arranged on each list page: the columns in order,
-  the lens of each, the zoom and the date a change-since lens compares
-  against. A list opens the way its reader left it.
+  the lens of each, the density of the rows and the date a change-since
+  lens compares against. A list opens the way its reader left it.
 
   The arrangements live in the account's `ui.grid.page_columns` setting at
   user scope, one plain JSON entry per page:
 
       %{"page" => "users",
         "view" => %{"columns" => ["name", "company.name"], "lenses" => %{},
-                    "zoom" => 28, "since" => nil}}
+                    "density" => "compact", "since" => nil}}
 
   A page is named by the catalog table its rows come from. A view that is
   the page's own, with nothing arranged, is not kept: its entry is removed,

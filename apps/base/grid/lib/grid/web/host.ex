@@ -92,22 +92,23 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   end
 
   @doc """
-  Splits a view's columns between a page's own built-in columns, by id, and
-  the specs the catalog resolves. Built-ins keep the page's order when the
-  view names none of them. Specs the catalog refuses are dropped.
+  The view's columns in order: a page's own built-in column as its id, a
+  walked column as the `Column` the catalog resolves it to. Built-ins keep
+  the page's order when the view names none of them. A spec the catalog
+  refuses is left out.
   """
   @spec split_columns(Catalog.t(), Table.t(), View.t(), [String.t()]) ::
-          {[String.t() | Column.t()], [String.t()]}
+          [String.t() | Column.t()]
   def split_columns(%Catalog{} = catalog, %Table{} = root, %View{columns: specs}, builtin_ids) do
     specs = if specs == [], do: builtin_ids, else: specs
 
-    Enum.reduce(specs, {[], []}, fn spec, {kept, dropped} ->
+    Enum.flat_map(specs, fn spec ->
       if spec in builtin_ids do
-        {kept ++ [spec], dropped}
+        [spec]
       else
         case Catalog.resolve(catalog, root, spec) do
-          {:ok, column} -> {kept ++ [column], dropped}
-          {:error, _reason} -> {kept, dropped ++ [spec]}
+          {:ok, column} -> [column]
+          {:error, _reason} -> []
         end
       end
     end)

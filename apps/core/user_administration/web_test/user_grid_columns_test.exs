@@ -95,6 +95,27 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     assert URI.decode_query(URI.parse(path).query)["cols"] =~ "company.parent.name"
   end
 
+  test "the add box offers columns to walk to, never one the page already shows", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    # On a fresh page the address names no columns, and Email is one the page
+    # draws itself: picking it would add nothing, so it is not offered. The
+    # email of the user's company is a different column and is.
+    view |> form("#users-add-column", %{add: "email"}) |> render_change()
+    refute has_element?(view, "#users-suggest-email")
+    assert has_element?(view, "#users-suggest-company-email", "Company › Email")
+
+    # Asking for a suggestion arranges nothing: the address still names no columns.
+    view |> element("#users-sort-name") |> render_click()
+    refute Map.has_key?(URI.decode_query(URI.parse(assert_patch(view)).query), "cols")
+
+    # Once removed, the built-in is something to add again.
+    view |> element("#users-remove-email") |> render_click()
+    assert_patch(view)
+    view |> form("#users-add-column", %{add: "email"}) |> render_change()
+    assert has_element?(view, "#users-suggest-email", "Email")
+  end
+
   test "a built-in column can be removed and a rollup expanded in place", %{conn: conn} do
     {:ok, view, _html} =
       conn |> log_in_as() |> live(~p"/users?cols=name%2Ccompany.users%3Acount")

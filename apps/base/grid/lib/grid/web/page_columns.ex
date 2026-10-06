@@ -50,7 +50,6 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
             cost: nil,
             since: nil,
             extras: [],
-            dropped: [],
             column_views: [],
             rows: [],
             mode: :normal,
@@ -139,14 +138,10 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   def load(%__MODULE__{} = state, entries, key) when is_list(entries) and is_function(key, 1) do
     builtin_ids = Enum.map(state.builtins, & &1.id)
 
-    {kept, dropped} =
+    kept =
       case state.table do
-        nil ->
-          {Enum.filter(state.view.columns, &(&1 in builtin_ids)),
-           state.view.columns -- builtin_ids}
-
-        table ->
-          Host.split_columns(state.catalog, table, state.view, builtin_ids)
+        nil -> Enum.filter(state.view.columns, &(&1 in builtin_ids))
+        table -> Host.split_columns(state.catalog, table, state.view, builtin_ids)
       end
 
     kept = if kept == [], do: builtin_ids, else: kept
@@ -196,7 +191,6 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
       state
       | view: view,
         extras: extras,
-        dropped: dropped,
         column_views: column_views,
         rows: rows,
         mode: view.density,
@@ -254,8 +248,10 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
           {:patch, view} ->
             arrange(spelled, view, builtin_ids)
 
+          # Against the spelled columns, so a built-in the page already
+          # draws is not offered as something to add.
           {:suggest, text} ->
-            {:update, suggest(state, text)}
+            {:update, suggest(state, text, spelled.view.columns)}
 
           {:add_typed, text} ->
             add_typed(spelled, text, builtin_ids)
@@ -287,13 +283,14 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     end
   end
 
-  defp suggest(%{table: nil} = state, text), do: %{state | add_query: text, suggestions: []}
+  defp suggest(%{table: nil} = state, text, _shown),
+    do: %{state | add_query: text, suggestions: []}
 
-  defp suggest(state, text) do
+  defp suggest(state, text, shown) do
     suggestions =
       if text == "",
         do: [],
-        else: Grid.suggest(state.catalog, state.table, text, exclude: state.view.columns)
+        else: Grid.suggest(state.catalog, state.table, text, exclude: shown)
 
     %{state | add_query: text, suggestions: Host.column_views(suggestions, state.view)}
   end
