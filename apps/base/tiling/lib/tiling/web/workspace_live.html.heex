@@ -15,13 +15,6 @@
         context={:inline}
         phx-click="open-layouts"
       />
-      <.icon_button
-        id="workspace-open-shortcuts"
-        icon="hero-command-line"
-        label={gettext("Keyboard shortcuts")}
-        context={:inline}
-        phx-click="open-shortcuts"
-      />
     </div>
   </:topbar_actions>
 
@@ -246,37 +239,6 @@
           }
         />
       </div>
-    </.modal>
-
-    <.modal
-      :if={@shortcuts_open?}
-      id="workspace-shortcuts"
-      title={gettext("Keyboard shortcuts")}
-      on_cancel={JS.push("close-shortcuts")}
-      flash={@flash}
-    >
-      <:description>
-        {gettext(
-          "Ctrl+. enters tiling mode, and the status bar names it. Each key below then acts on the focused tile. A tile's own menu holds only flipping the split and closing; dragging its grip onto another tile swaps the two."
-        )}
-      </:description>
-      <dl id="workspace-shortcut-list" class="divide-y divide-low-contrast-line text-sm">
-        <div
-          :for={{shortcut, index} <- Enum.with_index(shortcuts())}
-          id={"workspace-shortcut-#{index}"}
-          class="flex items-baseline gap-3 py-1.5"
-        >
-          <dt class="flex w-28 shrink-0 flex-wrap gap-1">
-            <kbd
-              :for={key <- shortcut.keys}
-              class="rounded-sm border border-line bg-surface-muted px-1.5 font-mono text-xs text-ink"
-            >
-              {key}
-            </kbd>
-          </dt>
-          <dd class="text-ink">{shortcut.does}</dd>
-        </div>
-      </dl>
     </.modal>
 
     <.modal

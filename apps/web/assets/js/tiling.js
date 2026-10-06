@@ -10,9 +10,8 @@
 //     Escape to leave, so nothing collides with what Windows or the browser
 //     reserves. The mode names itself in the shell's `#app-mode` status
 //     region. A tile's own menu holds only the split flip and close, so the
-//     mode is where the other tile operations live; `?` opens the list the
-//     host renders from `WorkspaceLive.shortcuts/0`, and a key added here is
-//     added there;
+//     mode is where the other tile operations live; each key is documented
+//     in apps/base/tiling/docs/README.md, and a key added here is added there;
 //   * moving real focus into the tile the server has focused after a
 //     keyboard move, so the ring and the caret agree;
 //   * dragging a split handle. A pointer over a frame is the frame's, so
@@ -340,10 +339,6 @@ const Tiling = {
         return true
       case "o":
         if (focused) this.pushEvent("open-alone", {id: focused})
-        return true
-      case "?":
-        this.setMode("off")
-        this.pushEvent("open-shortcuts", {})
         return true
       case "n":
         this.openPicker()

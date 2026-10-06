@@ -82,13 +82,10 @@ tiling mode:
 | `n` | Add a page |
 | `q` | Close the focused tile |
 | `1` to `9` | Open one of the first nine saved layouts |
-| `?` | Show the keyboard shortcuts dialog |
 | `Esc` | Leave tiling mode |
 
-The same list is the workspace's "Keyboard shortcuts" dialog, opened from
-the top bar or with `?`. `WorkspaceLive.shortcuts/0` is its source and the
-`Tiling` hook implements each key; change the two together, and this table
-with them.
+The `Tiling` hook implements each key and this table is their
+documentation; change it together with `apps/web/assets/js/tiling.js`.
 
 Inside a tile a page has one vertical scrollbar. Base UI's framed shell and
 the "list fill" rules in `apps/web/assets/css/app.css` give a list page the

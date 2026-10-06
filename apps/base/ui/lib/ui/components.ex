@@ -1943,15 +1943,15 @@ defmodule Bilimbi.Base.UI.Components do
   The caller's tile element is `relative` and carries the `group` class.
   The grip and the menu trigger stay out of sight until the pointer is over
   the tile, focus is inside these controls, or the tile is focused, so an
-  unfocused tile shows only its page. The framed shell leaves that corner
-  free (`Layouts.app/1`, the `data-tile-notch` spacer), so the controls
-  never cover a page's own action.
+  unfocused tile shows only its page. `app.css` pads the framed page
+  header, marked `data-page-header` by `header/1`, so the controls never
+  cover a page's own action.
 
   The menu offers the two operations a pointer needs, flipping the split
   and closing the tile. Everything else the workspace can do to a tile
   (fill the workspace, swap, move, follow, make master, open alone) is a
-  key in the `Ctrl+.` tiling mode, listed in the workspace's keyboard
-  shortcuts dialog; do not grow this menu back into a second list of them.
+  key in the `Ctrl+.` tiling mode, listed in the key table of
+  `apps/base/tiling/docs/README.md`; do not grow this menu back into a second list of them.
   It is a disclosure: its trigger's `aria-expanded` is the one record of
   open, the list derives its visibility from it, and the `DisclosureDismiss`
   hook closes it when focus leaves or Escape is pressed, exactly as

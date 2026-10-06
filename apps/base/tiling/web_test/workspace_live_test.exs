@@ -506,31 +506,6 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert has_element?(view, "#tile-t2[data-place*='left: 50.0%']")
   end
 
-  test "the keys the menu no longer lists are in the shortcuts dialog", %{conn: conn} do
-    {:ok, view, _html} = open(conn, "/workspace?t=/companies")
-
-    refute has_element?(view, "#workspace-shortcuts")
-    view |> element("#workspace-open-shortcuts") |> render_click()
-
-    for {key, does} <- [
-          {"f", "Fill the workspace"},
-          {"s", "Swap the focused tile"},
-          {"m", "Make the focused tile the master"},
-          {"w", "Follow the records"},
-          {"o", "alone"}
-        ] do
-      assert view
-             |> element("#workspace-shortcut-list div", does)
-             |> render() =~ ~r"<kbd[^>]*>\s*#{key}\s*</kbd>"
-    end
-
-    render_hook(view, "close-shortcuts", %{})
-    refute has_element?(view, "#workspace-shortcuts")
-
-    render_hook(view, "open-shortcuts", %{})
-    assert has_element?(view, "#workspace-shortcuts")
-  end
-
   test "the workspace holds as many tiles as the operator opens", %{conn: conn} do
     eight =
       "h.5(/companies,h.5(/companies,h.5(/companies,h.5(/companies,h.5(/companies,h.5(/companies,h.5(/companies,/companies)))))))"

@@ -33,9 +33,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   frame's URL and title. A tile has no bar. Its floating menu offers the two
   operations a pointer needs, flipping the split and closing the tile; a
   drag of its grip swaps two tiles and a split handle resizes. Every other
-  operation is a key of the mode, and `shortcuts/0` is the list the
-  keyboard shortcuts dialog shows, so a key that is added there is added to
-  the hook and the other way round.
+  operation is a key of the mode, implemented by the hook and listed in the
+  module's README.
 
   A tile whose page the account may not open shows the permission refusal
   in place of the frame, judged by the same route policy the page's mount
@@ -81,26 +80,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   @sides %{"left" => :left, "right" => :right, "up" => :up, "down" => :down}
 
-  # The keys of the `Ctrl+.` tiling mode, as the shortcuts dialog lists
-  # them. `apps/web/assets/js/tiling.js` implements each one; keep the two
-  # in step.
-  @shortcuts [
-    {["Ctrl+."], :mode},
-    {["h", "j", "k", "l"], :focus},
-    {["H", "J", "K", "L"], :move},
-    {["s"], :swap},
-    {["r"], :resize},
-    {["f"], :fill},
-    {["t"], :flip},
-    {["m"], :master},
-    {["w"], :follow},
-    {["o"], :alone},
-    {["n"], :add},
-    {["q"], :close},
-    {["1–9"], :layouts},
-    {["?"], :help},
-    {["Esc"], :leave}
-  ]
   @full_place "left: 0%; top: 0%; width: 100%; height: 100%"
 
   @impl true
@@ -136,7 +115,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:picker_for, nil)
      |> assign(:picker_open?, false)
      |> assign(:layouts_open?, false)
-     |> assign(:shortcuts_open?, false)
      |> assign(:pending_delete, nil)
      |> assign(:save_form, to_form(%{"label" => ""}, as: :layout))
      |> load_saved()
@@ -505,18 +483,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       _ ->
         {:noreply, socket}
     end
-  end
-
-  # ------------------------------------------------------------------
-  # Keyboard shortcuts
-  # ------------------------------------------------------------------
-
-  def handle_event("open-shortcuts", _params, socket) do
-    {:noreply, assign(socket, :shortcuts_open?, true)}
-  end
-
-  def handle_event("close-shortcuts", _params, socket) do
-    {:noreply, assign(socket, :shortcuts_open?, false)}
   end
 
   # ------------------------------------------------------------------
@@ -999,43 +965,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # could follow; nothing for any other page.
   defp follow_state(%{follow: pattern}) when is_binary(pattern), do: "on"
   defp follow_state(%{path: path}), do: if(follow_pattern(path), do: "off")
-
-  @doc false
-  def shortcuts do
-    Enum.map(@shortcuts, fn {keys, operation} ->
-      %{keys: keys, does: shortcut_label(operation)}
-    end)
-  end
-
-  defp shortcut_label(:mode), do: gettext("Enter or leave tiling mode")
-
-  defp shortcut_label(:focus),
-    do: gettext("Focus the tile to the left, below, above or right; the arrow keys do the same")
-
-  defp shortcut_label(:move), do: gettext("Move the focused tile that way")
-  defp shortcut_label(:swap), do: gettext("Swap the focused tile with its neighbour")
-
-  defp shortcut_label(:resize),
-    do: gettext("Resize with the arrow keys; Esc returns to tiling mode")
-
-  defp shortcut_label(:fill),
-    do: gettext("Fill the workspace with the focused tile, or show every tile again")
-
-  defp shortcut_label(:flip),
-    do: gettext("Flip the split direction, or the master direction in a master layout")
-
-  defp shortcut_label(:master),
-    do: gettext("Make the focused tile the master, in a master layout")
-
-  defp shortcut_label(:follow),
-    do: gettext("Follow the records other tiles select, or stop following")
-
-  defp shortcut_label(:alone), do: gettext("Open the focused tile's page alone")
-  defp shortcut_label(:add), do: gettext("Add a page")
-  defp shortcut_label(:close), do: gettext("Close the focused tile")
-  defp shortcut_label(:layouts), do: gettext("Open one of your first nine saved layouts")
-  defp shortcut_label(:help), do: gettext("Show this list")
-  defp shortcut_label(:leave), do: gettext("Leave tiling mode")
 
   defp first_label(%{type: :leaf, id: id}, labels), do: Map.get(labels, id, id)
   defp first_label(%{type: :split, first: first}, labels), do: first_label(first, labels)

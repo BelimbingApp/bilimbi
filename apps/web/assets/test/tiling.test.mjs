@@ -119,14 +119,6 @@ test("w asks to follow, and to stop on a tile the server marks as following", ()
   ])
 })
 
-test("? leaves the mode and opens the list of keys", () => {
-  leader()
-  press("?", {shiftKey: true})
-
-  assert.deepEqual(events(), [{event: "open-shortcuts", payload: {}}])
-  assert.equal(control.hook.el.dataset.mode, "off")
-})
-
 test("a mode key is consumed so the page under it never sees it", () => {
   leader()
   const event = new KeyboardEvent("keydown", {key: "q", bubbles: true, cancelable: true})
