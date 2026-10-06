@@ -7,91 +7,70 @@ defmodule Bilimbi.Base.Grid.ViewTest do
     params = %{
       "cols" => "name,company.name,employees:count",
       "lens" => "employees:count|bar",
-      "z" => "12",
-      "sort" => "employees:count",
-      "dir" => "desc",
-      "q" => "acme",
-      "page" => "2",
-      "per_page" => "50",
-      "group" => "status",
-      "pivot" => "company.name",
-      "follow" => "company",
-      "focus" => "73",
-      "since" => "2026-08-01",
-      "v" => "desk"
+      "density" => "compact",
+      "since" => "2026-08-01"
     }
 
     view = View.from_params(params, "users")
     assert view.columns == ~w(name company.name employees:count)
     assert view.lenses == %{"employees:count" => "bar"}
-    assert view.zoom == 12 and view.sort == "employees:count" and view.dir == :desc
-    assert view.search == "acme" and view.page == 2 and view.page_size == 50
-    assert view.group == "status" and view.pivot == "company.name"
-    assert view.follow == "company" and view.focus == "73"
+    assert view.density == :compact
     assert view.since == ~D[2026-08-01] and View.since(view) == ~D[2026-08-01]
-    assert view.slug == "desk"
 
     assert View.to_params(view) == %{
              cols: "name,company.name,employees:count",
              lens: "employees:count|bar",
-             z: 12,
-             sort: "employees:count",
-             dir: "desc",
-             q: "acme",
-             page: 2,
-             per_page: 50,
-             group: "status",
-             pivot: "company.name",
-             follow: "company",
-             focus: "73",
-             since: "2026-08-01",
-             v: "desk"
+             density: "compact",
+             since: "2026-08-01"
            }
 
     assert View.to_params(%View{table: "users"}) == %{}
+    assert View.default?(%View{table: "users"})
+    refute View.default?(view)
+  end
+
+  test "an address carries the view only when it names one of its keys" do
+    assert View.carried?(%{"cols" => "name"})
+    assert View.carried?(%{"lens" => "a|bar"})
+    assert View.carried?(%{"density" => "compact"})
+    assert View.carried?(%{"since" => "2026-08-01"})
+    # The page's own keys say nothing about the columns.
+    refute View.carried?(%{"sort" => "name", "page" => "2", "search" => "ada"})
+    refute View.carried?(%{})
   end
 
   test "malformed values fall back rather than raise" do
-    view =
-      View.from_params(
-        %{
-          "z" => "huge",
-          "page" => "-1",
-          "per_page" => "7",
-          "follow" => "Bad One",
-          "focus" => "a/b",
-          "dir" => "up"
-        },
-        "users"
-      )
+    view = View.from_params(%{"density" => "tiny", "cols" => "", "lens" => "nonsense"}, "users")
 
-    assert view.zoom == 28 and view.page == 1 and view.page_size == 25
-    assert view.follow == nil and view.focus == nil and view.dir == :asc
+    assert view.density == :normal and view.columns == [] and view.lenses == %{}
     assert View.from_params(%{"since" => "yesterday"}, "users").since == nil
     assert View.since(%View{}) == Date.add(Date.utc_today(), -30)
+    assert View.put_since(%View{since: ~D[2026-01-01]}, "soon").since == nil
   end
 
-  test "a saved map keeps the follow but never the selected record" do
+  test "a stored map reads back as the same view, and a broken one as the default" do
     view =
       View.from_params(
-        %{"follow" => "company", "focus" => "73", "cols" => "name", "since" => "2026-08-01"},
-        "users"
+        %{"cols" => "name,users:count", "lens" => "users:count|band", "density" => "compact"},
+        "companies"
       )
 
-    map = View.to_map(view)
-    assert map["follow"] == "company" and map["since"] == "2026-08-01"
-    assert View.from_map(map).since == ~D[2026-08-01]
-    refute Map.has_key?(map, "focus")
-    restored = View.from_map(map)
-    assert restored.follow == "company" and restored.focus == nil and restored.columns == ["name"]
+    assert View.from_map(View.to_map(view), "companies") == view
 
-    pivoted = View.from_params(%{"cols" => "a,b", "group" => "a", "pivot" => "b"}, "t")
-    assert View.remove_column(pivoted, "b").pivot == nil
-    assert View.from_map(View.to_map(pivoted)).pivot == "b"
+    assert View.from_map(%{"columns" => "name", "lenses" => [1], "density" => 7}, "companies") ==
+             %View{table: "companies", columns: ["name"]}
 
-    # A pivot needs a group, and a column other than the grouped one.
-    assert View.from_params(%{"cols" => "a,b", "pivot" => "b"}, "t").pivot == nil
-    assert View.from_params(%{"cols" => "a,b", "group" => "b", "pivot" => "b"}, "t").pivot == nil
-    assert View.from_map(%{"columns" => ["a", "b"], "pivot" => "b"}).pivot == nil
+    assert View.from_map(%{"columns" => [1, "name", "name"], "since" => 3}, "companies") ==
+             %View{table: "companies", columns: ["name"]}
+  end
+
+  test "removing a column drops its lens, and moving one keeps the rest in order" do
+    view = %View{columns: ~w(a b c), lenses: %{"b" => "bar"}}
+
+    assert View.remove_column(view, "b") == %View{columns: ~w(a c), lenses: %{}}
+    assert View.move_column(view, "c", "a").columns == ~w(c a b)
+    assert View.move_column(view, "a", nil).columns == ~w(b c a)
+    assert View.add_column(view, "a") == view
+    assert View.put_lens(view, "b", "value").lenses == %{}
   end
 end

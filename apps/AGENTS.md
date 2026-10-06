@@ -4,14 +4,17 @@ Read this before editing a LiveView, a template, or a test. The component that c
 
 ## Flexible columns on a list
 
-A list page that lets people add, remove, reorder or zoom columns renders
-`<.flex_table>` through `Bilimbi.Base.Grid.Web.PageColumns`: declare the
-page's own columns as built-ins, merge `PageColumns.params/1` into every
-path the page patches to, and delegate the `"grid"` event to
-`PageColumns.handle/3`. The users and companies lists are the two
-examples. Do not hand-roll a column picker, a per-page `cols` parser or a
-second table over the same rows; the module doc on `PageColumns` and the
-component comment on `flex_table/1` own the contract. A module puts its
+A list page that lets people add, remove and reorder columns or switch to
+compact rows renders `<.flex_table>` through
+`Bilimbi.Base.Grid.Web.PageColumns`: declare the page's own columns as
+built-ins, merge `PageColumns.params/1` into every path the page patches
+to, and delegate the `"grid"` event to `PageColumns.handle/2`. The users
+and companies lists are the two examples. `PageColumns` also remembers
+each account's arrangement per page; do not store it again, and do not
+hand-roll a column picker, a per-page `cols` parser or a second table over
+the same rows. The module doc on `PageColumns` and the component comment
+on `flex_table/1` own the contract. There is no standalone grid page: a
+table is explored on the list that already owns its rows. A module puts its
 tables in the catalog through a `:grid` contribution and a
 `Bilimbi.Base.Grid.Source`; see `apps/base/grid/docs/README.md`.
 

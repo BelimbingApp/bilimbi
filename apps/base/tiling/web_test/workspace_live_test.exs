@@ -64,12 +64,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/workspace")
 
     view |> element("#workspace-empty-add") |> render_click()
-
-    # Grid, like the workspace, is open to every signed-in account: each table
-    # on it is read under its own capability. Companies needs a grant.
     refute has_element?(view, "#workspace-pick-admin-company")
-    assert has_element?(view, "#workspace-pick-grid", "Grid")
-    refute has_element?(view, "#workspace-picker-empty")
+    assert has_element?(view, "#workspace-picker-empty", "No pages to add")
   end
 
   test "adding pages splits the focused tile and writes the tree into the URL", %{conn: conn} do

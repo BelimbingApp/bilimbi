@@ -2,8 +2,9 @@ defmodule Bilimbi.Base.Grid.Catalog do
   @moduledoc """
   The tables one account may read, and the paths between them.
 
-  `for_scope/1` reads the installed contribution snapshot once and keeps
-  only the tables whose capability the scope's actor holds, so a catalog is
+  `for_scope/1` reads the installed contribution snapshot once, keeps only
+  the tables whose capability the scope's actor holds, and settles which
+  key of its source each of their fields is read from, so a catalog is
   both the vocabulary of a grid and the proof of what it may show. Every
   later call takes the catalog, not the scope: a path is resolved against
   it, a query is built from it, and a table it left out cannot be reached
@@ -39,10 +40,71 @@ defmodule Bilimbi.Base.Grid.Catalog do
     visible =
       tables
       |> Enum.filter(fn {_id, table} -> table.capability in allowed end)
-      |> Map.new()
+      |> Map.new(fn {id, table} -> {id, resolve_columns!(table, scope)} end)
 
     %__MODULE__{scope: scope, tables: visible}
   end
+
+  # A field that declares no column is read from the source key its id
+  # names. The id is compared with each key as a string, so contribution
+  # data never creates an atom. A field no key answers to is refused here,
+  # naming the field, before any statement is built from it.
+  defp resolve_columns!(%Table{} = table, scope) do
+    keys = source_keys(table.source, scope)
+
+    fields =
+      Map.new(table.fields, fn
+        {id, %Field{column: nil} = field} ->
+          case Enum.find(keys, &(Atom.to_string(&1) == id)) do
+            nil ->
+              raise ArgumentError,
+                    "invalid grid table from #{table.owner} (#{inspect(table.id)}): field " <>
+                      "#{id} names no key its source #{inspect(table.source)} selects; " <>
+                      "it selects #{inspect(keys)}"
+
+            column ->
+              {id, %{field | column: column}}
+          end
+
+        entry ->
+          entry
+      end)
+
+    %{table | fields: fields}
+  end
+
+  # The keys a source's query selects, read from the query it builds for a
+  # real scope and kept for as long as that compiled source is loaded. The
+  # catalog asks only once a scope exists, never at boot: a source may ask
+  # another module's public API for what bounds its rows, and that reads
+  # the database. The keys never depend on the scope (`Source`), which is
+  # what makes them safe to keep.
+  defp source_keys(source, scope) do
+    cache = {__MODULE__, :source_keys, source, source.module_info(:md5)}
+
+    case :persistent_term.get(cache, nil) do
+      nil ->
+        keys = selected_keys(Ecto.Queryable.to_query(source.query(scope)))
+        :persistent_term.put(cache, keys)
+        keys
+
+      keys ->
+        keys
+    end
+  end
+
+  defp selected_keys(%Ecto.Query{select: select, from: from}) do
+    case select do
+      %{expr: {:%{}, _meta, pairs}} -> Keyword.keys(pairs)
+      %{expr: {:&, _meta, [0]}, take: %{0 => {_kind, fields}}} -> fields
+      _struct -> schema_fields(from.source)
+    end
+  end
+
+  defp schema_fields({_table, schema}) when is_atom(schema) and not is_nil(schema),
+    do: schema.__schema__(:fields)
+
+  defp schema_fields(_source), do: []
 
   # A system actor holds no grants a table capability could match, so it
   # reads nothing here; `Authz.scope_actor/1` says so for it.
@@ -55,10 +117,6 @@ defmodule Bilimbi.Base.Grid.Catalog do
         MapSet.new()
     end
   end
-
-  @doc "The visible tables, by label."
-  @spec tables(t()) :: [Table.t()]
-  def tables(%__MODULE__{tables: tables}), do: tables |> Map.values() |> Enum.sort_by(& &1.label)
 
   @spec fetch_table(t(), String.t()) :: {:ok, Table.t()} | :error
   def fetch_table(%__MODULE__{tables: tables}, id) when is_binary(id), do: Map.fetch(tables, id)
@@ -88,18 +146,6 @@ defmodule Bilimbi.Base.Grid.Catalog do
     |> case do
       {:ok, columns} -> {:ok, Enum.reverse(columns)}
       error -> error
-    end
-  end
-
-  @doc "The root table's own visible fields as columns, the grid's starting point."
-  @spec default_columns(t(), Table.t()) :: [Column.t()]
-  def default_columns(%__MODULE__{} = catalog, %Table{} = root) do
-    root
-    |> Table.visible_fields()
-    |> Enum.map(& &1.id)
-    |> then(&resolve_all(catalog, root, &1))
-    |> case do
-      {:ok, columns} -> columns
     end
   end
 
@@ -219,13 +265,5 @@ defmodule Bilimbi.Base.Grid.Catalog do
     else
       0
     end
-  end
-
-  @doc "The root field a search box matches against: every searchable string field."
-  @spec search_fields(Table.t()) :: [Field.t()]
-  def search_fields(%Table{} = table) do
-    table
-    |> Table.visible_fields()
-    |> Enum.filter(&(&1.searchable and &1.type in [:string, :enum]))
   end
 end

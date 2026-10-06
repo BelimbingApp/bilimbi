@@ -102,7 +102,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:token, token)
      |> assign(:topic, topic)
      |> assign(:follows, [])
-     |> assign(:page_follows, %{})
      |> assign(:tree, Layout.empty())
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
@@ -733,37 +732,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       else: {:noreply, socket}
   end
 
-  # A page follows kinds itself (a grid refiltering to the selection). Its
-  # kinds count while its process lives; the monitor drops them when the
-  # tile closes or the page moves on.
-  def handle_info({:workspace_page_follows, pid, kinds}, socket)
-      when is_pid(pid) and is_list(kinds) do
-    kinds = Enum.filter(kinds, &Workspace.kind?/1)
-    page_follows = socket.assigns.page_follows
-
-    if not Map.has_key?(page_follows, pid) and kinds != [], do: Process.monitor(pid)
-
-    page_follows =
-      if kinds == [], do: Map.delete(page_follows, pid), else: Map.put(page_follows, pid, kinds)
-
-    {:noreply, socket |> assign(:page_follows, page_follows) |> refresh_follows()}
-  end
-
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, socket) do
-    {:noreply,
-     socket
-     |> update(:page_follows, &Map.delete(&1, pid))
-     |> refresh_follows()}
-  end
-
   # This host's own broadcast, and anything else on the topic.
   def handle_info(_message, socket), do: {:noreply, socket}
-
-  defp refresh_follows(socket) do
-    kinds = follow_kinds(socket.assigns.tree, socket.assigns.page_follows)
-    if kinds != socket.assigns.follows, do: publish_follows(socket, kinds)
-    assign(socket, :follows, kinds)
-  end
 
   defp follow_fact(socket, kind, id) do
     {layout, moved} =
@@ -803,9 +773,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   # The module ids the tiles follow, told to every page in the workspace
-  # when they change and to a page that joins: the kinds of the record
-  # patterns tiles follow, plus the kinds pages follow themselves.
-  defp follow_kinds(layout, page_follows) do
+  # when they change and to a page that joins.
+  defp follow_kinds(layout) do
     layout
     |> Layout.follows()
     |> Enum.flat_map(fn pattern ->
@@ -814,9 +783,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         _other -> []
       end
     end)
-    |> Kernel.++(page_follows |> Map.values() |> List.flatten())
     |> Enum.uniq()
-    |> Enum.sort()
   end
 
   defp publish_follows(socket, kinds) do
@@ -854,7 +821,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # ------------------------------------------------------------------
 
   defp put_layout(socket, %Layout{} = layout) do
-    kinds = follow_kinds(layout, socket.assigns.page_follows)
+    kinds = follow_kinds(layout)
     if kinds != socket.assigns.follows, do: publish_follows(socket, kinds)
 
     socket |> assign(:tree, layout) |> assign(:follows, kinds) |> derive()

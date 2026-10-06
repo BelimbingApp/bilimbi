@@ -2,13 +2,13 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   @moduledoc false
 
   # The Design Library's host for `flex_table/1`: a fixed synthetic set of
-  # example companies, wide enough for the carpet to mean something, and the
-  # component's operations applied to plain assigns. There is no catalog
+  # example companies and the component's operations applied to plain
+  # assigns. There is no catalog
   # behind it, so the add bar offers the three columns the set holds back,
   # and a rollup expands to the lines the set carries for that row. Nothing
   # is simulated: every gesture changes what the specimen shows.
 
-  @rows 400
+  @rows 60
   @regions ~w(North South East West Central)
   @statuses ~w(active pending suspended)
 
@@ -154,7 +154,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
       columns: @columns,
       sort_by: "region",
       sort_dir: :asc,
-      zoom: 28,
+      density: :normal,
       suggestions: [],
       add_query: "",
       expanded: %{}
@@ -164,14 +164,13 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   @doc "The columns the add bar can still offer."
   def extra, do: @extra
 
-  @doc "Every row of the set, with cells prepared for the given columns."
-  def rows(state, limit \\ @rows, offset \\ 0) do
+  @doc "The first `limit` rows of the set in the specimen's order, with cells for its columns."
+  def rows(state, limit) do
     all_columns = @columns ++ @extra
     stats = stats(all_columns)
 
     values()
     |> sort(state.sort_by, state.sort_dir)
-    |> Enum.drop(offset)
     |> Enum.take(limit)
     |> Enum.map(fn row ->
       cells =
@@ -183,27 +182,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
       %{key: row.id, cells: cells}
     end)
   end
-
-  @doc "The window payload the hook draws in a canvas mode."
-  def window(state, offset, limit) do
-    rows =
-      state
-      |> rows(limit, offset)
-      |> Enum.map(fn row ->
-        [
-          row.key,
-          Enum.map(state.columns, fn column ->
-            cell = Map.fetch!(row.cells, column.id)
-            [cell.text, cell.n, cell.band, cell.scale, nil]
-          end)
-        ]
-      end)
-
-    %{offset: offset, total: @rows, rows: rows}
-  end
-
-  @doc "How many rows the set holds."
-  def total, do: @rows
 
   @doc "Applies one component op to the specimen's state."
   def apply(%{"op" => "remove", "spec" => spec}, state) do
@@ -262,24 +240,10 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   def apply(%{"op" => "sort", "sort" => spec}, state),
     do: %{state | sort_by: spec, sort_dir: :asc}
 
-  def apply(%{"op" => "zoom", "dir" => "in"}, state),
-    do: %{state | zoom: min(state.zoom + step(state.zoom), 40)}
+  def apply(%{"op" => "density", "density" => "compact"}, state),
+    do: %{state | density: :compact}
 
-  def apply(%{"op" => "zoom", "dir" => "out"}, state),
-    do: %{state | zoom: max(state.zoom - step(state.zoom), 2)}
-
-  def apply(%{"op" => "zoom_preset", "z" => z}, state) do
-    case Integer.parse(to_string(z)) do
-      {zoom, ""} -> %{state | zoom: zoom |> max(2) |> min(40)}
-      _other -> state
-    end
-  end
-
-  def apply(%{"op" => "zoom_rect"} = params, state) do
-    rows = max(int(params["to_row"]) - int(params["from_row"]), 1)
-    height = max(int(params["height"]), 100)
-    %{state | zoom: (height / rows) |> trunc() |> max(2) |> min(40)}
-  end
+  def apply(%{"op" => "density"}, state), do: %{state | density: :normal}
 
   def apply(%{"op" => "expand", "spec" => spec, "key" => key}, state) do
     with {id, ""} <- Integer.parse(to_string(key)),
@@ -307,11 +271,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
 
   def apply(_params, state), do: state
 
-  @doc "The mode a zoom falls in, by the same bands the grid page uses."
-  def mode(zoom) when zoom <= 6, do: :carpet
-  def mode(zoom) when zoom <= 20, do: :mid
-  def mode(_zoom), do: :full
-
   defp add(state, spec) do
     case Enum.find(@extra, &(&1.spec == spec)) do
       nil ->
@@ -333,17 +292,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
     |> Enum.filter(
       &(down == "" or String.contains?(String.downcase(&1.label <> " " <> &1.spec), down))
     )
-  end
-
-  defp step(zoom) when zoom < 8, do: 1
-  defp step(zoom) when zoom < 20, do: 2
-  defp step(_zoom), do: 4
-
-  defp int(value) do
-    case Integer.parse(to_string(value)) do
-      {integer, ""} -> integer
-      _other -> 0
-    end
   end
 
   # Deterministic values: the same set on every mount, spread enough that

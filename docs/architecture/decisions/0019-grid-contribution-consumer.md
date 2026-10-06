@@ -3,7 +3,7 @@
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
 **Scope:** Contribution consumer for the field-and-link catalog behind flexible tables
-**Last Updated:** 2026-09-27
+**Last Updated:** 2026-10-06
 
 ## Context
 
@@ -42,6 +42,13 @@ rendering are platform work.
    undeclared table or field, a `:one` link that does not join on the
    target's key, a source without the behaviour, or an edge outside the
    declaring application.
+6. **No source query is built at boot.** The validator checks declarations
+   only. Which key of a source's query a field is read from is settled the
+   first time a catalog is built for a scope that may read the table, and
+   a field no key answers to is refused then, naming the field. A source
+   may therefore ask another module's public API for what bounds its rows
+   while it builds its query; it never composes that module's query or
+   table into its own statement.
 
 ## Consequences
 
@@ -50,7 +57,16 @@ rendering are platform work.
   do so from this ADR forward.
 - Reads through the catalog are not the sibling-private-table access ADR
   0007 forbids: the owner declares what is readable and how it is scoped,
-  and the grid composes only declared sources.
-- Every grid statement is one parameterized SELECT; a many-link never
-  multiplies root rows, and the planner's cost estimate is surfaced so a
-  heavy set of rollups warns before it is run again.
+  and the grid composes only declared sources. A table with no tenant
+  column of its own stays inside that rule: the users source filters on
+  the company ids `Bilimbi.Core.Company.list_tenant_company_ids/1`
+  returns, and its statement reads only `users`.
+- The application boots, and the catalog validates, on a database with no
+  tables. The cost is that a field naming no source key is caught by the
+  host's catalog test and at first use rather than at boot.
+- The consumer of the catalog is a list page
+  (`Bilimbi.Base.Grid.Web.PageColumns`), which attaches walked columns to
+  the rows it already lists. Every such statement is one parameterized
+  SELECT bounded by that page of keys, and a many-link never multiplies
+  root rows. The one statement that reads a whole table, the range a bar
+  or band scales to, reports the planner's cost so a heavy one warns.

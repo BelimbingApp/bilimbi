@@ -15,7 +15,7 @@
 @source "../../../../apps/extensions";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */
-@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,table-cells,user-circle,user-group,users}");
+@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
 
@@ -119,7 +119,7 @@
   /* Data colour for the grid's lenses. A sequential scale for values that
      order on a number line (small to large), a categorical palette for
      values that only differ. Neither uses brand, success, warning or danger,
-     so a heat carpet never reads as status. */
+     so a coloured cell never reads as status. */
   --color-scale-1: var(--color-sky-100);
   --color-scale-2: var(--color-sky-200);
   --color-scale-3: var(--color-sky-400);
@@ -468,8 +468,9 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
  * The list is fixed to the viewport and placed by its anchor, so no ancestor
  * that scrolls or clips (a modal dialog, a card, a tile) can cut it off or
  * grow a scrollbar to hold it. It still follows the control when something
- * scrolls, flips above the control when there is no room below, and hides
- * when the control itself scrolls out of view. The scope keeps one field's
+ * scrolls, flips above the control when there is no room below, lines up
+ * with the control's other edge when it would run past the side of the
+ * screen, and hides when the control itself scrolls out of view. The scope keeps one field's
  * anchor from answering for another's list, which is what lets every field
  * use the same name.
  *
@@ -496,7 +497,26 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
     top: anchor(bottom);
     left: anchor(left);
     width: anchor-size(width);
-    position-try-fallbacks: flip-block;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    position-visibility: anchors-visible;
+  }
+}
+
+/* A panel a control opens beneath itself, such as table customization on
+ * `flex_table`. It shares the scope and the anchor of a field's list; it
+ * differs in lining up with the control's far edge and keeping its own
+ * width. */
+@utility floating-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+
+  @supports (anchor-scope: --floating-list) {
+    position: fixed;
+    position-anchor: --floating-list;
+    top: anchor(bottom);
+    right: anchor(right);
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
     position-visibility: anchors-visible;
   }
 }
@@ -708,5 +728,3 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 .flex-table [data-dragging='true'] { opacity: 0.5; }
 .flex-table [data-drop='before'] { box-shadow: inset 2px 0 0 var(--color-brand-strong); }
 .flex-table [data-drop='after'] { box-shadow: inset -2px 0 0 var(--color-brand-strong); }
-.flex-table[data-drag-active='true'] [data-group-zone] { display: flex; }
-.flex-table[data-drag-active='true'] [data-pivot-zone] { display: flex; }

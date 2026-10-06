@@ -34,14 +34,13 @@ defmodule Bilimbi.Base.Grid.Query do
         }
 
   @doc """
-  Builds the joined statement for `columns` on `root`, without select,
-  order or paging. `extra:` columns are joined and expressed like the
-  others, for a filter to use, but never selected.
+  Builds the joined statement for `columns` on `root`, without a select.
+  `trend:` names the rollup columns whose last twelve months are joined,
+  `delta:` a `{columns, since}` pair whose aggregate as of `since` is too.
   """
   @spec plan(Catalog.t(), Table.t(), [Column.t()], keyword()) :: plan()
-  def plan(%Catalog{scope: scope} = catalog, %Table{} = root, selected, opts \\ [])
-      when is_list(selected) do
-    columns = selected ++ Keyword.get(opts, :extra, [])
+  def plan(%Catalog{scope: scope} = catalog, %Table{} = root, columns, opts \\ [])
+      when is_list(columns) do
     indexed = Enum.with_index(columns)
     trend_indexes = indexes_of(indexed, Keyword.get(opts, :trend, []))
 
@@ -100,7 +99,7 @@ defmodule Bilimbi.Base.Grid.Query do
       selects: selects,
       key: dynamic([root: r], field(r, ^key_column)),
       key_column: key_column,
-      columns: selected,
+      columns: columns,
       trends: Map.new(trend_indexes, &{&1, trend_expr(&1, trend_bindings)}),
       deltas: Map.new(delta_indexes, &{&1, delta_expr(Enum.at(columns, &1), &1, rollup_bindings)})
     }
@@ -108,21 +107,6 @@ defmodule Bilimbi.Base.Grid.Query do
 
   defp indexes_of(indexed, wanted) do
     for {column, index} <- indexed, column in wanted, column.kind == :rollup, do: index
-  end
-
-  @doc """
-  Restricts the rows to the one record a workspace selection named:
-  `:root` for the root's own key, or a column whose value is the key of
-  the selected table, reached through one-links.
-  """
-  @spec focus(Ecto.Query.t(), plan(), :root | Column.t(), term()) :: Ecto.Query.t()
-  def focus(query, %{key_column: key_column}, :root, id) do
-    where(query, [root: r], field(r, ^key_column) == ^id)
-  end
-
-  def focus(query, %{selects: selects}, %Column{} = column, id) do
-    expr = Map.fetch!(selects, column)
-    where(query, ^dynamic([], ^expr == ^id))
   end
 
   defp prefixes(hops) do
@@ -553,70 +537,27 @@ defmodule Bilimbi.Base.Grid.Query do
     |> select_merge(^extras)
   end
 
-  @doc "Orders by a column, or by the key when `column` is nil, always tie-broken by key."
-  @spec order(Ecto.Query.t(), plan(), Column.t() | nil, :asc | :desc) :: Ecto.Query.t()
-  def order(query, %{key: key}, nil, dir), do: order_by(query, ^[{dir, key}])
-
-  def order(query, %{key: key, selects: selects}, %Column{} = column, dir) do
-    expr = Map.fetch!(selects, column)
-    nulls = if dir == :asc, do: :asc_nulls_last, else: :desc_nulls_last
-    order_by(query, ^[{nulls, expr}, {:asc, key}])
-  end
-
-  @doc "Restricts the rows to those whose searchable root fields contain `text`."
-  @spec search(Ecto.Query.t(), Table.t(), String.t()) :: Ecto.Query.t()
-  def search(query, %Table{}, text) when text in [nil, ""], do: query
-
-  def search(query, %Table{} = root, text) when is_binary(text) do
-    pattern = "%" <> escape_like(text) <> "%"
-
-    condition =
-      root
-      |> Catalog.search_fields()
-      |> Enum.reduce(nil, fn field, acc ->
-        column = field.column
-        match = dynamic([root: r], ilike(fragment("?::text", field(r, ^column)), ^pattern))
-        if acc, do: dynamic([], ^acc or ^match), else: match
-      end)
-
-    case condition do
-      nil -> where(query, false)
-      _dynamic -> where(query, ^condition)
-    end
-  end
-
-  defp escape_like(text) do
-    text
-    |> String.replace("\\", "\\\\")
-    |> String.replace("%", "\\%")
-    |> String.replace("_", "\\_")
-  end
-
   @doc "Restricts the plan to the root rows with these keys."
   @spec with_keys(Ecto.Query.t(), plan(), [term()]) :: Ecto.Query.t()
   def with_keys(query, %{key_column: key_column}, keys) when is_list(keys) do
     where(query, [root: r], field(r, ^key_column) in ^keys)
   end
 
-  @doc "How many root rows the statement yields."
-  @spec count(Ecto.Query.t(), plan()) :: non_neg_integer()
-  def count(query, %{key: key}) do
-    inner =
-      query |> exclude(:order_by) |> exclude(:limit) |> exclude(:offset) |> select(^%{key: key})
-
-    Repo.one(from(s in subquery(inner), select: count()))
-  end
-
-  @doc "Per numeric column, the smallest and largest value across the statement's rows."
-  @spec stats(Ecto.Query.t(), plan()) :: %{String.t() => %{min: term(), max: term()}}
-  def stats(query, %{selects: selects, columns: columns}) do
+  @doc """
+  Per numeric column, the smallest and largest value across every root row
+  of the plan, with PostgreSQL's estimated cost for the statement that reads
+  them. This is the one statement a list page runs over the whole table
+  rather than over its page of rows, so its cost is the one worth showing.
+  """
+  @spec stats(plan()) :: {%{String.t() => %{min: term(), max: term()}}, float() | nil}
+  def stats(%{query: query, selects: selects, columns: columns}) do
     numeric =
       columns
       |> Enum.with_index()
       |> Enum.filter(fn {column, _index} -> Column.numeric?(column) end)
 
     if numeric == [] do
-      %{}
+      {%{}, nil}
     else
       aggregates =
         Enum.reduce(numeric, %{}, fn {column, index}, acc ->
@@ -627,52 +568,20 @@ defmodule Bilimbi.Base.Grid.Query do
           |> Map.put(:"max#{index}", dynamic([], max(^expr)))
         end)
 
-      row =
-        query
-        |> exclude(:order_by)
-        |> exclude(:limit)
-        |> exclude(:offset)
-        |> select(%{})
-        |> select_merge(^aggregates)
-        |> Repo.one()
+      statement = query |> select(%{}) |> select_merge(^aggregates)
+      row = Repo.one(statement)
 
-      Map.new(numeric, fn {column, index} ->
-        {column.id, %{min: Map.get(row, :"min#{index}"), max: Map.get(row, :"max#{index}")}}
-      end)
+      ranges =
+        Map.new(numeric, fn {column, index} ->
+          {column.id, %{min: Map.get(row, :"min#{index}"), max: Map.get(row, :"max#{index}")}}
+        end)
+
+      {ranges, estimated_cost(statement)}
     end
   end
 
-  @doc """
-  The statement counting root rows per pair of values of two columns: one
-  GROUP BY, ordered by the pair, at most `limit` pairs. Each row it selects
-  is `%{rows: term(), across: term(), count: non_neg_integer()}`.
-  """
-  @spec pivot_counts(Ecto.Query.t(), plan(), Column.t(), Column.t(), pos_integer()) ::
-          Ecto.Query.t()
-  def pivot_counts(
-        query,
-        %{selects: selects, key_column: key_column},
-        rows_column,
-        across_column,
-        limit
-      ) do
-    rows_expr = Map.fetch!(selects, rows_column)
-    across_expr = Map.fetch!(selects, across_column)
-
-    query
-    |> exclude(:order_by)
-    |> exclude(:limit)
-    |> exclude(:offset)
-    |> group_by(^[rows_expr, across_expr])
-    |> order_by(^[asc: rows_expr, asc: across_expr])
-    |> limit(^limit)
-    |> select(^%{rows: rows_expr, across: across_expr})
-    |> select_merge([root: r], %{count: count(field(r, ^key_column))})
-  end
-
-  @doc "PostgreSQL's estimated total cost for the statement, from EXPLAIN."
-  @spec estimated_cost(Ecto.Query.t()) :: float() | nil
-  def estimated_cost(query) do
+  # PostgreSQL's estimated total cost for the statement, from EXPLAIN.
+  defp estimated_cost(query) do
     case Repo.explain(:all, query) do
       plan when is_binary(plan) ->
         case Regex.run(~r/cost=\d+(?:\.\d+)?\.\.(\d+(?:\.\d+)?)/, plan) do

@@ -1,4 +1,4 @@
-defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
+defmodule BilimbiWeb.GridCatalogTest do
   @moduledoc """
   The real catalog, as the host boots it: every Core module's tables,
   fields and links validate together, and a person's scope walks them over
@@ -90,7 +90,7 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
         status: "active"
       })
 
-    {:ok, _report} =
+    {:ok, report} =
       Employee.create_employee(scope, 73, %{
         full_name: "Report Person",
         employee_number: "E-2",
@@ -141,36 +141,46 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
       addressable_id: boss.id
     })
 
-    %{scope: scope, catalog: Grid.catalog(scope), boss: boss}
+    %{scope: scope, catalog: Grid.catalog(scope), boss: boss, report: report}
   end
 
-  defp row(result, key), do: Enum.find(result.rows, &(&1.key == key)).cells
+  # The walked cells of the rows with these keys, as a list page attaches
+  # them to rows of its own: `%{key => %{column_id => value}}`.
+  defp walk(catalog, table_id, specs, keys) do
+    {:ok, table} = Grid.fetch_table(catalog, table_id)
+    {:ok, columns} = Grid.resolve(catalog, table, specs)
+
+    catalog
+    |> Grid.attach(table, keys, columns)
+    |> Map.new(fn {key, attached} -> {key, attached.cells} end)
+  end
+
+  defp tables(catalog, ids),
+    do: Enum.filter(ids, &match?({:ok, _}, Grid.fetch_table(catalog, &1)))
+
+  @tables ~w(addresses companies countries departments employee_types employees legal_entity_types users)
 
   test "the booted catalog offers every Core table to a fully granted account", %{
     catalog: catalog
   } do
-    assert Enum.map(Grid.tables(catalog), & &1.id) |> Enum.sort() ==
-             ~w(addresses companies countries departments employee_types employees legal_entity_types users)
+    assert tables(catalog, @tables) == @tables
   end
 
   test "users walk to their company, employee and the company's people", %{catalog: catalog} do
-    {:ok, users} = Grid.fetch_table(catalog, "users")
-
-    {:ok, columns} =
-      Grid.resolve(
+    rows =
+      walk(
         catalog,
-        users,
+        "users",
         ~w(name company.name company.parent.name employee.full_name
-        company.users:count company.employees:count company.departments:count employee.subordinates:count)
+        company.users:count company.employees:count company.departments:count employee.subordinates:count),
+        [91, 92, 93, 94, 95]
       )
 
-    result = Grid.query(catalog, users, columns, sort: {hd(columns), :asc})
+    # Tenant 42's user and the unaffiliated user are outside the tenant's
+    # list, so asking for them by key reaches nothing.
+    assert rows |> Map.keys() |> Enum.sort() == [91, 92, 95]
 
-    # Tenant 42's user and the unaffiliated user are outside the tenant's list.
-    assert Enum.map(result.rows, & &1.key) == [91, 95, 92]
-    assert result.total_entries == 3
-
-    ada = row(result, 91)
+    ada = rows[91]
     assert ada["company-name"] == "Bilimbi Industries"
     assert ada["company-parent-name"] == nil
     assert ada["employee-full_name"] == nil
@@ -178,11 +188,11 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     assert ada["company-employees_count"] == 2
     assert ada["company-departments_count"] == 1
 
-    boss = row(result, 95)
+    boss = rows[95]
     assert boss["employee-full_name"] == "Boss Person"
     assert boss["employee-subordinates_count"] == 1
 
-    grace = row(result, 92)
+    grace = rows[92]
     assert grace["company-name"] == "Bilimbi Retail"
     assert grace["company-parent-name"] == "Bilimbi Industries"
     assert grace["company-users_count"] == 1
@@ -192,20 +202,19 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
   end
 
   test "companies roll up their people, addresses and attachments", %{catalog: catalog} do
-    {:ok, companies} = Grid.fetch_table(catalog, "companies")
-
-    {:ok, columns} =
-      Grid.resolve(
+    rows =
+      walk(
         catalog,
-        companies,
+        "companies",
         ~w(name users.email:list employees.full_name:list addresses:count
-        primary_address.locality primary_address.country.country children:count employees.status:list)
+        primary_address.locality primary_address.country.country children:count employees.status:list),
+        [73, 74, 75]
       )
 
-    result = Grid.query(catalog, companies, columns)
-    assert result.total_entries == 2
+    # Company 75 belongs to the other tenant.
+    assert rows |> Map.keys() |> Enum.sort() == [73, 74]
 
-    hq = row(result, 73)
+    hq = rows[73]
     assert hq["users-email_list"] == "ada@example.com, boss.login@example.com"
     assert hq["employees-full_name_list"] == "Boss Person, Report Person"
     assert hq["employees-status_list"] == "active, probation"
@@ -214,34 +223,35 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     assert hq["primary_address-country-country"] == "Malaysia"
     assert hq["children_count"] == 1
 
-    retail = row(result, 74)
+    retail = rows[74]
     assert retail["addresses_count"] == 0
     assert retail["primary_address-locality"] == nil
   end
 
   test "employees reach their type, department, supervisor and logins", %{
     catalog: catalog,
-    boss: boss
+    boss: boss,
+    report: report
   } do
-    {:ok, employees} = Grid.fetch_table(catalog, "employees")
+    rows =
+      walk(
+        catalog,
+        "employees",
+        ~w(full_name type.label type.is_system department.type_name
+        supervisor.full_name users.email:list addresses.locality:list company.name),
+        [boss.id, report.id]
+      )
 
-    {:ok, columns} =
-      Grid.resolve(catalog, employees, ~w(full_name type.label type.is_system department.type_name
-        supervisor.full_name users.email:list addresses.locality:list company.name))
-
-    result = Grid.query(catalog, employees, columns, search: "person")
-    assert result.total_entries == 2
-
-    boss_row = row(result, boss.id)
+    boss_row = rows[boss.id]
     assert boss_row["type-label"] != nil
     assert boss_row["type-is_system"] == true
     assert boss_row["users-email_list"] == "boss.login@example.com"
     assert boss_row["addresses-locality_list"] == "Penang"
     assert boss_row["company-name"] == "Bilimbi Industries"
 
-    [report] = Enum.reject(result.rows, &(&1.key == boss.id))
-    assert report.cells["supervisor-full_name"] == "Boss Person"
-    assert report.cells["users-email_list"] == nil
+    report_row = rows[report.id]
+    assert report_row["supervisor-full_name"] == "Boss Person"
+    assert report_row["users-email_list"] == nil
   end
 
   test "a narrower account sees a narrower catalog and cannot walk past it" do
@@ -256,7 +266,7 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     {:ok, tenant_scope} = Tenancy.scope(41)
     catalog = Grid.catalog(Authentication.sign_in(tenant_scope, 96, 73))
 
-    assert Enum.map(Grid.tables(catalog), & &1.id) == ~w(companies departments legal_entity_types)
+    assert tables(catalog, @tables) == ~w(companies departments legal_entity_types)
     {:ok, companies} = Grid.fetch_table(catalog, "companies")
 
     assert {:error, {"users:count", {:forbidden_table, "users"}}} =

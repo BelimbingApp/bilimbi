@@ -1,6 +1,6 @@
 defmodule Bilimbi.Base.Grid.Field do
   @moduledoc """
-  One field of a catalog table: a value a column can show, sort or search.
+  One field of a catalog table: a value a column can show.
 
   `column` is the key the owner's source query exposes it under. A field
   that declares none is resolved at boot to the source key its id names
@@ -10,7 +10,7 @@ defmodule Bilimbi.Base.Grid.Field do
   """
 
   @types [:integer, :float, :decimal, :string, :boolean, :date, :datetime, :enum]
-  @keys [:id, :label, :type, :column, :hidden, :values, :sortable, :searchable]
+  @keys [:id, :label, :type, :column, :hidden, :values]
   @id_pattern ~r/^[a-z][a-z0-9_]*$/
 
   @enforce_keys [:id, :label, :type, :column]
@@ -19,9 +19,7 @@ defmodule Bilimbi.Base.Grid.Field do
             type: nil,
             column: nil,
             hidden: false,
-            values: nil,
-            sortable: true,
-            searchable: nil
+            values: nil
 
   @type type :: :integer | :float | :decimal | :string | :boolean | :date | :datetime | :enum
 
@@ -31,9 +29,7 @@ defmodule Bilimbi.Base.Grid.Field do
           type: type(),
           column: atom(),
           hidden: boolean(),
-          values: [String.t()] | nil,
-          sortable: boolean(),
-          searchable: boolean()
+          values: [String.t()] | nil
         }
 
   @doc "The field types a contribution may declare."
@@ -93,9 +89,7 @@ defmodule Bilimbi.Base.Grid.Field do
       type: type,
       column: column,
       hidden: Map.get(attrs, :hidden, false) == true,
-      values: values,
-      sortable: Map.get(attrs, :sortable, true) == true,
-      searchable: Map.get(attrs, :searchable, type in [:string, :enum]) == true
+      values: values
     }
   end
 

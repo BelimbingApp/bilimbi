@@ -1,8 +1,10 @@
 defmodule Bilimbi.Base.Grid.PerformanceTest do
   @moduledoc """
-  Query timings over a synthetic set: many root rows, walked columns through
-  one-links, and rollups through many-links, measured as the grid runs them.
-  Excluded by default; run with `mix test --include performance`.
+  Timings over a synthetic set, measured as a list page runs them: walked
+  columns and rollups attached to one page of rows the page already has,
+  the range of the numeric ones over every root row (what a bar or a band
+  scales to), and one rollup expanded. Excluded by default; run with
+  `mix test --include performance`.
   """
 
   use Bilimbi.Base.Database.DataCase, async: false
@@ -110,61 +112,49 @@ defmodule Bilimbi.Base.Grid.PerformanceTest do
     {micros / 1000, result}
   end
 
-  test "windows over 20,000 rows with up to 100 walked and rolled-up columns", ctx do
+  test "a page of rows with up to 100 walked and rolled-up columns, over 20,000 root rows", ctx do
     IO.puts(
       "\n=== grid performance: #{@orders} orders, #{@customers} customers, #{@orders * @lines_per_order} lines ==="
     )
+
+    page = Enum.to_list(1..25)
+    largest_page = Enum.to_list(1..300)
 
     for count <- [5, 20, 50, 100] do
       {:ok, columns} =
         Grid.resolve(ctx.catalog, ctx.orders, specs(ctx.catalog, ctx.orders, count))
 
-      distinct = length(columns)
+      rollups = Enum.filter(columns, &(&1.kind == :rollup and &1.agg in [:count, :sum]))
 
-      {full_ms, full} = time(fn -> Grid.query(ctx.catalog, ctx.orders, columns, limit: 50) end)
+      {page_ms, attached} = time(fn -> Grid.attach(ctx.catalog, ctx.orders, page, columns) end)
 
-      {carpet_ms, carpet} =
+      {largest_ms, largest} =
+        time(fn -> Grid.attach(ctx.catalog, ctx.orders, largest_page, columns) end)
+
+      {lensed_ms, _} =
         time(fn ->
-          Grid.query(ctx.catalog, ctx.orders, columns, limit: 2000, stats: false, cost: false)
-        end)
-
-      {sorted_ms, _} =
-        time(fn ->
-          Grid.query(ctx.catalog, ctx.orders, columns,
-            limit: 50,
-            sort: {Enum.at(columns, 8), :desc},
-            stats: false,
-            cost: false
+          Grid.attach(ctx.catalog, ctx.orders, page, columns,
+            trend: Enum.take(rollups, 2),
+            delta: {Enum.take(rollups, 2), ~N[2026-06-01 00:00:00]}
           )
         end)
 
-      {search_ms, _} =
-        time(fn ->
-          Grid.query(ctx.catalog, ctx.orders, columns,
-            limit: 50,
-            search: "Order 12",
-            stats: false,
-            cost: false
-          )
-        end)
+      {stats_ms, {stats, cost}} = time(fn -> Grid.stats(ctx.catalog, ctx.orders, columns) end)
 
       IO.puts(
-        "columns=#{distinct} rows=#{full.total_entries} | page of 50 with stats+explain: #{Float.round(full_ms, 1)} ms " <>
-          "(cost #{trunc(full.cost || 0)}) | window of 2000: #{Float.round(carpet_ms, 1)} ms | sorted by rollup: #{Float.round(sorted_ms, 1)} ms | search: #{Float.round(search_ms, 1)} ms"
+        "columns=#{length(columns)} | attach to a page of 25: #{Float.round(page_ms, 1)} ms | " <>
+          "to a page of 300: #{Float.round(largest_ms, 1)} ms | " <>
+          "25 with two trends and two changes: #{Float.round(lensed_ms, 1)} ms | " <>
+          "range of #{map_size(stats)} numeric columns over #{@orders} rows: " <>
+          "#{Float.round(stats_ms, 1)} ms (cost #{trunc(cost || 0)})"
       )
 
-      assert full.total_entries == @orders
-      assert length(carpet.rows) == 2000
+      assert map_size(attached) == 25
+      assert map_size(largest) == 300
     end
 
-    {:ok, [count_column | _] = columns} =
+    {:ok, [count_column | _]} =
       Grid.resolve(ctx.catalog, ctx.orders, ~w(lines:count customer.country.name))
-
-    {attach_ms, values} =
-      time(fn -> Grid.attach(ctx.catalog, ctx.orders, Enum.to_list(1..300), columns) end)
-
-    IO.puts("attach 2 walked columns to 300 listed rows: #{Float.round(attach_ms, 1)} ms")
-    assert map_size(values) == 300
 
     {expand_ms, {:ok, rows}} =
       time(fn -> Grid.expand(ctx.catalog, ctx.orders, 17, count_column) end)

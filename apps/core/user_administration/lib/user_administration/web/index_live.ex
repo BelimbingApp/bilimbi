@@ -46,8 +46,10 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     }
   ]
 
-  # Column, lens and zoom operations rearrange the reading of the list; the
-  # page writes nothing through them.
+  # Column, lens and density operations rearrange the reading of the list. What
+  # they keep is the signed-in account's own arrangement of this page, a
+  # self-service setting as the dashboard layout is, not an administration
+  # write.
   @write_guard_opt_out ~w(grid)
 
   embed_templates("index_live/*")
@@ -63,7 +65,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:pending_delete, nil)
      |> assign(:role_options, role_options(scope))
-     |> assign(:columns, PageColumns.mount(scope, "users", @builtins))}
+     |> assign(:columns, PageColumns.mount(socket.assigns.current_scope, "users", @builtins))}
   end
 
   @impl true
@@ -110,7 +112,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   # PageColumns turns it into a URL change, a state update, or a sort this
   # page already knows how to do.
   def handle_event("grid", params, socket) do
-    case PageColumns.handle(socket.assigns.columns, params, "users") do
+    case PageColumns.handle(socket.assigns.columns, params) do
       {:patch, columns} ->
         {:noreply, push_patch(socket, to: users_path(socket.assigns.index_state, columns))}
 
@@ -119,12 +121,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
 
       {:sort, key} ->
         handle_event("sort", %{"sort" => key}, socket)
-
-      {:window, event, payload} ->
-        {:noreply, push_event(socket, event, payload)}
-
-      {:reply, text} ->
-        {:reply, %{text: text}, socket}
 
       :noop ->
         {:noreply, socket}
@@ -270,19 +266,9 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
         )
         |> assign(
           :columns,
-          PageColumns.load(socket.assigns.columns, page.entries, & &1.id, &builtin_cells/1)
+          PageColumns.load(socket.assigns.columns, page.entries, & &1.id)
         )
     end
-  end
-
-  defp builtin_cells(user) do
-    %{
-      "name" => user.name,
-      "email" => user.email,
-      "company_name" => user.company_name,
-      "roles" => Enum.map(user.roles, & &1.name),
-      "created_at" => user.created_at
-    }
   end
 
   defp state_from_params(params) do

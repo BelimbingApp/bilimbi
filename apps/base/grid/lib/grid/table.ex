@@ -7,10 +7,7 @@ defmodule Bilimbi.Base.Grid.Table do
   of its rows, checked before a path may touch the table. `source` implements
   `Bilimbi.Base.Grid.Source`. `key` names the field that identifies a row,
   `label_field` the one that names it to a person, and `time_field` the one a
-  rollup orders by for "latest" and buckets by for a trend. `record_kind` is
-  the stable module id whose workspace facts (`Bilimbi.Base.UI.Workspace`)
-  name a row of this table by its key, such as `"core/company"` for
-  `companies`; a module has at most one such table.
+  rollup orders by for "latest" and buckets by for a trend.
   """
 
   alias Bilimbi.Base.Grid.Field
@@ -24,7 +21,6 @@ defmodule Bilimbi.Base.Grid.Table do
     :key,
     :label_field,
     :time_field,
-    :record_kind,
     :fields,
     :links
   ]
@@ -38,7 +34,6 @@ defmodule Bilimbi.Base.Grid.Table do
             key: nil,
             label_field: nil,
             time_field: nil,
-            record_kind: nil,
             fields: %{},
             field_order: [],
             links: %{},
@@ -53,7 +48,6 @@ defmodule Bilimbi.Base.Grid.Table do
           key: String.t(),
           label_field: String.t() | nil,
           time_field: String.t() | nil,
-          record_kind: String.t() | nil,
           fields: %{String.t() => Field.t()},
           field_order: [String.t()],
           links: %{String.t() => Link.t()},
@@ -130,7 +124,6 @@ defmodule Bilimbi.Base.Grid.Table do
       key: key,
       label_field: Map.get(attrs, :label_field),
       time_field: Map.get(attrs, :time_field),
-      record_kind: record_kind!(attrs, id, owner),
       fields: field_map,
       field_order: field_ids,
       owner: owner
@@ -164,26 +157,6 @@ defmodule Bilimbi.Base.Grid.Table do
   @doc "The field that identifies a row."
   @spec key_field(t()) :: Field.t()
   def key_field(%__MODULE__{} = table), do: Map.fetch!(table.fields, table.key)
-
-  defp record_kind!(attrs, id, owner) do
-    case Map.get(attrs, :record_kind) do
-      nil ->
-        nil
-
-      kind when is_binary(kind) ->
-        if Regex.match?(~r{\A[a-z][a-z0-9_]*/[a-z][a-z0-9_]*\z}, kind),
-          do: kind,
-          else:
-            invalid!(owner, attrs, "table #{id} record_kind #{inspect(kind)} is not a module id")
-
-      other ->
-        invalid!(
-          owner,
-          attrs,
-          "table #{id} record_kind must be a module id, got #{inspect(other)}"
-        )
-    end
-  end
 
   defp fetch_string!(attrs, key, owner) do
     case Map.get(attrs, key) do

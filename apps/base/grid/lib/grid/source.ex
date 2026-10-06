@@ -10,9 +10,12 @@ defmodule Bilimbi.Base.Grid.Source do
   because only the owner knows where the tenant lives on its table, and it
   never reads a table whose owner did not declare it.
 
-  `query/1` only builds the query; it must not read the database. The
-  catalog calls it at boot, before any tenant or migration exists, to learn
-  the keys the query selects.
+  `query/1` is called only for a real scope, never at boot. A table whose
+  rows are bounded by another module's facts asks that module's public API
+  for them and filters on the answer, as the users source asks Company for
+  the tenant's company ids; it does not compose the other module's query
+  into its own. The keys the query selects must not depend on the scope:
+  the catalog reads them once per source and keeps them.
 
   The query must expose every declared field under the column named in the
   field declaration, either by selecting the schema struct (the default) or

@@ -60,8 +60,10 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
     }
   ]
 
-  # Column, lens and zoom operations rearrange the reading of the list; the
-  # page writes nothing through them.
+  # Column, lens and density operations rearrange the reading of the list. What
+  # they keep is the signed-in account's own arrangement of this page, a
+  # self-service setting as the dashboard layout is, not an administration
+  # write.
   @write_guard_opt_out ~w(grid)
 
   @impl true
@@ -78,7 +80,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
      |> assign(:filters_form, ListState.filters_form(state))
      |> assign(
        :columns,
-       PageColumns.mount(socket.assigns.current_scope.scope, "companies", @builtins)
+       PageColumns.mount(socket.assigns.current_scope, "companies", @builtins)
      )}
   end
 
@@ -106,7 +108,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   end
 
   def handle_event("grid", params, socket) do
-    case PageColumns.handle(socket.assigns.columns, params, "companies") do
+    case PageColumns.handle(socket.assigns.columns, params) do
       {:patch, columns} ->
         {:noreply, push_patch(socket, to: companies_path(socket.assigns.index_state, columns))}
 
@@ -115,12 +117,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
       {:sort, key} ->
         handle_event("sort", %{"sort" => key}, socket)
-
-      {:window, event, payload} ->
-        {:noreply, push_event(socket, event, payload)}
-
-      {:reply, text} ->
-        {:reply, %{text: text}, socket}
 
       :noop ->
         {:noreply, socket}
@@ -159,7 +155,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           |> assign(:filters_form, ListState.filters_form(state))
           |> assign(
             :columns,
-            PageColumns.load(socket.assigns.columns, page.entries, & &1.id, &builtin_cells/1)
+            PageColumns.load(socket.assigns.columns, page.entries, & &1.id)
           )
         end
 
@@ -170,19 +166,9 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
         |> assign(:companies_page, empty_page())
         |> assign(
           :columns,
-          PageColumns.load(socket.assigns.columns, [], & &1.id, &builtin_cells/1)
+          PageColumns.load(socket.assigns.columns, [], & &1.id)
         )
     end
-  end
-
-  defp builtin_cells(company) do
-    %{
-      "name" => company.name,
-      "code" => company.code,
-      "parent_name" => company.parent_name,
-      "status" => company.status,
-      "jurisdiction" => company.jurisdiction
-    }
   end
 
   defp listed(page, id), do: Enum.find(page.entries, &(&1.id == id))
@@ -397,13 +383,13 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               columns={@columns.column_views}
               rows={@columns.rows}
               mode={@columns.mode}
-              zoom={@columns.view.zoom}
-              sort_by={to_string(@index_state.sort_by)}
-              sort_dir={PageColumns.sort_dir(@index_state.sort_dir)}
+              sort_by={@index_state.sort_by}
+              sort_dir={@index_state.sort_dir}
               suggestions={@columns.suggestions}
               add_query={@columns.add_query}
-              total={@columns.total}
               expanded={@columns.expanded}
+              cost={@columns.cost}
+              since={@columns.since}
               row_id={&"companies-#{&1}"}
               caption="Companies"
             >
@@ -422,7 +408,10 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
                   {company.name}
                 </.record_link>
                 <span
-                  :if={company.legal_name && company.legal_name != company.name}
+                  :if={
+                    @columns.mode == :normal and company.legal_name != nil and
+                      company.legal_name != company.name
+                  }
                   class="block text-xs text-ink-subtle"
                 >
                   {company.legal_name}

@@ -123,6 +123,25 @@ defmodule Bilimbi.Base.Grid.TestSources do
     def query(_scope), do: nil
   end
 
+  defmodule ReadsDatabase do
+    @moduledoc """
+    A source that reads the database while it builds its query, as a table
+    bounded by another module's facts does. The table it reads is never
+    created, which is the state of every table before the first migration.
+    """
+    @behaviour Bilimbi.Base.Grid.Source
+
+    import Ecto.Query
+
+    alias Bilimbi.Base.Repo
+
+    @impl true
+    def query(_scope) do
+      ids = Repo.all(from(b in "grid_test_never_migrated", select: b.owner_id))
+      from(o in "grid_test_orders", where: o.id in ^ids, select: %{id: o.id, label: o.label})
+    end
+  end
+
   @doc "The `:grid` payload declaring the test domain."
   def tables do
     %{
@@ -133,7 +152,6 @@ defmodule Bilimbi.Base.Grid.TestSources do
           capability: "admin.test.order.view",
           source: Orders,
           key: "id",
-          record_kind: "test/order",
           label_field: "label",
           time_field: "placed_at",
           fields: [
@@ -162,7 +180,6 @@ defmodule Bilimbi.Base.Grid.TestSources do
           capability: "admin.test.customer.view",
           source: Customers,
           key: "id",
-          record_kind: "test/customer",
           label_field: "name",
           fields: [
             %{id: "id", label: "ID", type: :integer},

@@ -110,32 +110,94 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     assert URI.decode_query(URI.parse(path).query)["cols"] == "name"
   end
 
-  test "zooming out draws the page's rows on the canvas and serves them as a window", %{
-    conn: conn
-  } do
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users?cols=name%2Cemail&z=3")
+  test "one toggle switches the list between normal and compact rows", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
-    assert has_element?(view, "#users-canvas")
+    assert has_element?(view, "#users[data-mode='normal']")
+    assert has_element?(view, "#users-density[aria-pressed='false']")
+
+    view |> element("#users-density") |> render_click()
+    path = assert_patch(view)
+    assert URI.decode_query(URI.parse(path).query)["density"] == "compact"
+
+    # Compact is the same table: the rows, their links and the sort stay.
+    assert has_element?(view, "#users[data-mode='compact']")
+    assert has_element?(view, "#users-density[aria-pressed='true']")
+    assert has_element?(view, "#user-91 #user-91-show", "Ada Lovelace")
+    assert has_element?(view, "#users-sort-name")
     assert has_element?(view, "#users-pagination")
 
-    render_hook(view, "grid", %{
-      "op" => "window",
-      "id" => "users",
-      "offset" => 0,
-      "limit" => 50,
-      "detail" => "text"
+    view |> element("#users-density") |> render_click()
+    path = assert_patch(view)
+    refute Map.has_key?(URI.decode_query(URI.parse(path).query || ""), "density")
+    assert has_element?(view, "#users[data-mode='normal']")
+  end
+
+  test "the list opens the way the account left it, and an address that names columns wins",
+       %{conn: conn} do
+    conn = log_in_as(conn)
+    {:ok, view, _html} = live(conn, ~p"/users")
+
+    view |> form("#users-add-column", %{add: "parent"}) |> render_change()
+    view |> element("#users-suggest-company-parent-name") |> render_click()
+    assert_patch(view)
+    view |> element("#users-density") |> render_click()
+    assert_patch(view)
+
+    # A later visit to the bare address: the walked column and the density
+    # are back without the address saying so.
+    {:ok, later, _html} = live(conn, ~p"/users")
+    assert has_element?(later, "#users-chip-company-parent-name")
+    assert has_element?(later, "#users-cell-92-company-parent-name", "Bilimbi Industries")
+    assert has_element?(later, "#users[data-mode='compact']")
+
+    # The page's own controls carry the arrangement into the address.
+    later |> element("#users-sort-name") |> render_click()
+    query = URI.decode_query(URI.parse(assert_patch(later)).query)
+    assert query["cols"] =~ "company.parent.name" and query["density"] == "compact"
+
+    # A shared link says what to show, and opening it changes nothing kept.
+    {:ok, linked, _html} = live(conn, ~p"/users?cols=name")
+    assert has_element?(linked, "#users-chip-name")
+    refute has_element?(linked, "#users-chip-email")
+    refute has_element?(linked, "#users-chip-company-parent-name")
+    assert has_element?(linked, "#users[data-mode='normal']")
+
+    {:ok, again, _html} = live(conn, ~p"/users")
+    assert has_element?(again, "#users-chip-company-parent-name")
+    assert has_element?(again, "#users[data-mode='compact']")
+
+    # Going back to the page's own columns and rows forgets the arrangement.
+    again |> element("#users-remove-company-parent-name") |> render_click()
+    assert_patch(again)
+    again |> element("#users-density") |> render_click()
+    query = URI.decode_query(URI.parse(assert_patch(again)).query)
+    refute Map.has_key?(query, "cols") or Map.has_key?(query, "density")
+
+    {:ok, reset, _html} = live(conn, ~p"/users")
+    refute has_element?(reset, "#users-chip-company-parent-name")
+    assert has_element?(reset, "#users-chip-email")
+    assert has_element?(reset, "#users[data-mode='normal']")
+  end
+
+  test "an arrangement belongs to the account that made it", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+    view |> element("#users-density") |> render_click()
+    assert_patch(view)
+
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: 73,
+      name: "Colleague",
+      email: "colleague@example.com"
     })
 
-    assert_push_event(view, "users:window", %{total: 2, rows: rows})
+    grant_capabilities!(~w(admin.user.list admin.company.list), user_id: 96)
 
-    assert [
-             [
-               91,
-               [["Ada Lovelace", nil, nil, nil, nil], ["ada@example.com", nil, nil, nil, nil]]
-             ],
-             [92, _]
-           ] =
-             rows
+    {:ok, theirs, _html} =
+      conn |> log_in_as(%{"user_id" => 96, "company_id" => 73}) |> live(~p"/users")
+
+    assert has_element?(theirs, "#users[data-mode='normal']")
   end
 
   test "an account whose catalog lacks the walked table still sees its list", %{conn: conn} do

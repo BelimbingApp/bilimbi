@@ -25,12 +25,7 @@ defmodule Bilimbi.Base.UI.Workspace do
       id that owns the record (`"core/company"`), the same vocabulary
       descriptors and menu items use;
     * `{:workspace_follows, kinds}` from the host: the kinds some tile
-      follows, sent on every change and after every join;
-    * `{:workspace_page_follows, pid, kinds}` from a page that follows
-      kinds itself, sent by `follow/2`: a grid that refilters to the
-      selected record rather than a record page that navigates to it. The
-      host counts those kinds among the followed ones for as long as the
-      page process lives, and hands such a page the facts of its kinds.
+      follows, sent on every change and after every join.
 
   A page opts in with `<.record_link>` for a row and `announce/2` at mount.
   Both read the page's `@workspace` assign, which `on_mount/4` sets to
@@ -51,12 +46,7 @@ defmodule Bilimbi.Base.UI.Workspace do
   @kind ~r{\A[a-z][a-z0-9_]*/[a-z][a-z0-9_]*\z}
 
   @typedoc "What a page in a tile knows about its workspace."
-  @type t :: %{
-          token: String.t(),
-          topic: String.t(),
-          follows: [String.t()],
-          following: [String.t()]
-        }
+  @type t :: %{token: String.t(), topic: String.t(), follows: [String.t()]}
 
   @typedoc "A record a page opened or selected."
   @type fact :: %{kind: String.t(), id: pos_integer() | String.t()}
@@ -210,7 +200,7 @@ defmodule Bilimbi.Base.UI.Workspace do
 
       {:cont,
        socket
-       |> assign(:workspace, %{token: token, topic: topic, follows: [], following: []})
+       |> assign(:workspace, %{token: token, topic: topic, follows: []})
        |> LiveView.attach_hook(:workspace_follows, :handle_info, &handle_info/2)
        |> LiveView.attach_hook(:workspace_select, :handle_event, &handle_event/3)}
     else
@@ -218,34 +208,14 @@ defmodule Bilimbi.Base.UI.Workspace do
     end
   end
 
-  # The host published the followed kinds, which it does after every join
-  # too: a page that follows kinds itself says so again, so a host that
-  # mounted after the page still counts them.
   defp handle_info({:workspace_follows, kinds}, socket) when is_list(kinds) do
     workspace = %{socket.assigns.workspace | follows: Enum.filter(kinds, &kind?/1)}
-
-    if workspace.following != [],
-      do: broadcast(workspace.topic, {:workspace_page_follows, self(), workspace.following})
-
     {:halt, assign(socket, :workspace, workspace)}
   end
 
   defp handle_info({:workspace_follows, _kinds}, socket), do: {:halt, socket}
   defp handle_info({:workspace_joined}, socket), do: {:halt, socket}
-
-  # A fact of a kind the page follows itself reaches the page's own
-  # `handle_info/2`; every other fact stays here.
-  defp handle_info({:workspace_fact, fact}, socket) do
-    with %{following: following} when following != [] <- socket.assigns.workspace,
-         true <- fact?(fact),
-         true <- fact.kind in following do
-      {:cont, socket}
-    else
-      _other -> {:halt, socket}
-    end
-  end
-
-  defp handle_info({:workspace_page_follows, _pid, _kinds}, socket), do: {:halt, socket}
+  defp handle_info({:workspace_fact, _fact}, socket), do: {:halt, socket}
   defp handle_info(_message, socket), do: {:cont, socket}
 
   defp handle_event("workspace:select", %{"kind" => kind, "id" => id} = params, socket) do
@@ -284,29 +254,6 @@ defmodule Bilimbi.Base.UI.Workspace do
     end
 
     socket
-  end
-
-  @doc """
-  Makes the page follow `kinds` itself: the host counts them among the
-  followed kinds while the page lives, list rows of those kinds select
-  rather than navigate, and the facts of those kinds reach the page's own
-  `handle_info/2` as `{:workspace_fact, %{kind: kind, id: id}}`. An empty
-  list stops following. A page outside a workspace is unchanged.
-  """
-  @spec follow(LiveView.Socket.t(), [String.t()]) :: LiveView.Socket.t()
-  def follow(%LiveView.Socket{} = socket, kinds) when is_list(kinds) do
-    case socket.assigns[:workspace] do
-      %{topic: topic} = workspace ->
-        following = kinds |> Enum.filter(&kind?/1) |> Enum.uniq()
-
-        if LiveView.connected?(socket) and following != workspace.following,
-          do: broadcast(topic, {:workspace_page_follows, self(), following})
-
-        assign(socket, :workspace, %{workspace | following: following})
-
-      _outside ->
-        socket
-    end
   end
 
   @doc """

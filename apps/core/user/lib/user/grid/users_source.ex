@@ -17,10 +17,14 @@ defmodule Bilimbi.Core.User.Grid.UsersSource do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User.Schema
 
+  # Company owns `companies`, so the tenant's company ids come from its
+  # public API and this statement reads only `users`.
   @impl true
   def query(scope) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
     from(u in Schema,
-      where: u.company_id in subquery(Company.tenant_company_ids_query(scope)),
+      where: u.company_id in ^company_ids,
       select: %{
         id: u.id,
         company_id: u.company_id,

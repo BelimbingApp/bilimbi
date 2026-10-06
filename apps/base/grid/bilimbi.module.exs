@@ -8,14 +8,13 @@
   dependencies: [
     "base/authz",
     "base/database",
-    "base/menu",
     "base/module_registry",
     "base/settings",
     "base/tenancy",
     "base/ui"
   ],
   migrations: nil,
-  web: "priv/web_routes.exs",
+  web: nil,
   schema_contract: nil,
   contribution_provider: Bilimbi.Base.Grid.Contributions,
   dev_seed: nil

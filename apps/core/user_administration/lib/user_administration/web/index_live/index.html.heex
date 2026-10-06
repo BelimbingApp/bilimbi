@@ -53,20 +53,25 @@
           columns={@columns.column_views}
           rows={@columns.rows}
           mode={@columns.mode}
-          zoom={@columns.view.zoom}
           sort_by={@index_state.sort_by}
-          sort_dir={PageColumns.sort_dir(@index_state.sort_dir)}
+          sort_dir={@index_state.sort_dir}
           suggestions={@columns.suggestions}
           add_query={@columns.add_query}
-          total={@columns.total}
           expanded={@columns.expanded}
+          cost={@columns.cost}
+          since={@columns.since}
           row_id={&"user-#{&1}"}
           caption="Workspace users"
         >
           <:col :let={%{key: id}} id="name">
             <% user = listed(@users_page, id) %>
+            <%!-- The initials are taller than a compact row, so they stay with
+                 the normal one. --%>
             <div class="flex items-center gap-3">
-              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
+              <span
+                :if={@columns.mode == :normal}
+                class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink"
+              >
                 {initials(user.name)}
               </span>
               <.record_link

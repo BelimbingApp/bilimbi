@@ -17,17 +17,13 @@ defmodule Bilimbi.Base.Grid do
 
   alias Bilimbi.Base.Grid.Catalog
   alias Bilimbi.Base.Grid.Column
-  alias Bilimbi.Base.Grid.Lens
   alias Bilimbi.Base.Grid.Query
-  alias Bilimbi.Base.Grid.Result
   alias Bilimbi.Base.Grid.Table
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Scope
 
-  import Ecto.Query, only: [limit: 2, offset: 2, join: 5, select: 3, select_merge: 2, dynamic: 2]
+  import Ecto.Query, only: [limit: 2, join: 5, select: 3, select_merge: 2, dynamic: 2]
 
-  @default_limit 50
-  @max_limit 5000
   @expand_limit 50
 
   @doc "The catalog this scope may read."
@@ -38,147 +34,14 @@ defmodule Bilimbi.Base.Grid do
   @spec fetch_table(Catalog.t(), String.t()) :: {:ok, Table.t()} | :error
   defdelegate fetch_table(catalog, id), to: Catalog
 
-  @doc "The visible tables, by label."
-  @spec tables(Catalog.t()) :: [Table.t()]
-  defdelegate tables(catalog), to: Catalog
-
   @doc "Resolves column specs against a root table; see `Bilimbi.Base.Grid.Column`."
   @spec resolve(Catalog.t(), Table.t(), [String.t()]) ::
           {:ok, [Column.t()]} | {:error, {String.t(), term()}}
   defdelegate resolve(catalog, root, specs), to: Catalog, as: :resolve_all
 
-  @doc "The columns a table starts with: its own visible fields."
-  @spec default_columns(Catalog.t(), Table.t()) :: [Column.t()]
-  defdelegate default_columns(catalog, root), to: Catalog
-
   @doc "Columns a person could add, ranked against what they typed."
   @spec suggest(Catalog.t(), Table.t(), String.t(), keyword()) :: [Column.t()]
   defdelegate suggest(catalog, root, text, opts \\ []), to: Catalog
-
-  @doc """
-  Runs the grid: a window of rows, the total, the value range of every
-  numeric column, and the planner's cost estimate.
-
-  Options: `:offset` and `:limit` (at most #{@max_limit}) choose the window,
-  `:sort` a `{column, :asc | :desc}` pair, `:search` text matched against the
-  root's searchable fields, `:focus` a `{:root | column, key}` pair that keeps
-  only the rows reaching one record (see `focus_column/3`), `:trend` the
-  rollup columns whose last twelve months come back as a `series`, `:delta`
-  a `{columns, since}` pair whose aggregate as of `since` comes back as
-  `before`, and `:stats`,
-  `:cost` and `:count` (each default
-  true) switch the extra statements off when a caller does not show them or
-  already holds the total; with `count: false` the result's `total_entries`
-  is the `:total` option, or 0.
-  """
-  @spec query(Catalog.t(), Table.t(), [Column.t()], keyword()) :: Result.t()
-  def query(%Catalog{} = catalog, %Table{} = root, columns, opts \\ []) when is_list(columns) do
-    limit = opts |> Keyword.get(:limit, @default_limit) |> max(1) |> min(@max_limit)
-    offset = opts |> Keyword.get(:offset, 0) |> max(0)
-    {sort_column, dir} = Keyword.get(opts, :sort, {nil, :asc})
-
-    focus = Keyword.get(opts, :focus)
-
-    plan =
-      Query.plan(catalog, root, columns,
-        extra: focus_columns(focus),
-        trend: Keyword.get(opts, :trend, []),
-        delta: Keyword.get(opts, :delta)
-      )
-
-    base =
-      plan.query
-      |> Query.search(root, Keyword.get(opts, :search))
-      |> focus_rows(plan, focus)
-
-    rows_query =
-      base
-      |> Query.select_rows(plan)
-      |> Query.order(plan, sort_column, dir)
-      |> limit(^limit)
-      |> offset(^offset)
-
-    %Result{
-      columns: columns,
-      rows: rows_query |> Repo.all() |> Query.rows(plan),
-      total_entries:
-        if(Keyword.get(opts, :count, true),
-          do: Query.count(base, plan),
-          else: Keyword.get(opts, :total, 0)
-        ),
-      offset: offset,
-      limit: limit,
-      stats: if(Keyword.get(opts, :stats, true), do: Query.stats(base, plan), else: %{}),
-      cost: if(Keyword.get(opts, :cost, true), do: Query.estimated_cost(rows_query), else: nil)
-    }
-  end
-
-  defp focus_columns({%Column{} = column, _id}), do: [column]
-  defp focus_columns(_focus), do: []
-
-  defp focus_rows(query, plan, {:root, id}), do: Query.focus(query, plan, :root, id)
-  defp focus_rows(query, plan, {%Column{} = column, id}), do: Query.focus(query, plan, column, id)
-  defp focus_rows(query, _plan, _focus), do: query
-
-  @doc """
-  What a grid follows for a selected record of `kind`: `{:root, key_field}`
-  when the root table records that kind, or `{column, key_field}` for the
-  one-link `follow` whose target does, the column being that target's key
-  reached through the link. `:error` when neither holds, so a follow
-  written into a URL for another table means nothing here.
-
-  A selected key arrives as text; `key_field` tells the caller how to read
-  it before passing it as `focus:`.
-  """
-  @spec focus_column(Catalog.t(), Table.t(), String.t()) ::
-          {:ok, :root | Column.t(), Bilimbi.Base.Grid.Field.t(), String.t()} | :error
-  def focus_column(%Catalog{}, %Table{record_kind: kind} = root, "self") when is_binary(kind) do
-    {:ok, :root, Table.key_field(root), kind}
-  end
-
-  def focus_column(%Catalog{} = catalog, %Table{} = root, follow) when is_binary(follow) do
-    with %{kind: :one, to: to} <- Map.get(root.links, follow),
-         {:ok, %Table{record_kind: kind} = target} when is_binary(kind) <-
-           fetch_table(catalog, to),
-         {:ok, [column]} <- resolve(catalog, root, ["#{follow}.#{target.key}"]) do
-      {:ok, column, Table.key_field(target), kind}
-    else
-      _other -> :error
-    end
-  end
-
-  def focus_column(%Catalog{}, %Table{}, _follow), do: :error
-
-  @doc """
-  The ways this grid can follow a workspace selection: `"self"` when the
-  root table records a kind, and each one-link whose target does, with the
-  kind followed and the label to offer.
-  """
-  @spec follow_options(Catalog.t(), Table.t()) :: [
-          %{follow: String.t(), kind: String.t(), label: String.t()}
-        ]
-  def follow_options(%Catalog{} = catalog, %Table{} = root) do
-    own =
-      if root.record_kind,
-        do: [%{follow: "self", kind: root.record_kind, label: root.label}],
-        else: []
-
-    linked =
-      root
-      |> Table.links()
-      |> Enum.filter(&(&1.kind == :one))
-      |> Enum.flat_map(fn link ->
-        case fetch_table(catalog, link.to) do
-          {:ok, %Table{record_kind: kind}} when is_binary(kind) ->
-            [%{follow: link.id, kind: kind, label: link.label}]
-
-          _other ->
-            []
-        end
-      end)
-
-    own ++ linked
-  end
 
   @doc """
   The cells of `columns` for the root rows with these keys, keyed by row key.
@@ -207,13 +70,18 @@ defmodule Bilimbi.Base.Grid do
     |> Map.new(&{&1.key, Map.take(&1, [:cells, :series, :before])})
   end
 
-  @doc "The value range of numeric `columns` over every root row, for scaling bars and colours."
-  @spec stats(Catalog.t(), Table.t(), [Column.t()], keyword()) ::
-          %{String.t() => %{min: term(), max: term()}}
-  def stats(%Catalog{} = catalog, %Table{} = root, columns, opts \\ []) do
-    plan = Query.plan(catalog, root, columns)
-    base = Query.search(plan.query, root, Keyword.get(opts, :search))
-    Query.stats(base, plan)
+  @doc """
+  The value range of numeric `columns` over every root row, for scaling
+  bars and colours, with the planner's estimated cost of reading it.
+
+  `attach/5` and `expand/4` read for one page of rows or one row; this is
+  the statement that reads the whole table, so a caller shows its cost when
+  it is heavy.
+  """
+  @spec stats(Catalog.t(), Table.t(), [Column.t()]) ::
+          {%{String.t() => %{min: term(), max: term()}}, float() | nil}
+  def stats(%Catalog{} = catalog, %Table{} = root, columns) when is_list(columns) do
+    catalog |> Query.plan(root, columns) |> Query.stats()
   end
 
   @doc """
@@ -317,147 +185,4 @@ defmodule Bilimbi.Base.Grid do
       :error -> raise ArgumentError, "table #{inspect(id)} is not in this catalog"
     end
   end
-
-  @max_pivot_values 24
-  @max_pivot_pairs 5000
-
-  @doc """
-  Pivots the grid: one row per distinct value of `rows_column`, one column
-  per distinct value of `across_column` (the first #{@max_pivot_values} by
-  name, the rest folded into "Other"), each cell the number of root rows
-  with both values, plus a total. One GROUP BY statement over the same
-  joined plan, reading at most `:max_pairs` pairs (#{@max_pivot_pairs} by
-  default); `:search` and `:focus` narrow it as they narrow the grid. The result's first column
-  (`pv-rows`) names each row's value; the rest are counts. Its rows are
-  keyed by the row value's text, its stats over every count so a band or a
-  bar scales to the whole pivot, `more` whether the bound left row values
-  out, and `cost` the planner's estimate for the statement.
-  """
-  @spec pivot(Catalog.t(), Table.t(), Column.t(), Column.t(), keyword()) :: %{
-          columns: [map()],
-          rows: [%{key: String.t(), cells: %{String.t() => term()}}],
-          total_entries: non_neg_integer(),
-          stats: %{String.t() => %{min: term(), max: term()}},
-          more: boolean(),
-          cost: float() | nil
-        }
-  def pivot(
-        %Catalog{} = catalog,
-        %Table{} = root,
-        %Column{} = rows_column,
-        %Column{} = across_column,
-        opts \\ []
-      ) do
-    focus = Keyword.get(opts, :focus)
-    plan = Query.plan(catalog, root, [rows_column, across_column], extra: focus_columns(focus))
-
-    base =
-      plan.query
-      |> Query.search(root, Keyword.get(opts, :search))
-      |> focus_rows(plan, focus)
-
-    max_pairs = Keyword.get(opts, :max_pairs, @max_pivot_pairs)
-    statement = Query.pivot_counts(base, plan, rows_column, across_column, max_pairs + 1)
-    {triples, more} = bounded_pairs(Repo.all(statement), max_pairs)
-
-    across_values =
-      triples |> Enum.map(&Lens.text(&1.across, across_column)) |> Enum.uniq() |> Enum.sort()
-
-    {shown, folded} = Enum.split(across_values, @max_pivot_values)
-    other? = folded != []
-
-    count_columns =
-      Enum.with_index(shown, fn value, index ->
-        pivot_column("pv-#{index}", if(value == "", do: "—", else: value), across_column)
-      end) ++
-        if(other?, do: [pivot_column("pv-other", "Other", across_column)], else: []) ++
-        [pivot_column("pv-total", "Total", across_column)]
-
-    index_of =
-      shown |> Enum.with_index() |> Map.new(fn {value, index} -> {value, "pv-#{index}"} end)
-
-    rows =
-      triples
-      |> Enum.group_by(&Lens.text(&1.rows, rows_column))
-      |> Enum.map(fn {row_text, group} ->
-        counts =
-          Enum.reduce(group, %{}, fn triple, acc ->
-            id = Map.get(index_of, Lens.text(triple.across, across_column), "pv-other")
-            Map.update(acc, id, triple.count, &(&1 + triple.count))
-          end)
-
-        label = if(row_text == "", do: "—", else: row_text)
-
-        cells =
-          count_columns
-          |> Map.new(fn
-            %{id: "pv-total"} -> {"pv-total", counts |> Map.values() |> Enum.sum()}
-            %{id: id} -> {id, Map.get(counts, id, 0)}
-          end)
-          |> Map.put("pv-rows", label)
-
-        %{key: label, cells: cells}
-      end)
-      |> Enum.sort_by(& &1.key)
-
-    values =
-      Enum.flat_map(rows, fn row -> row.cells |> Map.delete("pv-rows") |> Map.values() end)
-
-    range = if values == [], do: nil, else: %{min: Enum.min(values), max: Enum.max(values)}
-
-    %{
-      columns: [rows_label_column(rows_column) | count_columns],
-      rows: rows,
-      total_entries: length(rows),
-      stats: Map.new(count_columns, &{&1.id, range}),
-      more: more,
-      cost: Query.estimated_cost(statement)
-    }
-  end
-
-  # The bound cuts the pairs in rows order, so the last row value read may
-  # be missing some of its pairs; it is left out rather than shown short.
-  defp bounded_pairs(pairs, max) when length(pairs) <= max, do: {pairs, false}
-
-  defp bounded_pairs(pairs, max) do
-    read = Enum.take(pairs, max)
-    last = List.last(read).rows
-    {Enum.reject(read, &(&1.rows == last)), true}
-  end
-
-  defp rows_label_column(%Column{} = rows) do
-    %{
-      id: "pv-rows",
-      spec: "pv-rows",
-      label: rows.label,
-      short_label: rows.short_label,
-      type: :string,
-      kind: :field,
-      lens: :value,
-      lenses: [:value],
-      sortable: false,
-      removable: false,
-      align: nil
-    }
-  end
-
-  defp pivot_column(id, label, %Column{} = across) do
-    %{
-      id: id,
-      spec: id,
-      label: "#{across.label}: #{label}",
-      short_label: label,
-      type: :integer,
-      kind: :field,
-      lens: :value,
-      lenses: [:value],
-      sortable: false,
-      removable: false,
-      align: :right
-    }
-  end
-
-  @doc "The largest window `query/4` serves."
-  @spec max_limit() :: pos_integer()
-  def max_limit, do: @max_limit
 end

@@ -681,42 +681,50 @@ never moves for a record of another kind.
 
 ### Flexible tables
 
-A flexible table lets a person pick columns by walking links, never by
-writing a join: the add bar suggests paths (`Company › Parent company ›
-Name`) as they type, a chip per column can be dragged to reorder and
-removed, and a many-link becomes one rollup cell (a count, a sum, the
-latest value, a list) that expands its rows in place beneath the row. A
+A list page lets a person pick columns by walking links, never by writing
+a join. A many-link becomes one rollup cell (a count, a sum, the latest
+value, a list) that expands its rows in place beneath the row, and a
 walked column carries its whole path as the heading's tooltip and its last
-word as the heading, so a wide table still scans.
+word as the heading, so a wide table still scans. The page keeps its own
+search, filters, sort and pagination; the flexible table is the list
+itself, not a page beside it.
+
+The table carries no bar. Two small icon buttons sit side by side in the
+corner of its header and stay there when the table scrolls sideways: the
+density toggle, and a settings icon named "Customize table" that opens
+**table customization**. That panel holds a chip per column, dragged to
+reorder and removed with its ✕, each with its lens; the add-a-column box,
+which suggests paths (`Company › Parent company › Name`) as the person
+types; and the comparison date while a change-since lens is worn. It is
+closed until asked for, stays open while columns are added and removed,
+and closes on a click outside it or Escape, which returns focus to the
+icon. Arranging columns is done once and then left alone, so it does not
+take a row of the page.
 
 The same column is read through a lens: the value, a bar scaled to the
-column's range across the whole set, or a colour band. Data colour is its
-own family (`scale-1` to `scale-5` for values that order, `cat-1` to
-`cat-8` for values that only differ) and never brand, success, warning or
-danger, so a heat carpet never reads as status; a categorical band paints a
-left edge, a sequential band the cell. A bar's width is written by the hook,
-because the CSP refuses inline style.
+column's range across the whole table, a colour band, and, for a count or
+sum over dated rows, a trend (twelve months as a sparkline) or the change
+since a date. Data
+colour is its own family (`scale-1` to `scale-5` for values that order,
+`cat-1` to `cat-8` for values that only differ) and never brand, success,
+warning or danger, so a coloured cell never reads as status; a categorical
+band paints a left edge, a sequential band the cell. A bar's width is
+written by the hook, because the CSP refuses inline style.
 
-Zoom is semantic and stated in words: **Table** is the full row with links
-and actions; **Compact** shows numbers, bars and short text on a canvas;
-**Carpet** is every cell a coloured square, so thousands of rows by
-hundreds of columns fit one screen and a control-room wall. Ctrl+wheel,
-the plus and minus keys, and the three preset buttons change it; a
-dragged rectangle zooms so that it fills the viewport, back to the table
-when it is small. A hover on the canvas reads the cell's real value, and
-only the visible window is ever queried or drawn. The URL holds the whole
-view, so a reload or a shared link reopens the same grid, and a view can
-be saved under a name, shared with the company or limited to its roles,
-and opened in a workspace tile. A grouped table sorts by the grouped column
-and heads each run of equal values with the value and its count; a heading
-dropped in the pivot corner turns a grouped table into a pivot, the grouped
-values as rows and the dropped column's values as counted columns with a
-total. A count or sum over dated rows reads as a trend (twelve months as a
-sparkline) or as the change since a date, the date beside the search while
-that lens is on. Inside a workspace a grid can follow another tile's
-selection and narrows to the rows reaching it, saying so with the way back.
-A heavy statement says so in the toolbar with the planner's estimate;
-nothing is refused.
+Rows are **Normal** or **Compact**, switched by the density toggle, whose
+name stays "Compact rows" and whose pressed state says which is on. Compact is the same table with tighter rows that never wrap, so
+more rows and columns fit and the table scrolls sideways; every link, sort,
+rollup and row action works in both, and a cell's second line is left out.
+There is no third density and no row-height stepper: a height between the
+two changes nothing a reader can see.
+
+What a person arranges, the columns, their lenses and the density, is
+remembered for their account on that page with no save step, so a list
+opens the way they left it. The address says the same thing when it carries it, and wins: a
+shared link shows what its sender saw, and changes nobody's memory until
+the reader arranges something. Scaling a bar or a band reads the whole
+table; when the planner estimates that as heavy a line above the table
+says so with the estimate, and nothing is refused.
 
 ### Navigation menu conventions
 

@@ -1970,66 +1970,92 @@
                 <div>
                   <h3 class="text-sm font-semibold text-ink">Flexible table</h3>
                   <p class="text-xs text-ink-muted">
-                    Four hundred example companies with columns walked to their people
-                    and orders. Add a column from the bar, drag a chip or a heading to
-                    reorder, switch a column's lens, expand a rollup, and zoom: the
-                    table is the full mode; the second specimen opens as the carpet,
-                    where every cell is a square coloured by its value and a hover
-                    reads it. Changes stay in this preview.
+                    Example companies with columns walked to their people and orders.
+                    The two icons in the corner of the header switch between normal and
+                    compact rows and open table customization: add a column from its
+                    box, drag a chip or a heading to reorder, remove a column, switch a
+                    column's lens. Expand a rollup and sort from the table itself.
+                    Compact is the same table with tighter rows that stay on one line.
+                    Changes stay in this preview.
                   </p>
                 </div>
+                <%!-- One specimen, drawn by whichever call matches its density, so
+                     each `mode` the component takes is spelled out and is the one
+                     on screen. --%>
+                <%= if @flex_sample.density == :compact do %>
+                  <.flex_table
+                    id="sample-flex-table"
+                    columns={@flex_sample.columns}
+                    rows={@flex_rows}
+                    mode={:compact}
+                    event="sample-flex"
+                    sort_by={@flex_sample.sort_by}
+                    sort_dir={@flex_sample.sort_dir}
+                    suggestions={@flex_sample.suggestions}
+                    add_query={@flex_sample.add_query}
+                    cost={%{estimate: 32_000.0, heavy?: true}}
+                    expanded={@flex_sample.expanded}
+                    caption="Example companies as a flexible table"
+                  >
+                    <:col :let={row} id="name">
+                      <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
+                    </:col>
+                    <:action :let={row}>
+                      <.icon_button
+                        icon="view"
+                        id={"sample-flex-preview-#{row.key}"}
+                        label={"Preview #{row.cells["name"].text}"}
+                        phx-click="preview-company"
+                        phx-value-id={row.key}
+                      />
+                    </:action>
+                    <:empty title="No example companies" reason="The example set is empty." />
+                  </.flex_table>
+                <% else %>
+                  <.flex_table
+                    id="sample-flex-table"
+                    columns={@flex_sample.columns}
+                    rows={@flex_rows}
+                    mode={:normal}
+                    event="sample-flex"
+                    sort_by={@flex_sample.sort_by}
+                    sort_dir={@flex_sample.sort_dir}
+                    suggestions={@flex_sample.suggestions}
+                    add_query={@flex_sample.add_query}
+                    cost={%{estimate: 32_000.0, heavy?: true}}
+                    expanded={@flex_sample.expanded}
+                    caption="Example companies as a flexible table"
+                  >
+                    <:col :let={row} id="name">
+                      <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
+                    </:col>
+                    <:action :let={row}>
+                      <.icon_button
+                        icon="view"
+                        id={"sample-flex-preview-#{row.key}"}
+                        label={"Preview #{row.cells["name"].text}"}
+                        phx-click="preview-company"
+                        phx-value-id={row.key}
+                      />
+                    </:action>
+                    <:empty title="No example companies" reason="The example set is empty." />
+                  </.flex_table>
+                <% end %>
+                <p class="text-xs text-ink-muted">
+                  The plainest shape: every column drawn from its cell, with no row
+                  actions and no caption. It keeps its own columns and density.
+                </p>
                 <.flex_table
-                  id="sample-flex-table"
-                  columns={@flex_sample.columns}
-                  rows={@flex_rows}
-                  mode={:full}
-                  zoom={28}
-                  event="sample-flex"
-                  sort_by={@flex_sample.sort_by}
-                  sort_dir={:asc}
-                  suggestions={@flex_sample.suggestions}
-                  add_query={@flex_sample.add_query}
-                  total={12}
-                  cost={%{estimate: 32_000.0, heavy?: true}}
-                  expanded={@flex_sample.expanded}
-                  group="region"
-                  caption="Example companies as a flexible table"
-                >
-                  <:col :let={row} id="name">
-                    <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
-                  </:col>
-                  <:action :let={row}>
-                    <.icon_button
-                      icon="view"
-                      id={"sample-flex-preview-#{row.key}"}
-                      label={"Preview #{row.cells["name"].text}"}
-                      phx-click="preview-company"
-                      phx-value-id={row.key}
-                    />
-                  </:action>
-                  <:empty title="No example companies" reason="The example set is empty." />
-                </.flex_table>
-                <.flex_table
-                  id="sample-flex-mid"
-                  columns={@flex_sample.columns}
-                  rows={[]}
-                  mode={:mid}
-                  zoom={12}
-                  event="sample-flex"
-                  group="region"
-                  pivot="status"
-                  total={400}
-                />
-                <.flex_table
-                  id="sample-flex-carpet"
-                  columns={@flex_sample.columns}
-                  rows={[]}
-                  mode={:carpet}
-                  zoom={3}
-                  event="sample-flex"
-                  sort_by="code"
-                  sort_dir={:desc}
-                  total={400}
+                  id="sample-flex-plain"
+                  columns={@flex_plain.columns}
+                  rows={@flex_plain_rows}
+                  mode={@flex_plain.density}
+                  event="sample-flex-plain"
+                  sort_by={@flex_plain.sort_by}
+                  sort_dir={@flex_plain.sort_dir}
+                  suggestions={@flex_plain.suggestions}
+                  add_query={@flex_plain.add_query}
+                  expanded={@flex_plain.expanded}
                 />
               </div>
             </div>

@@ -1,9 +1,13 @@
 # Base Grid
 
-Base Grid owns flexible tables: the catalog every module declares its
-tables into, the paths a person walks through it to pick columns without
-writing a join, the one statement that answers them, and the surfaces
-that show the result at any zoom, through lenses, and as saved views.
+Base Grid owns flexible columns on list pages: the catalog every module
+declares its tables into, the paths a person walks through it to pick
+columns without writing a join, the one statement that answers them for
+the rows a list already shows, and what each account last arranged on
+each list.
+
+It has no page of its own. A table is explored on the list that already
+owns its rows, its search, its filters and its pagination.
 
 ## The model
 
@@ -24,6 +28,15 @@ and keeps the tables whose capability the actor holds. Every later call
 takes that catalog, so there is no spelling of a path that reaches a table
 the account may not read.
 
+A source's query is built only for a real scope, never at boot: the
+snapshot validates declarations without calling `query/1`, and the catalog
+learns which key of the query each field is read from the first time a
+scope may read the table, then keeps it. So a table bounded by another
+module's facts asks that module's public API while building its query (the
+users source asks Company for the tenant's company ids) and does not
+compose the other module's query into its own, and the application still
+boots on a database with no tables.
+
 A column is a spec (`Bilimbi.Base.Grid.Column`): `name`, `company.name`,
 `company.parent.name` through one-links; `employees:count`,
 `lines.qty:sum`, `tags.name:list`, `lines.sku:latest` through a many-link,
@@ -32,62 +45,66 @@ many-link, so the root row count never changes whatever is added.
 `Bilimbi.Base.Grid.Query` builds one PostgreSQL statement: a LEFT JOIN
 per one-link prefix, one grouped subquery per many-link carrying every
 aggregate over it, positional bindings and select keys so no atom is ever
-made from a typed string. `Bilimbi.Base.Grid.query/4` adds sort, search
-over the root's text fields, a window, the value range of every numeric
-column across the whole set, and the planner's cost estimate from EXPLAIN.
-`attach/4` fetches walked columns for rows a page already has; `expand/4`
-lists the rows a rollup collapsed.
+made from a typed string. `Bilimbi.Base.Grid.attach/5` runs it for the
+rows a page already lists, by key; `expand/4` lists the rows a rollup
+collapsed; `stats/3` reads the range of the numeric columns over every
+root row, which is what a bar or a band scales to, and returns the
+planner's cost estimate for that one whole-table statement.
 
 ## The surfaces
 
-`Bilimbi.Base.UI.Components.flex_table/1` is the component; it is
-presentation only and pushes one event with an `op`. Its `FlexTable` hook
-draws the compact and carpet modes on a canvas from windows the host
-pushes, so the browser renders only what is visible; the full mode is a
-table. `Bilimbi.Base.Grid.Zoom` fixes the bands (row height at most 6 px is
-the carpet, at most 20 px compact, above that the table) and
-`Bilimbi.Base.Grid.Lens` prepares a cell for every mode at once: text, its
-position on the column's range, and the band that position falls in.
+`Bilimbi.Base.UI.Components.FlexTable.flex_table/1` is the component; it
+is presentation only and pushes one event with an `op`. It is one real
+table in two densities, `:normal` and `:compact`, switched by an icon
+toggle in the corner of its header; compact is the same table with tighter
+rows that never wrap. Beside the toggle a settings icon opens table
+customization, the panel that holds the column chips, their lenses and
+the add-a-column box.
+`Bilimbi.Base.Grid.Lens` prepares a cell for every lens at once: text, its
+position on the column's range, the band that position falls in, a trend's
+series and a change since a date.
 
-`Bilimbi.Base.Grid.View` is the whole state of a grid and lives in the URL;
-its module doc lists the keys, and `v` names a saved view.
-`Bilimbi.Base.Grid.Web.GridLive` is `/grid` and `/grid/:table`.
-`Bilimbi.Base.Grid.Web.PageColumns` lets a list page keep its own query
-and gain walked columns; the users and companies lists use it.
-`Bilimbi.Base.Grid.SavedViews` keeps an account's own views in
-`ui.grid.views` and the company's shared views in `ui.grid.shared_views`;
-a saved view opens at `/grid/<table>?v=<slug>` (or `v=shared:<slug>`),
-and the same address opens in a workspace tile.
+`Bilimbi.Base.Grid.Web.PageColumns` is the host a list page uses: the page
+keeps its own query and declares the columns it draws itself as built-ins,
+and `PageColumns` adds the walked columns for exactly the listed rows. The
+users and companies lists use it. `Bilimbi.Base.Grid.View` is what a
+person arranged (columns, lenses, density, the comparison date); its
+module doc lists the URL keys.
 
-Grouping sorts by the grouped column and heads each run of equal values;
-it is not a GROUP BY. Dragging a heading onto the group corner groups, and
-onto the pivot corner pivots a grouped grid: `Grid.pivot/5` counts root rows
-per pair of values in one GROUP BY statement, the grouped column's values
-as rows and the pivoted column's values (the first 24 by name, the rest
-folded into "Other") as columns, with a total, after a first column that
-names each row. It reads a bounded number of pairs; a row the bound cut
-short is left out, never shown with a partial total, and the page says the
-pivot is truncated. Dragging a chip or a
-heading onto another reorders.
+`Bilimbi.Base.Grid.PageViews` keeps that arrangement per account and per
+page in the account's `ui.grid.page_columns` setting, written on every
+change. A list opens the way its reader left it; an address that carries
+`cols`, `lens`, `density` or `since` wins, so a shared link shows what its
+sender saw and changes nobody's memory until the reader arranges
+something.
 
 Lenses are `value`, `bar`, `band`, and, for a count or sum over a dated
 many-link, `trend` (the aggregate per calendar month over the last twelve,
 a sparkline) and `delta` (the aggregate as of a date, through a FILTER in
-the same grouped subquery).
-The date lives in the view.
+the same grouped subquery). The date lives in the view and has a control
+in table customization while a column wears the lens.
 
-Inside a tiled workspace a grid can follow what another tile selects: a
-table declares the module kind whose facts name its rows (`record_kind`),
-the page tells the workspace the kinds it follows itself
-(`Bilimbi.Base.UI.Workspace.follow/2`), and a selection narrows the grid
-to the rows reaching that record, kept in the address as `follow` and
-`focus`. Shared views may be limited to role codes, as shared workspace
-layouts are.
+A walked column does not sort: the page owns the order of its rows.
+
+## Deliberate limits
+
+- **No grid page.** Flexible columns belong on the list that owns the
+  rows, with its search, filters and pagination. A page over every catalog
+  table would be a second, weaker way into the same records.
+- **No named or shared views.** An account's arrangement is remembered,
+  not saved under a name; the address is how one is shared.
+- **Two densities, one table.** Compact is a real table like normal, so
+  links, sorting and rollups work in both. There is no canvas mode and no
+  row-height control: a height between the two changes nothing a reader
+  can see.
+- **No grouping or pivot.** The page's own sort and filters order the
+  rows; the catalog only adds columns to them.
 
 ## What remains
 
-- In-cell editing at full zoom: the table shows full text but does not edit.
-- Cross-tile join by drag.
-- Server-side grouping with per-group aggregates beyond the pivot's counts.
-- Per-column filters beyond the root text search.
+- Sorting and filtering by a walked column: the page's own query sorts and
+  filters, so a walked column is read-only context.
+- In-cell editing.
 - Base Authz tables (roles, grants) in the catalog.
+- More list pages: employees, addresses and the reference lists declare
+  their tables in the catalog but do not host the flexible table yet.

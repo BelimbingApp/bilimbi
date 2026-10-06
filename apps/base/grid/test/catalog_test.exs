@@ -19,13 +19,51 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
     scope = TestFixtures.user_scope(~w(admin.test.order.view admin.test.customer.view))
     catalog = Grid.catalog(scope)
 
-    assert Enum.map(Grid.tables(catalog), & &1.id) == ~w(customers metrics orders)
+    assert catalog.tables |> Map.keys() |> Enum.sort() == ~w(customers metrics orders)
     assert {:ok, _} = Grid.fetch_table(catalog, "orders")
     assert :error = Grid.fetch_table(catalog, "countries")
   end
 
+  test "a field with no column is read from the source key its id names" do
+    catalog = Grid.catalog(TestFixtures.user_scope(TestSources.capabilities()))
+    {:ok, orders} = Grid.fetch_table(catalog, "orders")
+
+    assert orders.fields["placed_at"].column == :placed_at
+    assert orders.fields["customer_id"].column == :customer_id
+  end
+
+  test "an explicit column wins over the field id" do
+    install_orders!(fn fields -> fields ++ [%{id: "title", type: :string, column: :label}] end)
+
+    catalog = Grid.catalog(TestFixtures.user_scope(TestSources.capabilities()))
+    {:ok, orders} = Grid.fetch_table(catalog, "orders")
+
+    assert orders.fields["title"].column == :label
+  end
+
+  test "a field no source key answers to is refused when the catalog is built, naming the field" do
+    install_orders!(fn fields -> fields ++ [%{id: "missing", type: :string}] end)
+    scope = TestFixtures.user_scope(TestSources.capabilities())
+
+    assert_raise ArgumentError,
+                 ~r/invalid grid table from base\/grid \("orders"\): field missing names no key its source .*Orders selects; it selects \[:id, :label/,
+                 fn -> Grid.catalog(scope) end
+
+    # An account that may not read the table is not stopped by it.
+    assert %Catalog{} =
+             Grid.catalog(TestFixtures.other_tenant_scope(~w(admin.test.customer.view)))
+  end
+
+  defp install_orders!(change_fields) do
+    %{tables: [orders | rest]} = TestSources.tables()
+
+    TestFixtures.install_test_registry!(%{
+      tables: [Map.update!(orders, :fields, change_fields) | rest]
+    })
+  end
+
   test "a system scope names nobody and reads nothing" do
-    assert Grid.tables(Grid.catalog(TestFixtures.system_scope(1))) == []
+    assert Grid.catalog(TestFixtures.system_scope(1)).tables == %{}
   end
 
   test "a path through an unreadable table is refused even when the root is readable" do
@@ -40,14 +78,6 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
              Grid.resolve(catalog, orders, ["lines:count"])
 
     assert {:ok, [_label, _customer]} = Grid.resolve(catalog, orders, ["label", "customer.name"])
-  end
-
-  test "default columns are the root's visible fields" do
-    catalog = Grid.catalog(TestFixtures.user_scope(TestSources.capabilities()))
-    {:ok, orders} = Grid.fetch_table(catalog, "orders")
-
-    assert Enum.map(Grid.default_columns(catalog, orders), & &1.spec) ==
-             ~w(id label amount status placed_at)
   end
 
   test "suggestions walk visible links up to three deep and rank the typed words" do

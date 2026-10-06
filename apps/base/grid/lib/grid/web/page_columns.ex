@@ -5,48 +5,58 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   A list page keeps its query, filters, sort and pagination, and declares
   the columns it draws itself as built-ins. This struct adds everything the
   grid brings on top: columns a person walks to through the catalog (added,
-  removed, reordered and read through lenses), the zoom, rollups that
-  expand in place, and the canvas modes. The page's rows stay the rows; the
-  walked columns are fetched for exactly those rows with `Grid.attach/4`.
+  removed, reordered and read through lenses), compact or normal rows, and
+  rollups that expand in place. The page's rows stay the rows; the walked
+  columns are fetched for exactly those rows with `Grid.attach/5`.
 
   The page holds one `%PageColumns{}` in its assigns and:
 
-    1. builds it at mount with `mount/3`;
-    2. reads `cols`, `lens` and `z` from the URL with `from_params/2` and
-       merges `params/1` back into every path it patches to;
-    3. after loading its page, calls `load/4` with the entries, a key
-       function and a function giving each built-in's cell values;
-    4. renders `flex_table/1` from `column_views`, `rows`, `mode` and the
-       view, with a `<:col>` slot per built-in id;
+    1. builds it at mount with `mount/3`, from the session's
+       `current_scope`;
+    2. reads `cols`, `lens`, `density` and `since` from the URL with
+       `from_params/2` and merges `params/1` back into every path it
+       patches to;
+    3. after loading its page, calls `load/3` with the entries and a key
+       function;
+    4. renders `flex_table/1` from `column_views`, `rows`, `mode`, `cost`
+       and `since`, with a `<:col>` slot per built-in id;
     5. delegates its `"grid"` event to `handle/2`.
 
+  What a person arranges is remembered for their account and this page
+  (`Bilimbi.Base.Grid.PageViews`): `handle/2` keeps it on every change, and
+  an address that says nothing about columns, lenses or density opens the page
+  the way the account left it. An address that carries any of them wins,
+  so a shared link shows what its sender saw and changes nobody's memory
+  until the reader arranges something.
+
   A page whose table is not in the account's catalog still works: the
-  built-ins render and the add bar offers nothing.
+  built-ins render and the add-a-column box offers nothing.
   """
 
   alias Bilimbi.Base.Grid
   alias Bilimbi.Base.Grid.Column
-  alias Bilimbi.Base.Grid.Lens
-  alias Bilimbi.Base.Grid.Table
+  alias Bilimbi.Base.Grid.PageViews
   alias Bilimbi.Base.Grid.View
   alias Bilimbi.Base.Grid.Web.Host
-  alias Bilimbi.Base.Grid.Zoom
-  alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Settings
 
-  @enforce_keys [:catalog, :table, :builtins, :view]
+  @enforce_keys [:catalog, :table, :builtins, :view, :account]
   defstruct catalog: nil,
             table: nil,
             builtins: [],
             view: %View{},
+            account: nil,
+            remembered: nil,
+            cost: nil,
+            since: nil,
             extras: [],
             dropped: [],
             column_views: [],
             rows: [],
-            mode: :full,
+            mode: :normal,
             suggestions: [],
             add_query: "",
-            expanded: %{},
-            total: 0
+            expanded: %{}
 
   @type builtin :: %{
           required(:id) => String.t(),
@@ -59,9 +69,14 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
 
   @type t :: %__MODULE__{}
 
-  @doc "Builds the state for a page whose rows are `table_id` rows, with its built-in columns."
-  @spec mount(Scope.t(), String.t(), [builtin()]) :: t()
-  def mount(%Scope{} = scope, table_id, builtins) when is_list(builtins) do
+  @doc """
+  Builds the state for a page whose rows are `table_id` rows, with its
+  built-in columns, for the signed-in `current_scope`. Reads what the
+  account last arranged on this page.
+  """
+  @spec mount(map(), String.t(), [builtin()]) :: t()
+  def mount(%{scope: scope} = current_scope, table_id, builtins)
+      when is_binary(table_id) and is_list(builtins) do
     catalog = Grid.catalog(scope)
 
     table =
@@ -70,41 +85,58 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         :error -> nil
       end
 
-    %__MODULE__{catalog: catalog, table: table, builtins: builtins, view: %View{table: table_id}}
+    # The arrangement is the signed-in account's own, as its dashboard is.
+    account =
+      Settings.Scope.user(
+        Bilimbi.Base.UI.current_user_id(current_scope),
+        current_scope.user["company_id"],
+        scope.tenant.id
+      )
+
+    remembered =
+      case PageViews.fetch(account, table_id) do
+        {:ok, view} -> view
+        :error -> nil
+      end
+
+    %__MODULE__{
+      catalog: catalog,
+      table: table,
+      builtins: builtins,
+      view: %View{table: table_id},
+      account: account,
+      remembered: remembered
+    }
   end
 
-  @doc "Reads the walked columns, lenses and zoom from URL params."
+  @doc """
+  Reads the walked columns, lenses, density and comparison date. The URL says
+  them when it carries any of them; otherwise the account's remembered
+  arrangement does, and the page's own columns when there is none.
+  """
   @spec from_params(t(), map()) :: t()
   def from_params(%__MODULE__{} = state, params) do
-    incoming = View.from_params(params, state.view.table)
-    view = %{state.view | columns: incoming.columns, lenses: incoming.lenses, zoom: incoming.zoom}
+    view =
+      cond do
+        View.carried?(params) -> View.from_params(params, state.view.table)
+        state.remembered -> state.remembered
+        true -> %View{table: state.view.table}
+      end
+
     %{state | view: view, suggestions: [], add_query: "", expanded: %{}}
   end
 
   @doc "The URL params a page merges into its own: only what differs from the defaults."
   @spec params(t()) :: map()
-  def params(%__MODULE__{view: view}) do
-    View.to_params(%{
-      view
-      | sort: nil,
-        dir: :asc,
-        search: "",
-        page: 1,
-        page_size: 25,
-        group: nil,
-        slug: nil
-    })
-  end
+  def params(%__MODULE__{view: view}), do: View.to_params(view)
 
   @doc """
   Prepares the component's columns and rows for this page of entries.
-  `key` gives a row's key, `builtin_cells` the values of the built-in
-  columns for one entry as `%{id => value}`, so the compact and carpet
-  modes can draw them too.
+  `key` gives a row's key. A built-in column is drawn by the page's own
+  `<:col>`, so a row carries cells only for the walked columns.
   """
-  @spec load(t(), [term()], (term() -> term()), (term() -> map())) :: t()
-  def load(%__MODULE__{} = state, entries, key, builtin_cells)
-      when is_list(entries) and is_function(key, 1) and is_function(builtin_cells, 1) do
+  @spec load(t(), [term()], (term() -> term())) :: t()
+  def load(%__MODULE__{} = state, entries, key) when is_list(entries) and is_function(key, 1) do
     builtin_ids = Enum.map(state.builtins, & &1.id)
 
     {kept, dropped} =
@@ -121,8 +153,14 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     extras = Enum.filter(kept, &is_struct(&1, Column))
     kept_specs = Enum.map(kept, &if(is_binary(&1), do: &1, else: &1.spec))
     # The page's own order with nothing walked is the default, and the URL
-    # says nothing about a default.
-    view = %{state.view | columns: if(kept_specs == builtin_ids, do: [], else: kept_specs)}
+    # says nothing about a default. A lens belongs to a walked column that is
+    # shown; one named for anything else is dropped rather than carried.
+    view = %{
+      state.view
+      | columns: if(kept_specs == builtin_ids, do: [], else: kept_specs),
+        lenses: Map.take(state.view.lenses, Enum.map(extras, & &1.spec))
+    }
+
     keys = Enum.map(entries, key)
 
     values =
@@ -131,11 +169,14 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         else:
           Grid.attach(state.catalog, state.table, keys, extras, Host.lens_options(extras, view))
 
-    stats =
-      if extras == [] or state.table == nil or
-           not Enum.any?(extras, &(Host.lens(view, &1) != :value)),
-         do: %{},
-         else: Grid.stats(state.catalog, state.table, extras)
+    # Only a bar or a band is scaled to the column's range over the whole
+    # table, so only then is that range read, and its cost with it.
+    scaled = Enum.filter(extras, &(Host.lens(view, &1) in [:bar, :band]))
+
+    {stats, cost} =
+      if scaled == [] or state.table == nil,
+        do: {%{}, nil},
+        else: Grid.stats(state.catalog, state.table, scaled)
 
     extra_cells = Host.attached_cells(values, extras, stats, view)
     builtin_map = Map.new(state.builtins, &{&1.id, &1})
@@ -146,21 +187,10 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
           builtin_view(Map.fetch!(builtin_map, id))
 
         %Column{} = column ->
-          column |> List.wrap() |> Host.column_views(view) |> hd() |> Map.put(:sortable, false)
+          column |> List.wrap() |> Host.column_views(view) |> hd()
       end)
 
-    rows =
-      Enum.map(entries, fn entry ->
-        row_key = key.(entry)
-
-        cells =
-          entry
-          |> builtin_cells.()
-          |> Map.new(fn {id, value} -> {id, plain_cell(value)} end)
-          |> Map.merge(Map.get(extra_cells, row_key, %{}))
-
-        %{key: row_key, cells: cells}
-      end)
+    rows = Enum.map(keys, &%{key: &1, cells: Map.get(extra_cells, &1, %{})})
 
     %{
       state
@@ -169,8 +199,9 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         dropped: dropped,
         column_views: column_views,
         rows: rows,
-        mode: Zoom.mode(view.zoom),
-        total: length(rows)
+        mode: view.density,
+        cost: Host.cost(cost),
+        since: View.since(view)
     }
   end
 
@@ -191,65 +222,43 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     }
   end
 
-  defp plain_cell(nil),
-    do: %{text: "", value: nil, n: nil, band: nil, scale: nil, series: nil, delta: nil}
-
-  defp plain_cell(value) do
-    %{
-      text: plain_text(value),
-      value: value,
-      n: nil,
-      band: nil,
-      scale: nil,
-      series: nil,
-      delta: nil
-    }
-  end
-
-  defp plain_text(%NaiveDateTime{} = naive),
-    do: naive |> NaiveDateTime.to_date() |> Date.to_iso8601()
-
-  defp plain_text(%DateTime{} = datetime), do: datetime |> DateTime.to_date() |> Date.to_iso8601()
-  defp plain_text(list) when is_list(list), do: Enum.map_join(list, ", ", &plain_text/1)
-  defp plain_text(other), do: to_string(other)
-
   @type outcome ::
           {:patch, t()}
           | {:update, t()}
           | {:sort, String.t()}
-          | {:window, String.t(), map()}
-          | {:reply, String.t() | nil}
           | :noop
 
-  @doc "Applies one `flex_table` op. `table_id` is the component's DOM id, which names its window event."
-  @spec handle(t(), map(), String.t()) :: outcome()
-  def handle(%__MODULE__{} = state, params, table_id)
-      when is_map(params) and is_binary(table_id) do
+  @doc """
+  Applies one `flex_table` op. A `{:patch, state}` outcome has already been
+  remembered for the account; the page patches its URL with `params/1`.
+  `{:update, state}` changes only what is on screen, and `{:sort, key}` is
+  a built-in column's sort, which the page already knows how to do.
+  """
+  @spec handle(t(), map()) :: outcome()
+  def handle(%__MODULE__{} = state, params) when is_map(params) do
+    builtin_ids = Enum.map(state.builtins, & &1.id)
     builtin_sorts = state.builtins |> Enum.filter(&Map.has_key?(&1, :sort)) |> Enum.map(& &1.id)
     # An empty column list means the page default; an op that changes columns
     # starts from that default spelled out, so a built-in is never lost.
-    state =
+    spelled =
       if state.view.columns == [],
-        do: %{state | view: %{state.view | columns: Enum.map(state.builtins, & &1.id)}},
+        do: %{state | view: %{state.view | columns: builtin_ids}},
         else: state
 
     case params do
       %{"op" => "sort", "sort" => spec} ->
         if spec in builtin_sorts, do: {:sort, spec}, else: :noop
 
-      %{"op" => "group"} ->
-        :noop
-
-      %{"op" => "add_typed"} = params ->
-        add_typed(state, Map.get(params, "add", ""))
-
       _other ->
-        case Host.apply(params, state.view, state.extras) do
+        case Host.apply(params, spelled.view, spelled.extras) do
           {:patch, view} ->
-            {:patch, %{state | view: view}}
+            arrange(spelled, view, builtin_ids)
 
           {:suggest, text} ->
             {:update, suggest(state, text)}
+
+          {:add_typed, text} ->
+            add_typed(spelled, text, builtin_ids)
 
           {:expand, spec, key} ->
             {:update, expand(state, spec, key)}
@@ -257,22 +266,24 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
           {:collapse, spec, key} ->
             {:update, collapse(state, spec, key)}
 
-          {:window, _offset, _limit, detail} ->
-            {:window, "#{table_id}:window",
-             Host.window_payload_from_rows(state.rows, state.column_views, 0, state.total, detail)}
-
-          {:cell, row, column_id} ->
-            {:reply, cell_text(state, row, column_id)}
-
-          {:scroll, view, _row, _col} ->
-            {:patch, %{state | view: view}}
-
-          {:add_typed, text, _view} ->
-            add_typed(state, text)
-
           :noop ->
             :noop
         end
+    end
+  end
+
+  # The page's own order with nothing walked is the default, which neither
+  # the URL nor the account's memory spells out.
+  defp arrange(state, %View{} = view, builtin_ids) do
+    view = if view.columns == builtin_ids, do: %{view | columns: []}, else: view
+    state = %{state | view: view, suggestions: [], add_query: ""}
+    {:patch, remember(state)}
+  end
+
+  defp remember(%__MODULE__{account: account, view: view} = state) do
+    case PageViews.remember(account, view) do
+      :ok -> %{state | remembered: if(View.default?(view), do: nil, else: view)}
+      {:error, _changeset} -> state
     end
   end
 
@@ -287,12 +298,9 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     %{state | add_query: text, suggestions: Host.column_views(suggestions, state.view)}
   end
 
-  defp add_typed(%{table: nil}, _text), do: :noop
-  defp add_typed(_state, ""), do: :noop
+  defp add_typed(%{table: nil}, _text, _builtin_ids), do: :noop
 
-  defp add_typed(state, text) do
-    text = String.trim(text)
-
+  defp add_typed(state, text, builtin_ids) do
     resolved =
       case Grid.resolve(state.catalog, state.table, [text]) do
         {:ok, [column]} ->
@@ -310,8 +318,7 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
         :noop
 
       spec ->
-        {:patch,
-         %{state | view: View.add_column(state.view, spec), suggestions: [], add_query: ""}}
+        arrange(state, View.add_column(state.view, spec), builtin_ids)
     end
   end
 
@@ -343,26 +350,4 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
       _other -> state
     end
   end
-
-  defp cell_text(state, row_index, column_id) do
-    with %{cells: cells} <- Enum.at(state.rows, row_index),
-         %{text: text} <- Map.get(cells, column_id) do
-      text
-    else
-      _other -> nil
-    end
-  end
-
-  @doc "The component's `sort_dir` atom from a page's own direction value."
-  @spec sort_dir(term()) :: :asc | :desc
-  def sort_dir(dir) when dir in [:desc, "desc"], do: :desc
-  def sort_dir(_dir), do: :asc
-
-  @doc "Whether this table lives in the account's catalog (so the add bar has something to offer)."
-  @spec catalog?(t()) :: boolean()
-  def catalog?(%__MODULE__{table: %Table{}}), do: true
-  def catalog?(%__MODULE__{}), do: false
-
-  @doc false
-  def lens_text(value, %Column{} = column), do: Lens.text(value, column)
 end

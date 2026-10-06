@@ -6,11 +6,11 @@ defmodule Bilimbi.Base.Grid.Lens do
   be switched between the lenses its type allows; the data does not change,
   the reading does.
 
-  `cell/5` prepares one value for every mode at once: its text, its
+  `cell/5` prepares one value for every lens at once: its text, its
   position on the column's range as a number from 0 to 1, the band (0 to 4)
   that position falls in, the series a trend draws, and the change a delta
-  states, so the table, the compact view and the heat carpet all draw from
-  one prepared cell.
+  states, so switching a lens changes how the cell is drawn, never what was
+  fetched for it.
   """
 
   alias Bilimbi.Base.Grid.Column
@@ -85,7 +85,7 @@ defmodule Bilimbi.Base.Grid.Lens do
   Prepares one value: its text, its 0..1 position within `stats` (the
   column's `%{min, max}` over the whole set), and the band that position
   falls in. Text and enum values get a categorical band from a stable hash,
-  booleans a binary one, so a colour carpet reads them too.
+  booleans a binary one, so a colour band reads them too.
 
   `extras` may carry `series` (a trend's twelve values) and `before` (the
   aggregate as of the delta date); a delta lens then states the change in
@@ -191,7 +191,7 @@ defmodule Bilimbi.Base.Grid.Lens do
   defp band(n, :categorical, _value), do: round(n * 7)
   defp band(n, :sequential, _value), do: min(trunc(n * @bands), @bands - 1)
 
-  @doc "The text of a value, as the compact and carpet views show it."
+  @doc "The text of a value, as a cell shows it."
   @spec text(term(), Column.t()) :: String.t()
   def text(nil, _column), do: ""
   def text(true, _column), do: "Yes"

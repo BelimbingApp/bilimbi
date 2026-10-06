@@ -3,7 +3,8 @@ defmodule Bilimbi.Base.Grid.Column do
   One column of a grid: a path walked from the root table to a field, and,
   after a `:many` link, how the reached rows roll up into one cell.
 
-  The spec is the column's stable text form, used in URLs and saved views:
+  The spec is the column's stable text form, used in URLs and in what an
+  account's list remembers:
 
       name                          a field of the root table
       company.name                  a field reached through one-links
@@ -49,7 +50,6 @@ defmodule Bilimbi.Base.Grid.Column do
             tail: [],
             field: nil,
             agg: nil,
-            sortable: true,
             depth: 0
 
   @type agg :: :count | :sum | :avg | :min | :max | :latest | :list
@@ -68,7 +68,6 @@ defmodule Bilimbi.Base.Grid.Column do
           tail: [Link.t()],
           field: Field.t() | nil,
           agg: agg() | nil,
-          sortable: boolean(),
           depth: non_neg_integer()
         }
 
@@ -177,7 +176,6 @@ defmodule Bilimbi.Base.Grid.Column do
        tail: [],
        field: field,
        agg: nil,
-       sortable: field.sortable,
        depth: length(walk.hops)
      }}
   end
@@ -231,7 +229,6 @@ defmodule Bilimbi.Base.Grid.Column do
        tail: walk.tail,
        field: field,
        agg: agg,
-       sortable: true,
        depth: length(links)
      }}
   end

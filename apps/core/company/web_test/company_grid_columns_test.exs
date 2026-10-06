@@ -91,6 +91,47 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
     refute has_element?(view, "#companies-73")
   end
 
+  test "a change-since lens compares against a date the reader sets", %{conn: conn} do
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/companies?cols=name%2Cusers%3Acount&lens=users%3Acount%7Cdelta")
+
+    # Without a date in the address the lens compares against thirty days ago.
+    assert has_element?(
+             view,
+             "#companies-since-input[value='#{Date.add(Date.utc_today(), -30)}']"
+           )
+
+    view |> form("#companies-since", %{since: "2026-01-01"}) |> render_change()
+    query = URI.decode_query(URI.parse(assert_patch(view)).query)
+    assert query["since"] == "2026-01-01"
+    assert query["lens"] == "users:count|delta"
+    assert has_element?(view, "#companies-since-input[value='2026-01-01']")
+
+    # No column wears the lens: the control is gone.
+    {:ok, plain, _html} = conn |> log_in_as() |> live(~p"/companies?cols=name%2Cusers%3Acount")
+    refute has_element?(plain, "#companies-since")
+  end
+
+  test "compact rows drop the second line under a company's name", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      name: "Bilimbi Labs",
+      code: "bilimbi_labs",
+      legal_name: "Bilimbi Laboratories Sdn. Bhd."
+    })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+    assert has_element?(view, "#companies-76", "Bilimbi Laboratories Sdn. Bhd.")
+
+    view |> element("#companies-density") |> render_click()
+    assert_patch(view)
+    assert has_element?(view, "#companies-76", "Bilimbi Labs")
+    refute has_element?(view, "#companies-76", "Bilimbi Laboratories Sdn. Bhd.")
+  end
+
   test "the add bar walks to the parent company and the primary address", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
 

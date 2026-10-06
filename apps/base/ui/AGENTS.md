@@ -88,15 +88,20 @@ Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerc
 
 ## Flexible tables
 
-A table whose columns a person adds, removes, reorders or zooms is
-`<.flex_table>`, hosted by the grid page or by a list page through
+A table whose columns a person adds, removes or reorders is
+`<.flex_table>`, hosted by a list page through
 `Bilimbi.Base.Grid.Web.PageColumns`. It is presentation only: it never
 touches a catalog or a query, and its one event carries an `op`. Bars and
 bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
-refuses inline style; the `FlexTable` hook writes the bar width), the
-compact and carpet modes draw on a canvas from pushed windows, and the
-mode is the host's decision from the zoom. See the component comment in
-`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
+refuses inline style; the `FlexTable` hook writes the bar width). It has
+two densities, `:normal` and `:compact`, and both are the same real table:
+do not add a canvas, a third density or a row-height control. Its column
+chips and add box live in table customization, the panel behind the
+settings icon in the header corner; do not put a toolbar back above the
+table. A page that
+draws a second line in a `<:col>` leaves it out when the mode is
+`:compact`. See the component comment in `lib/ui/components/flex_table.ex`
+and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries
 
