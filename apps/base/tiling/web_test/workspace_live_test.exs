@@ -839,6 +839,19 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     refute has_element?(peer, "#workspace-shared-review")
   end
 
+  test "Shared workspaces sits under Administration > System and is current on its page",
+       %{conn: conn} do
+    grant_capabilities!("ui.workspace.publish")
+    {:ok, view, _html} = conn |> log_in_as() |> live("/workspace/shared-layouts")
+
+    assert has_element?(
+             view,
+             "#nav-children-admin-system #nav-admin-system-workspace-shared[href='/workspace/shared-layouts'][aria-current='page']"
+           )
+
+    refute has_element?(view, "#nav-workspace-shared")
+  end
+
   test "publishing and the shared workspace list require the publish capability", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/workspace/shared-layouts")
 
