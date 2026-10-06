@@ -4,7 +4,7 @@ Read the component comment before fighting a default. `DESIGN.md` is the design 
 
 ## Component modules
 
-Shared components live in four modules: `lib/ui/components.ex`, and `icon.ex`, `forms.ex` and `lists.ex` under `lib/ui/components/`. Take them with `use Bilimbi.Base.UI.Components`, not `import`: a plain import brings only what `components.ex` still defines, so `<.icon>`, `<.input>` and `<.table>` are undefined. A new group joins `Components.modules/0` and the `__using__` there, or the Design Library guards never measure it. The moduledoc of `Bilimbi.Base.UI.Components` owns the import order.
+Shared components live in five modules: `lib/ui/components.ex`, and `icon.ex`, `forms.ex`, `lists.ex` and `flex_table.ex` under `lib/ui/components/`. Take them with `use Bilimbi.Base.UI.Components`, not `import`: a plain import brings only what `components.ex` still defines, so `<.icon>`, `<.input>` and `<.table>` are undefined. A new group joins `Components.modules/0` and the `__using__` there, or the Design Library guards never measure it. The moduledoc of `Bilimbi.Base.UI.Components` owns the import order.
 
 ## Defaults the component owns
 
@@ -91,8 +91,8 @@ touches a catalog or a query, and its one event carries an `op`. Bars and
 bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
 refuses inline style; the `FlexTable` hook writes the bar width), the
 compact and carpet modes draw on a canvas from pushed windows, and the
-mode is the host's decision from the zoom. See the component comment and
-`Bilimbi.Base.UI.FlexTable`.
+mode is the host's decision from the zoom. See the component comment in
+`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries
 

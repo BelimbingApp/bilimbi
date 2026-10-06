@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @all ~w(admin.user.list admin.company.list admin.employee.list admin.employee-type.list
@@ -23,7 +24,6 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_departments_table!()
     CompanyFixtures.create_department_types_table!()
-    AddressFixtures.create_address_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Bilimbi Industries"})
@@ -44,8 +44,8 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     })
 
     CompanyFixtures.assign_primary_company!(41, 73)
-    AddressFixtures.insert_country!(%{iso: "MY"})
-    AddressFixtures.insert_country!(%{iso: "SG"})
+    GeonamesFixtures.insert_country!(%{iso: "MY"})
+    GeonamesFixtures.insert_country!(%{iso: "SG"})
     CompanyFixtures.insert_department!(1, 73)
 
     UserFixtures.insert_user!(%{

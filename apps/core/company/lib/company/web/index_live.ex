@@ -25,7 +25,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
   # The query string stays `sort`, `dir`, `status`, and `per_page`, and omits
   # a value that is already the default. `ListState` speaks `sort_by` /
-  # `sort_dir`; `companies_path/1` translates. A key rename would break links
+  # `sort_dir`; `companies_path/2` translates. A key rename would break links
   # this page already shares.
   @list ListState.spec!(
           sortable: %{name: :asc, status: :asc, jurisdiction: :asc},
@@ -236,7 +236,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   defp query_status("all"), do: :all
   defp query_status(status), do: status
 
-  defp companies_path(%ListState{} = state, columns \\ nil) do
+  defp companies_path(%ListState{} = state, columns) do
     params = ListState.to_params(state)
 
     query =
@@ -248,7 +248,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
       |> maybe_put(:page, page_param(Map.get(params, "page")))
       |> maybe_put(:per_page, per_page_param(Map.get(params, "per_page")))
 
-    query = if columns, do: query ++ Enum.to_list(PageColumns.params(columns)), else: query
+    query = query ++ Enum.to_list(PageColumns.params(columns))
 
     case query do
       [] -> ~p"/companies"
@@ -391,7 +391,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
         <.card id="companies-card" inner_class="p-0">
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
 
-
           <div class="p-2">
             <.flex_table
               id="companies"
@@ -410,85 +409,88 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             >
               <:col :let={%{key: id}} id="name">
                 <% company = listed(@companies_page, id) %>
-              <%!-- The name leads every surface; the legal name is formal
+                <%!-- The name leads every surface; the legal name is formal
                    detail (#614 identity-line ruling). Display now matches
                    the sort field. --%>
-              <.record_link
-                workspace={@workspace}
-                kind="core/company"
-                record_id={company.id}
-                navigate={~p"/companies/#{company.id}"}
-                class="font-medium text-ink-strong hover:underline"
-              >
-                {company.name}
-              </.record_link>
-              <span
-                :if={company.legal_name && company.legal_name != company.name}
-                class="block text-xs text-ink-subtle"
-              >
-                {company.legal_name}
-              </span>
-            </:col>
+                <.record_link
+                  workspace={@workspace}
+                  kind="core/company"
+                  record_id={company.id}
+                  navigate={~p"/companies/#{company.id}"}
+                  class="font-medium text-ink-strong hover:underline"
+                >
+                  {company.name}
+                </.record_link>
+                <span
+                  :if={company.legal_name && company.legal_name != company.name}
+                  class="block text-xs text-ink-subtle"
+                >
+                  {company.legal_name}
+                </span>
+              </:col>
               <:col :let={%{key: id}} id="code">
                 <% company = listed(@companies_page, id) %>
-              <code class="text-xs font-medium tabular-nums">{company.code}</code>
-            </:col>
+                <code class="text-xs font-medium tabular-nums">{company.code}</code>
+              </:col>
               <:col :let={%{key: id}} id="parent_name">
                 <% company = listed(@companies_page, id) %>
-              <span class={[is_nil(company.parent_name) && "text-ink-faint"]}>
-                {company.parent_name || "None"}
-              </span>
-            </:col>
+                <span class={[is_nil(company.parent_name) && "text-ink-faint"]}>
+                  {company.parent_name || "None"}
+                </span>
+              </:col>
               <:col :let={%{key: id}} id="status">
                 <% company = listed(@companies_page, id) %>
-              <.badge kind={status_badge_kind(company.status)}>
-                {company.status}
-              </.badge>
-            </:col>
+                <.badge kind={status_badge_kind(company.status)}>
+                  {company.status}
+                </.badge>
+              </:col>
               <:col :let={%{key: id}} id="jurisdiction">
                 <% company = listed(@companies_page, id) %>
-              <span class={[is_nil(company.jurisdiction) && "text-ink-faint"]}>
-                {company.jurisdiction || "—"}
-              </span>
-            </:col>
+                <span class={[is_nil(company.jurisdiction) && "text-ink-faint"]}>
+                  {company.jurisdiction || "—"}
+                </span>
+              </:col>
               <:action :let={%{key: id}}>
                 <% company = listed(@companies_page, id) %>
-              <div class="flex items-center justify-end gap-3">
-                <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
-                <.icon_button
-                  icon="view"
-                  label={"Open #{company.name}"}
-                  navigate={~p"/companies/#{company.id}"}
-                />
-              </div>
-            </:action>
-            <%!-- Two different absences, two different sentences: a search or
+                <div class="flex items-center justify-end gap-3">
+                  <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
+                  <.icon_button
+                    icon="view"
+                    label={"Open #{company.name}"}
+                    navigate={~p"/companies/#{company.id}"}
+                  />
+                </div>
+              </:action>
+              <%!-- Two different absences, two different sentences: a search or
                  filter that matched nothing offers the way back; a tenant with no
                  companies yet offers the first create to an actor who may make
                  one. --%>
-            <:empty
-              :if={@companies_page.entries == [] and filtered?(@index_state)}
-              title={filtered_empty_title(@index_state)}
-              reason={filtered_empty_reason(@index_state)}
-            >
-              <.button id="companies-clear-search" patch={companies_path(cleared(@index_state), @columns)}>
-                {clear_label(@index_state)}
-              </.button>
-            </:empty>
-            <:empty
-              :if={@companies_page.entries == [] and not filtered?(@index_state)}
-              title="No companies yet"
-              reason="Companies created in this tenant appear here."
-            >
-              <.button
-                :if={allowed?(@current_scope, "admin.company.create")}
-                id="companies-empty-add"
-                variant="primary"
-                navigate={~p"/companies/create"}
+              <:empty
+                :if={@companies_page.entries == [] and filtered?(@index_state)}
+                title={filtered_empty_title(@index_state)}
+                reason={filtered_empty_reason(@index_state)}
               >
-                <.icon name="create" class="size-4" /> Add Company
-              </.button>
-            </:empty>
+                <.button
+                  id="companies-clear-search"
+                  patch={companies_path(cleared(@index_state), @columns)}
+                >
+                  {clear_label(@index_state)}
+                </.button>
+              </:empty>
+              <:empty
+                :if={@companies_page.entries == [] and not filtered?(@index_state)}
+                title="No companies yet"
+                reason="Companies created in this tenant appear here."
+              >
+                <.button
+                  :if={allowed?(@current_scope, "admin.company.create")}
+                  id="companies-empty-add"
+                  variant="primary"
+                  navigate={~p"/companies/create"}
+                >
+                  <.icon name="create" class="size-4" /> Add Company
+                </.button>
+              </:empty>
             </.flex_table>
           </div>
 

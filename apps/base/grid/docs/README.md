@@ -8,7 +8,7 @@ that show the result at any zoom, through lenses, and as saved views.
 ## The model
 
 A module puts a table in the catalog through its `:grid` contribution
-(ADR 0018): the table's `fields`, its `links` to other tables, the
+(ADR 0019): the table's `fields`, its `links` to other tables, the
 `capability` that reads it, and a `Bilimbi.Base.Grid.Source` whose
 `query/1` returns the rows a scope may see, with the owner's own tenant,
 soft-delete and company filters applied. The grid wraps every source in a

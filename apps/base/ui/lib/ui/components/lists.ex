@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.UI.Components.Lists do
 
   import Bilimbi.Base.UI.Components.Forms, only: [input: 1, multi_select: 1]
   import Bilimbi.Base.UI.Components.Icon
+  import Bilimbi.Base.UI.Components.SortHeading
 
   alias Bilimbi.Base.UI.Components.Forms
 
@@ -615,62 +616,6 @@ defmodule Bilimbi.Base.UI.Components.Lists do
 
   defp permission_wording(action), do: "You do not have permission to #{action}."
   defp permission_recovery, do: "Ask an operator to review your role."
-
-  attr(:col, :map, required: true)
-  attr(:table_id, :string, required: true)
-  attr(:sort_by, :any, required: true)
-  attr(:sort_dir, :any, required: true)
-  attr(:sort_event, :string, default: "sort")
-  attr(:sort_target, :any, default: nil)
-
-  defp table_sort_heading(assigns) do
-    ~H"""
-    <button
-      id={@col[:sort_id] || "#{@table_id}-sort-#{@col[:sort]}"}
-      type="button"
-      phx-click={@sort_event}
-      phx-target={@sort_target}
-      phx-value-sort={@col[:sort]}
-      class={[
-        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
-        @col[:align] == :right && "ml-auto",
-        @col[:align] != :right && "text-left"
-      ]}
-    >
-      {@col[:label]}
-      <.icon
-        name={table_sort_icon(@col[:sort], @sort_by, @sort_dir)}
-        class={["size-3.5", table_sort_active?(@col[:sort], @sort_by) && "text-action"]}
-      />
-    </button>
-    """
-  end
-
-  defp table_aria_sort(nil, _sort_by, _sort_dir), do: nil
-
-  defp table_aria_sort(sort, sort_by, sort_dir) do
-    cond do
-      not table_sort_active?(sort, sort_by) -> "none"
-      table_sort_dir(sort_dir) == :asc -> "ascending"
-      table_sort_dir(sort_dir) == :desc -> "descending"
-      true -> "none"
-    end
-  end
-
-  defp table_sort_icon(sort, sort_by, sort_dir) do
-    cond do
-      not table_sort_active?(sort, sort_by) -> "sort"
-      table_sort_dir(sort_dir) == :asc -> "sort-asc"
-      table_sort_dir(sort_dir) == :desc -> "sort-desc"
-      true -> "sort"
-    end
-  end
-
-  defp table_sort_active?(sort, sort_by), do: to_string(sort) == to_string(sort_by)
-
-  defp table_sort_dir(dir) when dir in ["asc", :asc], do: :asc
-  defp table_sort_dir(dir) when dir in ["desc", :desc], do: :desc
-  defp table_sort_dir(_dir), do: nil
 
   defp table_empty_colspan(cols, action) when action == [], do: length(cols)
   defp table_empty_colspan(cols, _action), do: length(cols) + 1

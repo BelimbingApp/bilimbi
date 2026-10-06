@@ -1,9 +1,10 @@
 defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
   use ExUnit.Case, async: true
 
+  use Bilimbi.Base.UI.Components
+
   import Phoenix.Component
   import Phoenix.LiveViewTest
-  import Bilimbi.Base.UI.Components
 
   @columns [
     %{

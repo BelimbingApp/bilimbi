@@ -1,4 +1,4 @@
-# ADR 0018: Grid table catalog as a contribution consumer
+# ADR 0019: Grid table catalog as a contribution consumer
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
