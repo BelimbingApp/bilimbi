@@ -6,8 +6,9 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   the columns it draws itself as built-ins. This struct adds everything the
   grid brings on top: columns a person walks to through the catalog (added,
   removed, reordered and read through lenses), the zoom from compact to
-  normal rows, and rollups that expand in place. The page's rows stay the rows; the walked
-  columns are fetched for exactly those rows with `Grid.attach/5`.
+  normal rows, and rollups that expand in place. The page's rows stay the
+  rows; the walked columns are fetched for exactly those rows with
+  `Grid.attach/5`.
 
   The page holds one `%PageColumns{}` in its assigns and:
 
@@ -38,7 +39,8 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
   and forgets what was kept.
 
   A page whose table is not in the account's catalog still works: the
-  built-ins render and the add-a-column box offers nothing.
+  built-ins render and the add-a-column box offers only the page's removed
+  built-ins.
   """
 
   alias Bilimbi.Base.Grid

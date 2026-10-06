@@ -704,8 +704,7 @@ and then left alone, so it does not take a row of the page.
 The same column is read through a lens: the value, a bar scaled to the
 column's range across the whole table, a colour band, and, for a count or
 sum over dated rows, a trend (twelve months as a sparkline) or the change
-since a date. Data
-colour is its own family (`scale-1` to `scale-5` for values that order,
+since a date. Data colour is its own family (`scale-1` to `scale-5` for values that order,
 `cat-1` to `cat-8` for values that only differ) and never brand, success,
 warning or danger, so a coloured cell never reads as status; a categorical
 band paints a left edge, a sequential band the cell. A bar's width is
@@ -728,9 +727,9 @@ opens the way they left it. Because nothing asks before keeping it, a
 removed column can always come back: the add-a-column box offers the
 page's own removed columns by their label beside the ones it can walk to,
 and "Reset to default columns" returns the page to its own columns and
-rows and forgets what was kept. The address says the same thing when it carries it, and wins: a
-shared link shows what its sender saw, and changes nobody's memory until
-the reader arranges something. Scaling a bar or a band reads the whole
+rows and forgets what was kept. The address says the same thing when it
+carries it, and wins: a shared link shows what its sender saw, and changes
+nobody's memory until the reader arranges something. Scaling a bar or a band reads the whole
 table; when the planner estimates that as heavy a line above the table
 says so with the estimate, and nothing is refused.
 
