@@ -37,6 +37,54 @@ defmodule Bilimbi.Base.UI.LayoutsAppFramedTest do
     refute html =~ ~s(id="app-statusbar")
   end
 
+  # The stylesheet's "list fill" rules give a list page in a tile one
+  # scrollbar, the table's. They start from these marks, so a component that
+  # drops one silently returns the page to scrolling as a whole.
+  test "a framed list page carries the marks the list fill rules read" do
+    html =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <Layouts.app flash={%{}} current_scope={@current_scope} active_nav={nil}>
+            <Bilimbi.Base.UI.Components.page id="things-index">
+              <Bilimbi.Base.UI.Components.header>Things</Bilimbi.Base.UI.Components.header>
+              <Bilimbi.Base.UI.Components.card id="things-card" inner_class="p-0">
+                <Bilimbi.Base.UI.Components.Lists.table
+                  id="things"
+                  rows={[%{name: "One"}]}
+                  framed={false}
+                >
+                  <:col :let={thing} label="Name">{thing.name}</:col>
+                </Bilimbi.Base.UI.Components.Lists.table>
+              </Bilimbi.Base.UI.Components.card>
+            </Bilimbi.Base.UI.Components.page>
+          </Layouts.app>
+          """
+        end,
+        %{current_scope: %{framed: true, shell_preferences: %{mode: "local", theme: "system"}}}
+      )
+
+    document = LazyHTML.from_fragment(html)
+
+    # The tile's one scroll box is positioned, so an `sr-only` label inside
+    # it cannot be laid out against the document and scroll that too.
+    [main_class] =
+      document
+      |> LazyHTML.query("#app-shell[data-framed=true] > main#app-content")
+      |> LazyHTML.attribute("class")
+
+    assert "relative" in String.split(main_class)
+    assert "overflow-y-auto" in String.split(main_class)
+
+    chain =
+      "#app-content > #things-index[data-page=list] > #things-card[data-card] > div > [data-table-region] > table"
+
+    assert document |> LazyHTML.query(chain) |> Enum.count() == 1
+
+    assert document |> LazyHTML.query("#things-index > header[data-page-header]") |> Enum.count() ==
+             1
+  end
+
   test "a shell scope renders its pin list, and a missing list is omitted" do
     loaded =
       render_component(&page/1, %{

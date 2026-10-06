@@ -550,83 +550,62 @@
               </p>
             </section>
             <.card
-              id="component-tile-header"
-              title="Workspace tile header"
+              id="component-tile-controls"
+              title="Workspace tile controls"
               inner_class="space-y-4 p-4"
             >
               <p class="text-xs text-ink-muted">
-                The compact bar above each tile of the tiled workspace: the page's title and a menu carrying every operation the tiling keyboard mode offers. The focused tile's title takes the brand accent; a master tile is marked in its bar. The menu closes when focus leaves it or Escape is pressed.
+                A workspace tile has no title bar: the page's own heading names it. Its controls float over the top right corner, a grip for dragging the tile onto another to swap them and a menu with the two operations a pointer needs. A focused tile keeps them in sight; on any other tile they appear when the pointer is over it or focus reaches them, so hover the second example. The menu closes when focus leaves it or Escape is pressed. Every other tile operation is a key of the tiling mode.
               </p>
               <div
-                id="design-library-tile-header-focused"
-                class="overflow-hidden rounded-md border border-brand-strong"
+                id="design-library-tile-controls-focused"
+                class="group relative h-20 rounded-md border border-brand-strong ring-1 ring-brand-strong"
               >
-                <.tile_header
-                  id="design-library-tile-header-a"
+                <.tile_controls
+                  id="design-library-tile-controls-a"
                   title="Companies"
                   focused
-                  master_layout
-                  master_tile
-                  open_alone={~p"/system/design-library/components"}
-                  on_focus={JS.push("test_click")}
-                  on_close={JS.push("test_click")}
-                  on_monocle={JS.push("test_click")}
                   on_split={JS.push("test_click")}
-                  on_swap={JS.push("test_click")}
-                  on_make_master={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
                 />
               </div>
               <div
-                id="design-library-tile-header-master-stack"
-                class="overflow-hidden rounded-md border border-line"
+                id="design-library-tile-controls-unfocused"
+                class="group relative h-20 rounded-md border border-line"
               >
-                <.tile_header
-                  id="design-library-tile-header-c"
-                  title="Employees, in the master stack"
-                  master_layout
-                  open_alone={~p"/system/design-library/components"}
-                  on_focus={JS.push("test_click")}
-                  on_close={JS.push("test_click")}
-                  on_monocle={JS.push("test_click")}
+                <.tile_controls
+                  id="design-library-tile-controls-b"
+                  title="Users"
                   on_split={JS.push("test_click")}
-                  on_swap={JS.push("test_click")}
-                  on_make_master={JS.push("test_click")}
-                />
-              </div>
-              <div
-                id="design-library-tile-header-monocle"
-                class="overflow-hidden rounded-md border border-line"
-              >
-                <.tile_header
-                  id="design-library-tile-header-b"
-                  title="Users, filling the workspace"
-                  monocle
-                  open_alone={~p"/system/design-library/components"}
-                  on_focus={JS.push("test_click")}
                   on_close={JS.push("test_click")}
-                  on_monocle={JS.push("test_click")}
-                  on_split={JS.push("test_click")}
-                  on_swap={JS.push("test_click")}
                 />
               </div>
               <p class="text-xs text-ink-muted">
-                A tile showing one record can follow selections: the menu offers it, and a following tile carries the link icon before its title and opens whichever record of that kind another tile selects.
+                Two states stay visible on a tile that is not focused: the master tile of a master layout, whose menu turns the whole arrangement, and a tile that follows the records other tiles select.
               </p>
               <div
-                id="design-library-tile-header-following"
-                class="overflow-hidden rounded-md border border-line"
+                id="design-library-tile-controls-master"
+                class="group relative h-20 rounded-md border border-line"
               >
-                <.tile_header
-                  id="design-library-tile-header-d"
+                <.tile_controls
+                  id="design-library-tile-controls-c"
+                  title="Employees"
+                  master_layout
+                  master_tile
+                  on_split={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
+                />
+              </div>
+              <div
+                id="design-library-tile-controls-following"
+                class="group relative h-20 rounded-md border border-line"
+              >
+                <.tile_controls
+                  id="design-library-tile-controls-d"
                   title="A company record"
                   following
-                  open_alone={~p"/system/design-library/components"}
-                  on_focus={JS.push("test_click")}
-                  on_close={JS.push("test_click")}
-                  on_monocle={JS.push("test_click")}
                   on_split={JS.push("test_click")}
-                  on_swap={JS.push("test_click")}
-                  on_follow={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
                 />
               </div>
             </.card>

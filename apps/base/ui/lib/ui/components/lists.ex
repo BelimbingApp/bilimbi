@@ -419,6 +419,11 @@ defmodule Bilimbi.Base.UI.Components.Lists do
   #
   # A row is not clickable. The row that opens a record carries a
   # `<.record_link>` in a cell, which is a real link a keyboard reaches.
+  #
+  # `data-table-region` marks the scroll box. On a page of its own it only
+  # scrolls sideways. Inside a workspace tile the "list fill" rules in
+  # `apps/web/assets/css/app.css` give it the room the tile has left, so it
+  # scrolls its rows and keeps the heading row stuck to its top.
   def table(assigns) do
     assigns =
       with %{rows: %Phoenix.LiveView.LiveStream{}} <- assigns do
@@ -426,7 +431,10 @@ defmodule Bilimbi.Base.UI.Components.Lists do
       end
 
     ~H"""
-    <div class={["overflow-x-auto", @framed && "border border-line bg-surface"]}>
+    <div
+      data-table-region
+      class={["overflow-x-auto", @framed && "border border-line bg-surface"]}
+    >
       <table class="w-full text-left text-sm">
         <caption :if={@caption} class="sr-only">{@caption}</caption>
         <thead class="border-b border-line bg-surface-sunken">

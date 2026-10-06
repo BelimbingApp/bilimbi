@@ -24,7 +24,7 @@ live page: its own LiveView process, socket and database checkouts on the
 server, and its own document in the browser. A wall of twenty tiles costs
 what twenty tabs cost, and a page that polls does so once per tile. The
 operator decides tile sizes, so a small tile keeps showing its page; the
-tile menu's monocle fills the workspace with it.
+tiling mode's `f` fills the workspace with it.
 
 `Bilimbi.Base.Tiling.Layout` is the pure tree: open, close, resize, move,
 swap, flip, directional neighbours, the rectangles every tile and divider
@@ -57,9 +57,43 @@ capability check, and nothing in any module changes to be shown in a tile.
 Base UI renders the framed page chromeless; the Web host marks framed
 requests (`BilimbiWeb.FramedRender`) and ships the `Tiling` hook
 (`apps/web/assets/js/tiling.js`) with the keyboard bridge into each frame,
-the `Ctrl+.` tiling mode, drag resizing and the frame reports. The tile bar
-and split handle are shared Base UI components, presented in the Design
-Library.
+the `Ctrl+.` tiling mode, drag resizing and the frame reports. The tile
+controls and split handle are shared Base UI components, presented in the
+Design Library.
+
+A tile has no title bar; the page's heading is its title. `<.tile_controls>`
+floats a grip and a menu over the tile's top right corner. The menu offers
+"Flip split direction" and "Close tile" only, and dragging the grip onto
+another tile swaps the two. Every other tile operation is a key of the
+tiling mode:
+
+| Key | Does |
+| --- | --- |
+| `Ctrl+.` | Enter or leave tiling mode |
+| `h` `j` `k` `l`, arrows | Focus the tile in that direction |
+| `H` `J` `K` `L` | Move the focused tile that way |
+| `s` | Swap the focused tile with its neighbour |
+| `r`, then arrows | Resize; `Esc` returns to tiling mode |
+| `f` | Fill the workspace with the focused tile, or show every tile again |
+| `t` | Flip the split direction, or the master direction in a master layout |
+| `m` | Make the focused tile the master, in a master layout |
+| `w` | Follow the records other tiles select, or stop following |
+| `o` | Open the focused tile's page alone |
+| `n` | Add a page |
+| `q` | Close the focused tile |
+| `1` to `9` | Open one of the first nine saved layouts |
+| `?` | Show the keyboard shortcuts dialog |
+| `Esc` | Leave tiling mode |
+
+The same list is the workspace's "Keyboard shortcuts" dialog, opened from
+the top bar or with `?`. `WorkspaceLive.shortcuts/0` is its source and the
+`Tiling` hook implements each key; change the two together, and this table
+with them.
+
+Inside a tile a page has one vertical scrollbar. Base UI's framed shell and
+the "list fill" rules in `apps/web/assets/css/app.css` give a list page the
+tile's height and let its table scroll under a sticky heading row with the
+pager below; nothing in this module or in a page takes part.
 
 Tiles talk through the follow channel, `Bilimbi.Base.UI.Workspace`: one
 PubSub topic per workspace, named by the account and a token the host
@@ -72,7 +106,10 @@ follow selections: the tree keeps that page's route pattern
 a record of the module that owns the pattern, the host fills the id in and
 the hook sends the frame there. A page opts in with `<.record_link>` on its
 rows and `Workspace.announce/2` at mount; the Company, Employee and User
-lists and record pages do.
+lists and record pages do. The tiling mode's `w` marks or unmarks the
+focused tile; the host renders `data-follow` on each tile so the hook knows
+whether to stop, and answers with a notice when the tile's page names no
+record to follow.
 
 This module depends on Authz, Settings and UI. The host page lives here
 rather than in Base UI because Settings itself depends on Base UI for its own

@@ -30,8 +30,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   The `Tiling` hook owns what the server cannot: the keyboard bridge into
   each frame, the `Ctrl+.` tiling mode, drag resizing, and reporting each
-  frame's URL and title. Every keyboard operation is also on the tile menu
-  or a split handle, so the mode is a shortcut and never the only path.
+  frame's URL and title. A tile has no bar. Its floating menu offers the two
+  operations a pointer needs, flipping the split and closing the tile; a
+  drag of its grip swaps two tiles and a split handle resizes. Every other
+  operation is a key of the mode, and `shortcuts/0` is the list the
+  keyboard shortcuts dialog shows, so a key that is added there is added to
+  the hook and the other way round.
 
   A tile whose page the account may not open shows the permission refusal
   in place of the frame, judged by the same route policy the page's mount
@@ -71,11 +75,32 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
                           clear-default-layout copy-layout set-layout-mode make-master)
 
   # The root layout's title suffix, stripped from what a frame reports so
-  # the tile bar shows the page's own name. Keep in step with
+  # the tile is named by the page's own name. Keep in step with
   # apps/base/ui/lib/ui/layouts/root.html.heex.
   @title_suffix " · Business application platform"
 
   @sides %{"left" => :left, "right" => :right, "up" => :up, "down" => :down}
+
+  # The keys of the `Ctrl+.` tiling mode, as the shortcuts dialog lists
+  # them. `apps/web/assets/js/tiling.js` implements each one; keep the two
+  # in step.
+  @shortcuts [
+    {["Ctrl+."], :mode},
+    {["h", "j", "k", "l"], :focus},
+    {["H", "J", "K", "L"], :move},
+    {["s"], :swap},
+    {["r"], :resize},
+    {["f"], :fill},
+    {["t"], :flip},
+    {["m"], :master},
+    {["w"], :follow},
+    {["o"], :alone},
+    {["n"], :add},
+    {["q"], :close},
+    {["1–9"], :layouts},
+    {["?"], :help},
+    {["Esc"], :leave}
+  ]
   @full_place "left: 0%; top: 0%; width: 100%; height: 100%"
 
   @impl true
@@ -111,6 +136,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:picker_for, nil)
      |> assign(:picker_open?, false)
      |> assign(:layouts_open?, false)
+     |> assign(:shortcuts_open?, false)
      |> assign(:pending_delete, nil)
      |> assign(:save_form, to_form(%{"label" => ""}, as: :layout))
      |> load_saved()
@@ -352,7 +378,17 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     {:noreply, socket |> put_layout(layout) |> focus(id) |> sync_url()}
   end
 
-  def handle_event("make-master", _params, socket), do: {:noreply, socket}
+  # The key is the only way to ask, so a layout with no master says so.
+  def handle_event("make-master", _params, socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :info,
+       gettext(
+         "This layout has no master tile. The saved layouts dialog switches a saved layout to master."
+       )
+     )}
+  end
 
   # Closing down to one tile leaves a workspace entered by tiling in place
   # for that page's own URL: it began from a full page, and it ends as one.
@@ -381,16 +417,38 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # made on a record the person can see rather than from a list of kinds.
   def handle_event("follow-tile", %{"id" => id}, socket) do
     with %{path: path} <- Layout.fetch_leaf(socket.assigns.tree, id),
-         pattern when is_binary(pattern) <- follow_pattern(path) do
+         {:pattern, pattern} when is_binary(pattern) <- {:pattern, follow_pattern(path)} do
       {:noreply,
        socket |> put_layout(Layout.follow(socket.assigns.tree, id, pattern)) |> sync_url()}
     else
-      _ -> {:noreply, socket}
+      # The key is the only way to ask, so a page with nothing to follow
+      # says so instead of doing nothing.
+      {:pattern, nil} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           gettext(
+             "This tile's page shows no single record, so there is nothing for it to follow. Open a record in the tile first."
+           )
+         )}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
   def handle_event("unfollow-tile", %{"id" => id}, socket) do
     {:noreply, socket |> put_layout(Layout.follow(socket.assigns.tree, id, nil)) |> sync_url()}
+  end
+
+  # The tile's own page with the full shell. A tile is a page that stays
+  # reachable alone, so this is a plain navigation to the address it shows.
+  def handle_event("open-alone", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.tiles, &(&1.id == id)) do
+      %{access: :ok, path: path} -> {:noreply, push_navigate(socket, to: path)}
+      _ -> {:noreply, socket}
+    end
   end
 
   def handle_event("toggle-monocle", params, socket) do
@@ -447,6 +505,18 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       _ ->
         {:noreply, socket}
     end
+  end
+
+  # ------------------------------------------------------------------
+  # Keyboard shortcuts
+  # ------------------------------------------------------------------
+
+  def handle_event("open-shortcuts", _params, socket) do
+    {:noreply, assign(socket, :shortcuts_open?, true)}
+  end
+
+  def handle_event("close-shortcuts", _params, socket) do
+    {:noreply, assign(socket, :shortcuts_open?, false)}
   end
 
   # ------------------------------------------------------------------
@@ -888,8 +958,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
           focused?: focused?,
           master?: leaf.id == master_id,
           access: access(current_scope, leaf.path),
-          following?: is_binary(leaf.follow),
-          on_follow: follow_command(leaf)
+          follow: follow_state(leaf)
         }
       end
 
@@ -925,14 +994,48 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # Ids are `t<n>` with n increasing, so length-then-text is numeric order.
   defp tile_order(%{id: id}), do: {byte_size(id), id}
 
-  # The menu entry: stop following, follow the page shown, or nothing for a
-  # page that names no record.
-  defp follow_command(%{id: id, follow: pattern}) when is_binary(pattern),
-    do: JS.push("unfollow-tile", value: %{id: id})
+  # Rendered as `data-follow`: "on" while the tile follows, which is what
+  # the mode's `w` reads to stop; "off" when its page names a record it
+  # could follow; nothing for any other page.
+  defp follow_state(%{follow: pattern}) when is_binary(pattern), do: "on"
+  defp follow_state(%{path: path}), do: if(follow_pattern(path), do: "off")
 
-  defp follow_command(%{id: id, path: path}) do
-    if follow_pattern(path), do: JS.push("follow-tile", value: %{id: id})
+  @doc false
+  def shortcuts do
+    Enum.map(@shortcuts, fn {keys, operation} ->
+      %{keys: keys, does: shortcut_label(operation)}
+    end)
   end
+
+  defp shortcut_label(:mode), do: gettext("Enter or leave tiling mode")
+
+  defp shortcut_label(:focus),
+    do: gettext("Focus the tile to the left, below, above or right; the arrow keys do the same")
+
+  defp shortcut_label(:move), do: gettext("Move the focused tile that way")
+  defp shortcut_label(:swap), do: gettext("Swap the focused tile with its neighbour")
+
+  defp shortcut_label(:resize),
+    do: gettext("Resize with the arrow keys; Esc returns to tiling mode")
+
+  defp shortcut_label(:fill),
+    do: gettext("Fill the workspace with the focused tile, or show every tile again")
+
+  defp shortcut_label(:flip),
+    do: gettext("Flip the split direction, or the master direction in a master layout")
+
+  defp shortcut_label(:master),
+    do: gettext("Make the focused tile the master, in a master layout")
+
+  defp shortcut_label(:follow),
+    do: gettext("Follow the records other tiles select, or stop following")
+
+  defp shortcut_label(:alone), do: gettext("Open the focused tile's page alone")
+  defp shortcut_label(:add), do: gettext("Add a page")
+  defp shortcut_label(:close), do: gettext("Close the focused tile")
+  defp shortcut_label(:layouts), do: gettext("Open one of your first nine saved layouts")
+  defp shortcut_label(:help), do: gettext("Show this list")
+  defp shortcut_label(:leave), do: gettext("Leave tiling mode")
 
   defp first_label(%{type: :leaf, id: id}, labels), do: Map.get(labels, id, id)
   defp first_label(%{type: :split, first: first}, labels), do: first_label(first, labels)

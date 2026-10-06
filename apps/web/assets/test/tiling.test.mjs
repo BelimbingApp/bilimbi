@@ -10,6 +10,8 @@ import {mountHook, render, focused, settle} from "./support/hook.mjs"
 
 let control
 
+// The tile chrome `<.tile_controls>` renders: a grip and the menu trigger,
+// floating over the tile. `data-title` and `data-follow` are the host's.
 function workspace({focusedTile = "t1", count = 2} = {}) {
   return render(
     `<div id="app-shell">
@@ -18,16 +20,18 @@ function workspace({focusedTile = "t1", count = 2} = {}) {
             data-tile-count="${count}">
          <p id="workspace-announcement" role="status"></p>
          <div id="workspace-tiles">
-           <div id="tile-t1" class="workspace-tile" data-tile="t1" data-focused="${focusedTile === "t1"}">
-             <div id="tile-t1-header" data-tile-header>
-               <button type="button" id="tile-t1-header-title">Companies</button>
-               <button type="button" id="tile-t1-header-menu" data-tile-menu aria-expanded="false">Menu</button>
+           <div id="tile-t1" class="workspace-tile" data-tile="t1" data-title="Companies"
+                data-focused="${focusedTile === "t1"}">
+             <div id="tile-t1-controls" data-tile-controls>
+               <span id="tile-t1-controls-grip" data-tile-grip></span>
+               <button type="button" id="tile-t1-controls-menu" data-tile-menu aria-expanded="false">Menu</button>
              </div>
            </div>
-           <div id="tile-t2" class="workspace-tile" data-tile="t2" data-focused="${focusedTile === "t2"}">
-             <div id="tile-t2-header" data-tile-header>
-               <button type="button" id="tile-t2-header-title">Users</button>
-               <button type="button" id="tile-t2-header-menu" data-tile-menu aria-expanded="false">Menu</button>
+           <div id="tile-t2" class="workspace-tile" data-tile="t2" data-title="Users"
+                data-focused="${focusedTile === "t2"}">
+             <div id="tile-t2-controls" data-tile-controls>
+               <span id="tile-t2-controls-grip" data-tile-grip></span>
+               <button type="button" id="tile-t2-controls-menu" data-tile-menu aria-expanded="false">Menu</button>
              </div>
            </div>
            <div id="split-s3" role="separator" tabindex="0" data-split="s3" data-direction="h"
@@ -84,6 +88,8 @@ test("in the mode, directions focus, shifted directions move, and letters run th
   press("s")
   press("f")
   press("t")
+  press("m")
+  press("o")
   press("3")
   press("q")
 
@@ -94,9 +100,31 @@ test("in the mode, directions focus, shifted directions move, and letters run th
     {event: "swap-tile", payload: {id: "t1", side: "down"}},
     {event: "toggle-monocle", payload: {id: "t1"}},
     {event: "toggle-split", payload: {id: "t1"}},
+    {event: "make-master", payload: {id: "t1"}},
+    {event: "open-alone", payload: {id: "t1"}},
     {event: "open-layout", payload: {n: 3}},
     {event: "close-tile", payload: {id: "t1"}},
   ])
+})
+
+test("w asks to follow, and to stop on a tile the server marks as following", () => {
+  leader()
+  press("w")
+  document.getElementById("tile-t1").dataset.follow = "on"
+  press("w")
+
+  assert.deepEqual(events(), [
+    {event: "follow-tile", payload: {id: "t1"}},
+    {event: "unfollow-tile", payload: {id: "t1"}},
+  ])
+})
+
+test("? leaves the mode and opens the list of keys", () => {
+  leader()
+  press("?", {shiftKey: true})
+
+  assert.deepEqual(events(), [{event: "open-shortcuts", payload: {}}])
+  assert.equal(control.hook.el.dataset.mode, "off")
 })
 
 test("a mode key is consumed so the page under it never sees it", () => {
@@ -141,8 +169,7 @@ test("an expanded sidebar branch does not hold Escape", () => {
 
 test("Escape leaves an open menu alone", () => {
   leader()
-  document.getElementById("tile-t1-header").innerHTML =
-    '<button type="button" id="tile-t1-header-menu" aria-expanded="true">Menu</button>'
+  document.getElementById("tile-t1-controls-menu").setAttribute("aria-expanded", "true")
 
   press("Escape")
 
@@ -172,11 +199,11 @@ function tileUnderPointer(id) {
   document.elementFromPoint = () => (id ? document.getElementById(`tile-${id}`) : null)
 }
 
-test("dragging a title bar onto another tile marks the target and swaps on release", () => {
-  const title = document.getElementById("tile-t1-header-title")
+test("dragging a tile's grip onto another tile marks the target and swaps on release", () => {
+  const grip = document.getElementById("tile-t1-controls-grip")
   tileUnderPointer("t2")
 
-  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  pointer("pointerdown", grip, {clientX: 10, clientY: 10})
   window.dispatchEvent(new PointerEvent("pointermove", {clientX: 12, clientY: 10}))
   assert.equal(control.hook.el.dataset.tileDrag, undefined, "a wobble is not a drag")
 
@@ -193,44 +220,52 @@ test("dragging a title bar onto another tile marks the target and swaps on relea
   assert.equal(document.documentElement.style.cursor, "")
   assert.match(document.getElementById("workspace-announcement").textContent, /Swapped Companies and Users/)
 
-  // The click the release produces is not a focus of the tile under it.
+  // The click the release produces is not a press of the control under it.
   const click = new MouseEvent("click", {bubbles: true, cancelable: true})
-  document.getElementById("tile-t2-header-title").dispatchEvent(click)
+  document.getElementById("tile-t2-controls-menu").dispatchEvent(click)
   assert.equal(click.defaultPrevented, true)
 })
 
 test("a drag released over its own tile or over nothing swaps nothing", () => {
-  const title = document.getElementById("tile-t1-header-title")
+  const grip = document.getElementById("tile-t1-controls-grip")
 
   tileUnderPointer("t1")
-  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  pointer("pointerdown", grip, {clientX: 10, clientY: 10})
   window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
   assert.equal(document.getElementById("tile-t1").hasAttribute("data-drop-target"), false)
   window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
 
   tileUnderPointer(null)
-  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  pointer("pointerdown", grip, {clientX: 10, clientY: 10})
   window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
   window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
 
   assert.deepEqual(events(), [])
 })
 
-test("the tile menu is not a grip, and a plain press stays the title's click", () => {
+test("the tile menu is not a grip, and a press that never travels swaps nothing", () => {
   tileUnderPointer("t2")
 
-  pointer("pointerdown", document.getElementById("tile-t1-header-menu"), {clientX: 10, clientY: 10})
+  pointer("pointerdown", document.getElementById("tile-t1-controls-menu"), {clientX: 10, clientY: 10})
   window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
   window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
   assert.equal(control.hook.el.dataset.tileDrag, undefined)
 
-  pointer("pointerdown", document.getElementById("tile-t1-header-title"), {clientX: 10, clientY: 10})
+  pointer("pointerdown", document.getElementById("tile-t1-controls-grip"), {clientX: 10, clientY: 10})
   window.dispatchEvent(new PointerEvent("pointerup", {clientX: 10, clientY: 10}))
   const click = new MouseEvent("click", {bubbles: true, cancelable: true})
-  document.getElementById("tile-t1-header-title").dispatchEvent(click)
+  document.getElementById("tile-t1-controls-menu").dispatchEvent(click)
 
   assert.equal(click.defaultPrevented, false)
   assert.deepEqual(events(), [])
+})
+
+test("a press on the chrome of a tile that is not focused focuses it", () => {
+  pointer("pointerdown", document.getElementById("tile-t1-controls-menu"))
+  assert.deepEqual(events(), [], "the focused tile is not focused again")
+
+  pointer("pointerdown", document.getElementById("tile-t2-controls-menu"))
+  assert.deepEqual(events(), [{event: "focus-tile", payload: {id: "t2"}}])
 })
 
 test("after a keyboard move, focus follows the tile the server focused", () => {
@@ -241,16 +276,16 @@ test("after a keyboard move, focus follows the tile the server focused", () => {
   document.getElementById("tile-t2").dataset.focused = "true"
   control.hook.updated()
 
-  assert.equal(focused(), "tile-t2-header-title")
+  assert.equal(focused(), "tile-t2-controls-menu")
 })
 
 test("a server patch that did not follow a keyboard move leaves focus alone", () => {
-  document.getElementById("tile-t1-header-title").focus()
+  document.getElementById("tile-t1-controls-menu").focus()
 
   control.hook.el.dataset.focused = "t2"
   control.hook.updated()
 
-  assert.equal(focused(), "tile-t1-header-title")
+  assert.equal(focused(), "tile-t1-controls-menu")
 })
 
 test("a patch that moves tiles and dividers repaints both to the server's geometry", () => {
@@ -331,6 +366,21 @@ test("a tile-navigate event sends the named frame to the page, and nothing else"
   control.serverEvent("tile-navigate", {id: "t2", path: "//example.test/x"})
   assert.equal(moves.length, 1)
   assert.equal(frame.getAttribute("src"), "/users")
+})
+
+test("a frame is named after the title its tile reports", () => {
+  const tile = document.getElementById("tile-t2")
+  tile.insertAdjacentHTML(
+    "beforeend",
+    '<iframe id="tile-t2-page" data-tile-frame="t2" title="/users"></iframe>'
+  )
+
+  control.hook.updated()
+  assert.equal(document.getElementById("tile-t2-page").title, "Users")
+
+  tile.dataset.title = "Grace Hopper"
+  control.hook.updated()
+  assert.equal(document.getElementById("tile-t2-page").title, "Grace Hopper")
 })
 
 test("a frame whose window is out of reach takes the path as its source", () => {

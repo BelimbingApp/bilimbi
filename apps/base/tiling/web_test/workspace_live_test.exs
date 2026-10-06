@@ -80,7 +80,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
              "#tile-t1[data-focused='true'] iframe#tile-t1-page[src^='/companies?ws=']"
            )
 
-    assert has_element?(view, "#tile-t1-header-title", "/companies")
+    assert has_element?(view, "#tile-t1[data-title='/companies']")
     refute has_element?(view, "#workspace-picker")
 
     view |> element("#workspace-add-page") |> render_click()
@@ -386,11 +386,11 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     render_hook(view, "focus-direction", %{"side" => "right"})
     assert has_element?(view, "#tile-t2[data-focused='true']")
 
-    view |> element("#tile-t2-header-swap") |> render_click()
+    render_hook(view, "swap-tile", %{"id" => "t2"})
     assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
     assert has_element?(view, "#tile-t2[data-place*='left: 0.0%']")
 
-    view |> element("#tile-t2-header-split") |> render_click()
+    view |> element("#tile-t2-controls-split") |> render_click()
     assert_patch(view, "/workspace?t=v.5%28%2Fcompanies%2C%2Fcompanies%29")
     assert has_element?(view, "#split-s3[aria-orientation='horizontal']")
 
@@ -408,14 +408,13 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert_patch(view, "/workspace?t=v.3%28%2Fcompanies%2C%2Fcompanies%29")
     assert has_element?(view, "#tile-t1[data-place*='top: 0.0%']")
 
-    view |> element("#tile-t2-header-monocle") |> render_click()
+    render_hook(view, "toggle-monocle", %{"id" => "t2"})
     assert has_element?(view, "#workspace[data-monocle='true']")
     assert has_element?(view, "#tile-t2[data-place*='width: 100%']")
     assert has_element?(view, "#tile-t1[hidden]")
     refute has_element?(view, "#split-s3")
-    assert has_element?(view, "#tile-t2-header-monocle", "Show every tile")
 
-    view |> element("#tile-t2-header-close") |> render_click()
+    view |> element("#tile-t2-controls-close") |> render_click()
     assert_patch(view, "/workspace?t=%2Fcompanies")
     assert has_element?(view, "#workspace[data-tile-count='1']")
   end
@@ -462,12 +461,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     })
 
     assert_patch(view, "/workspace?t=%2Fcompanies%2Fdepartment-types%3Fpage%3D2")
-    assert has_element?(view, "#tile-t1-header-title", "Department Types")
-
-    assert has_element?(
-             view,
-             "#tile-t1-header-open-alone[href='/companies/department-types?page=2']"
-           )
+    assert has_element?(view, "#tile-t1[data-title='Department Types']")
+    assert has_element?(view, "#tile-t1-controls-menu[aria-label='Tile menu: Department Types']")
 
     # An absolute URL or an unserved path never becomes a tile.
     render_hook(view, "tile-navigated", %{
@@ -483,11 +478,57 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     })
 
     render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "/nowhere", "title" => "x"})
+    assert has_element?(view, "#tile-t1[data-title='Department Types']")
 
-    assert has_element?(
-             view,
-             "#tile-t1-header-open-alone[href='/companies/department-types?page=2']"
-           )
+    # The tile still shows the page it reported, which is where it opens alone.
+    render_hook(view, "open-alone", %{"id" => "t9"})
+    render_hook(view, "open-alone", %{"id" => "t1"})
+    assert_redirect(view, "/companies/department-types?page=2")
+  end
+
+  test "a tile has no bar, and its menu holds only the split flip and close", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
+
+    refute has_element?(view, "[data-tile-header]")
+    assert has_element?(view, "#tile-t1 iframe[title='/companies']")
+    assert has_element?(view, "#tile-t1-controls [data-tile-grip]")
+    assert has_element?(view, "#tile-t1-controls-menu-items button", "Flip split direction")
+    assert has_element?(view, "#tile-t1-controls-menu-items button", "Close tile")
+    refute has_element?(view, "#tile-t1-controls-menu-items a")
+    refute has_element?(view, "#tile-t1-controls-menu-items button:nth-of-type(3)")
+  end
+
+  test "making a master in a layout that has none says why nothing moved", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
+
+    render_hook(view, "make-master", %{"id" => "t2"})
+    assert has_element?(view, "#flash-info", "This layout has no master tile")
+    assert has_element?(view, "#tile-t2[data-place*='left: 50.0%']")
+  end
+
+  test "the keys the menu no longer lists are in the shortcuts dialog", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/workspace?t=/companies")
+
+    refute has_element?(view, "#workspace-shortcuts")
+    view |> element("#workspace-open-shortcuts") |> render_click()
+
+    for {key, does} <- [
+          {"f", "Fill the workspace"},
+          {"s", "Swap the focused tile"},
+          {"m", "Make the focused tile the master"},
+          {"w", "Follow the records"},
+          {"o", "alone"}
+        ] do
+      assert view
+             |> element("#workspace-shortcut-list div", does)
+             |> render() =~ ~r"<kbd[^>]*>\s*#{key}\s*</kbd>"
+    end
+
+    render_hook(view, "close-shortcuts", %{})
+    refute has_element?(view, "#workspace-shortcuts")
+
+    render_hook(view, "open-shortcuts", %{})
+    assert has_element?(view, "#workspace-shortcuts")
   end
 
   test "the workspace holds as many tiles as the operator opens", %{conn: conn} do
@@ -551,10 +592,11 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       )
 
       assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='3']")
-      assert has_element?(view, "#tile-t4-header-make-master", "Make master")
-      view |> element("#tile-t4-header-make-master") |> render_click()
+      refute has_element?(view, "#tile-t4-controls-master")
+      assert has_element?(view, "#tile-t4-controls-split", "Flip master direction")
+      render_hook(view, "make-master", %{"id" => "t4"})
       assert has_element?(view, "#tile-t4[data-place*='left: 0.0%']")
-      assert has_element?(view, "#tile-t4-header", "Master")
+      assert has_element?(view, "#tile-t4-controls-master", "Master")
 
       render_hook(view, "open-layout", %{"n" => 2})
       assert_patch(view, "/workspace/lookups")
@@ -615,7 +657,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "/companies", "master")
 
       {:ok, view, _html} = open(conn, "/workspace/records")
-      view |> element("#tile-t1-header-close") |> render_click()
+      view |> element("#tile-t1-controls-close") |> render_click()
       assert_patch(view, "/workspace/records?t=")
       assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='0']")
       refute has_element?(view, "#tile-t1")
@@ -625,7 +667,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "h.5(/companies,/companies)")
 
       {:ok, view, _html} = open(conn, "/workspace/records")
-      view |> element("#tile-t2-header-close") |> render_click()
+      view |> element("#tile-t2-controls-close") |> render_click()
       assert_patch(view, "/workspace/records?t=%2Fcompanies")
 
       view |> element("#workspace-open-layouts") |> render_click()

@@ -601,6 +601,14 @@ address, so Back and Forward work at the workspace level and a copied address
 reproduces the screen; a navigation inside a tile replaces history instead of
 adding to it.
 
+A tile has one vertical scrollbar. On a list page it is the table's: the
+page takes the tile's height, the table takes the room under the heading and
+filters and scrolls under its heading row, which stays in sight, and the
+pager stays at the foot of the tile. Any other page scrolls as a whole, and
+so does a list page in a tile too short to leave room for rows. The page
+never scrolls as a document inside the frame. Outside a tile a page scrolls
+as a whole, as it always has.
+
 The usual way in is the sidebar: every navigable row carries "Open in a
 tile" beside its pin, at the pin's weight and visible on hover and focus.
 From any page it puts that page in the left half and the clicked one in the
@@ -615,41 +623,50 @@ a narrow screen the control opens the page normally.
 
 A saved layout may use master mode: one tile takes the master area, with the
 other tiles stacked beside it, divided evenly when a tile opens or closes and
-resizable like any split. Its saved mode and tree stay together; the tile
-menu can make a stack tile master or turn the master arrangement, and the
-saved-layouts dialog switches between master and dwindle without saving
-unsaved tile changes.
+resizable like any split. Its saved mode and tree stay together; the mode's
+`m` makes a stack tile master, the tile menu turns the master arrangement,
+and the saved-layouts dialog switches between master and dwindle without
+saving unsaved tile changes. The master tile is marked "Master" under its
+controls.
 
-A compact `h-6` bar above each tile carries the page's title and a menu with
-every operation: monocle (one tile fills the workspace, the others stay
-mounted), swap, flip the split, open alone, close. The bar is also the grip:
-dragging a tile by it onto another tile swaps the two, the target showing a
-`brand-strong` ring while the pointer is over it; the menu's swap and the
-mode's `s` stay the pointer-free way. The focused tile shows a
-`brand-strong` border and its title in `text-brand-strong`, never colour
-alone. Tiles are separated by focusable `role="separator"` handles that
-resize by drag or by the arrow keys. Keyboard control is a mode, as in
-Hyprland's submaps, because every modifier chord collides with Windows or
-the browser: `Ctrl+.` enters it, the status bar names it (`Tiling`,
-`Resize`), single keys move focus (`h j k l` or arrows), move tiles (`H J K
-L`), swap (`s`), resize (`r`, then arrows), monocle (`f`), flip the split
-(`t`), add (`n`) or close (`q`) a tile, and open a saved layout (`1` to `9`);
-Escape leaves. An open menu takes Escape first. No operation exists only as a
-key. Focus follows a click, never the pointer, and nothing animates.
+A tile has no title bar. The page's own heading is the title, and a bar that
+repeated it cost every tile a row. Two small controls float over the tile's
+top right corner, in sight on the focused tile and on any tile the pointer is
+over or focus reaches: a grip and a menu. The framed page header leaves that
+corner free, so they never cover a page's own action. The menu holds the two
+operations a pointer needs, flip the split and close. Dragging a tile by its
+grip onto another tile swaps the two, the target showing a `brand-strong`
+ring while the pointer is over it. The focused tile shows a `brand-strong`
+border and ring and keeps its controls in sight, never colour alone. Tiles
+are separated by focusable `role="separator"` handles that resize by drag or
+by the arrow keys.
+
+Everything else is a key. Keyboard control is a mode, as in Hyprland's
+submaps, because every modifier chord collides with Windows or the browser:
+`Ctrl+.` enters it, the status bar names it (`Tiling`, `Resize`), single keys
+move focus (`h j k l` or arrows), move tiles (`H J K L`), swap (`s`), resize
+(`r`, then arrows), fill the workspace with one tile while the others stay
+mounted (`f`), flip the split (`t`), make master (`m`), follow selections
+(`w`), open the tile's page alone (`o`), add (`n`) or close (`q`) a tile, and
+open a saved layout (`1` to `9`); Escape leaves. An open menu takes Escape
+first. The workspace's top bar carries a "Keyboard shortcuts" button, and `?`
+in the mode opens the same list, so a key is never a secret: an operation
+that is not on the tile menu is in that list. Focus follows a click, never
+the pointer, and nothing animates.
 
 There is no cap on tiles: the operator decides, and a control-room wall
 holds more than a laptop. Every tile is a live page with its own connection,
 so the picker says that many tiles cost as much as many tabs, and nothing
-pretends otherwise. A small tile keeps showing its page; monocle is the way
-out. A tile whose page the account may
+pretends otherwise. A small tile keeps showing its page; filling the
+workspace with it (`f`) is the way out. A tile whose page the account may
 not open shows the permission wording in place of the frame. Below `lg` the
 workspace shows one tile at a time with a strip of tabs, keeping the tree.
 Layouts are saved per account by name, opened at `/workspace/<slug>` or from
 the saved-layouts dialog, and one may be the default the sidebar entry opens.
 
-Tiles follow each other. A tile showing one record offers "Follow
-selections" on its menu; a following tile carries a link icon before its
-title and opens whichever record of that kind another tile selects. Inside a
+Tiles follow each other. A tile showing one record follows selections with
+the mode's `w`; a following tile carries a link icon under its controls
+and opens whichever record of that kind another tile selects. Inside a
 workspace a list row is a selection rather than a link: it opens the record
 in the following tile and the list stays, or, when nothing follows that
 kind, opens the record in its own tile as the link would. A record page
