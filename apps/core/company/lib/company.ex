@@ -68,9 +68,10 @@ defmodule Bilimbi.Core.Company do
   `tax_id` and `email` need `admin.company.sensitive.view`
   (`Bilimbi.Core.Company.Summary.field_policy/0`). Every summary this module
   returns already carries `Bilimbi.Base.Authz.Withheld` in those fields for
-  such a reader; this names them for a surface that shows the same columns
-  from elsewhere, such as a record's audit history, and for the list search,
-  which does not match a withheld column.
+  such a reader; this names them for the update path and for the list
+  search, which does not match a withheld column. The audit views withhold
+  the same columns through the policy `Bilimbi.Core.Company.Contributions`
+  declares for `auditable_types/0`.
   """
   @spec withheld_fields(Scope.t()) :: [atom()]
   def withheld_fields(%Scope{} = scope) do
@@ -420,6 +421,19 @@ defmodule Bilimbi.Core.Company do
 
   @spec addressable_identity() :: String.t()
   def addressable_identity, do: "App\\Core\\Company\\Models\\Company"
+
+  @doc """
+  Every `auditable_type` a company's audit rows are recorded under.
+
+  Capture records the schema's module name; the others are the name a row
+  adopted from Belimbing carries. The record history reads all of them, and
+  `Bilimbi.Core.Company.Contributions` declares the company field policy
+  against each, so the audit views withhold the same columns as the page.
+  """
+  @spec auditable_types() :: [String.t()]
+  def auditable_types do
+    ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", addressable_identity()]
+  end
 
   @doc "Whether a department belongs to the requested tenant-owned company."
   @spec department_belongs_to_company?(Scope.t(), pos_integer(), pos_integer()) :: boolean()

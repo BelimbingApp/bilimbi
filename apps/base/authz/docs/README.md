@@ -53,28 +53,35 @@ string, so code that would compare or store it raises.
 The decision is made once per call from the reader's effective allow list,
 the same list the route gate reads, so a field and the pages that need its
 capability agree, and no decision-log row is written: nothing was attempted.
-`Authz.effective_capabilities/1` remembers that list in the calling process
-for the same actor, installed capabilities and grants, and every grant write
-through this module advances a node-local version that is part of the key;
-so a request or a page loads the actor's grants once however many company
-reads it makes, and a change made on the same node is seen by the next ask
-(the function's doc has the exact bound).
+`Authz.effective_capabilities/1` keeps nothing between calls: every ask reads
+the grants afresh, so a revoked capability stops working on the next check, on
+any node and inside a LiveView that is already open. A whole field policy is
+one evaluation (`Authz.withheld_fields/2` asks once however many fields it
+names, and `redact/3` once for a whole list).
 A named system principal is judged by `can/4`. An anonymous system scope
 names nobody and is withheld every field. A write to a withheld field is
 refused by the owner through `FieldPolicy.refuse_changes/2`, with an error
 on that field. The owner's grid fields carry the same key
 (`Bilimbi.Base.Grid.Field`), so the column the record page withholds is
-not in that reader's catalog either, and a record page passes the same
-field names to the audit history panel so a change to the field is listed
-without its values.
+not in that reader's catalog either.
+
+The audit views follow the same policy. Base Audit cannot depend on Authz
+(Authz depends on Audit), so a module also names its policy in its `:authz`
+contribution, `field_policies`, keyed by every `auditable_type` its rows are
+recorded under; the validator rejects a type declared twice or a policy
+naming an unregistered capability. `Authz.withheld_fields_by_type/2` answers
+for many types in one evaluation through Base Audit's
+`Bilimbi.Base.Audit.Authorization` seam, and `Bilimbi.Base.Audit` takes the
+withheld values out of every mutation it returns, so the record history
+panel, the mutations browser at `/audit/mutations` and any other caller list
+a change to such a field with `<.withheld>` and without its before and after
+values, whatever audit capability the reader holds.
 
 The first policy is Core Company's: `tax_id` and `email` need
 `admin.company.sensitive.view`, which the configured `tenant_owner` role
 receives. An existing installation carries it into its database with
 `mix bilimbi.authz.reconcile`; until then only `grant_all` roles see those
-two fields. Field-level authorization governs the record's own read models
-and its page; the Audit module's own log pages remain the audit
-capability's domain and show what capture recorded.
+two fields.
 
 ## A record in another company
 

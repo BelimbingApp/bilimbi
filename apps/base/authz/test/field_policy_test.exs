@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.FieldPolicy
+  alias Bilimbi.Base.Authz.PrincipalCapability
   alias Bilimbi.Base.Authz.Withheld
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
@@ -112,38 +113,101 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
     end
   end
 
-  describe "effective capabilities memory" do
-    test "a second ask in the same process runs no statement, and a grant write is seen at once" do
+  describe "grants are read afresh" do
+    test "a revoked grant withholds the field on the very next ask, however it was written" do
+      reader = holder()
+      {:ok, actor} = Authz.scope_actor(reader)
+
+      assert Authz.withheld_fields(reader, @policy) == []
+      assert @capability in Authz.effective_capabilities(actor).allowed
+
+      # Written around the facade, as another node or an open transaction
+      # would: nothing in this process was told.
+      Repo.delete_all(PrincipalCapability)
+
+      assert Authz.withheld_fields(reader, @policy) == [:tax_id, :email]
+      refute @capability in Authz.effective_capabilities(actor).allowed
+
+      assert %Record{tax_id: %Withheld{}, email: %Withheld{}} =
+               Authz.redact(reader, @policy, record())
+    end
+
+    test "a grant is seen on the next ask, and every ask reads the database" do
       scope = TenancyFixtures.scope()
       reader = Authentication.sign_in(scope, 7, 10)
 
-      first = capture_queries(fn -> Authz.withheld_fields(reader, @policy) end)
-      assert first != []
+      assert capture_queries(fn -> Authz.withheld_fields(reader, @policy) end) != []
       assert Authz.withheld_fields(reader, @policy) == [:tax_id, :email]
-
-      assert capture_queries(fn -> Authz.withheld_fields(reader, @policy) end) == []
 
       assert {:ok, :stored} =
                Authz.put_principal_capability(scope, 10, :user, 7, @capability, true)
 
+      assert capture_queries(fn -> Authz.withheld_fields(reader, @policy) end) != []
       assert Authz.withheld_fields(reader, @policy) == []
+    end
 
-      {:ok, actor} = Authz.scope_actor(reader)
-      assert @capability in Authz.effective_capabilities(actor).allowed
-      assert capture_queries(fn -> Authz.effective_capabilities(actor) end) == []
+    test "a list is one evaluation however many records it holds" do
+      reader = signed_in_without()
+      one = capture_queries(fn -> Authz.redact(reader, @policy, record()) end)
 
-      # Another process has no memory of this one.
-      parent = self()
+      many =
+        capture_queries(fn -> Authz.redact(reader, @policy, List.duplicate(record(), 50)) end)
 
-      spawn_link(fn ->
-        send(
-          parent,
-          {:queries, capture_queries(fn -> Authz.withheld_fields(reader, @policy) end)}
-        )
-      end)
+      assert length(many) == length(one)
+    end
+  end
 
-      assert_receive {:queries, queries}
-      assert queries != []
+  describe "Authz.withheld_fields_by_type/2" do
+    setup do
+      install_test_registry!(
+        field_policies: %{"Example.Record" => @policy, "Example.Legacy" => @policy}
+      )
+
+      :ok
+    end
+
+    test "names the withheld fields of each declared type, as stored strings" do
+      assert Authz.withheld_fields_by_type(signed_in_without(), [
+               "Example.Record",
+               "Example.Legacy",
+               "Example.Unrelated"
+             ]) ==
+               %{
+                 "Example.Record" => ["tax_id", "email"],
+                 "Example.Legacy" => ["tax_id", "email"]
+               }
+    end
+
+    test "a holder has nothing withheld, and a type nobody declared is absent" do
+      assert Authz.withheld_fields_by_type(holder(), ["Example.Record"]) == %{}
+      assert Authz.withheld_fields_by_type(signed_in_without(), ["Example.Unrelated"]) == %{}
+      assert Authz.withheld_fields_by_type(signed_in_without(), []) == %{}
+    end
+
+    test "an anonymous system scope is withheld every field, and the answer follows a revoke" do
+      assert Authz.withheld_fields_by_type(TenancyFixtures.scope(), ["Example.Record"]) ==
+               %{"Example.Record" => ["tax_id", "email"]}
+
+      reader = holder()
+      assert Authz.withheld_fields_by_type(reader, ["Example.Record"]) == %{}
+      Repo.delete_all(PrincipalCapability)
+
+      assert Authz.withheld_fields_by_type(reader, ["Example.Record"]) ==
+               %{"Example.Record" => ["tax_id", "email"]}
+    end
+
+    test "many types cost one load of the grants" do
+      reader = signed_in_without()
+
+      one = capture_queries(fn -> Authz.withheld_fields_by_type(reader, ["Example.Record"]) end)
+
+      both =
+        capture_queries(fn ->
+          Authz.withheld_fields_by_type(reader, ["Example.Record", "Example.Legacy"])
+        end)
+
+      assert one != []
+      assert length(both) == length(one)
     end
   end
 

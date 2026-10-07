@@ -1825,6 +1825,42 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#company-record-history-panel", "TAX-98765")
     end
 
+    test "the audit mutations browser withholds the same fields, before and after", %{conn: conn} do
+      grant_capabilities!(["admin.audit.log.list"])
+
+      {:ok, view, html} = conn |> log_in_as() |> live(~p"/audit/mutations?page_size=100")
+      refute html =~ "TAX-98765"
+      refute html =~ "hq@bilimbi.test"
+
+      mutation = company_update_mutation!()
+
+      view |> element("#mutation-#{mutation.id}-details-toggle") |> render_click()
+
+      assert has_element?(
+               view,
+               "#mutation-#{mutation.id}-details #mutation-#{mutation.id}-tax_id-withheld[data-withheld]",
+               "Withheld"
+             )
+
+      assert has_element?(
+               view,
+               "#mutation-#{mutation.id}-details #mutation-#{mutation.id}-email-withheld[data-withheld]"
+             )
+
+      refute has_element?(view, "#mutation-#{mutation.id}-tax_id-old")
+      refute has_element?(view, "#mutation-#{mutation.id}-tax_id-new")
+      refute render(view) =~ "TAX-98765"
+      refute render(view) =~ "hq@bilimbi.test"
+
+      grant_capabilities!("admin.company.sensitive.view")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations?page_size=100")
+      view |> element("#mutation-#{mutation.id}-details-toggle") |> render_click()
+
+      assert has_element?(view, "#mutation-#{mutation.id}-tax_id-new", "TAX-98765")
+      assert has_element?(view, "#mutation-#{mutation.id}-email-new", "hq@bilimbi.test")
+      refute has_element?(view, "#mutation-#{mutation.id}-details [data-withheld]")
+    end
+
     test "the companies list does not search a withheld email", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
 
@@ -1845,6 +1881,15 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
                "#companies-search[placeholder='Search by name, code, legal name, email, or jurisdiction...']"
              )
     end
+  end
+
+  defp company_update_mutation!() do
+    {:ok, mutations} = Audit.list_mutations(holder_scope())
+
+    Enum.find(mutations, fn mutation ->
+      mutation.event == "updated" and mutation.auditable_id == "73" and
+        mutation.new_values["tax_id"] == "TAX-98765"
+    end) || flunk("the company update was not audited")
   end
 
   # A second account at company 73 (user 92) holding the sensitive capability,

@@ -38,7 +38,8 @@ defmodule Bilimbi.Base.Audit.Mutation do
     :old_values,
     :new_values,
     :trace_id,
-    :occurred_at
+    :occurred_at,
+    withheld: []
   ]
 
   @type t :: %__MODULE__{
@@ -63,7 +64,8 @@ defmodule Bilimbi.Base.Audit.Mutation do
           old_values: map() | list() | nil,
           new_values: map() | list() | nil,
           trace_id: String.t() | nil,
-          occurred_at: NaiveDateTime.t()
+          occurred_at: NaiveDateTime.t(),
+          withheld: [String.t()]
         }
 
   @doc false
@@ -94,4 +96,35 @@ defmodule Bilimbi.Base.Audit.Mutation do
       occurred_at: mutation.occurred_at
     }
   end
+
+  @doc false
+  # Takes the values of `fields` out of the read model. A field the change
+  # touched is named in `withheld` instead, so a reader still sees that it
+  # changed; a field the change left alone is simply gone.
+  @spec withhold(t(), [String.t()]) :: t()
+  def withhold(%__MODULE__{} = mutation, []), do: mutation
+
+  def withhold(%__MODULE__{} = mutation, fields) when is_list(fields) do
+    old_values = if is_map(mutation.old_values), do: mutation.old_values, else: %{}
+    new_values = if is_map(mutation.new_values), do: mutation.new_values, else: %{}
+
+    withheld =
+      Enum.filter(fields, fn field ->
+        present? = Map.has_key?(old_values, field) or Map.has_key?(new_values, field)
+
+        present? and
+          (mutation.event != "updated" or
+             Map.get(old_values, field) != Map.get(new_values, field))
+      end)
+
+    %{
+      mutation
+      | old_values: drop(mutation.old_values, fields),
+        new_values: drop(mutation.new_values, fields),
+        withheld: withheld
+    }
+  end
+
+  defp drop(values, fields) when is_map(values), do: Map.drop(values, fields)
+  defp drop(values, _fields), do: values
 end

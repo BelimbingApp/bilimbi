@@ -61,7 +61,13 @@ defmodule Bilimbi.Core.Company.Contributions do
         # (`Bilimbi.Core.Company.Summary.field_policy/0`). It is granted to
         # the configured owner role so an installation keeps seeing what it
         # saw; `mix bilimbi.authz.reconcile` carries it into an existing
-        # database.
+        # database. The same policy governs the audit views of a company's
+        # changes, which Base Audit cannot ask Core about: `field_policies`
+        # names it for every type a company's audit rows are recorded under.
+        field_policies:
+          Map.new(Bilimbi.Core.Company.auditable_types(), fn type ->
+            {type, Bilimbi.Core.Company.Summary.field_policy()}
+          end),
         capabilities: [
           "admin.company.view",
           "admin.company.list",

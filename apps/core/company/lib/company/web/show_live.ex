@@ -269,7 +269,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:is_primary, is_primary)
          |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
          |> assign(:can_lifecycle?, can_lifecycle?(scope, company_id))
-         |> assign(:withheld_fields, Enum.map(Company.withheld_fields(scope), &Atom.to_string/1))
          |> assign(:legal_entity_types, legal_entity_types)
          |> assign(:country_options, Geonames.country_options())
          |> assign(:parent_companies, parent_companies)
@@ -373,10 +372,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     else
       _ -> %{}
     end
-  end
-
-  defp company_auditable_types do
-    ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", Company.addressable_identity()]
   end
 
   defp not_found(socket) do
@@ -998,10 +993,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 current_scope={@current_scope}
                 opts={
                   %{
-                    auditable_types: company_auditable_types(),
+                    auditable_types: Company.auditable_types(),
                     auditable_id: @company.id,
-                    record: @company,
-                    withheld: @withheld_fields
+                    record: @company
                   }
                 }
               />

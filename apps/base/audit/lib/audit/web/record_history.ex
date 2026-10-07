@@ -44,13 +44,14 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
 
   ## Fields the reader may not see
 
-  The page passes `withheld`, the string names of the record's fields its
-  owner withholds from this reader (`Bilimbi.Base.Authz.withheld_fields/2`
-  on the owner's field policy). A change to such a field is listed, so the
-  reader knows the record changed, but both values render `<.withheld>`:
-  the trail is the same record the page shows, and a value the page
-  withholds is not disclosed by its history. Capture-time redaction
-  (`sensitive`) is a different thing and stays "redacted".
+  A change to a field the record's owner withholds from this reader is
+  listed, so the reader knows the record changed, but its values render
+  `<.withheld>`: the trail is the same record the page shows, and a value
+  the page withholds is not disclosed by its history. `Bilimbi.Base.Audit`
+  takes those values out of the entries it returns, from the owner's field
+  policy, so this panel and the mutations table agree without being told.
+  Capture-time redaction (`sensitive`) is a different thing and stays
+  "redacted".
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -67,7 +68,6 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
       |> assign(assigns)
       |> assign_new(:title, fn -> "Record History" end)
       |> assign_new(:open, fn -> false end)
-      |> assign_new(:withheld, fn -> [] end)
 
     {:ok, load_entries(socket)}
   end
@@ -174,14 +174,14 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
               >
                 <span class="truncate font-semibold text-ink-muted">{diff.field}</span>
                 <span class="min-w-0 truncate text-ink">
+                  <.withheld
+                    :if={diff.withheld}
+                    id={"#{@id}-entry-#{entry.id}-#{diff.field}-withheld"}
+                  />
                   <%= if diff.sensitive do %>
                     redacted
                   <% end %>
-                  <.withheld
-                    :if={not diff.sensitive and diff.field in @withheld}
-                    id={"#{@id}-entry-#{entry.id}-#{diff.field}-withheld"}
-                  />
-                  <%= if not diff.sensitive and diff.field not in @withheld do %>
+                  <%= if not diff.sensitive and not diff.withheld do %>
                     <.diff_value
                       id={"#{@id}-entry-#{entry.id}-#{diff.field}-old"}
                       value={diff.old}

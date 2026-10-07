@@ -142,6 +142,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
                 capabilities: ["admin.test.record.view"]
               }
             },
+            field_policies: Keyword.get(opts, :field_policies, %{}),
             company_directory: Keyword.get(opts, :company_directory, TestCompanyDirectory)
           }
         }

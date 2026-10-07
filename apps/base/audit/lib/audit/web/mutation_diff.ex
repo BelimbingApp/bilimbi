@@ -16,6 +16,13 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   one minute read as two different values. A calendar date or a bare time stays
   text: neither denotes an instant, so neither has a zone to shift.
 
+  A field the reader may not see (`withheld` on the mutation, set by
+  `Bilimbi.Base.Audit` from the owning module's field policy) is still a row,
+  so the reader knows the record changed, but it carries no values: its row
+  has `withheld: true` and both sides `:absent`, and a surface renders
+  `<.withheld>` in their place. That is different from a sensitive key,
+  whose value capture itself redacted.
+
   Keys are classified as sensitive by the same substring rule both surfaces
   already applied; which fields are redacted at capture is
   `Bilimbi.Base.Audit.MutationCapture`'s decision, not this module's.
@@ -29,7 +36,13 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   @type value :: :absent | {:instant, DateTime.t()} | {:text, String.t()}
 
   @typedoc "One changed field."
-  @type row :: %{field: String.t(), old: value(), new: value(), sensitive: boolean()}
+  @type row :: %{
+          field: String.t(),
+          old: value(),
+          new: value(),
+          sensitive: boolean(),
+          withheld: boolean()
+        }
 
   @sensitive_fragments ["password", "secret", "token", "key", "hash"]
 
@@ -41,19 +54,25 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   differ.
   """
   @spec rows(map()) :: [row()]
-  def rows(%{event: "created", new_values: new_values}) when is_map(new_values) do
+  def rows(mutation) do
+    withheld = for field <- Map.get(mutation, :withheld, []), do: withheld_row(field)
+
+    (data_rows(mutation) ++ withheld) |> Enum.sort_by(& &1.field)
+  end
+
+  defp data_rows(%{event: "created", new_values: new_values}) when is_map(new_values) do
     new_values
     |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
     |> Enum.map(fn {key, value} -> row(key, :absent, value(value)) end)
   end
 
-  def rows(%{event: "deleted", old_values: old_values}) when is_map(old_values) do
+  defp data_rows(%{event: "deleted", old_values: old_values}) when is_map(old_values) do
     old_values
     |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
     |> Enum.map(fn {key, value} -> row(key, value(value), :absent) end)
   end
 
-  def rows(%{old_values: old_values, new_values: new_values}) do
+  defp data_rows(%{old_values: old_values, new_values: new_values}) do
     old_map = if is_map(old_values), do: old_values, else: %{}
     new_map = if is_map(new_values), do: new_values, else: %{}
 
@@ -66,7 +85,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
     end)
   end
 
-  def rows(_mutation), do: []
+  defp data_rows(_mutation), do: []
 
   @doc """
   The names of the fields `rows/1` would render, without their values.
@@ -75,15 +94,20 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   walks every value, including large JSON, which the closed row does not show.
   """
   @spec changed_fields(map()) :: [String.t()]
-  def changed_fields(%{event: "created", new_values: new_values}) when is_map(new_values) do
+  def changed_fields(mutation) do
+    (data_fields(mutation) ++ Enum.map(Map.get(mutation, :withheld, []), &to_string/1))
+    |> Enum.sort()
+  end
+
+  defp data_fields(%{event: "created", new_values: new_values}) when is_map(new_values) do
     names(Map.keys(new_values))
   end
 
-  def changed_fields(%{event: "deleted", old_values: old_values}) when is_map(old_values) do
+  defp data_fields(%{event: "deleted", old_values: old_values}) when is_map(old_values) do
     names(Map.keys(old_values))
   end
 
-  def changed_fields(%{old_values: old_values, new_values: new_values}) do
+  defp data_fields(%{old_values: old_values, new_values: new_values}) do
     old_map = if is_map(old_values), do: old_values, else: %{}
     new_map = if is_map(new_values), do: new_values, else: %{}
 
@@ -93,7 +117,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
     |> names()
   end
 
-  def changed_fields(_mutation), do: []
+  defp data_fields(_mutation), do: []
 
   @doc """
   Like `summary/1` but takes a precomputed field list so callers that already
@@ -166,7 +190,11 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   end
 
   defp row(key, old, new) do
-    %{field: to_string(key), old: old, new: new, sensitive: sensitive_key?(key)}
+    %{field: to_string(key), old: old, new: new, sensitive: sensitive_key?(key), withheld: false}
+  end
+
+  defp withheld_row(field) do
+    %{field: to_string(field), old: :absent, new: :absent, sensitive: false, withheld: true}
   end
 
   defp names(keys) do

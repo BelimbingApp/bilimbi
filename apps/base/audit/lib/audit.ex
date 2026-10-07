@@ -118,7 +118,7 @@ defmodule Bilimbi.Base.Audit do
         order_by: [asc: mutation.occurred_at, asc: mutation.id]
       )
       |> Repo.all()
-      |> Enum.map(&Mutation.from_schema/1)
+      |> read_mutations(scope)
 
     {:ok, mutations}
   end
@@ -144,7 +144,7 @@ defmodule Bilimbi.Base.Audit do
         limit: ^limit
       )
       |> Repo.all()
-      |> Enum.map(&Mutation.from_schema/1)
+      |> read_mutations(scope)
 
     {:ok, mutations}
   end
@@ -158,7 +158,7 @@ defmodule Bilimbi.Base.Audit do
         limit: ^limit
       )
       |> Repo.all()
-      |> Enum.map(&Mutation.from_schema/1)
+      |> read_mutations(scope)
 
     {:ok, mutations}
   end
@@ -193,7 +193,7 @@ defmodule Bilimbi.Base.Audit do
       base_query,
       ordered_query,
       opts,
-      fn rows -> Enum.map(rows, &Mutation.from_schema/1) end
+      &read_mutations(&1, scope)
     )
   end
 
@@ -280,6 +280,22 @@ defmodule Bilimbi.Base.Audit do
 
   defp authorize(scope) do
     if Authorization.can?(scope, @manage_capability), do: :ok, else: {:error, :forbidden}
+  end
+
+  # The one place a stored mutation becomes a read model. The owning module's
+  # field policy is applied here, so no screen or caller of this module can
+  # obtain a value its reader may not see.
+  defp read_mutations(rows, %Scope{} = scope) do
+    mutations = Enum.map(rows, &Mutation.from_schema/1)
+    types = mutations |> Enum.map(& &1.auditable_type) |> Enum.uniq()
+
+    case Authorization.withheld_fields(scope, types) do
+      withheld when withheld == %{} ->
+        mutations
+
+      withheld ->
+        Enum.map(mutations, &Mutation.withhold(&1, Map.get(withheld, &1.auditable_type, [])))
+    end
   end
 
   defp page_query(count_query, ordered_query, opts, mapper) do
