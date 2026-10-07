@@ -27,6 +27,7 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Core.Company.ExternalAccesses
   alias Bilimbi.Core.Company.ExternalAccessSummary
   alias Bilimbi.Core.Company.LegalEntityType
+  alias Bilimbi.Core.Company.Lifecycle
   alias Bilimbi.Core.Company.LiveCompanyProof
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
@@ -41,6 +42,8 @@ defmodule Bilimbi.Core.Company do
 
   @type lookup_error :: :not_provisioned | :invariant_violation | :database_unavailable
   @type access_lookup_error :: :not_found | :company_not_found | :relationship_not_found
+  @type lifecycle_operation :: Lifecycle.operation()
+  @type lifecycle_error :: Lifecycle.error()
   @manage_across_tenant_capability "admin.company.tenant-wide.manage"
 
   @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
@@ -472,6 +475,12 @@ defmodule Bilimbi.Core.Company do
 
   @doc """
   Updates a live Company record scoped to the caller's tenant.
+
+  `status` is not an attribute this path writes. A status change is one of
+  the lifecycle operations below (`archive_company/3`, `suspend_company/3`,
+  `activate_company/3`, `reactivate_company/3`); an attribute map that
+  carries `status` is refused with a changeset error on that field rather
+  than silently dropped.
   """
   @spec update_company(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
@@ -498,6 +507,73 @@ defmodule Bilimbi.Core.Company do
   end
 
   def update_company(%Scope{}, _company_id, _attributes), do: {:error, :not_found}
+
+  # Lifecycle. The public names stay here; the transition table and the
+  # bodies live in `Lifecycle`.
+
+  @doc """
+  Archives a live company: `pending`, `active` or `suspended` to `archived`.
+
+  Archived is final; no operation leaves it. Every lifecycle operation takes
+  the sealed scope of the person performing it, requires
+  `admin.company.update` on it now and, for a company other than the one the
+  person signed in under, `admin.company.tenant-wide.manage` as well (as
+  `authorize_company_target/3` decides), accepts an optional `reason:` (trimmed,
+  at most `Lifecycle.reason_max_length/0` characters; blank records none),
+  writes the status and one retained `company.<event>` audit action in the
+  same transaction, and returns the updated summary. A system scope
+  is `{:error, :forbidden}`; a company the operation does not
+  start from is `{:error, {:invalid_transition, current_status}}`; a missing,
+  deleted or cross-tenant id is `{:error, :not_found}`; a reason longer than
+  that limit is `{:error, :reason_too_long}` and one that is not text is
+  `{:error, :invalid_reason}`. `archive_company/3` and `suspend_company/3`
+  refuse the tenant's primary company with `{:error, :primary_company}` and
+  the performing account's own signed-in company with `{:error, :own_company}`.
+  The table of operations is `docs/README.md` "Lifecycle".
+  """
+  @spec archive_company(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, Summary.t()} | {:error, lifecycle_error()}
+  def archive_company(%Scope{} = scope, company_id, opts \\ []),
+    do: Lifecycle.apply(:archive, scope, company_id, opts)
+
+  @doc "Suspends an `active` company. See `archive_company/3` for the shared contract."
+  @spec suspend_company(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, Summary.t()} | {:error, lifecycle_error()}
+  def suspend_company(%Scope{} = scope, company_id, opts \\ []),
+    do: Lifecycle.apply(:suspend, scope, company_id, opts)
+
+  @doc "Activates a `pending` company. See `archive_company/3` for the shared contract."
+  @spec activate_company(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, Summary.t()} | {:error, lifecycle_error()}
+  def activate_company(%Scope{} = scope, company_id, opts \\ []),
+    do: Lifecycle.apply(:activate, scope, company_id, opts)
+
+  @doc "Reactivates a `suspended` company. See `archive_company/3` for the shared contract."
+  @spec reactivate_company(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, Summary.t()} | {:error, lifecycle_error()}
+  def reactivate_company(%Scope{} = scope, company_id, opts \\ []),
+    do: Lifecycle.apply(:reactivate, scope, company_id, opts)
+
+  @doc """
+  The lifecycle operations a company in `status` may undergo.
+
+  A page offers exactly these controls and nothing else; `archived` yields
+  `[]`. The order is fixed: activate, reactivate, suspend, archive.
+  """
+  @spec lifecycle_operations(String.t()) :: [lifecycle_operation()]
+  defdelegate lifecycle_operations(status), to: Lifecycle, as: :operations_from
+
+  @doc """
+  The statuses a company may be created in: `active` (the default) and
+  `pending`. `suspended` and `archived` are reached only through the
+  lifecycle operations.
+  """
+  @spec initial_statuses() :: [String.t()]
+  defdelegate initial_statuses(), to: Schema
+
+  @doc "The longest reason a lifecycle operation records, in characters."
+  @spec lifecycle_reason_max_length() :: pos_integer()
+  defdelegate lifecycle_reason_max_length(), to: Lifecycle, as: :reason_max_length
 
   @doc """
   Lists live direct child companies (subsidiaries) for a given parent company in the caller's tenant.

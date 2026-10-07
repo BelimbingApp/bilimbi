@@ -17,6 +17,74 @@ The module-owned detail and list page headers follow DESIGN.md's "Demoted
 secondary actions" pattern; `Bilimbi.Core.Company.Web.ShowLive`'s moduledoc owns
 the detail header contract.
 
+## Lifecycle
+
+A company's `status` is a lifecycle, not an attribute. `update_company/3`
+refuses a `status` key with a changeset error; a status changes only through
+one of these operations, each a named verb on `Bilimbi.Core.Company` whose
+body is `Bilimbi.Core.Company.Lifecycle`:
+
+| Operation | From | To | Audit event |
+|---|---|---|---|
+| `activate_company/3` | `pending` | `active` | `company.activated` |
+| `reactivate_company/3` | `suspended` | `active` | `company.reactivated` |
+| `suspend_company/3` | `active` | `suspended` | `company.suspended` |
+| `archive_company/3` | `pending`, `active`, `suspended` | `archived` | `company.archived` |
+
+`pending` is an initial state only: `create_company/3` accepts `active` (the
+default) or `pending` and nothing else, and `activate_company/3` is the one
+way out. `archived` is final: no operation starts from it, matching the rule
+in `apps/core/AGENTS.md` that archiving is not undone. Any other pairing is
+`{:error, {:invalid_transition, current_status}}`, a refusal the caller can
+name rather than a changeset error on a field.
+
+Every operation:
+
+- takes the sealed `%Bilimbi.Base.Tenancy.Scope{}` of the person performing
+  it and requires `admin.company.update` on it now, through
+  `authorize_company_target/3`: the capability where the person signed in is
+  enough for that company, and any other company of the tenant additionally
+  requires `admin.company.tenant-wide.manage`. Holding the update capability
+  at one company never reaches another. The lifecycle shares the update
+  capability rather than owning one of its own; a system scope names nobody
+  and is `{:error, :forbidden}` because a business event records who
+  performed it. The company page shows the controls only where this holds
+  and says why when it does not;
+- accepts `reason:` as an option: trimmed, blank recorded as none, at most
+  `lifecycle_reason_max_length/0` characters, counted as characters and not
+  bytes (`{:error, :reason_too_long}`); a reason that is not text is
+  `{:error, :invalid_reason}`;
+- locks the live row, judges the transition against the status it will
+  overwrite, writes it, and records one retained `base_audit_actions` row
+  with the event above in the same transaction. The payload is the semantic
+  shape the impersonation and system-principal records use: `summary`
+  ("Archived company “Name”"), `subject` (`company`, its id and name) and
+  `context` with `from_status`, `to_status` and `reason`. If the action
+  cannot be recorded the status write is rolled back
+  (`{:error, :audit_unavailable}`). The captured mutation on `companies`
+  still records the field values; the action records the intent;
+- for `archive_company/3` and `suspend_company/3`, which take a company out
+  of service, refuses the tenant's primary company
+  (`{:error, :primary_company}`, judged against the assignment under the
+  row lock) and the company the performing account signed in under
+  (`{:error, :own_company}`, the scope actor's `company_id`), after the
+  transition itself has been judged. The tenant and the operator stand on
+  those companies; activate and reactivate are never refused for this;
+- returns `{:error, :not_found}` for a missing, soft-deleted or cross-tenant
+  id, as `get_company/2` does.
+
+`lifecycle_operations/1` answers which operations a status offers, in the
+fixed order activate, reactivate, suspend, archive; a page renders exactly
+those controls. The company page offers them beside the status badge and
+commits each through one dialog that names the consequence and takes the
+reason (`Bilimbi.Core.Company.Web.ShowLive`).
+
+Soft deletion (`deleted_at`) is a separate fact from the `archived` status,
+as it is in Belimbing, where `archive()` sets the status and `delete()`
+retires the row. The frozen-account behaviour on a user page and the Authz
+company-scope denial follow `deleted_at`; a status of `archived` does not
+yet freeze anything. There is no `delete_company` in this API today.
+
 ## Tenant-wide reads
 
 | Function | Soft-deleted companies |

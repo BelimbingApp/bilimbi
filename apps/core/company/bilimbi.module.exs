@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Company,
   dependencies: [
     "base/grid",
+    "base/audit",
     "base/authz",
     "base/dashboard",
     "base/datetime",

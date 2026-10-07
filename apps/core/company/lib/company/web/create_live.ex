@@ -13,7 +13,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
   alias Bilimbi.Core.Company
   alias Ecto.Changeset
 
-  @statuses ~w(active suspended pending archived)
   @create_capability "admin.company.create"
 
   @field_types %{
@@ -235,7 +234,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
     |> validate_required([:name, :status])
-    |> validate_inclusion(:status, @statuses)
+    |> validate_inclusion(:status, Company.initial_statuses())
     |> validate_length(:name, min: 1, max: 255)
     |> validate_length(:code, max: 255)
     |> validate_length(:jurisdiction, max: 2)
@@ -328,7 +327,9 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     Enum.map(types, &{&1.name, &1.id})
   end
 
+  # A company is created pending or active; suspended and archived are
+  # reached only through the lifecycle operations on its page.
   defp status_options do
-    Enum.map(@statuses, &{String.capitalize(&1), &1})
+    Enum.map(Company.initial_statuses(), &{String.capitalize(&1), &1})
   end
 end

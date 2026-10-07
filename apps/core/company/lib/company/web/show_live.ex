@@ -14,9 +14,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     `<.inline_edit>`; Escape cancels. Name and code are required columns, so
     an emptied value commits nothing; the other five are nullable and pass
     `allow_empty`;
-  - a choice fact (status, legal entity type, jurisdiction, parent company,
-    default timezone) reads as its badge or name and becomes a select on
-    click; the select commits on change, and Escape or leaving it cancels.
+  - a choice fact (legal entity type, jurisdiction, parent company, default
+    timezone) reads as its name and becomes a select on click; the select
+    commits on change, and Escape or leaving it cancels.
     The default timezone reads the company's own setting; without one it
     reads "Not configured" beside the zone `Bilimbi.Base.DateTime` renders
     its dates in through the tenant and platform settings, so UTC is named
@@ -28,7 +28,20 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     from its chip;
   - the metadata JSON is a multi-line document, so the shared
     `<.inline_long_text>` opens its textarea on the read value, commits on
-    blur and cancels on Escape.
+    blur and cancels on Escape;
+  - the status is not a fact an edit writes. It reads as its badge, and
+    beside it the operator sees only the lifecycle operations the company
+    may undergo from where it is (`Company.lifecycle_operations/1`): a
+    pending company offers Activate and Archive, an active one Suspend and
+    Archive, a suspended one Reactivate and Archive, and an archived one
+    nothing, with the row saying that archiving is final. Each operation
+    opens one `<.modal>` that leads with the consequence, states whether it
+    can be undone, takes an optional reason for the audit trail, and commits
+    through the named Company API verb; a completed operation closes the
+    dialog and flashes `:success`, as a completed write does. The dialog is
+    a modal rather than `<.confirm_dialog>` because the reason travels with
+    the decision, so one dialog both collects it and, for the irreversible
+    archive, confirms it with the same consequence-first shape.
 
   Each fact reports its own outcome through the shared commit status that
   `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
@@ -93,7 +106,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # default timezone is a company setting rather than a column, so it is a
   # choice fact with its own event.
   @choice_fields %{
-    "status" => :status,
     "legal_entity_type_id" => :legal_entity_type_id,
     "jurisdiction" => :jurisdiction,
     "parent_id" => :parent_id
@@ -126,12 +138,49 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     "timezone" => "Default Timezone"
   }
 
-  @status_options [
-    {"Active", "active"},
-    {"Suspended", "suspended"},
-    {"Pending", "pending"},
-    {"Archived", "archived"}
-  ]
+  # The lifecycle dialog's copy per operation: the consequence sentence is
+  # the dialog's title, the detail says what is kept and whether it can be
+  # undone, and the verb names the confirm. Which operations a status offers
+  # is Company's answer, not this page's.
+  @lifecycle_copy %{
+    activate: %{
+      label: "Activate",
+      verb: "Activate",
+      working: "Activating…",
+      consequence: "%{name} will be activated.",
+      detail: "It becomes a working company of this workspace. It can be suspended later.",
+      done: "Activated %{name}.",
+      variant: "primary"
+    },
+    reactivate: %{
+      label: "Reactivate",
+      verb: "Reactivate",
+      working: "Reactivating…",
+      consequence: "%{name} will be reactivated.",
+      detail: "The suspension is lifted and the company is active again.",
+      done: "Reactivated %{name}.",
+      variant: "primary"
+    },
+    suspend: %{
+      label: "Suspend",
+      verb: "Suspend",
+      working: "Suspending…",
+      consequence: "%{name} will be suspended.",
+      detail: "Its records are kept. Reactivating the company lifts the suspension.",
+      done: "Suspended %{name}.",
+      variant: "primary"
+    },
+    archive: %{
+      label: "Archive",
+      verb: "Archive",
+      working: "Archiving…",
+      consequence: "%{name} will be archived.",
+      detail:
+        "Its records are kept. Archiving is final: an archived company cannot be reactivated.",
+      done: "Archived %{name}.",
+      variant: "danger"
+    }
+  }
 
   @page_sizes [25, 50, 100, 300]
 
@@ -210,6 +259,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> Workspace.announce(%{kind: "core/company", id: company.id})
          |> assign(:is_primary, is_primary)
          |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+         |> assign(:can_lifecycle?, can_lifecycle?(scope, company_id))
          |> assign(:legal_entity_types, legal_entity_types)
          |> assign(:country_options, Geonames.country_options())
          |> assign(:parent_companies, parent_companies)
@@ -222,7 +272,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
          |> assign_timezone(company)
-         |> assign(:status_options, @status_options)
+         |> assign(:pending_lifecycle, nil)
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
          |> assign(:editing_metadata?, false)
@@ -369,6 +419,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     save_timezone
   )
 
+  # A lifecycle operation is judged against the company it acts on, as the
+  # verb judges it: `admin.company.update`, plus the tenant-wide reach for a
+  # company other than the one the person signed in under.
+  @lifecycle_events ~w(request_lifecycle apply_lifecycle)
+
   @impl true
   def handle_event(event, params, socket) when event in @write_events do
     if can_update?(socket) do
@@ -378,8 +433,20 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
+  def handle_event(event, params, socket) when event in @lifecycle_events do
+    if can_lifecycle?(socket.assigns.current_scope.scope, socket.assigns.company.id) do
+      write_event(event, params, socket)
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
   def handle_event("cancel_remove_activity", _params, socket) do
     {:noreply, assign(socket, :pending_activity, nil)}
+  end
+
+  def handle_event("cancel_lifecycle", _params, socket) do
+    {:noreply, assign(socket, :pending_lifecycle, nil)}
   end
 
   def handle_event("cancel_edit_field", _params, socket) do
@@ -440,6 +507,33 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
       :error ->
         {:noreply, socket}
+    end
+  end
+
+  # A lifecycle operation: the status row offers only what Company says the
+  # company may undergo, the request holds that operation and the dialog
+  # names its consequence, and applying it calls the named verb with the
+  # reason typed. A forged operation the status does not offer is ignored
+  # here and refused again by Company.
+  defp write_event("request_lifecycle", %{"operation" => operation}, socket) do
+    case lifecycle_operation(socket, operation) do
+      nil ->
+        {:noreply, socket}
+
+      operation ->
+        {:noreply,
+         socket
+         |> clear_flash()
+         |> assign(:pending_lifecycle, %{operation: operation, reason: ""})}
+    end
+  end
+
+  defp write_event("request_lifecycle", _params, socket), do: {:noreply, socket}
+
+  defp write_event("apply_lifecycle", params, socket) do
+    case socket.assigns.pending_lifecycle do
+      nil -> {:noreply, socket}
+      %{operation: operation} -> {:noreply, apply_lifecycle(socket, operation, params)}
     end
   end
 
@@ -597,6 +691,112 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     )
   end
 
+  defp apply_lifecycle(socket, operation, params) do
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+    reason = Map.get(params, "reason", "")
+    copy = lifecycle_copy(operation)
+
+    case lifecycle_verb(operation).(scope, company.id, reason: reason) do
+      {:ok, updated} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> assign_company(updated)
+        |> put_flash(:success, interpolate(copy.done, updated))
+
+      {:error, :reason_too_long} ->
+        socket
+        |> assign(:pending_lifecycle, %{operation: operation, reason: reason})
+        |> put_flash(
+          :error,
+          "The reason was not saved: it must be at most #{Company.lifecycle_reason_max_length()} characters."
+        )
+
+      {:error, :invalid_reason} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(:error, "The reason was not saved: it must be text.")
+
+      {:error, :primary_company} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: it is this tenant's primary company, which the tenant depends on."
+        )
+
+      {:error, :own_company} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: it is the company you are signed in under. " <>
+            "Someone signed in under another company can do it."
+        )
+
+      {:error, :forbidden} ->
+        socket |> assign(:pending_lifecycle, nil) |> write_forbidden()
+
+      {:error, {:invalid_transition, status}} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> reload_company()
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: it is now #{status}, " <>
+            "so that operation is no longer offered."
+        )
+
+      {:error, :not_found} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(:error, Map.fetch!(@failures, :not_found))
+
+      {:error, :audit_unavailable} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: the audit trail could not record it. Nothing was changed."
+        )
+    end
+  end
+
+  defp lifecycle_copy(operation), do: Map.fetch!(@lifecycle_copy, operation)
+
+  defp lifecycle_verb(:archive), do: &Company.archive_company/3
+  defp lifecycle_verb(:suspend), do: &Company.suspend_company/3
+  defp lifecycle_verb(:activate), do: &Company.activate_company/3
+  defp lifecycle_verb(:reactivate), do: &Company.reactivate_company/3
+
+  defp past(:archive), do: "Archived"
+  defp past(:suspend), do: "Suspended"
+  defp past(:activate), do: "Activated"
+  defp past(:reactivate), do: "Reactivated"
+
+  # The operation named by the event, only when the company's current status
+  # offers it; anything else is nil, and user input never becomes an atom.
+  defp lifecycle_operation(socket, name) when is_binary(name) do
+    socket.assigns.company.status
+    |> Company.lifecycle_operations()
+    |> Enum.find(&(Atom.to_string(&1) == name))
+  end
+
+  defp lifecycle_operation(_socket, _name), do: nil
+
+  defp interpolate(template, company), do: String.replace(template, "%{name}", company.name)
+
+  # The status changed under the page (a colleague archived it first): show
+  # the company as it is rather than the one the request was made against.
+  defp reload_company(socket) do
+    scope = socket.assigns.current_scope.scope
+
+    case Company.get_company(scope, socket.assigns.company.id) do
+      {:ok, company} -> assign_company(socket, company)
+      {:error, :not_found} -> socket
+    end
+  end
+
   defp assign_company(socket, updated) do
     socket
     |> assign(:company, updated)
@@ -625,13 +825,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     Authz.can(socket.assigns.current_scope.actor, @update_capability).allowed
   end
 
+  defp can_lifecycle?(scope, company_id) do
+    match?({:ok, _}, Company.authorize_company_target(scope, company_id, @update_capability))
+  end
+
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 
   # What the operator chose, as a refusal names it: the option's label when it
   # came from this page's list, "None" for the blank option, and the raw
   # value for anything else.
   defp choice_label(_socket, _name, ""), do: "None"
-  defp choice_label(_socket, "status", value), do: String.capitalize(value)
 
   defp choice_label(socket, "legal_entity_type_id", value),
     do: option_label(legal_entity_type_options(socket.assigns.legal_entity_types), value)
@@ -843,17 +1046,38 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               />
             </:item>
             <:item title={fact_label("status")} id="detail-status">
-              <.choice_fact
-                id="company-status"
-                name="status"
-                value={@company.status}
-                options={@status_options}
-                editing?={@editing_field == "status"}
-                can_update?={@can_update?}
-                status={@field_status["status"]}
-              >
+              <%!-- Not a choice fact: a status change is a lifecycle operation
+                   with a transition table of its own, so the row offers the
+                   named verbs Company allows from here and no select. --%>
+              <div id="company-status" class="flex flex-wrap items-center gap-3">
                 <.status_badge status={@company.status} />
-              </.choice_fact>
+                <%= if @can_lifecycle? do %>
+                  <button
+                    :for={operation <- Company.lifecycle_operations(@company.status)}
+                    type="button"
+                    id={"company-#{operation}"}
+                    phx-click="request_lifecycle"
+                    phx-value-operation={operation}
+                    class={[Bilimbi.Base.UI.Components.demoted_action_class(), "cursor-pointer"]}
+                  >
+                    {lifecycle_copy(operation).label}
+                  </button>
+                  <span
+                    :if={Company.lifecycle_operations(@company.status) == []}
+                    id="company-status-final"
+                    class="text-xs text-ink-muted"
+                  >
+                    Archiving is final.
+                  </span>
+                <% end %>
+                <span
+                  :if={@can_update? and not @can_lifecycle?}
+                  id="company-status-reach"
+                  class="text-xs text-ink-muted"
+                >
+                  Changing the status of another company needs tenant-wide company management.
+                </span>
+              </div>
             </:item>
             <:item title={fact_label("legal_entity_type_id")} id="detail-legal-entity-type">
               <.choice_fact
@@ -1334,6 +1558,45 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             %{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}
           }
         />
+
+        <.modal
+          :if={@pending_lifecycle}
+          id="company-lifecycle-modal"
+          title={interpolate(lifecycle_copy(@pending_lifecycle.operation).consequence, @company)}
+          flash={@flash}
+          on_cancel={JS.push("cancel_lifecycle")}
+        >
+          <:description>{lifecycle_copy(@pending_lifecycle.operation).detail}</:description>
+          <form id="company-lifecycle-form" phx-submit="apply_lifecycle" class="mt-4">
+            <.input
+              type="textarea"
+              id="company-lifecycle-reason"
+              name="reason"
+              label="Reason"
+              value={@pending_lifecycle.reason}
+              hint="Optional. Recorded with this change in the audit trail."
+              maxlength={Company.lifecycle_reason_max_length()}
+              phx-mounted={JS.focus()}
+            />
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+              <.button
+                id="company-lifecycle-cancel"
+                type="button"
+                phx-click={JS.push("cancel_lifecycle")}
+              >
+                Cancel
+              </.button>
+              <.button
+                id="company-lifecycle-confirm"
+                type="submit"
+                variant={lifecycle_copy(@pending_lifecycle.operation).variant}
+                phx-disable-with={lifecycle_copy(@pending_lifecycle.operation).working}
+              >
+                {lifecycle_copy(@pending_lifecycle.operation).verb}
+              </.button>
+            </div>
+          </form>
+        </.modal>
 
         <.confirm_dialog
           :if={@pending_activity}

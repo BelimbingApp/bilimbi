@@ -63,11 +63,19 @@ defmodule Bilimbi.Core.Company.Schema do
     :metadata
   ]
 
-  @update_fields @creation_fields
+  # Status leaves the generic update path: a status change is a lifecycle
+  # operation (`Bilimbi.Core.Company.Lifecycle`) with its own transition
+  # table and audit action, never an attribute an update carries along.
+  @update_fields @creation_fields -- [:status]
   @statuses ~w(active suspended pending archived)
+  @initial_statuses ~w(active pending)
 
   @spec statuses() :: [String.t()]
   def statuses, do: @statuses
+
+  @doc "The statuses a company may be created in; the others are reached only through a lifecycle operation."
+  @spec initial_statuses() :: [String.t()]
+  def initial_statuses, do: @initial_statuses
 
   @spec creation_changeset(pos_integer(), map()) :: Ecto.Changeset.t()
   def creation_changeset(tenant_id, attributes) do
@@ -80,7 +88,7 @@ defmodule Bilimbi.Core.Company.Schema do
     |> validate_required([:tenant_id, :name, :code, :status])
     |> validate_length(:name, min: 1, max: 255)
     |> validate_length(:code, min: 1, max: 255)
-    |> validate_inclusion(:status, @statuses)
+    |> validate_inclusion(:status, @initial_statuses)
     |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "must be an email address")
     |> validate_jurisdiction()
     |> unique_constraint(:code, name: :companies_code_unique)
@@ -92,12 +100,12 @@ defmodule Bilimbi.Core.Company.Schema do
   def update_changeset(%__MODULE__{} = company, attributes) do
     company
     |> cast(attributes, @update_fields)
+    |> refuse_status(attributes)
     |> update_change(:name, &trim_text/1)
     |> update_change(:code, &trim_text/1)
-    |> validate_required([:name, :code, :status])
+    |> validate_required([:name, :code])
     |> validate_length(:name, min: 1, max: 255)
     |> validate_length(:code, min: 1, max: 255)
-    |> validate_inclusion(:status, @statuses)
     |> validate_length(:legal_name, max: 255)
     |> validate_length(:registration_number, max: 255)
     |> validate_length(:tax_id, max: 255)
@@ -109,6 +117,23 @@ defmodule Bilimbi.Core.Company.Schema do
     |> check_parent_not_self()
     |> unique_constraint(:code, name: :companies_code_unique)
     |> foreign_key_constraint(:parent_id, name: :companies_parent_tenant_foreign)
+  end
+
+  @doc false
+  @spec transition_changeset(t(), String.t()) :: Ecto.Changeset.t()
+  def transition_changeset(%__MODULE__{} = company, status) when status in @statuses do
+    change(company, status: status)
+  end
+
+  # `cast/3` drops a key it was not told about, so a caller still sending
+  # `status` through the update path would write nothing and hear nothing.
+  # Refusing it names the door that closed.
+  defp refuse_status(changeset, attributes) do
+    if Map.has_key?(attributes, :status) or Map.has_key?(attributes, "status") do
+      add_error(changeset, :status, "is changed through a lifecycle operation, not an update")
+    else
+      changeset
+    end
   end
 
   defp validate_jurisdiction(changeset) do
