@@ -46,7 +46,9 @@ Every operation:
   rather than owning one of its own; a system scope that names nobody is
   `{:error, :forbidden}` because a business event records who performed it;
 - accepts `reason:` as an option: trimmed, blank recorded as none, at most
-  `lifecycle_reason_max_length/0` characters (`{:error, :reason_too_long}`);
+  `lifecycle_reason_max_length/0` characters, counted as characters and not
+  bytes (`{:error, :reason_too_long}`); a reason that is not text is
+  `{:error, :invalid_reason}`;
 - locks the live row, judges the transition against the status it will
   overwrite, writes it, and records one retained `base_audit_actions` row
   with the event above in the same transaction. The payload is the semantic
@@ -56,6 +58,13 @@ Every operation:
   cannot be recorded the status write is rolled back
   (`{:error, :audit_unavailable}`). The captured mutation on `companies`
   still records the field values; the action records the intent;
+- for `archive_company/3` and `suspend_company/3`, which take a company out
+  of service, refuses the tenant's primary company
+  (`{:error, :primary_company}`, judged against the assignment under the
+  row lock) and the company the performing account signed in under
+  (`{:error, :own_company}`, the scope actor's `company_id`), after the
+  transition itself has been judged. The tenant and the operator stand on
+  those companies; activate and reactivate are never refused for this;
 - returns `{:error, :not_found}` for a missing, soft-deleted or cross-tenant
   id, as `get_company/2` does.
 

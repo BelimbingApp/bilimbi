@@ -1419,7 +1419,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     end
 
     test "the status row offers only the operations the company may undergo", %{conn: conn} do
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
 
       # Active: suspend or archive, in that order, and no select.
       assert has_element?(view, "#company-status", "Active")
@@ -1436,20 +1436,20 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       render_click(view, "request_lifecycle", %{"operation" => "drop table"})
       refute has_element?(view, "#company-lifecycle-modal")
       render_submit(view, "apply_lifecycle", %{"reason" => "nothing pending"})
-      assert Company.get_company(scope!(), 73) |> elem(1) |> Map.fetch!(:status) == "active"
+      assert Company.get_company(scope!(), 74) |> elem(1) |> Map.fetch!(:status) == "active"
     end
 
     test "suspending leads with the consequence, records the reason and reports once", %{
       conn: conn
     } do
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
 
       view |> element("#company-suspend") |> render_click()
 
       assert has_element?(
                view,
                "dialog#company-lifecycle-modal h2",
-               "Bilimbi Industries will be suspended."
+               "Bilimbi Subsidiary will be suspended."
              )
 
       assert has_element?(view, "#company-lifecycle-modal-description", "Reactivating")
@@ -1476,42 +1476,42 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#company-reactivate", "Reactivate")
       assert has_element?(view, "#company-archive", "Archive")
       refute has_element?(view, "#company-suspend")
-      assert has_element?(view, "#flash-success", "Suspended Bilimbi Industries.")
+      assert has_element?(view, "#flash-success", "Suspended Bilimbi Subsidiary.")
 
       scope = scope!()
-      assert {:ok, %{status: "suspended"}} = Company.get_company(scope, 73)
+      assert {:ok, %{status: "suspended"}} = Company.get_company(scope, 74)
 
       {:ok, actions} = Audit.list_actions(scope)
       assert [action] = Enum.filter(actions, &(&1.event == "company.suspended"))
       assert action.actor_type == "user"
       assert action.actor_id == 91
-      assert action.company_id == 73
+      assert action.company_id == 74
       assert action.is_retained
-      assert action.payload["summary"] == "Suspended company “Bilimbi Industries”"
+      assert action.payload["summary"] == "Suspended company “Bilimbi Subsidiary”"
       assert action.payload["context"]["reason"] == "Unpaid invoices"
       assert action.payload["context"]["from_status"] == "active"
       assert action.payload["context"]["to_status"] == "suspended"
-      assert action.url =~ "/companies/73"
+      assert action.url =~ "/companies/74"
 
       # Reactivating is the inverse, with no reason this time.
       view |> element("#company-reactivate") |> render_click()
       view |> form("#company-lifecycle-form", %{"reason" => ""}) |> render_submit()
       assert has_element?(view, "#company-status", "Active")
-      assert has_element?(view, "#flash-success", "Reactivated Bilimbi Industries.")
+      assert has_element?(view, "#flash-success", "Reactivated Bilimbi Subsidiary.")
       {:ok, actions} = Audit.list_actions(scope)
       assert [reactivated] = Enum.filter(actions, &(&1.event == "company.reactivated"))
       assert reactivated.payload["context"]["reason"] == nil
     end
 
     test "archiving states that it is final and leaves nothing to offer", %{conn: conn} do
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
 
       view |> element("#company-archive") |> render_click()
 
       assert has_element?(
                view,
                "dialog#company-lifecycle-modal h2",
-               "Bilimbi Industries will be archived."
+               "Bilimbi Subsidiary will be archived."
              )
 
       assert has_element?(
@@ -1527,10 +1527,10 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#company-status", "Archived")
       assert has_element?(view, "#company-status-final", "Archiving is final.")
       refute has_element?(view, "#company-status button")
-      assert has_element?(view, "#flash-success", "Archived Bilimbi Industries.")
+      assert has_element?(view, "#flash-success", "Archived Bilimbi Subsidiary.")
 
       scope = scope!()
-      assert {:ok, %{status: "archived"}} = Company.get_company(scope, 73)
+      assert {:ok, %{status: "archived"}} = Company.get_company(scope, 74)
       {:ok, actions} = Audit.list_actions(scope)
       assert [action] = Enum.filter(actions, &(&1.event == "company.archived"))
       assert action.payload["context"]["reason"] == "Wound up"
@@ -1538,13 +1538,13 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       # Nothing leaves archived, even by a forged event.
       render_click(view, "request_lifecycle", %{"operation" => "reactivate"})
       refute has_element?(view, "#company-lifecycle-modal")
-      assert {:ok, %{status: "archived"}} = Company.get_company(scope, 73)
+      assert {:ok, %{status: "archived"}} = Company.get_company(scope, 74)
     end
 
     test "an overlong reason is refused in the open dialog and nothing is written", %{
       conn: conn
     } do
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
 
       view |> element("#company-suspend") |> render_click()
       too_long = String.duplicate("x", Company.lifecycle_reason_max_length() + 1)
@@ -1559,7 +1559,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
              )
 
       assert has_element?(view, "#company-lifecycle-reason", String.slice(too_long, 0, 50))
-      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 73)
+      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 74)
       {:ok, actions} = Audit.list_actions(scope!())
       refute Enum.any?(actions, &String.starts_with?(&1.event, "company."))
     end
@@ -1567,20 +1567,70 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     test "a status changed by someone else is shown and the stale operation is refused", %{
       conn: conn
     } do
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
 
       view |> element("#company-suspend") |> render_click()
 
       # A colleague archives it while the dialog is open.
       scope = scope!() |> Bilimbi.Base.Tenancy.Authentication.sign_in(91, 73)
-      assert {:ok, _} = Company.archive_company(scope, 73)
+      assert {:ok, _} = Company.archive_company(scope, 74)
 
       view |> form("#company-lifecycle-form", %{"reason" => ""}) |> render_submit()
 
       refute has_element?(view, "#company-lifecycle-modal")
       assert has_element?(view, "#company-status", "Archived")
       assert has_element?(view, "#flash-error", "it is now archived")
-      assert {:ok, %{status: "archived"}} = Company.get_company(scope!(), 73)
+      assert {:ok, %{status: "archived"}} = Company.get_company(scope!(), 74)
+    end
+
+    test "the tenant's primary company is not archived or suspended, and says why", %{conn: conn} do
+      CompanyFixtures.assign_primary_company!(41, 74)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+
+      for operation <- ["suspend", "archive"] do
+        view |> element("#company-#{operation}") |> render_click()
+        view |> form("#company-lifecycle-form", %{"reason" => "Wound up"}) |> render_submit()
+
+        refute has_element?(view, "#company-lifecycle-modal")
+        assert has_element?(view, "#flash-error", "it is this tenant's primary company")
+        assert has_element?(view, "#company-status", "Active")
+      end
+
+      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 74)
+      {:ok, actions} = Audit.list_actions(scope!())
+      refute Enum.any?(actions, &String.starts_with?(&1.event, "company."))
+    end
+
+    test "the company the account is signed in under is not archived or suspended, and says why",
+         %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      for operation <- ["suspend", "archive"] do
+        view |> element("#company-#{operation}") |> render_click()
+        view |> form("#company-lifecycle-form", %{"reason" => ""}) |> render_submit()
+
+        refute has_element?(view, "#company-lifecycle-modal")
+        assert has_element?(view, "#flash-error", "it is the company you are signed in under")
+        assert has_element?(view, "#company-status", "Active")
+      end
+
+      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 73)
+      {:ok, actions} = Audit.list_actions(scope!())
+      refute Enum.any?(actions, &String.starts_with?(&1.event, "company."))
+    end
+
+    test "a reason is counted in characters, not bytes", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+
+      reason = String.duplicate("公司", div(Company.lifecycle_reason_max_length(), 2))
+      assert byte_size(reason) > Company.lifecycle_reason_max_length()
+
+      view |> element("#company-suspend") |> render_click()
+      view |> form("#company-lifecycle-form", %{"reason" => reason}) |> render_submit()
+
+      assert has_element?(view, "#company-status", "Suspended")
+      assert has_element?(view, "#flash-success", "Suspended Bilimbi Subsidiary.")
     end
   end
 

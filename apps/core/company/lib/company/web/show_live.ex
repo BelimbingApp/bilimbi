@@ -700,6 +700,28 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           "The reason was not saved: it must be at most #{Company.lifecycle_reason_max_length()} characters."
         )
 
+      {:error, :invalid_reason} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(:error, "The reason was not saved: it must be text.")
+
+      {:error, :primary_company} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: it is this tenant's primary company, which the tenant depends on."
+        )
+
+      {:error, :own_company} ->
+        socket
+        |> assign(:pending_lifecycle, nil)
+        |> put_flash(
+          :error,
+          "#{company.name} was not #{String.downcase(past(operation))}: it is the company you are signed in under. " <>
+            "Someone signed in under another company can do it."
+        )
+
       {:error, :forbidden} ->
         socket |> assign(:pending_lifecycle, nil) |> write_forbidden()
 

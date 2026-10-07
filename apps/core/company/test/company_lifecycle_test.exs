@@ -21,6 +21,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
 
   @user_id 91
   @company_id 73
+  @target_id 74
   @capability "admin.company.update"
 
   setup do
@@ -35,6 +36,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
     insert_tenant!()
     insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
     insert_company!(%{id: @company_id, name: "Bilimbi Industries"})
+    insert_company!(%{id: @target_id, name: "Bilimbi Subsidiary", code: "subsidiary"})
 
     {:ok, system_scope} = Tenancy.scope(41)
     scope = Authentication.sign_in(system_scope, @user_id, @company_id)
@@ -59,7 +61,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
 
       for {from, operation, to} <- table do
         set_status!(from)
-        assert {:ok, %Summary{id: @company_id, status: ^to}} = call(operation, scope)
+        assert {:ok, %Summary{id: @target_id, status: ^to}} = call(operation, scope)
         assert stored_status() == to
       end
 
@@ -104,9 +106,9 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
          %{scope: scope} do
       grant!()
 
-      assert {:ok, _} = Company.suspend_company(scope, @company_id, reason: "  Unpaid invoices  ")
-      assert {:ok, _} = Company.reactivate_company(scope, @company_id)
-      assert {:ok, _} = Company.archive_company(scope, @company_id, reason: "Wound up")
+      assert {:ok, _} = Company.suspend_company(scope, @target_id, reason: "  Unpaid invoices  ")
+      assert {:ok, _} = Company.reactivate_company(scope, @target_id)
+      assert {:ok, _} = Company.archive_company(scope, @target_id, reason: "Wound up")
 
       assert {:ok, actions} = Audit.list_actions(scope)
 
@@ -116,17 +118,17 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
       suspended = Enum.find(actions, &(&1.event == "company.suspended"))
       assert suspended.actor_type == "user"
       assert suspended.actor_id == @user_id
-      assert suspended.company_id == @company_id
+      assert suspended.company_id == @target_id
       assert suspended.is_retained
 
       assert suspended.payload == %{
                "semantic" => true,
                "source" => "Company",
-               "summary" => "Suspended company “Bilimbi Industries”",
+               "summary" => "Suspended company “Bilimbi Subsidiary”",
                "subject" => %{
                  "name" => "company",
-                 "id" => @company_id,
-                 "label" => "Bilimbi Industries"
+                 "id" => @target_id,
+                 "label" => "Bilimbi Subsidiary"
                },
                "context" => %{
                  "from_status" => "active",
@@ -137,7 +139,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
              }
 
       reactivated = Enum.find(actions, &(&1.event == "company.reactivated"))
-      assert reactivated.payload["summary"] == "Reactivated company “Bilimbi Industries”"
+      assert reactivated.payload["summary"] == "Reactivated company “Bilimbi Subsidiary”"
       assert reactivated.payload["context"]["reason"] == nil
 
       archived = Enum.find(actions, &(&1.event == "company.archived"))
@@ -153,17 +155,32 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
          %{scope: scope} do
       grant!()
 
-      assert {:ok, _} = Company.suspend_company(scope, @company_id, reason: "   ")
+      assert {:ok, _} = Company.suspend_company(scope, @target_id, reason: "   ")
       assert {:ok, [action]} = Audit.list_actions(scope)
       assert action.payload["context"]["reason"] == nil
 
       too_long = String.duplicate("x", Company.lifecycle_reason_max_length() + 1)
 
       assert {:error, :reason_too_long} =
-               Company.reactivate_company(scope, @company_id, reason: too_long)
+               Company.reactivate_company(scope, @target_id, reason: too_long)
+
+      assert {:error, :invalid_reason} =
+               Company.reactivate_company(scope, @target_id, reason: %{"not" => "text"})
 
       assert stored_status() == "suspended"
       assert {:ok, [_only_the_suspension]} = Audit.list_actions(scope)
+    end
+
+    test "the reason limit counts characters, not bytes", %{scope: scope} do
+      grant!()
+
+      reason = String.duplicate("公司", div(Company.lifecycle_reason_max_length(), 2))
+      assert byte_size(reason) > Company.lifecycle_reason_max_length()
+      assert String.length(reason) == Company.lifecycle_reason_max_length()
+
+      assert {:ok, _} = Company.suspend_company(scope, @target_id, reason: reason)
+      assert {:ok, [action]} = Audit.list_actions(scope)
+      assert action.payload["context"]["reason"] == reason
     end
 
     test "the operator behind an impersonated session and the request trace are recorded", %{
@@ -186,7 +203,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
 
       on_exit(fn -> Bilimbi.Base.Audit.Context.put(nil) end)
 
-      assert {:ok, _} = Company.suspend_company(scope, @company_id)
+      assert {:ok, _} = Company.suspend_company(scope, @target_id)
       assert {:ok, [action]} = Audit.list_actions(scope)
       assert action.actor_id == @user_id
       assert action.impersonator_id == 7
@@ -198,46 +215,83 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
     test "without the update capability the operation is forbidden and nothing is written", %{
       scope: scope
     } do
-      assert {:error, :forbidden} = Company.suspend_company(scope, @company_id)
+      assert {:error, :forbidden} = Company.suspend_company(scope, @target_id)
       assert stored_status() == "active"
       assert {:ok, []} = Audit.list_actions(scope)
     end
 
     test "a system scope that names nobody is refused", %{system_scope: system_scope} do
-      assert {:error, :forbidden} = Company.archive_company(system_scope, @company_id)
+      assert {:error, :forbidden} = Company.archive_company(system_scope, @target_id)
       assert stored_status() == "active"
     end
 
     test "a missing, soft-deleted or cross-tenant company is not found", %{scope: scope} do
       grant!()
-      insert_company!(%{id: 74, code: "retired", deleted_at: ~N[2026-08-11 12:00:00]})
-      insert_company!(%{id: 75, tenant_id: 42, code: "elsewhere"})
+      insert_company!(%{id: 84, code: "retired", deleted_at: ~N[2026-08-11 12:00:00]})
+      insert_company!(%{id: 85, tenant_id: 42, code: "elsewhere"})
 
       assert {:error, :not_found} = Company.suspend_company(scope, 9999)
-      assert {:error, :not_found} = Company.suspend_company(scope, 74)
-      assert {:error, :not_found} = Company.suspend_company(scope, 75)
+      assert {:error, :not_found} = Company.suspend_company(scope, 84)
+      assert {:error, :not_found} = Company.suspend_company(scope, 85)
       assert {:error, :not_found} = Company.suspend_company(scope, "73")
       assert {:error, :not_found} = Company.suspend_company(scope, 0)
+    end
+  end
+
+  describe "standing" do
+    test "the tenant's primary company is neither archived nor suspended", %{scope: scope} do
+      grant!()
+      assign_primary_company!(41, @target_id)
+
+      for operation <- [:archive, :suspend] do
+        assert {:error, :primary_company} = call(operation, scope)
+      end
+
+      assert stored_status() == "active"
+      assert {:ok, []} = Audit.list_actions(scope)
+
+      set_status!("pending")
+      assert {:ok, %Summary{status: "active"}} = call(:activate, scope)
+    end
+
+    test "the company the performing account signed in under is neither archived nor suspended",
+         %{system_scope: system_scope} do
+      grant!(@target_id)
+      own = Authentication.sign_in(system_scope, @user_id, @target_id)
+
+      for operation <- [:archive, :suspend] do
+        assert {:error, :own_company} = call(operation, own)
+      end
+
+      assert stored_status() == "active"
+      assert {:ok, []} = Audit.list_actions(own)
+    end
+
+    test "another company being primary does not stand in the way", %{scope: scope} do
+      grant!()
+      assign_primary_company!(41, @company_id)
+
+      assert {:ok, %Summary{status: "archived"}} = call(:archive, scope)
     end
   end
 
   describe "the generic paths" do
     test "update_company/3 refuses a status key instead of dropping it", %{system_scope: scope} do
       assert {:error, changeset} =
-               Company.update_company(scope, @company_id, %{status: "archived"})
+               Company.update_company(scope, @target_id, %{status: "archived"})
 
       assert {:status, {message, _}} = List.keyfind(changeset.errors, :status, 0)
       assert message =~ "lifecycle operation"
 
       assert {:error, changeset} =
-               Company.update_company(scope, @company_id, %{
+               Company.update_company(scope, @target_id, %{
                  "status" => "suspended",
                  "name" => "X"
                })
 
       assert List.keyfind(changeset.errors, :status, 0)
       assert stored_status() == "active"
-      assert Repo.get!(Bilimbi.Core.Company.Schema, @company_id).name == "Bilimbi Industries"
+      assert Repo.get!(Bilimbi.Core.Company.Schema, @target_id).name == "Bilimbi Subsidiary"
     end
 
     test "create_company/3 starts a company active or pending and nowhere else", %{
@@ -260,29 +314,29 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
     end
   end
 
-  defp call(:archive, scope), do: Company.archive_company(scope, @company_id)
-  defp call(:suspend, scope), do: Company.suspend_company(scope, @company_id)
-  defp call(:activate, scope), do: Company.activate_company(scope, @company_id)
-  defp call(:reactivate, scope), do: Company.reactivate_company(scope, @company_id)
+  defp call(:archive, scope), do: Company.archive_company(scope, @target_id)
+  defp call(:suspend, scope), do: Company.suspend_company(scope, @target_id)
+  defp call(:activate, scope), do: Company.activate_company(scope, @target_id)
+  defp call(:reactivate, scope), do: Company.reactivate_company(scope, @target_id)
 
   defp set_status!(status) do
     Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = $1 WHERE id = $2", [
       status,
-      @company_id
+      @target_id
     ])
   end
 
   defp stored_status do
-    Repo.get!(Bilimbi.Core.Company.Schema, @company_id).status
+    Repo.get!(Bilimbi.Core.Company.Schema, @target_id).status
   end
 
-  defp grant! do
+  defp grant!(company_id \\ @company_id) do
     {:ok, scope} = Tenancy.scope(41)
 
     assert {:ok, :stored} =
              Authz.put_principal_capability(
                scope,
-               @company_id,
+               company_id,
                :user,
                @user_id,
                @capability,

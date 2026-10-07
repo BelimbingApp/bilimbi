@@ -24,12 +24,16 @@ defmodule Bilimbi.Core.Company.Lifecycle do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company.Schema
   alias Bilimbi.Core.Company.Summary
+  alias Bilimbi.Core.Company.TenantPrimaryCompany
 
   @type operation :: :archive | :suspend | :activate | :reactivate
   @type error ::
           :not_found
           | :forbidden
           | :reason_too_long
+          | :invalid_reason
+          | :primary_company
+          | :own_company
           | :audit_unavailable
           | {:invalid_transition, String.t()}
 
@@ -43,6 +47,11 @@ defmodule Bilimbi.Core.Company.Lifecycle do
     activate: {~w(pending), "active", "company.activated"},
     reactivate: {~w(suspended), "active", "company.reactivated"}
   }
+
+  # The operations that take a company out of service. The tenant's primary
+  # company and the company the performing account signed in under are what
+  # the tenant and the operator stand on, so neither may be taken out.
+  @guarded [:archive, :suspend]
 
   @operations Map.keys(@transitions) |> Enum.sort()
 
@@ -78,6 +87,7 @@ defmodule Bilimbi.Core.Company.Lifecycle do
       Repo.transaction(fn ->
         with {:ok, company} <- lock_live_company(scope, company_id),
              :ok <- check_transition(operation, company.status),
+             :ok <- check_standing(operation, scope, actor, company),
              {:ok, updated} <- Repo.update(Schema.transition_changeset(company, to(operation))),
              :ok <- record(scope, actor, operation, company, updated, reason) do
           Summary.from_schema(updated)
@@ -115,14 +125,16 @@ defmodule Bilimbi.Core.Company.Lifecycle do
   defp normalize_reason(nil), do: {:ok, nil}
 
   defp normalize_reason(reason) when is_binary(reason) do
-    case String.trim(reason) do
-      "" -> {:ok, nil}
-      trimmed when byte_size(trimmed) > @reason_max_length -> {:error, :reason_too_long}
-      trimmed -> {:ok, trimmed}
+    trimmed = String.trim(reason)
+
+    cond do
+      trimmed == "" -> {:ok, nil}
+      String.length(trimmed) > @reason_max_length -> {:error, :reason_too_long}
+      true -> {:ok, trimmed}
     end
   end
 
-  defp normalize_reason(_other), do: {:error, :reason_too_long}
+  defp normalize_reason(_other), do: {:error, :invalid_reason}
 
   # The row is locked so the transition is judged against the status that
   # will actually be overwritten, not one read a moment earlier.
@@ -143,6 +155,24 @@ defmodule Bilimbi.Core.Company.Lifecycle do
     {from, _to, _event} = Map.fetch!(@transitions, operation)
 
     if status in from, do: :ok, else: {:error, {:invalid_transition, status}}
+  end
+
+  defp check_standing(operation, %Scope{} = scope, actor, %Schema{} = company)
+       when operation in @guarded do
+    cond do
+      primary_company?(scope, company.id) -> {:error, :primary_company}
+      actor.company_id == company.id -> {:error, :own_company}
+      true -> :ok
+    end
+  end
+
+  defp check_standing(_operation, _scope, _actor, _company), do: :ok
+
+  defp primary_company?(%Scope{} = scope, company_id) do
+    TenantPrimaryCompany
+    |> Tenancy.scope_query(scope)
+    |> where([primary], primary.company_id == ^company_id)
+    |> Repo.exists?()
   end
 
   defp to(operation), do: @transitions |> Map.fetch!(operation) |> elem(1)

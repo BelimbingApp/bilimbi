@@ -522,8 +522,12 @@ defmodule Bilimbi.Core.Company do
   same transaction, and returns the updated summary. A system scope that
   names nobody is `{:error, :forbidden}`; a company the operation does not
   start from is `{:error, {:invalid_transition, current_status}}`; a missing,
-  deleted or cross-tenant id is `{:error, :not_found}`. The table of
-  operations is `docs/README.md` "Lifecycle".
+  deleted or cross-tenant id is `{:error, :not_found}`; a reason longer than
+  that limit is `{:error, :reason_too_long}` and one that is not text is
+  `{:error, :invalid_reason}`. `archive_company/3` and `suspend_company/3`
+  refuse the tenant's primary company with `{:error, :primary_company}` and
+  the performing account's own signed-in company with `{:error, :own_company}`.
+  The table of operations is `docs/README.md` "Lifecycle".
   """
   @spec archive_company(Scope.t(), pos_integer(), keyword()) ::
           {:ok, Summary.t()} | {:error, lifecycle_error()}
