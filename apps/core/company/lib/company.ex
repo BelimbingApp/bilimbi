@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Company do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
@@ -47,27 +48,24 @@ defmodule Bilimbi.Core.Company do
   @manage_across_tenant_capability "admin.company.tenant-wide.manage"
 
   @doc """
-  The company fields the scope's actor may not see, as summary keys.
+  The company fields the scope's actor may not see, as
+  `%{summary key => Bilimbi.Base.Authz.Restricted}`.
 
   An operator restricts a field of the `companies` catalog table to roles
   (`Bilimbi.Base.Authz.put_field_restriction/4`); everyone else reads it as
-  `Bilimbi.Base.Authz.Restricted` in every summary this module returns, may
-  not set it on create or update, does not search it, and does not see it as
-  a grid column. The create form uses this to show those fields as
-  read-only rows.
+  the same marker in every summary this module returns, may not set it on
+  create or update, does not search it, and does not see it as a grid column.
+  The create forms use the keys to show those fields as read-only rows and
+  the markers to name the roles that see them. One evaluation answers both.
   """
-  @spec restricted_fields(Scope.t()) :: [atom()]
-  def restricted_fields(%Scope{} = scope) do
-    keys = Map.keys(%Summary{id: 0, tenant_id: 0, name: "", code: "", status: ""})
+  @spec restricted_field_markers(Scope.t()) :: %{atom() => Restricted.t()}
+  def restricted_field_markers(%Scope{} = scope) do
+    blank = %Summary{id: 0, tenant_id: 0, name: "", code: "", status: ""}
 
-    scope
-    |> Authz.restricted_fields(Summary.table_id())
-    |> Enum.flat_map(fn field_id ->
-      case Enum.find(keys, &(Atom.to_string(&1) == field_id)) do
-        nil -> []
-        key -> [key]
-      end
-    end)
+    for {key, %Restricted{} = marker} <-
+          scope |> Authz.redact(Summary.table_id(), blank) |> Map.from_struct(),
+        into: %{},
+        do: {key, marker}
   end
 
   @doc """
@@ -573,7 +571,7 @@ defmodule Bilimbi.Core.Company do
   Updates a live Company record scoped to the caller's tenant.
 
   A field an operator restricted to roles the scope's actor lacks
-  (`restricted_fields/1`) is not theirs to set: attributes that name one are
+  (`restricted_field_markers/1`) is not theirs to set: attributes that name one are
   refused with an error on that field, whatever value they carry, and
   nothing is written.
 

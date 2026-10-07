@@ -293,6 +293,33 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
   end
 
   describe "a restricted field" do
+    test "names the roles that see it in the tooltip, as the record page does", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create"])
+      {:ok, scope} = Tenancy.scope(41)
+      grant_capabilities!("admin.authz.field.manage", user_id: 92)
+      operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
+      {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
+      {:ok, audit} = Authz.create_role(operator, 73, %{name: "Audit", code: "audit"})
+      {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [finance.id])
+
+      {:ok, _} =
+        Authz.put_field_restriction(operator, "companies", "tax_id", [finance.id, audit.id])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(
+               view,
+               "#company-email-restricted-value[title=\"You don't have access to this. Ask your administrator for the Finance role.\"]"
+             )
+
+      assert has_element?(
+               view,
+               "#company-tax-id-restricted-value[title^=\"You don't have access to this. Ask your administrator for one of the roles \"]"
+             )
+
+      assert has_element?(view, "input[name='company[legal_name]']")
+    end
+
     test "is a read-only row that submits nothing, and the module refuses a forged value", %{
       conn: conn
     } do

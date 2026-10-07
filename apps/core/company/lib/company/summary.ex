@@ -42,7 +42,7 @@ defmodule Bilimbi.Core.Company.Summary do
           name: String.t(),
           code: String.t(),
           status: String.t(),
-          legal_name: String.t() | Restricted.t() | nil,
+          legal_name: String.t() | nil,
           registration_number: String.t() | Restricted.t() | nil,
           tax_id: String.t() | Restricted.t() | nil,
           legal_entity_type_id: pos_integer() | nil,

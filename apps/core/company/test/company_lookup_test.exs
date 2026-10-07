@@ -139,7 +139,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
                Company.get_company(reader, @company_id)
 
       assert marker == %Restricted{table_id: "companies", field_id: "email", roles: ["Finance"]}
-      assert Company.restricted_fields(reader) == [:email]
+      assert Company.restricted_field_markers(reader) == %{email: marker}
 
       assert {:ok, [%Summary{email: %Restricted{}}, %Summary{email: %Restricted{}}]} =
                Company.list_companies(reader)
@@ -155,7 +155,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
                Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
 
       assert {:ok, %Summary{email: "hq@bilimbi.test"}} = Company.get_company(reader, @company_id)
-      assert Company.restricted_fields(reader) == []
+      assert Company.restricted_field_markers(reader) == %{}
     end
 
     test "is refused on update and create whatever the value, and nothing is written", %{

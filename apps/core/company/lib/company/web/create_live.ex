@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
   alias Ecto.Changeset
@@ -46,10 +47,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
          |> assign(:parent_companies, companies)
          |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
          |> assign(:country_options, Bilimbi.Core.Geonames.country_options())
-         |> assign(
-           :restricted_fields,
-           Company.restricted_fields(socket.assigns.current_scope.scope)
-         )
+         |> assign_restricted()
          |> assign_form(form_changeset(%{"status" => "active"}))}
 
       {:error, :unauthorized} ->
@@ -148,17 +146,11 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 maxlength="255"
               />
               <.input
-                :if={:legal_name not in @restricted_fields}
                 field={@form[:legal_name]}
                 id="company-legal-name"
                 label="Legal Name"
                 placeholder="Registered legal entity name"
                 maxlength="255"
-              />
-              <.restricted_field
-                :if={:legal_name in @restricted_fields}
-                id="company-legal-name-restricted"
-                label="Legal Name"
               />
               <.input
                 field={@form[:legal_entity_type_id]}
@@ -179,6 +171,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:registration_number in @restricted_fields}
                 id="company-registration-number-restricted"
                 label="Registration Number"
+                requirement={Restricted.requirement(@restricted_markers.registration_number)}
               />
               <.input
                 :if={:tax_id not in @restricted_fields}
@@ -191,6 +184,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:tax_id in @restricted_fields}
                 id="company-tax-id-restricted"
                 label="Tax ID"
+                requirement={Restricted.requirement(@restricted_markers.tax_id)}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
@@ -206,6 +200,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:jurisdiction in @restricted_fields}
                 id="company-jurisdiction-restricted"
                 label="Jurisdiction"
+                requirement={Restricted.requirement(@restricted_markers.jurisdiction)}
               />
               <.input
                 :if={:email not in @restricted_fields}
@@ -219,6 +214,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:email in @restricted_fields}
                 id="company-email-restricted"
                 label="Email"
+                requirement={Restricted.requirement(@restricted_markers.email)}
               />
               <.input
                 :if={:website not in @restricted_fields}
@@ -232,6 +228,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:website in @restricted_fields}
                 id="company-website-restricted"
                 label="Website"
+                requirement={Restricted.requirement(@restricted_markers.website)}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-2">
@@ -359,6 +356,14 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   defp blank_to_nil(value) when value in [nil, ""], do: nil
   defp blank_to_nil(value), do: value
+
+  defp assign_restricted(socket) do
+    markers = Company.restricted_field_markers(socket.assigns.current_scope.scope)
+
+    socket
+    |> assign(:restricted_markers, markers)
+    |> assign(:restricted_fields, Map.keys(markers))
+  end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :company))

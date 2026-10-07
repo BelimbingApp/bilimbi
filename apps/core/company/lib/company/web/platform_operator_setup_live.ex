@@ -12,6 +12,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
@@ -55,10 +56,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
          |> assign(:active_nav, "admin.company")
          |> assign(:companies, companies)
          |> assign(:mode, mode)
-         |> assign(
-           :restricted_fields,
-           Company.restricted_fields(socket.assigns.current_scope.scope)
-         )
+         |> assign_restricted()
          |> assign_form(form_changeset(%{}))}
     end
   end
@@ -213,16 +211,10 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 maxlength="255"
               />
               <.input
-                :if={:legal_name not in @restricted_fields}
                 field={@form[:legal_name]}
                 id="platform-operator-legal-name"
                 label="Legal Name"
                 maxlength="255"
-              />
-              <.restricted_field
-                :if={:legal_name in @restricted_fields}
-                id="platform-operator-legal-name-restricted"
-                label="Legal Name"
               />
               <.input
                 :if={:registration_number not in @restricted_fields}
@@ -235,6 +227,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 :if={:registration_number in @restricted_fields}
                 id="platform-operator-registration-number-restricted"
                 label="Registration Number"
+                requirement={Restricted.requirement(@restricted_markers.registration_number)}
               />
               <.input
                 :if={:tax_id not in @restricted_fields}
@@ -247,6 +240,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 :if={:tax_id in @restricted_fields}
                 id="platform-operator-tax-id-restricted"
                 label="Tax ID"
+                requirement={Restricted.requirement(@restricted_markers.tax_id)}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
@@ -261,6 +255,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 :if={:jurisdiction in @restricted_fields}
                 id="platform-operator-jurisdiction-restricted"
                 label="Jurisdiction"
+                requirement={Restricted.requirement(@restricted_markers.jurisdiction)}
               />
               <.input
                 :if={:email not in @restricted_fields}
@@ -274,6 +269,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 :if={:email in @restricted_fields}
                 id="platform-operator-email-restricted"
                 label="Email"
+                requirement={Restricted.requirement(@restricted_markers.email)}
               />
               <.input
                 :if={:website not in @restricted_fields}
@@ -286,6 +282,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 :if={:website in @restricted_fields}
                 id="platform-operator-website-restricted"
                 label="Website"
+                requirement={Restricted.requirement(@restricted_markers.website)}
               />
             </div>
             <.button id="platform-operator-save" type="submit" variant="primary">
@@ -351,6 +348,14 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
 
   defp blank_to_nil(value) when value in [nil, ""], do: nil
   defp blank_to_nil(value), do: value
+
+  defp assign_restricted(socket) do
+    markers = Company.restricted_field_markers(socket.assigns.current_scope.scope)
+
+    socket
+    |> assign(:restricted_markers, markers)
+    |> assign(:restricted_fields, Map.keys(markers))
+  end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :company))
