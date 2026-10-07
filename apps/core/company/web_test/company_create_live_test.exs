@@ -3,8 +3,8 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
