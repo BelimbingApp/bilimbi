@@ -83,6 +83,7 @@ defmodule Bilimbi.Core.Company.ExternalAccessLockTest do
   defp seed! do
     TenancyFixtures.create_tenants_table!(persistent: true)
     CompanyFixtures.create_companies_table!(persistent: true)
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!(persistent: true)
     CompanyFixtures.create_external_access_tables!(persistent: true)
     TenancyFixtures.insert_tenant!(%{id: 41, name: "Platform operator"})
     CompanyFixtures.insert_company!()

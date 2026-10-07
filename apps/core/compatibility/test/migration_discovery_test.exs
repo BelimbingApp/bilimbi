@@ -108,7 +108,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Audit.Migrations.AddTenantTimelineIndexes,
              Bilimbi.Base.Authz.Migrations.AddDecisionLogTimelineIndex,
              Bilimbi.Base.Schedule.Migrations.IndexAndPruneScheduleOccurrences,
-             Bilimbi.Core.User.Migrations.CreateUserBootstrapReceipt
+             Bilimbi.Core.User.Migrations.CreateUserBootstrapReceipt,
+             Bilimbi.Base.Authz.Migrations.CreateFieldRestrictions
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -138,6 +139,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

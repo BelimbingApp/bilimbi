@@ -12,10 +12,16 @@ defmodule Bilimbi.Core.Company.TestFixtures do
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
   alias Ecto.Adapters.SQL
 
+  # Every company read applies the tenant's field access restrictions
+  # (`Bilimbi.Base.Authz.restricted_fields/1`), so the identity tables bring
+  # the two restriction tables they are read with, and only those: a package
+  # may define the rest of the Authz tables itself. The owner's fixture
+  # defines the DDL; this only loads it for a package whose test helper did not.
   def create_company_identity_tables! do
     apply(TenancyFixtures, :create_tenants_table!, [])
     apply(GeonamesTestFixtures, :create_geonames_tables!, [])
     create_companies_table!()
+    create_field_restriction_tables!()
 
     SQL.query!(
       Repo,
@@ -27,6 +33,20 @@ defmodule Bilimbi.Core.Company.TestFixtures do
       """,
       []
     )
+  end
+
+  defp create_field_restriction_tables! do
+    for {module, path} <- [
+          {Bilimbi.Base.Database.TestTables,
+           "../../../../base/database/test/support/test_tables.ex"},
+          {Bilimbi.Base.Authz.TestFixtures,
+           "../../../../base/authz/test/support/test_fixtures.ex"}
+        ],
+        not Code.ensure_loaded?(module) do
+      Code.require_file(Path.expand(path, __DIR__))
+    end
+
+    apply(Bilimbi.Base.Authz.TestFixtures, :create_field_restriction_tables!, [])
   end
 
   def create_companies_table!(opts \\ []) do

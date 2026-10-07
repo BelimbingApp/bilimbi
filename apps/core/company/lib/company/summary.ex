@@ -1,7 +1,20 @@
 defmodule Bilimbi.Core.Company.Summary do
   @moduledoc """
   Stable read model for presenting a tenant-owned company.
+
+  Every summary `Bilimbi.Core.Company` returns is built through
+  `for_scope/2`, which applies the tenant's field access restrictions
+  (`Bilimbi.Base.Authz.restricted_fields/2` for the `companies` catalog
+  table): a field an operator restricted to roles the reader lacks carries a
+  `Bilimbi.Base.Authz.Restricted` marker instead of its value, and a
+  template renders it with `<.restricted>` and offers no editor.
   """
+
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Restricted
+  alias Bilimbi.Base.Tenancy.Scope
+
+  @table_id "companies"
 
   @enforce_keys [:id, :tenant_id, :name, :code, :status]
   defstruct [
@@ -29,13 +42,13 @@ defmodule Bilimbi.Core.Company.Summary do
           name: String.t(),
           code: String.t(),
           status: String.t(),
-          legal_name: String.t() | nil,
-          registration_number: String.t() | nil,
-          tax_id: String.t() | nil,
+          legal_name: String.t() | Restricted.t() | nil,
+          registration_number: String.t() | Restricted.t() | nil,
+          tax_id: String.t() | Restricted.t() | nil,
           legal_entity_type_id: pos_integer() | nil,
-          jurisdiction: String.t() | nil,
-          email: String.t() | nil,
-          website: String.t() | nil,
+          jurisdiction: String.t() | Restricted.t() | nil,
+          email: String.t() | Restricted.t() | nil,
+          website: String.t() | Restricted.t() | nil,
           scope_activities: map() | list() | nil,
           metadata: map() | nil
         }
@@ -48,6 +61,29 @@ defmodule Bilimbi.Core.Company.Summary do
   @spec display_name(%{legal_name: String.t() | nil, name: String.t()}) :: String.t()
   def display_name(%{legal_name: legal_name, name: name}) do
     if present?(legal_name), do: legal_name, else: name
+  end
+
+  @doc "The grid catalog table whose restrictions govern this read model."
+  @spec table_id() :: String.t()
+  def table_id, do: @table_id
+
+  @doc """
+  The read model of one row, or of each row in a list, as `scope` may see it.
+
+  This is where field access restrictions are enforced for companies: the
+  summary is built from the row and `Bilimbi.Base.Authz.redact/3` replaces
+  every restricted field the scope's actor may not see with a `Restricted`
+  marker. `Bilimbi.Core.Company` builds every summary it returns through
+  this, so no caller obtains a value the reader may not have.
+  """
+  @spec for_scope(Bilimbi.Core.Company.Schema.t(), Scope.t()) :: t()
+  @spec for_scope([Bilimbi.Core.Company.Schema.t()], Scope.t()) :: [t()]
+  def for_scope(companies, %Scope{} = scope) when is_list(companies) do
+    Authz.redact(scope, @table_id, Enum.map(companies, &from_schema/1))
+  end
+
+  def for_scope(company, %Scope{} = scope) do
+    Authz.redact(scope, @table_id, from_schema(company))
   end
 
   @doc false

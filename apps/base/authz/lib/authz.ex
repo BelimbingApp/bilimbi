@@ -19,9 +19,9 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.Diagnostics
   alias Bilimbi.Base.Authz.EffectivePermissions
   alias Bilimbi.Base.Authz.Evaluator
-  alias Bilimbi.Base.Authz.FieldPolicy
+  alias Bilimbi.Base.Authz.FieldRestrictions
+  alias Bilimbi.Base.Authz.FieldRestrictionSummary
   alias Bilimbi.Base.Authz.Resource
-  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Authz.RoleService
   alias Bilimbi.Base.Authz.SystemPrincipalGrant
   alias Bilimbi.Base.Authz.SystemPrincipalService
@@ -265,113 +265,144 @@ defmodule Bilimbi.Base.Authz do
   end
 
   @doc """
-  The fields of `policy` the scope's actor may not see.
-
-  A field policy (`Bilimbi.Base.Authz.FieldPolicy`) names each sensitive
-  field of a read model with the capability that shows it. For a signed-in
-  user the answer comes from the same effective allow list the route gate
-  reads, so a field and the pages that need its capability agree; a field
-  the user lacks the key for is withheld without a decision-log row, because
-  nothing was attempted — the read model simply has that shape for that
-  reader. A named system principal (ADR 0017) is judged by `can/4`, one
-  logged decision per distinct capability. An anonymous system scope names
-  nobody and is withheld every field: a job or seed that needs a value reads
-  the row through its owner, not through a reader's view of it.
-
-  The grants are read afresh on every call, so a revoked capability
-  withholds the field on the very next one.
-
-  The result is in the policy's declaration order and is what the owning
-  module passes to `FieldPolicy.refuse_attempts/3` on a write.
+  The tables and fields an operator may restrict, in the vocabulary of the
+  installed grid catalog (`Bilimbi.Base.Grid`), without the fields their
+  owners protected and the ones every reader needs: a table's key, label and
+  time fields, hidden fields, and fields a link joins on.
   """
-  @spec withheld_fields(Scope.t(), FieldPolicy.t()) :: [atom()]
-  def withheld_fields(%Scope{} = scope, %FieldPolicy{} = policy) do
-    FieldPolicy.withheld(policy, held_capabilities(scope, FieldPolicy.capabilities(policy)))
+  @spec field_restriction_catalog() :: [FieldRestrictions.catalog_table()]
+  def field_restriction_catalog, do: FieldRestrictions.catalog()
+
+  @doc """
+  The field access restrictions of the scope's tenant, with their roles named.
+
+  The caller must be a signed-in user holding `admin.authz.field.manage`.
+  """
+  @spec list_field_restrictions(Scope.t()) ::
+          {:ok, [FieldRestrictionSummary.t()]} | {:error, :forbidden}
+  def list_field_restrictions(%Scope{} = scope) do
+    with {:ok, _operator} <- administrator(scope, "admin.authz.field.manage") do
+      {:ok, FieldRestrictions.list(scope, registry!())}
+    end
   end
 
   @doc """
-  The fields of each record type the scope's actor may not see, as the
-  string names a stored audit row keys its values by.
+  Restricts one catalog field in the scope's tenant to `role_ids`, or
+  replaces the roles of an existing restriction.
 
-  Installed modules declare a field policy for the record types they own in
-  their `:authz` contribution (`field_policies`, keyed by the type name an
-  audit row records as `auditable_type`). This answers for many types in one
-  evaluation, so a page of three hundred mutations loads the actor's grants
-  once. A type no module declared, or one whose fields the actor may all see,
-  is absent from the result. Base Audit asks through its
-  `Bilimbi.Base.Audit.Authorization` seam; the answer is what makes the audit
-  views show a withheld column as withheld, exactly as the owning module's
-  own read model does.
+  Everyone in the tenant who holds none of those roles reads the field as
+  `Bilimbi.Base.Authz.Restricted` and may not write it. The field must be in
+  `field_restriction_catalog/0` (`:not_restrictable`), and every role must be
+  one the scope may see (`{:unknown_roles, ids}`). The caller must be a
+  signed-in user holding `admin.authz.field.manage`; the write and a retained
+  `authz.field_restriction.set` audit action naming them commit together.
+  """
+  @spec put_field_restriction(Scope.t(), String.t(), String.t(), [pos_integer()]) ::
+          {:ok, FieldRestrictionSummary.t()}
+          | {:error,
+             :forbidden
+             | :not_restrictable
+             | {:unknown_roles, [term()]}
+             | :audit_unavailable}
+  def put_field_restriction(%Scope{} = scope, table_id, field_id, role_ids)
+      when is_binary(table_id) and is_binary(field_id) and is_list(role_ids) do
+    with {:ok, operator} <- administrator(scope, "admin.authz.field.manage") do
+      FieldRestrictions.put(scope, table_id, field_id, role_ids, operator, registry!())
+    end
+  end
+
+  @doc """
+  Removes one field access restriction of the scope's tenant by its id.
+
+  The caller must be a signed-in user holding `admin.authz.field.manage`; the
+  deletion and a retained `authz.field_restriction.removed` action naming them
+  commit together. A restriction that is not the tenant's is `{:ok, :not_found}`.
+  """
+  @spec remove_field_restriction(Scope.t(), pos_integer()) ::
+          {:ok, :removed | :not_found} | {:error, :forbidden | :audit_unavailable}
+  def remove_field_restriction(%Scope{} = scope, restriction_id) do
+    with {:ok, operator} <- administrator(scope, "admin.authz.field.manage") do
+      FieldRestrictions.remove(scope, restriction_id, operator, registry!())
+    end
+  end
+
+  @doc """
+  The catalog fields the scope's actor may not see, per table:
+  `%{table_id => %{field_id => [role names that see it]}}`.
+
+  One query for the tenant's restrictions and, only when there are any, one
+  for the roles the actor holds in the company they signed in at. Nothing is
+  kept between calls, so a revoked role or a removed restriction takes effect
+  on the next check, on any node and inside an open LiveView. No decision-log
+  row is written: nothing was attempted, the read model simply has this shape
+  for this reader. A system scope, named or not, holds no roles and is
+  withheld every restricted field.
+  """
+  @spec restricted_fields(Scope.t()) :: %{String.t() => %{String.t() => [String.t()]}}
+  def restricted_fields(%Scope{} = scope), do: FieldRestrictions.restricted(scope, &registry!/0)
+
+  @doc "The field ids of `table_id` the scope's actor may not see, sorted."
+  @spec restricted_fields(Scope.t(), String.t()) :: [String.t()]
+  def restricted_fields(%Scope{} = scope, table_id) when is_binary(table_id) do
+    scope |> restricted_fields() |> Map.get(table_id, %{}) |> Map.keys() |> Enum.sort()
+  end
+
+  @doc """
+  Replaces every field of `table_id` the scope's actor may not see with a
+  `Bilimbi.Base.Authz.Restricted` marker, in one record or in each of a list.
+
+  The decision is made once per call, so a list of three hundred rows costs
+  what one row costs. A restricted field the record does not carry is
+  skipped. This is the enforcement point: an owning module applies it where
+  its read model is built from the row, so no caller — a page, a panel, a
+  grid, another module — obtains the value. A template then renders the
+  marker with `<.restricted>` and offers no editor for it.
+  """
+  @spec redact(Scope.t(), String.t(), record) :: record when record: struct() | [struct()]
+  def redact(%Scope{} = scope, table_id, records) when is_binary(table_id) do
+    FieldRestrictions.redact(scope, table_id, records, &registry!/0)
+  end
+
+  @doc """
+  Refuses a write to `table_id` that names a field the scope's actor may not
+  see, with an error on that field whatever value `attrs` carries, so the
+  refusal never confirms a guess. The owner calls this on its create and
+  update changesets with the submitted attributes.
+  """
+  @spec refuse_restricted_attempts(Ecto.Changeset.t(), Scope.t(), String.t(), map()) ::
+          Ecto.Changeset.t()
+  def refuse_restricted_attempts(%Ecto.Changeset{} = changeset, %Scope{} = scope, table_id, attrs)
+      when is_binary(table_id) and is_map(attrs) do
+    FieldRestrictions.refuse_attempts(changeset, restricted_fields(scope, table_id), attrs)
+  end
+
+  @doc """
+  The field names the scope's actor may not see, per audit record type, as
+  `%{auditable_type => [field name]}`.
+
+  A grid table declares the `record_types` its rows are recorded under
+  (`Bilimbi.Base.Grid.Table`), which is how a restriction on `companies` /
+  `email` reaches the audit views of a company's changes. Base Audit asks
+  this through its `Bilimbi.Base.Audit.Authorization` seam and takes the
+  values out of every mutation it returns. A type no table claims, or one
+  with nothing restricted for this actor, is absent.
   """
   @spec withheld_fields_by_type(Scope.t(), [String.t()]) :: %{String.t() => [String.t()]}
   def withheld_fields_by_type(%Scope{} = scope, types) when is_list(types) do
-    policies = Map.take(registry!().field_policies, types)
+    restricted = restricted_fields(scope)
 
-    if policies == %{} do
+    if restricted == %{} do
       %{}
     else
-      held =
-        held_capabilities(
-          scope,
-          policies |> Map.values() |> Enum.flat_map(&FieldPolicy.capabilities/1) |> Enum.uniq()
-        )
-
-      for {type, policy} <- policies,
-          withheld = FieldPolicy.withheld(policy, held),
-          withheld != [],
+      for table <- field_restriction_catalog(),
+          fields = restricted |> Map.get(table.id, %{}) |> Map.keys() |> Enum.sort(),
+          fields != [],
+          type <- table.record_types,
+          type in types,
           into: %{} do
-        {type, Enum.map(withheld, &Atom.to_string/1)}
+        {type, fields}
       end
     end
-  end
-
-  # Which of `capabilities` the scope's actor holds, asked once for all of
-  # them. An anonymous system scope holds none.
-  defp held_capabilities(%Scope{} = scope, capabilities) do
-    case Scope.actor(scope) do
-      %TenancyActor{type: :user} ->
-        {:ok, actor} = scope_actor(scope)
-        effective_capabilities(actor).allowed
-
-      %TenancyActor{type: :system, system_principal: name} when is_binary(name) ->
-        Enum.filter(capabilities, &can(scope, &1).allowed)
-
-      %TenancyActor{type: :system} ->
-        []
-    end
-  end
-
-  @doc """
-  Replaces every field of `policy` the scope's actor may not see with a
-  `Bilimbi.Base.Authz.Restricted` marker, in one record or in each of a list.
-
-  The decision is made once per call (`withheld_fields/2`), not once per
-  record, so a list of three hundred rows costs what one row costs. Each
-  record must carry every field the policy names; a policy that names a
-  field the record lacks raises, because the policy and the read model it
-  governs are declared by the same module and must agree.
-
-  This is the enforcement point. An owning module applies it where its
-  read model is built from the row, so no caller — a page, a panel, a grid,
-  another module — can obtain the value without the capability. A template
-  then renders the marker with `<.restricted>` and offers no editor for it.
-  """
-  @spec redact(Scope.t(), FieldPolicy.t(), record) :: record when record: struct() | [struct()]
-  def redact(%Scope{} = scope, %FieldPolicy{} = policy, records) when is_list(records) do
-    case withheld_fields(scope, policy) do
-      [] -> records
-      withheld -> Enum.map(records, &withhold(&1, policy, withheld))
-    end
-  end
-
-  def redact(%Scope{} = scope, %FieldPolicy{} = policy, %_{} = record) do
-    withhold(record, policy, withheld_fields(scope, policy))
-  end
-
-  defp withhold(%_{} = record, policy, withheld) do
-    Enum.reduce(withheld, record, fn field, acc ->
-      Map.replace!(acc, field, %Restricted{capability: FieldPolicy.capability!(policy, field)})
-    end)
   end
 
   @doc """

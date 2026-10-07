@@ -112,6 +112,52 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
     ]
 
     Enum.each(statements, &SQL.query!(Repo, &1, []))
+    create_field_restriction_tables!(opts)
+  end
+
+  @doc """
+  The two Bilimbi-only field access restriction tables, on their own.
+
+  Every Core Company read applies the tenant's restrictions, so Company's
+  identity-table fixture creates these two through this function without
+  the rest of the Authz tables, which a package may define itself. No
+  foreign keys here on purpose: the order the tables appear in a test must
+  not matter.
+  """
+  def create_field_restriction_tables!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
+    statements = [
+      """
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_field_restrictions (
+        id bigserial PRIMARY KEY,
+        tenant_id bigint NOT NULL,
+        table_id varchar(100) NOT NULL,
+        field_id varchar(100) NOT NULL,
+        created_at timestamp(0) without time zone NOT NULL,
+        updated_at timestamp(0) without time zone NOT NULL
+      ) #{TestTables.on_commit(persistent, "DROP")}
+      """,
+      """
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_field_restrictions_unique
+        ON base_authz_field_restrictions (tenant_id, table_id, field_id)
+      """,
+      """
+      #{TestTables.create(persistent)} IF NOT EXISTS base_authz_field_restriction_roles (
+        id bigserial PRIMARY KEY,
+        restriction_id bigint NOT NULL,
+        role_id bigint NOT NULL,
+        created_at timestamp(0) without time zone NOT NULL,
+        updated_at timestamp(0) without time zone NOT NULL
+      ) #{TestTables.on_commit(persistent, "DROP")}
+      """,
+      """
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_field_restriction_roles_unique
+        ON base_authz_field_restriction_roles (restriction_id, role_id)
+      """
+    ]
+
+    Enum.each(statements, &SQL.query!(Repo, &1, []))
   end
 
   @doc """
@@ -142,7 +188,6 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
                 capabilities: ["admin.test.record.view"]
               }
             },
-            field_policies: Keyword.get(opts, :field_policies, %{}),
             company_directory: Keyword.get(opts, :company_directory, TestCompanyDirectory)
           }
         }

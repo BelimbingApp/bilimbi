@@ -2173,15 +2173,12 @@
               >
                 <p class="text-xs text-ink-muted">
                   A field the viewer may not see, beside an empty one: restricted is not blank.
-                  The lock's tooltip says what to do, and names the permission when the page
-                  knows it.
+                  The lock's tooltip says what to do, and names the roles to ask for when the
+                  page knows them.
                 </p>
                 <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
                   <span class="text-ink-muted">Bank account</span>
-                  <.restricted
-                    id="design-library-restricted"
-                    capability="admin.payee.bank-account.view"
-                  />
+                  <.restricted id="design-library-restricted" requirement="the Payroll role" />
                   <span class="text-ink-muted">Salary</span>
                   <.restricted id="design-library-restricted-plain" />
                   <span class="text-ink-muted">Bonus</span>
@@ -2204,7 +2201,7 @@
                 <.restricted_field
                   id="design-library-restricted-field"
                   label="Bank account"
-                  capability="admin.payee.bank-account.view"
+                  requirement="the Payroll role"
                 />
                 <.restricted_field
                   id="design-library-restricted-field-reason"

@@ -7,9 +7,12 @@ defmodule Bilimbi.Base.Grid.Table do
   of its rows, checked before a path may touch the table. `source` implements
   `Bilimbi.Base.Grid.Source`. `key` names the field that identifies a row,
   `label_field` the one that names it to a person, and `time_field` the one a
-  rollup orders by for "latest" and buckets by for a trend. A field may
-  carry a `capability` of its own (`Bilimbi.Base.Grid.Field`); the catalog
-  leaves it out for an account that lacks that key.
+  rollup orders by for "latest" and buckets by for a trend. `record_types`
+  names the `auditable_type` values the table's rows are recorded under in
+  the audit log, so a field access restriction set on the table
+  (`Bilimbi.Base.Authz.put_field_restriction/4`) reaches the audit views of
+  those rows; the catalog also leaves a restricted field out for an account
+  the restriction does not include.
   """
 
   alias Bilimbi.Base.Grid.Field
@@ -24,7 +27,8 @@ defmodule Bilimbi.Base.Grid.Table do
     :label_field,
     :time_field,
     :fields,
-    :links
+    :links,
+    :record_types
   ]
   @id_pattern ~r/^[a-z][a-z0-9_]*$/
 
@@ -40,6 +44,7 @@ defmodule Bilimbi.Base.Grid.Table do
             field_order: [],
             links: %{},
             link_order: [],
+            record_types: [],
             owner: nil
 
   @type t :: %__MODULE__{
@@ -54,6 +59,7 @@ defmodule Bilimbi.Base.Grid.Table do
           field_order: [String.t()],
           links: %{String.t() => Link.t()},
           link_order: [String.t()],
+          record_types: [String.t()],
           owner: String.t()
         }
 
@@ -103,27 +109,8 @@ defmodule Bilimbi.Base.Grid.Table do
           time_field: Map.get(attrs, :time_field)
         ],
         not is_nil(field_id) do
-      case Map.fetch(field_map, field_id) do
-        :error ->
-          invalid!(
-            owner,
-            attrs,
-            "table #{id} #{name} #{inspect(field_id)} is not a declared field"
-          )
-
-        # The key identifies a row, the label names it and the time field
-        # orders it: every reader of the table needs all three, so none of
-        # them can be withheld from one.
-        {:ok, %Field{capability: capability}} when is_binary(capability) ->
-          invalid!(
-            owner,
-            attrs,
-            "table #{id} #{name} #{inspect(field_id)} carries a capability; a table's key, " <>
-              "label and time fields are read with the table"
-          )
-
-        {:ok, %Field{}} ->
-          :ok
+      unless Map.has_key?(field_map, field_id) do
+        invalid!(owner, attrs, "table #{id} #{name} #{inspect(field_id)} is not a declared field")
       end
     end
 
@@ -138,6 +125,13 @@ defmodule Bilimbi.Base.Grid.Table do
       |> List.wrap()
       |> Enum.map(&Link.new!(&1, id, owner))
 
+    record_types = attrs |> Map.get(:record_types, []) |> List.wrap()
+
+    unless Enum.all?(record_types, &(is_binary(&1) and &1 != "")) and
+             Enum.uniq(record_types) == record_types do
+      invalid!(owner, attrs, "table #{id} record_types must be distinct non-empty strings")
+    end
+
     table = %__MODULE__{
       id: id,
       label: Map.get(attrs, :label, String.capitalize(id)),
@@ -148,6 +142,7 @@ defmodule Bilimbi.Base.Grid.Table do
       time_field: Map.get(attrs, :time_field),
       fields: field_map,
       field_order: field_ids,
+      record_types: record_types,
       owner: owner
     }
 

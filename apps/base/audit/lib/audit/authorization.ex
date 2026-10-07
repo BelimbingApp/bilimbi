@@ -9,7 +9,7 @@ defmodule Bilimbi.Base.Audit.Authorization do
 
   The second question is which fields of a recorded value the reader may not
   see. The module that owns a record declares its field policy
-  (`Bilimbi.Base.Authz.FieldPolicy`), and a mutation of such a record is
+  (`Bilimbi.Base.Authz.put_field_restriction/4`), and a mutation of such a record is
   read through that same policy, so the audit views never show a value the
   record's own page withholds. Without an answer nothing is declared and
   every recorded value reads as recorded: the audit screens are themselves

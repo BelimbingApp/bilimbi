@@ -102,14 +102,31 @@ A caller picks the cheapest read that answers its question. `get_company/2`
 returns the summary: a caller that shows the company to a reader uses it. A
 caller that needs only existence or the id uses `require_live_company/2`,
 and one that needs only the id, code and name uses `identity/2`.
-`authorize_company_target/3` answers the authorized company's id for the
-same reason. Core Employee, Core User and Core Address check existence
+`authorize_company_target/3` answers the authorized company's summary, so a
+page that authorizes a target can name it. Core Employee, Core User and Core Address check existence
 through `require_live_company/2`; `BilimbiWeb.UserAuth`, the employee page
 and the Departments and Relationships pages read the name through
 `identity/2`; `Company.Web.ShowLive` reads the summary.
 
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
 queries `companies` directly (BLB-S1-010 option a).
+
+## Field access
+
+An operator may restrict any non-protected field of the `companies` catalog
+table to roles (Administration › Authorization › Field Access). Every summary
+this module returns is built through `Summary.for_scope/2`, so a reader who
+holds none of those roles gets a `Bilimbi.Base.Authz.Restricted` marker in
+that field; `create_company/3` and `update_company/3` refuse any attempt to
+set it with an error on the field, whatever the value; the administration
+search skips the column (`searchable_columns/1`); the companies grid leaves
+the column out; and the record history and `/audit/mutations` withhold its
+values through the table's `record_types` (`auditable_types/0`). `code` and
+`status` are protected, and the key `id` and the label `name` are protected
+implicitly. `restricted_fields/1` names the restricted summary keys for the
+create and setup forms, which show them as `<.restricted_field>` rows. The
+seam itself is Base Authz's (`apps/base/authz/docs/README.md`
+"Field-level authorization").
 
 ## Authorized company reach
 

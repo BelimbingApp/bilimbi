@@ -4,7 +4,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
   import ExUnit.CaptureIO
 
   alias Bilimbi.Base.Authz.ContributionValidator
-  alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Authz.TestCompanyDirectory
 
   test "merges role capabilities after validating the complete provider graph" do
@@ -97,65 +96,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
                      })
                    ])
                  end
-  end
-
-  describe "field policies" do
-    @policy FieldPolicy.new!(tax_id: "admin.record.secret.view")
-    @base %{
-      domains: %{"admin" => "Administrative operations"},
-      verbs: ["view"],
-      capabilities: ["admin.record.secret.view"]
-    }
-
-    test "keeps each declared policy by its record type" do
-      snapshot =
-        ContributionValidator.validate_contributions!([
-          entry("core/company", Map.put(@base, :field_policies, %{"Company" => @policy}))
-        ])
-
-      assert snapshot.field_policies == %{"Company" => @policy}
-    end
-
-    test "a snapshot with none declares none" do
-      assert ContributionValidator.validate_contributions!([entry("core/company", @base)]).field_policies ==
-               %{}
-    end
-
-    test "refuses a policy that names a capability nobody registered" do
-      assert_raise ArgumentError,
-                   ~r/field policy for Company references unknown capabilities/,
-                   fn ->
-                     ContributionValidator.validate_contributions!([
-                       entry(
-                         "core/company",
-                         Map.merge(@base, %{
-                           capabilities: [],
-                           field_policies: %{"Company" => @policy}
-                         })
-                       )
-                     ])
-                   end
-    end
-
-    test "refuses a type two modules both declare, and a value that is not a policy" do
-      assert_raise ArgumentError,
-                   ~r/field policy for Company is already declared by core\/company/,
-                   fn ->
-                     ContributionValidator.validate_contributions!([
-                       entry(
-                         "core/company",
-                         Map.put(@base, :field_policies, %{"Company" => @policy})
-                       ),
-                       entry("domain/other", %{field_policies: %{"Company" => @policy}})
-                     ])
-                   end
-
-      assert_raise ArgumentError, ~r/must name a record type and carry a FieldPolicy/, fn ->
-        ContributionValidator.validate_contributions!([
-          entry("core/company", Map.put(@base, :field_policies, %{"Company" => [:tax_id]}))
-        ])
-      end
-    end
   end
 
   describe "company directory contract" do

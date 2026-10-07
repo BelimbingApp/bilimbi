@@ -307,10 +307,10 @@ page:
 - **A fact the viewer may not see** reads `<.restricted>`: the word
   "Restricted", the registry's lock, and a tooltip that says what to do
   ("You don't have access to this. Ask your administrator.", naming the
-  permission when the page knows it), with no editor whatever the update
-  capability says. It is never blank and never "—", which mean "empty"; the
-  owning module withholds the value before the page sees it
-  (`Bilimbi.Base.Authz.FieldPolicy`). A create or edit form shows the same
+  roles that see the field when the page knows them), with no editor
+  whatever the update capability says. It is never blank and never "—",
+  which mean "empty"; the owning module withholds the value before the page
+  sees it, as the operator restricted it (`Bilimbi.Base.Authz.redact/3`). A create or edit form shows the same
   field as `<.restricted_field>`, a greyed read-only row that keeps its label
   and submits nothing, never an omitted input.
 - **Facts the page cannot save stay read-only.** A relation another module

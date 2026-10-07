@@ -200,7 +200,7 @@ defmodule Bilimbi.Base.Grid.TestFixtures do
           descriptor: @descriptor,
           payload: %{
             domains: %{"admin" => "Administrative operations"},
-            verbs: ["view"],
+            verbs: ["view", "manage"],
             capabilities: TestSources.capabilities(),
             roles: %{},
             company_directory: TestCompanyDirectory

@@ -22,15 +22,22 @@ defmodule Bilimbi.Core.Company.GridTables do
           key: "id",
           label_field: "name",
           time_field: "created_at",
+          # Audit rows of a company are recorded under these types, so a field
+          # access restriction set on this table reaches the record history
+          # and the mutations browser. Code and status are protected: the
+          # module's own logic and every list need them, so no operator may
+          # restrict them (the key and the name are protected implicitly).
+          record_types: Bilimbi.Core.Company.auditable_types(),
           fields: [
             %{id: "id", label: "ID", type: :integer},
             %{id: "name", label: "Name", type: :string},
-            %{id: "code", label: "Code", type: :string},
+            %{id: "code", label: "Code", type: :string, protected: true},
             %{
               id: "status",
               label: "Status",
               type: :enum,
-              values: ~w(active suspended pending archived)
+              values: ~w(active suspended pending archived),
+              protected: true
             },
             %{id: "legal_name", label: "Legal name", type: :string},
             %{id: "registration_number", label: "Registration number", type: :string},

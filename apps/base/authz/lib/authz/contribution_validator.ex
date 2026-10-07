@@ -5,13 +5,11 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
 
   alias Bilimbi.Base.Authz.CapabilityKey
   alias Bilimbi.Base.Authz.CompanyDirectory
-  alias Bilimbi.Base.Authz.FieldPolicy
 
   @payload_keys [
     :capabilities,
     :company_directory,
     :domains,
-    :field_policies,
     :platform_capabilities,
     :roles,
     :verbs
@@ -34,7 +32,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
       verbs: %{},
       capabilities: %{},
       platform_capabilities: %{},
-      field_policies: %{},
       roles: %{},
       company_directory: nil
     }
@@ -53,7 +50,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
     |> merge_verbs!(descriptor.id, Map.get(payload, :verbs, []))
     |> merge_capabilities!(descriptor.id, Map.get(payload, :capabilities, []))
     |> merge_platform_capabilities!(descriptor.id, Map.get(payload, :platform_capabilities, []))
-    |> merge_field_policies!(descriptor.id, Map.get(payload, :field_policies, %{}))
     |> merge_roles!(descriptor.id, Map.get(payload, :roles, %{}))
     |> merge_company_directory!(descriptor, Map.get(payload, :company_directory))
   end
@@ -149,28 +145,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
 
   defp merge_platform_capabilities!(_snapshot, owner, _capabilities),
     do: invalid!(owner, "platform_capabilities must be a list")
-
-  defp merge_field_policies!(snapshot, owner, policies) when is_map(policies) do
-    Enum.reduce(policies, snapshot, fn {type, policy}, acc ->
-      unless non_empty_string?(type) and match?(%FieldPolicy{}, policy) do
-        invalid!(
-          owner,
-          "field policy #{inspect(type)} must name a record type and carry a FieldPolicy"
-        )
-      end
-
-      case Map.fetch(acc.field_policies, type) do
-        :error ->
-          %{acc | field_policies: Map.put(acc.field_policies, type, {owner, policy})}
-
-        {:ok, {first_owner, _policy}} ->
-          invalid!(owner, "field policy for #{type} is already declared by #{first_owner}")
-      end
-    end)
-  end
-
-  defp merge_field_policies!(_snapshot, owner, _policies),
-    do: invalid!(owner, "field_policies must be a map")
 
   defp merge_roles!(snapshot, owner, roles) when is_map(roles) do
     Enum.reduce(roles, snapshot, fn {code, definition}, acc ->
@@ -315,8 +289,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
       capability_owners: snapshot.capabilities,
       platform_capabilities: snapshot.platform_capabilities |> Map.keys() |> Enum.sort(),
       roles: roles,
-      field_policies:
-        Map.new(snapshot.field_policies, fn {type, {_owner, policy}} -> {type, policy} end),
       company_directory: snapshot.company_directory
     }
   end
@@ -325,18 +297,6 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
     Enum.each(snapshot.platform_capabilities, fn {capability, owner} ->
       unless Map.has_key?(snapshot.capabilities, capability) do
         invalid!(owner, "platform capability #{capability} is not declared")
-      end
-    end)
-
-    Enum.each(snapshot.field_policies, fn {type, {owner, policy}} ->
-      unknown = FieldPolicy.capabilities(policy) -- Map.keys(snapshot.capabilities)
-
-      if unknown != [] do
-        invalid!(
-          owner,
-          "field policy for #{type} references unknown capabilities: " <>
-            Enum.join(Enum.sort(unknown), ", ")
-        )
       end
     end)
 

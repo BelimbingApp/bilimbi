@@ -8,6 +8,10 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Tenancy
+
+  alias Bilimbi.Base.Authz
+
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -118,6 +122,17 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     view |> form("#users-add-column", %{add: "email"}) |> render_change()
     refute has_element?(view, "#users-suggest-email")
     assert has_element?(view, "#users-suggest-company-email", "Company › Email")
+
+    # Once an operator restricts the company email to a role this account
+    # lacks, the walked column is no longer offered.
+    {:ok, scope} = Tenancy.scope(41)
+    grant_capabilities!("admin.authz.field.manage", user_id: 96)
+    operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 96, 73)
+    {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+    view |> form("#users-add-column", %{add: "email"}) |> render_change()
+    refute has_element?(view, "#users-suggest-company-email")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
     # Asking for a suggestion arranges nothing: the address still names no columns.
     view |> element("#users-sort-name") |> render_click()

@@ -19,7 +19,6 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionConsumer
 
-  alias Bilimbi.Base.Grid.Field
   alias Bilimbi.Base.Grid.Link
   alias Bilimbi.Base.Grid.Source
   alias Bilimbi.Base.Grid.Table
@@ -36,6 +35,7 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
       end)
 
     table_map = reject_duplicate_ids!(tables)
+    reject_shared_record_types!(tables)
 
     table_map =
       Enum.reduce(links, table_map, fn {%Link{} = link, owner}, acc ->
@@ -134,6 +134,27 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
     Map.new(tables, &{&1.id, &1})
   end
 
+  # An audit row is recorded under one type, so one table claims it: a
+  # restriction on a field must reach exactly the rows of that table.
+  defp reject_shared_record_types!(tables) do
+    tables
+    |> Enum.flat_map(fn table -> Enum.map(table.record_types, &{&1, table}) end)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Enum.filter(fn {_type, claimants} -> length(claimants) > 1 end)
+    |> case do
+      [] ->
+        :ok
+
+      shared ->
+        detail =
+          Enum.map_join(shared, "; ", fn {type, claimants} ->
+            "#{type} claimed by #{Enum.map_join(claimants, ", ", &"#{&1.owner} (#{&1.id})")}"
+          end)
+
+        raise ArgumentError, "grid record types must belong to one table: #{detail}"
+    end
+  end
+
   defp validate_link!(%Link{} = link, owner, tables) do
     from = fetch_table!(tables, link.from, link, owner)
     to = fetch_table!(tables, link.to, link, owner)
@@ -157,17 +178,6 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
         unless Map.has_key?(to.fields, to_field) do
           invalid!(owner, "link #{link.id} joins on #{to.id}.#{to_field}, which is not declared")
-        end
-
-        # A join field is read for every account that walks the link, so a
-        # field with a capability of its own cannot be one.
-        for {table, field_id} <- [{from, from_field}, {to, to_field}],
-            %Field{capability: capability} = Map.fetch!(table.fields, field_id),
-            is_binary(capability) do
-          invalid!(
-            owner,
-            "link #{link.id} joins on #{table.id}.#{field_id}, which carries a capability"
-          )
         end
 
         if link.kind == :one and to_field != to.key do

@@ -8,17 +8,15 @@ defmodule Bilimbi.Base.Grid.Field do
   appear as columns or suggestions. `values` names the closed set an `:enum`
   field takes, which the band lens colours categorically.
 
-  `capability` is field-level authorization: a field that carries one is in
-  the catalog only for an account that holds that key, in addition to the
-  table's own. It is the same key the owning module's
-  `Bilimbi.Base.Authz.FieldPolicy` names for that column, so a value the
-  record page withholds cannot be read as a grid column either. A table's
-  key, label and time fields, and the fields a link joins on, take none:
-  they are read with the table.
+  `protected` marks a field an operator may never restrict
+  (`Bilimbi.Base.Authz.field_restriction_catalog/0`): one the owning
+  module's own logic needs every reader to see, such as a company's code.
+  A table's key, label and time fields, hidden fields and the fields a link
+  joins on are protected without saying so.
   """
 
   @types [:integer, :float, :decimal, :string, :boolean, :date, :datetime, :enum]
-  @keys [:id, :label, :type, :column, :hidden, :values, :capability]
+  @keys [:id, :label, :type, :column, :hidden, :values, :protected]
   @id_pattern ~r/^[a-z][a-z0-9_]*$/
 
   @enforce_keys [:id, :label, :type, :column]
@@ -28,7 +26,7 @@ defmodule Bilimbi.Base.Grid.Field do
             column: nil,
             hidden: false,
             values: nil,
-            capability: nil
+            protected: false
 
   @type type :: :integer | :float | :decimal | :string | :boolean | :date | :datetime | :enum
 
@@ -39,7 +37,7 @@ defmodule Bilimbi.Base.Grid.Field do
           column: atom(),
           hidden: boolean(),
           values: [String.t()] | nil,
-          capability: String.t() | nil
+          protected: boolean()
         }
 
   @doc "The field types a contribution may declare."
@@ -93,10 +91,10 @@ defmodule Bilimbi.Base.Grid.Field do
       invalid!(owner, attrs, "field #{id} column must be an atom")
     end
 
-    capability = Map.get(attrs, :capability)
+    protected = Map.get(attrs, :protected, false)
 
-    unless is_nil(capability) or Bilimbi.Base.Authz.CapabilityKey.valid?(capability) do
-      invalid!(owner, attrs, "field #{id} capability must be a capability key")
+    unless is_boolean(protected) do
+      invalid!(owner, attrs, "field #{id} protected must be a boolean")
     end
 
     %__MODULE__{
@@ -106,14 +104,9 @@ defmodule Bilimbi.Base.Grid.Field do
       column: column,
       hidden: Map.get(attrs, :hidden, false) == true,
       values: values,
-      capability: capability
+      protected: protected
     }
   end
-
-  @doc "Whether an account holding `held` may read this field."
-  @spec readable?(t(), Enumerable.t()) :: boolean()
-  def readable?(%__MODULE__{capability: nil}, _held), do: true
-  def readable?(%__MODULE__{capability: capability}, held), do: capability in held
 
   defp fetch_string!(attrs, key, owner) do
     case Map.get(attrs, key) do

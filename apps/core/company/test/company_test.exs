@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.CompanyTest do
 
   setup do
     create_company_identity_tables!()
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     :ok
   end
 

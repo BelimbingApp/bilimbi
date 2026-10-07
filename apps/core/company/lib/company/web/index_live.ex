@@ -78,10 +78,24 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
      |> assign(:index_state, state)
      |> assign(:companies_page, empty_page())
      |> assign(:filters_form, ListState.filters_form(state))
+     |> assign(:search_placeholder, search_placeholder(socket.assigns.current_scope.scope))
      |> assign(
        :columns,
        PageColumns.mount(socket.assigns.current_scope, "companies", @builtins)
      )}
+  end
+
+  # The placeholder names the columns this reader's search matches
+  # (`Company.searchable_columns/1`): a column an operator restricted to
+  # roles the reader lacks is not searched, and the box says so.
+  defp search_placeholder(scope) do
+    {last, rest} =
+      scope
+      |> Company.searchable_columns()
+      |> Enum.map(&(&1 |> Atom.to_string() |> String.replace("_", " ")))
+      |> List.pop_at(-1)
+
+    "Search by #{Enum.join(rest, ", ")}, or #{last}..."
   end
 
   @impl true
@@ -357,7 +371,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             field={@filters_form[:search]}
             id="companies-search"
             label="Search companies"
-            placeholder="Search by name, code, legal name, email, or jurisdiction..."
+            placeholder={@search_placeholder}
           />
           <:control
             type={:select}

@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
 
   setup do
     create_company_identity_tables!()
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     create_external_access_tables!()
     insert_tenant!(%{id: 41})
     insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})

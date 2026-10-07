@@ -15,34 +15,47 @@ defmodule Bilimbi.Base.Grid.ContributionValidatorTest do
     %{tables: [Map.merge(orders, overrides) |> Map.put(:links, [])]}
   end
 
-  test "a field capability must be a capability key" do
-    assert_raise ArgumentError, ~r/field amount capability must be a capability key/, fn ->
-      validate(orders_only(%{fields: gate_field(:amount, "amount")}))
+  test "a field's protected flag must be a boolean" do
+    assert_raise ArgumentError, ~r/field amount protected must be a boolean/, fn ->
+      validate(orders_only(%{fields: mark_field("amount", protected: "yes")}))
     end
+
+    %{tables: %{"orders" => orders}} =
+      validate(orders_only(%{fields: mark_field("amount", protected: true)}))
+
+    assert orders.fields["amount"].protected
+    refute orders.fields["label"].protected
   end
 
-  test "a table's key, label and time fields cannot carry a capability" do
-    for {field, name} <- [{"id", "key"}, {"label", "label_field"}, {"placed_at", "time_field"}] do
-      assert_raise ArgumentError, ~r/table orders #{name} "#{field}" carries a capability/, fn ->
-        validate(orders_only(%{fields: gate_field("admin.test.customer.view", field)}))
-      end
-    end
-  end
+  test "record types are distinct strings claimed by one table" do
+    assert_raise ArgumentError,
+                 ~r/table orders record_types must be distinct non-empty strings/,
+                 fn ->
+                   validate(orders_only(%{record_types: ["Test.Order", "Test.Order"]}))
+                 end
 
-  test "a link cannot join on a field that carries a capability" do
+    %{tables: %{"orders" => orders}} = validate(orders_only(%{record_types: ["Test.Order"]}))
+    assert orders.record_types == ["Test.Order"]
+
     %{tables: [orders, customers | rest]} = TestSources.tables()
-    gated = Map.put(orders, :fields, gate_field("admin.test.customer.view", "customer_id"))
 
     assert_raise ArgumentError,
-                 ~r/link customer joins on orders.customer_id, which carries a capability/,
-                 fn -> validate(%{tables: [gated, customers | rest]}) end
+                 ~r/record types must belong to one table: Test.Order claimed by/,
+                 fn ->
+                   validate(%{
+                     tables: [
+                       Map.put(orders, :record_types, ["Test.Order"]),
+                       Map.put(customers, :record_types, ["Test.Order"]) | rest
+                     ]
+                   })
+                 end
   end
 
-  defp gate_field(capability, field_id) do
+  defp mark_field(field_id, attrs) do
     [orders | _rest] = TestSources.tables().tables
 
     Enum.map(orders.fields, fn
-      %{id: ^field_id} = field -> Map.put(field, :capability, capability)
+      %{id: ^field_id} = field -> Map.merge(field, Map.new(attrs))
       field -> field
     end)
   end

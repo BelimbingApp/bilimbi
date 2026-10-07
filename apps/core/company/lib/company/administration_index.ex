@@ -3,18 +3,25 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company.AdministrationEntry
   alias Bilimbi.Core.Company.AdministrationPage
   alias Bilimbi.Core.Company.Schema
+  alias Bilimbi.Core.Company.Summary
 
   @default_page 1
   @default_page_size 25
   @max_page_size 300
   @statuses Schema.statuses()
   @allowed_option_keys [:page, :page_size, :search, :status_filter, :sort_by, :sort_dir]
+
+  # The columns the search matches. A restricted column is matched only for a
+  # reader who may see it: `ILIKE` over a restricted column would let anyone
+  # with the list probe its value one pattern at a time.
+  @search_columns [:name, :code, :legal_name, :email, :jurisdiction]
 
   @type normalized_options :: %{
           page: pos_integer(),
@@ -52,12 +59,19 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
 
   def normalize_options(_options), do: {:error, :invalid_options}
 
+  @doc "The columns `page/2` searches for this scope's actor, in match order."
+  @spec searchable_columns(Scope.t()) :: [atom()]
+  def searchable_columns(%Scope{} = scope) do
+    restricted = Authz.restricted_fields(scope, Summary.table_id())
+    Enum.reject(@search_columns, &(Atom.to_string(&1) in restricted))
+  end
+
   @spec page(Scope.t(), normalized_options()) :: AdministrationPage.t()
   def page(%Scope{} = scope, options) do
     query =
       scope
       |> base_query()
-      |> apply_search(options.search)
+      |> apply_search(options.search, searchable_columns(scope))
       |> apply_status_filter(options.status_filter)
 
     total_entries = query |> exclude(:order_by) |> Repo.aggregate(:count, :id)
@@ -101,20 +115,20 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
       where: is_nil(company.deleted_at)
   end
 
-  defp apply_search(query, ""), do: query
+  defp apply_search(query, "", _columns), do: query
 
-  defp apply_search(query, search) do
+  defp apply_search(query, search, columns) do
     pattern = "%#{escape_like(search)}%"
 
-    where(
-      query,
-      [company, _parent, _primary],
-      fragment("? ILIKE ? ESCAPE E'\\\\'", company.name, ^pattern) or
-        fragment("? ILIKE ? ESCAPE E'\\\\'", company.code, ^pattern) or
-        fragment("? ILIKE ? ESCAPE E'\\\\'", company.legal_name, ^pattern) or
-        fragment("? ILIKE ? ESCAPE E'\\\\'", company.email, ^pattern) or
-        fragment("? ILIKE ? ESCAPE E'\\\\'", company.jurisdiction, ^pattern)
-    )
+    matches =
+      Enum.reduce(columns, dynamic(false), fn column, acc ->
+        dynamic(
+          [company, _parent, _primary],
+          ^acc or fragment("? ILIKE ? ESCAPE E'\\\\'", field(company, ^column), ^pattern)
+        )
+      end)
+
+    where(query, ^matches)
   end
 
   defp apply_status_filter(query, :all), do: query

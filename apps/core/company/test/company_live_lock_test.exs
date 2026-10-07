@@ -22,6 +22,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
     on_schema!(schema, fn ->
       TenancyFixtures.create_tenants_table!(persistent: true)
       CompanyFixtures.create_companies_table!(persistent: true)
+      Bilimbi.Base.Authz.TestFixtures.create_authz_tables!(persistent: true)
       TenancyFixtures.insert_tenant!(%{id: 41, name: "Owner"})
       TenancyFixtures.insert_tenant!(%{id: 42, name: "Other", is_platform_operator: false})
       CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Live", code: "live"})

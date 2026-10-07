@@ -55,6 +55,10 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
          |> assign(:active_nav, "admin.company")
          |> assign(:companies, companies)
          |> assign(:mode, mode)
+         |> assign(
+           :restricted_fields,
+           Company.restricted_fields(socket.assigns.current_scope.scope)
+         )
          |> assign_form(form_changeset(%{}))}
     end
   end
@@ -90,7 +94,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
     changeset = form_changeset(params) |> Map.put(:action, :insert)
 
     if changeset.valid? do
-      attrs = create_attrs(changeset)
+      attrs = create_attrs(changeset, socket.assigns.restricted_fields)
 
       case Company.create_company(socket.assigns.current_scope.scope, attrs, is_primary: true) do
         {:ok, company} ->
@@ -209,43 +213,79 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 maxlength="255"
               />
               <.input
+                :if={:legal_name not in @restricted_fields}
                 field={@form[:legal_name]}
                 id="platform-operator-legal-name"
                 label="Legal Name"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:legal_name in @restricted_fields}
+                id="platform-operator-legal-name-restricted"
+                label="Legal Name"
+              />
               <.input
+                :if={:registration_number not in @restricted_fields}
                 field={@form[:registration_number]}
                 id="platform-operator-registration-number"
                 label="Registration Number"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:registration_number in @restricted_fields}
+                id="platform-operator-registration-number-restricted"
+                label="Registration Number"
+              />
               <.input
+                :if={:tax_id not in @restricted_fields}
                 field={@form[:tax_id]}
                 id="platform-operator-tax-id"
                 label="Tax ID"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:tax_id in @restricted_fields}
+                id="platform-operator-tax-id-restricted"
+                label="Tax ID"
+              />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.input
+                :if={:jurisdiction not in @restricted_fields}
                 field={@form[:jurisdiction]}
                 id="platform-operator-jurisdiction"
                 label="Jurisdiction"
                 maxlength="2"
               />
+              <.restricted_field
+                :if={:jurisdiction in @restricted_fields}
+                id="platform-operator-jurisdiction-restricted"
+                label="Jurisdiction"
+              />
               <.input
+                :if={:email not in @restricted_fields}
                 field={@form[:email]}
                 id="platform-operator-email"
                 type="email"
                 label="Email"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:email in @restricted_fields}
+                id="platform-operator-email-restricted"
+                label="Email"
+              />
               <.input
+                :if={:website not in @restricted_fields}
                 field={@form[:website]}
                 id="platform-operator-website"
                 label="Website"
                 maxlength="255"
+              />
+              <.restricted_field
+                :if={:website in @restricted_fields}
+                id="platform-operator-website-restricted"
+                label="Website"
               />
             </div>
             <.button id="platform-operator-save" type="submit" variant="primary">
@@ -278,20 +318,25 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
     |> validate_length(:name, min: 1, max: 255)
   end
 
-  defp create_attrs(changeset) do
+  # A restricted field never reaches the attributes; `create_company/3` would
+  # refuse the key anyway.
+  defp create_attrs(changeset, restricted_fields) do
     name = get_field(changeset, :name)
 
-    %{
-      name: name,
-      code: code_from_name(name),
-      status: "active",
-      legal_name: blank_to_nil(get_field(changeset, :legal_name)),
-      registration_number: blank_to_nil(get_field(changeset, :registration_number)),
-      tax_id: blank_to_nil(get_field(changeset, :tax_id)),
-      jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
-      email: blank_to_nil(get_field(changeset, :email)),
-      website: blank_to_nil(get_field(changeset, :website))
-    }
+    Map.drop(
+      %{
+        name: name,
+        code: code_from_name(name),
+        status: "active",
+        legal_name: blank_to_nil(get_field(changeset, :legal_name)),
+        registration_number: blank_to_nil(get_field(changeset, :registration_number)),
+        tax_id: blank_to_nil(get_field(changeset, :tax_id)),
+        jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
+        email: blank_to_nil(get_field(changeset, :email)),
+        website: blank_to_nil(get_field(changeset, :website))
+      },
+      restricted_fields
+    )
   end
 
   # Belimbing `Company::creating` slugs a blank code; main's changeset still

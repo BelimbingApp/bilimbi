@@ -25,9 +25,9 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     """
   end
 
-  defp marker_with_capability(assigns) do
+  defp marker_with_requirement(assigns) do
     ~H"""
-    <.restricted id="salary-restricted" capability="admin.payroll.salary.view" />
+    <.restricted id="salary-restricted" requirement="the Payroll role" />
     """
   end
 
@@ -43,7 +43,7 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
       <.restricted_field
         id="payee-bank-account"
         label="Bank account"
-        capability="admin.payee.bank-account.view"
+        requirement="the Payroll role"
       />
     </form>
     """
@@ -63,13 +63,11 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
              ~s(aria-description="You don&#39;t have access to this. Ask your administrator.")
   end
 
-  test "names the permission to ask for when the page knows it" do
-    html = render_component(&marker_with_capability/1, %{})
+  test "names what to ask for when the page knows it" do
+    html = render_component(&marker_with_requirement/1, %{})
 
     assert html =~
-             ~s(title="You don&#39;t have access to this. Ask your administrator for the admin.payroll.salary.view permission.")
-
-    assert html =~ ~s(data-capability="admin.payroll.salary.view")
+             ~s(title="You don&#39;t have access to this. Ask your administrator for the Payroll role.")
   end
 
   test "a page's own reason replaces the default sentence" do
@@ -86,7 +84,7 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     assert html =~ ~s(data-restricted-field)
     assert html =~ ~s(aria-readonly="true")
     assert html =~ ~s(aria-labelledby="payee-bank-account-label")
-    assert html =~ ~s(for the admin.payee.bank-account.view permission.)
+    assert html =~ ~s(for the Payroll role.)
     refute html =~ "<input"
     refute html =~ "<select"
     refute html =~ "<textarea"

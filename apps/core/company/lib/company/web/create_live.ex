@@ -46,6 +46,10 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
          |> assign(:parent_companies, companies)
          |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
          |> assign(:country_options, Bilimbi.Core.Geonames.country_options())
+         |> assign(
+           :restricted_fields,
+           Company.restricted_fields(socket.assigns.current_scope.scope)
+         )
          |> assign_form(form_changeset(%{"status" => "active"}))}
 
       {:error, :unauthorized} ->
@@ -75,7 +79,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
       |> Map.put(:action, :insert)
 
     with true <- changeset.valid?,
-         {:ok, attrs} <- domain_attrs(changeset) do
+         {:ok, attrs} <- domain_attrs(changeset, socket.assigns.restricted_fields) do
       case Company.create_company(socket.assigns.current_scope.scope, attrs) do
         {:ok, _company} ->
           {:noreply,
@@ -144,11 +148,17 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 maxlength="255"
               />
               <.input
+                :if={:legal_name not in @restricted_fields}
                 field={@form[:legal_name]}
                 id="company-legal-name"
                 label="Legal Name"
                 placeholder="Registered legal entity name"
                 maxlength="255"
+              />
+              <.restricted_field
+                :if={:legal_name in @restricted_fields}
+                id="company-legal-name-restricted"
+                label="Legal Name"
               />
               <.input
                 field={@form[:legal_entity_type_id]}
@@ -159,39 +169,69 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 options={legal_entity_type_options(@legal_entity_types)}
               />
               <.input
+                :if={:registration_number not in @restricted_fields}
                 field={@form[:registration_number]}
                 id="company-registration-number"
                 label="Registration Number"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:registration_number in @restricted_fields}
+                id="company-registration-number-restricted"
+                label="Registration Number"
+              />
               <.input
+                :if={:tax_id not in @restricted_fields}
                 field={@form[:tax_id]}
                 id="company-tax-id"
                 label="Tax ID"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:tax_id in @restricted_fields}
+                id="company-tax-id-restricted"
+                label="Tax ID"
+              />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.combobox
+                :if={:jurisdiction not in @restricted_fields}
                 field={@form[:jurisdiction]}
                 id="company-jurisdiction"
                 label="Jurisdiction"
                 placeholder="Select country..."
                 options={@country_options}
               />
+              <.restricted_field
+                :if={:jurisdiction in @restricted_fields}
+                id="company-jurisdiction-restricted"
+                label="Jurisdiction"
+              />
               <.input
+                :if={:email not in @restricted_fields}
                 field={@form[:email]}
                 id="company-email"
                 type="email"
                 label="Email"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:email in @restricted_fields}
+                id="company-email-restricted"
+                label="Email"
+              />
               <.input
+                :if={:website not in @restricted_fields}
                 field={@form[:website]}
                 id="company-website"
                 label="Website"
                 placeholder="example.com"
                 maxlength="255"
+              />
+              <.restricted_field
+                :if={:website in @restricted_fields}
+                id="company-website-restricted"
+                label="Website"
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-2">
@@ -282,24 +322,29 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     end
   end
 
-  defp domain_attrs(%Changeset{} = changeset) do
+  # A restricted field never reaches the attributes: the form showed no input
+  # for it, and `create_company/3` would refuse the key anyway.
+  defp domain_attrs(%Changeset{} = changeset, restricted_fields) do
     if changeset.valid? do
       {:ok,
-       %{
-         parent_id: get_field(changeset, :parent_id),
-         name: get_field(changeset, :name),
-         code: blank_to_nil(get_field(changeset, :code)),
-         status: get_field(changeset, :status),
-         legal_name: blank_to_nil(get_field(changeset, :legal_name)),
-         registration_number: blank_to_nil(get_field(changeset, :registration_number)),
-         tax_id: blank_to_nil(get_field(changeset, :tax_id)),
-         legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
-         jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
-         email: blank_to_nil(get_field(changeset, :email)),
-         website: blank_to_nil(get_field(changeset, :website)),
-         scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
-         metadata: decode_object(get_field(changeset, :metadata_json))
-       }}
+       Map.drop(
+         %{
+           parent_id: get_field(changeset, :parent_id),
+           name: get_field(changeset, :name),
+           code: blank_to_nil(get_field(changeset, :code)),
+           status: get_field(changeset, :status),
+           legal_name: blank_to_nil(get_field(changeset, :legal_name)),
+           registration_number: blank_to_nil(get_field(changeset, :registration_number)),
+           tax_id: blank_to_nil(get_field(changeset, :tax_id)),
+           legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
+           jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
+           email: blank_to_nil(get_field(changeset, :email)),
+           website: blank_to_nil(get_field(changeset, :website)),
+           scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
+           metadata: decode_object(get_field(changeset, :metadata_json))
+         },
+         restricted_fields
+       )}
     else
       {:error, changeset}
     end

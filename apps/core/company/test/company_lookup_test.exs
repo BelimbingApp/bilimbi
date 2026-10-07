@@ -1,9 +1,10 @@
 defmodule Bilimbi.Core.CompanyLookupTest do
   @moduledoc """
-  The cheap company reads: `require_live_company/2` and `identity/2` answer
-  existence and the id, code and display name from one tenant-scoped query
-  and never evaluate authorization, and a relationship never carries another
-  company's raw row across the module boundary.
+  The cheap company reads (`require_live_company/2`, `identity/2`) answer
+  existence and identity from one tenant-scoped query, a relationship never
+  carries another company's raw row across the module boundary, and a field
+  an operator restricted is withheld from every summary, refused on write
+  and skipped by the search for a reader without one of its roles.
   """
 
   use Bilimbi.Base.Database.DataCase, async: false
@@ -11,6 +12,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.Authz.DecisionLog
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
@@ -18,6 +20,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Summary
 
+  import Bilimbi.Base.Database.TestHelpers
   import Bilimbi.Core.Company.TestFixtures
 
   @user_id 91
@@ -28,6 +31,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
     Code.ensure_loaded!(Bilimbi.Base.Authz.TestFixtures)
     create_company_identity_tables!()
     Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
+    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
     install_company_authz!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
 
@@ -44,7 +48,20 @@ defmodule Bilimbi.Core.CompanyLookupTest do
     })
 
     {:ok, system_scope} = Tenancy.scope(41)
-    %{reader: Authentication.sign_in(system_scope, @user_id, @company_id)}
+
+    %{
+      reader: Authentication.sign_in(system_scope, @user_id, @company_id),
+      system_scope: system_scope
+    }
+  end
+
+  # The signed-in user restricts `companies.email` to a Finance role nobody
+  # holds yet, as the operator page would.
+  defp restrict_email!(reader) do
+    grant!("admin.authz.field.manage")
+    {:ok, finance} = Authz.create_role(reader, @company_id, %{name: "Finance", code: "finance"})
+    {:ok, _} = Authz.put_field_restriction(reader, "companies", "email", [finance.id])
+    finance
   end
 
   test "the identity lookup is one query with no authorization evaluation", %{reader: reader} do
@@ -111,6 +128,102 @@ defmodule Bilimbi.Core.CompanyLookupTest do
     assert %Summary{tax_id: "TAX-11111"} = outgoing.other_company
   end
 
+  describe "a restricted field" do
+    test "is withheld from every summary and names the roles that see it", %{reader: reader} do
+      finance = restrict_email!(reader)
+
+      assert {:ok, %Summary{email: %Restricted{} = marker, tax_id: "TAX-98765"}} =
+               Company.get_company(reader, @company_id)
+
+      assert marker == %Restricted{table_id: "companies", field_id: "email", roles: ["Finance"]}
+      assert Company.restricted_fields(reader) == [:email]
+
+      assert {:ok, [%Summary{email: %Restricted{}}, %Summary{email: %Restricted{}}]} =
+               Company.list_companies(reader)
+
+      assert {:ok, [%Summary{email: %Restricted{}}]} =
+               Company.list_child_companies(reader, @company_id)
+
+      assert {:ok, %{company: %Summary{email: %Restricted{}}}} =
+               Company.dashboard_summary(reader, @company_id)
+
+      # A holder of the role reads the value, on the very next call.
+      assert {:ok, :assigned} =
+               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+
+      assert {:ok, %Summary{email: "hq@bilimbi.test"}} = Company.get_company(reader, @company_id)
+      assert Company.restricted_fields(reader) == []
+    end
+
+    test "is refused on update and create whatever the value, and nothing is written", %{
+      reader: reader
+    } do
+      restrict_email!(reader)
+      grant!("admin.company.update")
+
+      for attrs <- [
+            %{email: "hq@bilimbi.test"},
+            %{"email" => "new@bilimbi.test", "name" => "Renamed"}
+          ] do
+        assert {:error, changeset} = Company.update_company(reader, @company_id, attrs)
+        assert errors_on(changeset) == %{email: ["is restricted and cannot be changed"]}
+      end
+
+      assert {:ok, %Summary{name: "Renamed", email: %Restricted{}}} =
+               Company.update_company(reader, @company_id, %{name: "Renamed"})
+
+      assert {:error, changeset} =
+               Company.create_company(reader, %{name: "New Co", email: "new@bilimbi.test"})
+
+      assert errors_on(changeset) == %{email: ["is restricted and cannot be changed"]}
+
+      assert {:ok, %Summary{name: "New Co", email: %Restricted{}}} =
+               Company.create_company(reader, %{name: "New Co"})
+
+      {:ok, system_scope} = Tenancy.scope(41)
+
+      assert {:ok, %Summary{name: "Renamed", email: %Restricted{}}} =
+               Company.get_company(system_scope, @company_id)
+    end
+
+    test "is not searched for a reader who may not see it", %{reader: reader} do
+      assert Company.searchable_columns(reader) == [
+               :name,
+               :code,
+               :legal_name,
+               :email,
+               :jurisdiction
+             ]
+
+      assert {:ok, %{entries: [%{id: @company_id}]}} =
+               Company.list_administration_page(reader, search: "hq@bilimbi")
+
+      finance = restrict_email!(reader)
+      assert Company.searchable_columns(reader) == [:name, :code, :legal_name, :jurisdiction]
+
+      assert {:ok, %{entries: []}} =
+               Company.list_administration_page(reader, search: "hq@bilimbi")
+
+      assert {:ok, %{entries: [%{id: @company_id}]}} =
+               Company.list_administration_page(reader, search: "Bilimbi Ind")
+
+      assert {:ok, :assigned} =
+               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+
+      assert {:ok, %{entries: [%{id: @company_id}]}} =
+               Company.list_administration_page(reader, search: "hq@bilimbi")
+    end
+
+    test "the catalog protects the code and status and never offers the key or the name" do
+      companies = Enum.find(Authz.field_restriction_catalog(), &(&1.id == "companies"))
+      offered = Enum.map(companies.fields, & &1.id)
+
+      assert "email" in offered and "tax_id" in offered and "jurisdiction" in offered
+      refute Enum.any?(~w(id name code status parent_id legal_entity_type_id), &(&1 in offered))
+      assert companies.record_types == Company.auditable_types()
+    end
+  end
+
   defp grant!(capability) do
     {:ok, scope} = Tenancy.scope(41)
 
@@ -118,6 +231,8 @@ defmodule Bilimbi.Core.CompanyLookupTest do
              Authz.put_principal_capability(scope, @company_id, :user, @user_id, capability, true)
   end
 
+  # The real Company grid tables, so the restriction catalog is the one the
+  # operator page offers, beside a minimal Authz snapshot.
   defp install_company_authz! do
     authz =
       ContributionValidator.validate_contributions!([
@@ -125,14 +240,22 @@ defmodule Bilimbi.Core.CompanyLookupTest do
           descriptor: %{id: "core/company", otp_app: :bilimbi_core_company},
           payload: %{
             domains: %{"admin" => "Administrative operations"},
-            verbs: ["update"],
-            capabilities: ["admin.company.update"],
+            verbs: ["update", "manage"],
+            capabilities: ["admin.company.update", "admin.authz.field.manage"],
             company_directory: Bilimbi.Core.Company.AuthzCompanyDirectory
           }
         }
       ])
 
-    ContributionRegistry.put_consumers_for_test!(%{authz: authz}, "company-lookup")
+    grid =
+      Bilimbi.Base.Grid.ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "core/company", otp_app: :bilimbi_core_company},
+          payload: Bilimbi.Core.Company.GridTables.tables()
+        }
+      ])
+
+    ContributionRegistry.put_consumers_for_test!(%{authz: authz, grid: grid}, "company-lookup")
   end
 
   defp capture_queries(fun) do
