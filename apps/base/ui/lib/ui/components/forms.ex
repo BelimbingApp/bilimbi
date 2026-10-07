@@ -29,21 +29,22 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   an omitted input.
 
   The tooltip tells the person what to do: "You don't have access to this.
-  Ask your administrator." Pass `requirement`, what to ask for in words
-  (`Bilimbi.Base.Authz.Restricted.requirement/1` names the roles that see
-  the field), and the sentence ends with it. `reason` replaces the whole
-  sentence when a page has a better one.
+  Ask your administrator." Pass `roles`, the names of the roles that see the
+  field (`roles` of the `Bilimbi.Base.Authz.Restricted` marker), and the
+  sentence names them: "... for the Finance role." or "... for one of the
+  roles Audit, Finance." `reason` replaces the whole sentence when a page has
+  a better one.
 
   ## Examples
 
-      <.restricted id="detail-email-restricted" requirement={Restricted.requirement(@company.email)} />
+      <.restricted id="detail-email-restricted" roles={@company.email.roles} />
       <.restricted id="salary-restricted" reason="Salaries are shown to payroll only." />
   """
   attr(:id, :string, required: true)
 
-  attr(:requirement, :string,
-    default: nil,
-    doc: "what to ask the administrator for, in words, such as \"the Tenant Owner role\""
+  attr(:roles, :list,
+    default: [],
+    doc: "the names of the roles that see the field, as the marker carries them"
   )
 
   attr(:reason, :string,
@@ -54,7 +55,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   attr(:class, :any, default: nil)
 
   def restricted(assigns) do
-    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason(assigns.requirement))
+    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason(assigns.roles))
 
     ~H"""
     <span
@@ -72,15 +73,19 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
   @doc """
   The sentence a restricted field explains itself with: what happened and
-  what to do, ending with what to ask for when the caller knows it.
+  what to do, naming the roles that see the field when there are any.
   """
-  @spec restricted_reason(String.t() | nil) :: String.t()
-  def restricted_reason(nil),
+  @spec restricted_reason([String.t()]) :: String.t()
+  def restricted_reason([]),
     do: gettext("You don't have access to this. Ask your administrator.")
 
-  def restricted_reason(requirement) when is_binary(requirement) do
-    gettext("You don't have access to this. Ask your administrator for %{requirement}.",
-      requirement: requirement
+  def restricted_reason([_ | _] = roles) do
+    ngettext(
+      "You don't have access to this. Ask your administrator for the %{role} role.",
+      "You don't have access to this. Ask your administrator for one of the roles %{roles}.",
+      length(roles),
+      role: hd(roles),
+      roles: Enum.join(roles, ", ")
     )
   end
 
@@ -98,14 +103,14 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
   ## Examples
 
-      <.restricted_field id="company-email" label="Email" requirement="the Tenant Owner role" />
+      <.restricted_field id="company-email" label="Email" roles={["Tenant Owner"]} />
   """
   attr(:id, :string, required: true)
   attr(:label, :string, required: true)
 
-  attr(:requirement, :string,
-    default: nil,
-    doc: "what to ask the administrator for, in words, such as \"the Tenant Owner role\""
+  attr(:roles, :list,
+    default: [],
+    doc: "the names of the roles that see the field, as the marker carries them"
   )
 
   attr(:reason, :string,
@@ -120,7 +125,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       assign(
         assigns,
         :tooltip,
-        assigns.reason || restricted_reason(assigns.requirement)
+        assigns.reason || restricted_reason(assigns.roles)
       )
 
     ~H"""
@@ -135,7 +140,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         title={@tooltip}
         class="flex min-h-10 w-full items-center rounded-lg border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted"
       >
-        <.restricted id={"#{@id}-restricted"} requirement={@requirement} reason={@reason} />
+        <.restricted id={"#{@id}-restricted"} roles={@roles} reason={@reason} />
       </div>
     </div>
     """

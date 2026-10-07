@@ -25,9 +25,15 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     """
   end
 
-  defp marker_with_requirement(assigns) do
+  defp marker_with_role(assigns) do
     ~H"""
-    <.restricted id="salary-restricted" requirement="the Payroll role" />
+    <.restricted id="salary-restricted" roles={["Payroll"]} />
+    """
+  end
+
+  defp marker_with_roles(assigns) do
+    ~H"""
+    <.restricted id="salary-restricted" roles={["Audit", "Payroll"]} />
     """
   end
 
@@ -43,7 +49,7 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
       <.restricted_field
         id="payee-bank-account"
         label="Bank account"
-        requirement="the Payroll role"
+        roles={["Payroll"]}
       />
     </form>
     """
@@ -63,11 +69,18 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
              ~s(aria-description="You don&#39;t have access to this. Ask your administrator.")
   end
 
-  test "names what to ask for when the page knows it" do
-    html = render_component(&marker_with_requirement/1, %{})
+  test "names the role to ask for when the page knows it" do
+    html = render_component(&marker_with_role/1, %{})
 
     assert html =~
              ~s(title="You don&#39;t have access to this. Ask your administrator for the Payroll role.")
+  end
+
+  test "names every role when several see the field" do
+    html = render_component(&marker_with_roles/1, %{})
+
+    assert html =~
+             ~s(title="You don&#39;t have access to this. Ask your administrator for one of the roles Audit, Payroll.")
   end
 
   test "a page's own reason replaces the default sentence" do

@@ -15,12 +15,11 @@ defmodule Bilimbi.Base.Authz.Restricted do
 
   A template renders it with `<.restricted>` from
   `Bilimbi.Base.UI.Components`, which is the one designed treatment: the
-  word "Restricted", a lock, and the reason in its tooltip. Interpolated
-  directly, as `{@value}` or inside an attribute, it renders the word
-  "Restricted" through `Phoenix.HTML.Safe`, so a template that was not
-  written for it still cannot show the value. It has no `String.Chars`
-  implementation on purpose: code that would compare, search or store it as a
-  string raises instead of treating the marker as data.
+  word "Restricted", a lock, and the reason in its tooltip, built from
+  `roles`. This module carries data only, no copy. It has no `String.Chars`
+  or `Phoenix.HTML.Safe` implementation on purpose: code that would compare,
+  search, store or interpolate it raises instead of treating the marker as
+  data, so a template that was not written for it cannot show the value.
   """
 
   @enforce_keys [:table_id, :field_id]
@@ -32,21 +31,4 @@ defmodule Bilimbi.Base.Authz.Restricted do
   @spec restricted?(term()) :: boolean()
   def restricted?(%__MODULE__{}), do: true
   def restricted?(_value), do: false
-
-  @doc "The word a restricted field reads as wherever it is rendered as text."
-  @spec text() :: String.t()
-  def text, do: "Restricted"
-
-  @doc """
-  What to ask an administrator for: the roles that see the field, as the
-  `requirement` of `<.restricted>`, or `nil` when no role sees it.
-  """
-  @spec requirement(t()) :: String.t() | nil
-  def requirement(%__MODULE__{roles: []}), do: nil
-  def requirement(%__MODULE__{roles: [role]}), do: "the #{role} role"
-  def requirement(%__MODULE__{roles: roles}), do: "one of the roles " <> Enum.join(roles, ", ")
-end
-
-defimpl Phoenix.HTML.Safe, for: Bilimbi.Base.Authz.Restricted do
-  def to_iodata(%Bilimbi.Base.Authz.Restricted{}), do: Bilimbi.Base.Authz.Restricted.text()
 end

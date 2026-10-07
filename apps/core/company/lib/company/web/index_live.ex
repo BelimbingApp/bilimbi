@@ -469,7 +469,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               <.restricted
                 :if={Restricted.restricted?(company.jurisdiction)}
                 id={"company-#{company.id}-jurisdiction-restricted"}
-                requirement={Restricted.requirement(company.jurisdiction)}
+                roles={company.jurisdiction.roles}
               />
               <span
                 :if={not Restricted.restricted?(company.jurisdiction)}

@@ -1117,7 +1117,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <.restricted
                 :if={Restricted.restricted?(@company.jurisdiction)}
                 id="company-jurisdiction-restricted"
-                requirement={Restricted.requirement(@company.jurisdiction)}
+                roles={@company.jurisdiction.roles}
               />
               <.choice_fact
                 :if={not Restricted.restricted?(@company.jurisdiction)}
@@ -1357,7 +1357,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               </span>
             </:col>
             <:col :let={child} label="Jurisdiction">
-              <span class="text-sm text-ink-subtle">
+              <.restricted
+                :if={Restricted.restricted?(child.jurisdiction)}
+                id={"child-#{child.id}-jurisdiction-restricted"}
+                roles={child.jurisdiction.roles}
+              />
+              <span
+                :if={not Restricted.restricted?(child.jurisdiction)}
+                class="text-sm text-ink-subtle"
+              >
                 {child.jurisdiction || "—"}
               </span>
             </:col>
@@ -1664,7 +1672,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     <.restricted
       :if={@restricted?}
       id={"#{@dom_id}-restricted"}
-      requirement={Restricted.requirement(@value)}
+      roles={@value.roles}
       class={@class}
     />
     <.commit_status :if={@restricted?} id={"#{@dom_id}-status"} status={@field_status[@name]} />

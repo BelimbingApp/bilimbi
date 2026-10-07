@@ -107,7 +107,10 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
              socket
              |> put_flash(
                :success,
-               "#{restriction.table_label} › #{restriction.field_label} is no longer restricted."
+               gettext("%{table} › %{field} is no longer restricted.",
+                 table: restriction.table_label,
+                 field: restriction.field_label
+               )
              )
              |> reset_form()
              |> load()}
@@ -115,11 +118,12 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
           {:ok, :not_found} ->
             {:noreply,
              socket
-             |> put_flash(:info, "That restriction was already removed.")
+             |> put_flash(:info, gettext("That restriction was already removed."))
              |> load()}
 
           {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "The restriction could not be removed.")}
+            {:noreply,
+             put_flash(socket, :error, gettext("The restriction could not be removed."))}
         end
 
       {:denied, socket} ->
@@ -135,27 +139,31 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
       {:ok, restriction} ->
         {:noreply,
          socket
-         |> put_flash(
-           :success,
-           "#{restriction.table_label} › #{restriction.field_label} is restricted to " <>
-             roles_sentence(restriction.role_names) <> "."
-         )
+         |> put_flash(:success, saved_message(restriction))
          |> reset_form()
          |> load()}
 
       {:error, :not_restrictable} ->
         {:noreply,
-         put_flash(socket, :error, "Choose a table and one of its restrictable fields.")}
+         put_flash(
+           socket,
+           :error,
+           gettext("Choose a table and one of its restrictable fields.")
+         )}
 
       {:error, {:unknown_roles, _ids}} ->
-        {:noreply, put_flash(socket, :error, "Choose roles of this tenant.")}
+        {:noreply, put_flash(socket, :error, gettext("Choose roles of this tenant."))}
 
       {:error, :forbidden} ->
         {:noreply,
-         put_flash(socket, :error, "You do not have permission to manage field access.")}
+         put_flash(
+           socket,
+           :error,
+           gettext("You do not have permission to manage field access.")
+         )}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "The restriction could not be saved.")}
+        {:noreply, put_flash(socket, :error, gettext("The restriction could not be saved."))}
     end
   end
 
@@ -210,6 +218,18 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
 
   defp role_options(roles), do: Enum.map(roles, &{&1.name, Integer.to_string(&1.id)})
 
-  defp roles_sentence([]), do: "no role"
-  defp roles_sentence(names), do: Enum.join(names, ", ")
+  defp saved_message(%{role_names: []} = restriction) do
+    gettext("%{table} › %{field} is restricted to no role.",
+      table: restriction.table_label,
+      field: restriction.field_label
+    )
+  end
+
+  defp saved_message(restriction) do
+    gettext("%{table} › %{field} is restricted to %{roles}.",
+      table: restriction.table_label,
+      field: restriction.field_label,
+      roles: Enum.join(restriction.role_names, ", ")
+    )
+  end
 end
