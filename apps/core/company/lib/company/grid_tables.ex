@@ -24,9 +24,11 @@ defmodule Bilimbi.Core.Company.GridTables do
           time_field: "created_at",
           # Audit rows of a company are recorded under these types, so a field
           # access restriction set on this table reaches the record history
-          # and the mutations browser. Code and status are protected: the
-          # module's own logic and every list need them, so no operator may
-          # restrict them (the key and the name are protected implicitly).
+          # and the mutations browser. Code, status and legal name are
+          # protected: the module's own logic and every list need them (the
+          # legal name is the display identity every header, title and the
+          # login page show), so no operator may restrict them (the key and
+          # the name are protected implicitly).
           record_types: Bilimbi.Core.Company.auditable_types(),
           fields: [
             %{id: "id", label: "ID", type: :integer},
@@ -39,7 +41,7 @@ defmodule Bilimbi.Core.Company.GridTables do
               values: ~w(active suspended pending archived),
               protected: true
             },
-            %{id: "legal_name", label: "Legal name", type: :string},
+            %{id: "legal_name", label: "Legal name", type: :string, protected: true},
             %{id: "registration_number", label: "Registration number", type: :string},
             %{id: "tax_id", label: "Tax ID", type: :string},
             %{id: "jurisdiction", label: "Jurisdiction", type: :string},

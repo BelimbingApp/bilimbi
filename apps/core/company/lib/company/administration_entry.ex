@@ -6,8 +6,13 @@ defmodule Bilimbi.Core.Company.AdministrationEntry do
   metadata, and persistence details. Consumers needing a Company detail
   record must use the separate public detail API instead of making this
   list row wider by accident.
+
+  `jurisdiction` carries a `Bilimbi.Base.Authz.Restricted` marker for a
+  reader an operator withheld it from; `Bilimbi.Core.Company.AdministrationIndex`
+  redacts every page it returns.
   """
 
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Core.Company.Schema
 
   @enforce_keys [:id, :name, :code, :status, :primary?]
@@ -29,7 +34,7 @@ defmodule Bilimbi.Core.Company.AdministrationEntry do
           code: String.t(),
           legal_name: String.t() | nil,
           status: String.t(),
-          jurisdiction: String.t() | nil,
+          jurisdiction: String.t() | Restricted.t() | nil,
           parent_id: pos_integer() | nil,
           parent_name: String.t() | nil,
           primary?: boolean()

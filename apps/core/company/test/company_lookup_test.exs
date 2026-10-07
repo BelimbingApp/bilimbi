@@ -36,7 +36,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
     on_exit(&ContributionRegistry.clear_for_test!/0)
 
     insert_tenant!()
-    insert_company!(%{tax_id: "TAX-98765", email: "hq@bilimbi.test"})
+    insert_company!(%{tax_id: "TAX-98765", email: "hq@bilimbi.test", jurisdiction: "MY"})
 
     insert_company!(%{
       id: @sibling_id,
@@ -44,7 +44,8 @@ defmodule Bilimbi.Core.CompanyLookupTest do
       name: "Sibling",
       parent_id: @company_id,
       tax_id: "TAX-11111",
-      email: "sibling@bilimbi.test"
+      email: "sibling@bilimbi.test",
+      jurisdiction: "AU"
     })
 
     {:ok, system_scope} = Tenancy.scope(41)
@@ -57,10 +58,12 @@ defmodule Bilimbi.Core.CompanyLookupTest do
 
   # The signed-in user restricts `companies.email` to a Finance role nobody
   # holds yet, as the operator page would.
-  defp restrict_email!(reader) do
+  defp restrict_email!(reader), do: restrict!(reader, "email")
+
+  defp restrict!(reader, field) do
     grant!("admin.authz.field.manage")
     {:ok, finance} = Authz.create_role(reader, @company_id, %{name: "Finance", code: "finance"})
-    {:ok, _} = Authz.put_field_restriction(reader, "companies", "email", [finance.id])
+    {:ok, _} = Authz.put_field_restriction(reader, "companies", field, [finance.id])
     finance
   end
 
@@ -212,6 +215,41 @@ defmodule Bilimbi.Core.CompanyLookupTest do
 
       assert {:ok, %{entries: [%{id: @company_id}]}} =
                Company.list_administration_page(reader, search: "hq@bilimbi")
+    end
+
+    test "jurisdiction reads Restricted in the list, orders nothing and is not searched", %{
+      reader: reader
+    } do
+      desc = [sort_by: :jurisdiction, sort_dir: :desc]
+
+      assert {:ok, %{entries: [%{jurisdiction: "MY"}, %{jurisdiction: "AU"}]}} =
+               Company.list_administration_page(reader, desc)
+
+      assert {:ok, %{entries: [%{id: @sibling_id}]}} =
+               Company.list_administration_page(reader, search: "AU")
+
+      finance = restrict!(reader, "jurisdiction")
+
+      assert {:ok, %{entries: [first, second]}} = Company.list_administration_page(reader, desc)
+      assert [first.name, second.name] == ["Sibling", "Bilimbi Industries"]
+
+      assert %Restricted{field_id: "jurisdiction", roles: ["Finance"]} = first.jurisdiction
+      assert %Restricted{} = second.jurisdiction
+      assert first.legal_name == nil
+
+      assert {:ok, %{entries: []}} = Company.list_administration_page(reader, search: "AU")
+
+      assert {:ok, :assigned} =
+               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+
+      assert {:ok, %{entries: [%{jurisdiction: "MY"}, %{jurisdiction: "AU"}]}} =
+               Company.list_administration_page(reader, desc)
+    end
+
+    test "the legal name is protected, so no operator can withhold it from the list or a header" do
+      companies = Enum.find(Authz.field_restriction_catalog(), &(&1.id == "companies"))
+
+      refute "legal_name" in Enum.map(companies.fields, & &1.id)
     end
 
     test "the catalog protects the code and status and never offers the key or the name" do

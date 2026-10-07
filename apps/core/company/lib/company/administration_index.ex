@@ -61,17 +61,23 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
 
   @doc "The columns `page/2` searches for this scope's actor, in match order."
   @spec searchable_columns(Scope.t()) :: [atom()]
-  def searchable_columns(%Scope{} = scope) do
-    restricted = Authz.restricted_fields(scope, Summary.table_id())
-    Enum.reject(@search_columns, &(Atom.to_string(&1) in restricted))
-  end
+  def searchable_columns(%Scope{} = scope),
+    do: scope |> restricted_fields() |> searchable_columns_without()
+
+  defp restricted_fields(scope), do: Authz.restricted_fields(scope, Summary.table_id())
+
+  defp searchable_columns_without(restricted),
+    do: Enum.reject(@search_columns, &(Atom.to_string(&1) in restricted))
 
   @spec page(Scope.t(), normalized_options()) :: AdministrationPage.t()
   def page(%Scope{} = scope, options) do
+    restricted = restricted_fields(scope)
+    sort_by = sortable_by(options.sort_by, restricted)
+
     query =
       scope
       |> base_query()
-      |> apply_search(options.search, searchable_columns(scope))
+      |> apply_search(options.search, searchable_columns_without(restricted))
       |> apply_status_filter(options.status_filter)
 
     total_entries = query |> exclude(:order_by) |> Repo.aggregate(:count, :id)
@@ -79,7 +85,7 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
 
     entries =
       query
-      |> apply_order(options.sort_by, options.sort_dir)
+      |> apply_order(sort_by, options.sort_dir)
       |> offset(^((options.page - 1) * options.page_size))
       |> limit(^options.page_size)
       |> select(
@@ -88,6 +94,7 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
       )
       |> Repo.all()
       |> Enum.map(&AdministrationEntry.from_query_result/1)
+      |> redact(scope, restricted)
 
     %AdministrationPage{
       entries: entries,
@@ -99,6 +106,16 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
       has_next?: options.page < total_pages
     }
   end
+
+  # A restricted column orders nothing: sorting by it would reveal the order
+  # of values the reader may not see, so the default order stands in.
+  defp sortable_by(:jurisdiction, restricted),
+    do: if("jurisdiction" in restricted, do: :name, else: :jurisdiction)
+
+  defp sortable_by(sort_by, _restricted), do: sort_by
+
+  defp redact(entries, _scope, []), do: entries
+  defp redact(entries, scope, _restricted), do: Authz.redact(scope, Summary.table_id(), entries)
 
   # Both joins hang off the Tenancy.scope_query base and add no tenant
   # comparison of their own: the parent join cannot cross tenants because the

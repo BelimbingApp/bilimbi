@@ -12,6 +12,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Grid.Web.PageColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Company
@@ -69,6 +70,8 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   @impl true
   def mount(_params, _session, socket) do
     state = ListState.parse(%{}, @list)
+    searchable = Company.searchable_columns(socket.assigns.current_scope.scope)
+    jurisdiction? = :jurisdiction in searchable
 
     {:ok,
      socket
@@ -78,20 +81,27 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
      |> assign(:index_state, state)
      |> assign(:companies_page, empty_page())
      |> assign(:filters_form, ListState.filters_form(state))
-     |> assign(:search_placeholder, search_placeholder(socket.assigns.current_scope.scope))
+     |> assign(:jurisdiction?, jurisdiction?)
+     |> assign(:search_placeholder, search_placeholder(searchable))
      |> assign(
        :columns,
-       PageColumns.mount(socket.assigns.current_scope, "companies", @builtins)
+       PageColumns.mount(
+         socket.assigns.current_scope,
+         "companies",
+         builtins(jurisdiction?)
+       )
      )}
   end
 
-  # The placeholder names the columns this reader's search matches
-  # (`Company.searchable_columns/1`): a column an operator restricted to
-  # roles the reader lacks is not searched, and the box says so.
-  defp search_placeholder(scope) do
+  # A column an operator restricted to roles the reader lacks is neither
+  # searched (`Company.searchable_columns/1`) nor drawn nor sorted by, and the
+  # search box names only what it matches.
+  defp builtins(true), do: @builtins
+  defp builtins(false), do: Enum.reject(@builtins, &(&1.id == "jurisdiction"))
+
+  defp search_placeholder(searchable) do
     {last, rest} =
-      scope
-      |> Company.searchable_columns()
+      searchable
       |> Enum.map(&(&1 |> Atom.to_string() |> String.replace("_", " ")))
       |> List.pop_at(-1)
 
@@ -146,6 +156,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
   defp load_page(socket, state) do
     scope = socket.assigns.current_scope.scope
+    state = withhold_sort(state, socket.assigns.jurisdiction?)
 
     options = [
       page: state.page,
@@ -184,6 +195,11 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
         )
     end
   end
+
+  defp withhold_sort(%ListState{sort_by: :jurisdiction} = state, false),
+    do: %{state | sort_by: :name, sort_dir: :asc}
+
+  defp withhold_sort(state, _jurisdiction?), do: state
 
   defp listed(page, id), do: Enum.find(page.entries, &(&1.id == id))
 
@@ -450,7 +466,15 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             </:col>
             <:col :let={%{key: id}} id="jurisdiction">
               <% company = listed(@companies_page, id) %>
-              <span class={[is_nil(company.jurisdiction) && "text-ink-faint"]}>
+              <.restricted
+                :if={Restricted.restricted?(company.jurisdiction)}
+                id={"company-#{company.id}-jurisdiction-restricted"}
+                requirement={Restricted.requirement(company.jurisdiction)}
+              />
+              <span
+                :if={not Restricted.restricted?(company.jurisdiction)}
+                class={[is_nil(company.jurisdiction) && "text-ink-faint"]}
+              >
                 {company.jurisdiction || "—"}
               </span>
             </:col>

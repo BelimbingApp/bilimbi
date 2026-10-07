@@ -4,7 +4,9 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
   import Ecto.Query, only: [from: 2]
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -183,6 +185,38 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       assert has_element?(view, "#companies-card th", "Jurisdiction")
       assert has_element?(view, "#companies", "Primary")
       assert has_element?(view, "#companies", "Bilimbi Industries")
+    end
+
+    test "a restricted jurisdiction reads Restricted, has no column, sort or search for a non-holder",
+         %{conn: conn} do
+      from(c in "companies", where: c.id == 73) |> Repo.update_all(set: [jurisdiction: "MY"])
+      grant_capabilities!(["admin.company.list"])
+      grant_capabilities!("admin.authz.field.manage", user_id: 92)
+      {:ok, scope} = Tenancy.scope(41)
+      operator = Tenancy.Authentication.sign_in(scope, 92, 73)
+      {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+      assert has_element?(view, "#companies-card th", "Jurisdiction")
+      assert has_element?(view, "#companies-sort-jurisdiction")
+      assert has_element?(view, "#companies", "MY")
+
+      {:ok, _} = Authz.put_field_restriction(operator, "companies", "jurisdiction", [finance.id])
+
+      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
+      refute html =~ "MY"
+      refute has_element?(view, "#companies-card th", "Jurisdiction")
+      refute has_element?(view, "#companies-sort-jurisdiction")
+      assert has_element?(view, "#companies tr:first-child td:first-child", "Bilimbi Industries")
+
+      refute has_element?(view, "#companies-search[placeholder*='jurisdiction']")
+      assert has_element?(view, "#companies-search[placeholder*='legal name']")
+
+      {:ok, _} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
+      assert has_element?(view, "#companies-card th", "Jurisdiction")
+      assert has_element?(view, "#companies", "MY")
     end
 
     test "junk query parameters normalize to defaults", %{conn: conn} do
