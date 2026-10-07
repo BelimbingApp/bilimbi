@@ -53,9 +53,9 @@ source /etc/bilimbi/bilimbi.env
 set +a
 unset PHX_SERVER
 if [[ "$mode" == adopt ]]; then
-  runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.adopt()'
+  runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.adopt()' </dev/null
 fi
-runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.migrate()'
+runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.migrate()' </dev/null
 
 ln -sfn "$target" "$root/.current.next"
 mv -Tf "$root/.current.next" "$current"

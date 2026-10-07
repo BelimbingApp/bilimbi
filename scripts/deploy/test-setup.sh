@@ -18,12 +18,15 @@ case "$*" in
   'inspect --format {{.Image}} old-container') echo sha256:previous ;;
   *'ps -q app') [[ ${PREVIOUS_CONTAINER:-yes} == yes ]] && echo old-container; exit 0 ;;
   *'run --rm --no-deps -T'*'Release.bootstrap()')
-    read -r password
-    [[ "$password" == test-password ]] || exit 42
+    IFS= read -r password
+    [[ "$password" == "${EXPECTED_PASSWORD:-test-password}" ]] || exit 42
     ;;
   *'run --rm --no-deps -T'*'Release.adopt()')
     [[ ${REFUSE_ADOPTION:-no} == no ]] || exit 43
+    # Deliberately drain stdin like the real Compose client.
+    cat >/dev/null
     ;;
+  *'run --rm --no-deps -T'*) cat >/dev/null ;;
 esac
 SH
 cat > "$test_dir/bin/curl" <<'SH'
@@ -44,6 +47,11 @@ contains 'Release.migrate()'
 contains 'Release.bootstrap()'
 absent test-password
 absent 'Release.adopt()'
+
+reset_log
+printf ' test-password \n' | EXPECTED_PASSWORD=' test-password ' run install bilimbi:test "$test_dir/release.env" Tenant Company code Admin admin@example.com
+contains 'Release.bootstrap()'
+absent test-password
 
 reset_log
 run upgrade bilimbi:test "$test_dir/release.env"

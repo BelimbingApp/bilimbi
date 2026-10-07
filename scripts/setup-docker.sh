@@ -30,7 +30,9 @@ docker image inspect "$BILIMBI_IMAGE" >/dev/null 2>&1 || docker pull "$BILIMBI_I
 previous=$({ "${compose[@]}" ps -q app | xargs -r docker inspect --format '{{.Image}}'; } | head -n 1)
 
 run_release() {
-  "${compose[@]}" run --rm --no-deps -T app bin/bilimbi eval "$1"
+  # Compose forwards stdin by default. Migration/adoption/seed commands must
+  # not consume a password piped to the later bootstrap prompt.
+  "${compose[@]}" run --rm --no-deps -T app bin/bilimbi eval "$1" </dev/null
 }
 if [[ "$mode" == adopt ]]; then
   run_release 'BilimbiWeb.Release.adopt()'
@@ -38,7 +40,7 @@ fi
 run_release 'BilimbiWeb.Release.migrate()'
 case "$mode" in
   install)
-    read -rsp 'Initial admin password (blank for completed setup): ' bootstrap_password
+    IFS= read -rsp 'Initial admin password (blank for completed setup): ' bootstrap_password || bootstrap_password=
     echo
     printf '%s\n' "$bootstrap_password" | "${compose[@]}" run --rm --no-deps -T \
       -e "BOOT_TENANT_NAME=$4" -e "BOOT_COMPANY_NAME=$5" -e "BOOT_COMPANY_CODE=$6" \

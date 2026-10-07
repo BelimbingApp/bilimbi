@@ -7,4 +7,4 @@ set -a
 source /etc/bilimbi/bilimbi.env
 set +a
 unset PHX_SERVER
-runuser -u bilimbi -- /opt/bilimbi/current/bin/bilimbi eval 'BilimbiWeb.Release.seed()'
+runuser -u bilimbi -- /opt/bilimbi/current/bin/bilimbi eval 'BilimbiWeb.Release.seed()' </dev/null
