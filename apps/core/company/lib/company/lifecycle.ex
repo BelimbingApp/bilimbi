@@ -17,11 +17,10 @@ defmodule Bilimbi.Core.Company.Lifecycle do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.Context, as: AuditContext
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Schema
   alias Bilimbi.Core.Company.Summary
   alias Bilimbi.Core.Company.TenantPrimaryCompany
@@ -81,9 +80,10 @@ defmodule Bilimbi.Core.Company.Lifecycle do
   def apply(operation, %Scope{} = scope, company_id, opts)
       when operation in @operations and is_integer(company_id) and company_id > 0 and
              is_list(opts) do
-    with {:ok, actor} <- performing_actor(scope),
-         :ok <- authorize(scope),
+    with :ok <- authorize(scope, company_id),
          {:ok, reason} <- normalize_reason(Keyword.get(opts, :reason)) do
+      actor = Scope.actor(scope)
+
       Repo.transaction(fn ->
         with {:ok, company} <- lock_live_company(scope, company_id),
              :ok <- check_transition(operation, company.status),
@@ -102,23 +102,15 @@ defmodule Bilimbi.Core.Company.Lifecycle do
       when operation in @operations and is_list(opts),
       do: {:error, :not_found}
 
-  # A business event names who performed it. A system scope that names nobody
-  # (seeds, `Tenancy.scope/1`) is refused; a named system principal is a
-  # recorded identity and is decided by Authz like a person.
-  defp performing_actor(%Scope{} = scope) do
-    actor = Scope.actor(scope)
-
-    if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
-      {:error, :forbidden}
-    else
-      {:ok, actor}
-    end
-  end
-
-  defp authorize(%Scope{} = scope) do
-    case Authz.can(scope, @capability) do
-      %{allowed: true} -> :ok
-      %{allowed: false} -> {:error, :forbidden}
+  # A business event names who performed it, and the person must reach the
+  # company acted on: the capability at their own company, and for another
+  # company of the tenant the tenant-wide reach as well. A system scope names
+  # nobody and is refused.
+  defp authorize(%Scope{} = scope, company_id) do
+    case Company.authorize_company_target(scope, company_id, @capability) do
+      {:ok, _company} -> :ok
+      {:error, :unauthorized} -> {:error, :forbidden}
+      {:error, :not_found} -> {:error, :not_found}
     end
   end
 
@@ -189,9 +181,8 @@ defmodule Bilimbi.Core.Company.Lifecycle do
     attributes = %{
       company_id: before.id,
       actor_type: Atom.to_string(actor.type),
-      actor_id: actor.user_id || 0,
+      actor_id: actor.user_id,
       impersonator_id: actor.impersonator_id,
-      system_principal: actor.system_principal,
       ip_address: context.ip_address,
       url: context.url,
       user_agent: context.user_agent && String.slice(context.user_agent, 0, 80),

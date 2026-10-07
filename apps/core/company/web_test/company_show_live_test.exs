@@ -1414,8 +1414,67 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
   describe "Lifecycle" do
     setup do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
       :ok
+    end
+
+    test "another company's status needs the tenant-wide reach: no controls, forged events refused",
+         %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      assert has_element?(view, "#company-suspend")
+
+      revoke_capability!(scope!(), "admin.company.tenant-wide.manage")
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      refute has_element?(view, "#company-status button")
+
+      assert has_element?(
+               view,
+               "#company-status-reach",
+               "needs tenant-wide company management"
+             )
+
+      render_click(view, "request_lifecycle", %{"operation" => "archive"})
+      render_submit(view, "apply_lifecycle", %{"reason" => "forged"})
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      refute has_element?(view, "#company-lifecycle-modal")
+      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 74)
+      {:ok, actions} = Audit.list_actions(scope!())
+      refute Enum.any?(actions, &String.starts_with?(&1.event, "company."))
+
+      # The company the person signed in under needs only the update capability.
+      {:ok, own_view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      assert has_element?(own_view, "#company-suspend")
+      refute has_element?(own_view, "#company-status-reach")
+    end
+
+    test "a revoked reach is refused on apply even though the dialog was opened", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      view |> element("#company-suspend") |> render_click()
+
+      revoke_capability!(scope!(), "admin.company.tenant-wide.manage")
+
+      view |> form("#company-lifecycle-form", %{"reason" => ""}) |> render_submit()
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert {:ok, %{status: "active"}} = Company.get_company(scope!(), 74)
     end
 
     test "the status row offers only the operations the company may undergo", %{conn: conn} do

@@ -23,6 +23,7 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
   @company_id 73
   @target_id 74
   @capability "admin.company.update"
+  @reach "admin.company.tenant-wide.manage"
 
   setup do
     Code.ensure_loaded!(Bilimbi.Base.Authz.TestFixtures)
@@ -238,6 +239,35 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
     end
   end
 
+  describe "reach" do
+    test "the capability at the signed-in company alone does not reach another company", %{
+      scope: scope
+    } do
+      grant!(@company_id, [@capability])
+
+      for operation <- [:archive, :suspend, :activate, :reactivate] do
+        assert {:error, :forbidden} = call(operation, scope)
+      end
+
+      assert stored_status() == "active"
+      assert {:ok, []} = Audit.list_actions(scope)
+    end
+
+    test "with the tenant-wide reach the same account may", %{scope: scope} do
+      grant!(@company_id, [@capability, @reach])
+
+      assert {:ok, %Summary{status: "suspended"}} = call(:suspend, scope)
+      assert {:ok, [%{event: "company.suspended"}]} = Audit.list_actions(scope)
+    end
+
+    test "the reach without the update capability is not enough", %{scope: scope} do
+      grant!(@company_id, [@reach])
+
+      assert {:error, :forbidden} = call(:suspend, scope)
+      assert stored_status() == "active"
+    end
+  end
+
   describe "standing" do
     test "the tenant's primary company is neither archived nor suspended", %{scope: scope} do
       grant!()
@@ -330,18 +360,20 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
     Repo.get!(Bilimbi.Core.Company.Schema, @target_id).status
   end
 
-  defp grant!(company_id \\ @company_id) do
+  defp grant!(company_id \\ @company_id, capabilities \\ [@capability, @reach]) do
     {:ok, scope} = Tenancy.scope(41)
 
-    assert {:ok, :stored} =
-             Authz.put_principal_capability(
-               scope,
-               company_id,
-               :user,
-               @user_id,
-               @capability,
-               true
-             )
+    for capability <- capabilities do
+      assert {:ok, :stored} =
+               Authz.put_principal_capability(
+                 scope,
+                 company_id,
+                 :user,
+                 @user_id,
+                 capability,
+                 true
+               )
+    end
   end
 
   defp install_company_authz! do
@@ -351,8 +383,8 @@ defmodule Bilimbi.Core.CompanyLifecycleTest do
           descriptor: %{id: "core/company", otp_app: :bilimbi_core_company},
           payload: %{
             domains: %{"admin" => "Administrative operations"},
-            verbs: ["update"],
-            capabilities: [@capability],
+            verbs: ["update", "manage"],
+            capabilities: [@capability, @reach],
             company_directory: Bilimbi.Core.Company.AuthzCompanyDirectory
           }
         }

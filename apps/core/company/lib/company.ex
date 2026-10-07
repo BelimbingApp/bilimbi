@@ -516,11 +516,13 @@ defmodule Bilimbi.Core.Company do
 
   Archived is final; no operation leaves it. Every lifecycle operation takes
   the sealed scope of the person performing it, requires
-  `admin.company.update` on it now, accepts an optional `reason:` (trimmed,
+  `admin.company.update` on it now and, for a company other than the one the
+  person signed in under, `admin.company.tenant-wide.manage` as well (as
+  `authorize_company_target/3` decides), accepts an optional `reason:` (trimmed,
   at most `Lifecycle.reason_max_length/0` characters; blank records none),
   writes the status and one retained `company.<event>` audit action in the
-  same transaction, and returns the updated summary. A system scope that
-  names nobody is `{:error, :forbidden}`; a company the operation does not
+  same transaction, and returns the updated summary. A system scope
+  is `{:error, :forbidden}`; a company the operation does not
   start from is `{:error, {:invalid_transition, current_status}}`; a missing,
   deleted or cross-tenant id is `{:error, :not_found}`; a reason longer than
   that limit is `{:error, :reason_too_long}` and one that is not text is

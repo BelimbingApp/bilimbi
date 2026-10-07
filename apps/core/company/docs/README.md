@@ -42,9 +42,14 @@ Every operation:
 
 - takes the sealed `%Bilimbi.Base.Tenancy.Scope{}` of the person performing
   it and requires `admin.company.update` on it now, through
-  `Bilimbi.Base.Authz.can/2`. The lifecycle shares the update capability
-  rather than owning one of its own; a system scope that names nobody is
-  `{:error, :forbidden}` because a business event records who performed it;
+  `authorize_company_target/3`: the capability where the person signed in is
+  enough for that company, and any other company of the tenant additionally
+  requires `admin.company.tenant-wide.manage`. Holding the update capability
+  at one company never reaches another. The lifecycle shares the update
+  capability rather than owning one of its own; a system scope names nobody
+  and is `{:error, :forbidden}` because a business event records who
+  performed it. The company page shows the controls only where this holds
+  and says why when it does not;
 - accepts `reason:` as an option: trimmed, blank recorded as none, at most
   `lifecycle_reason_max_length/0` characters, counted as characters and not
   bytes (`{:error, :reason_too_long}`); a reason that is not text is

@@ -26,7 +26,10 @@ check the capability, judge the transition and record a retained
 refuses a `status` key. `archive_company/3` and `suspend_company/3` also
 refuse the tenant's primary company (`:primary_company`) and the performing
 account's own signed-in company (`:own_company`); a page reports each by
-name, never as a generic failure. The table is [`docs/README.md`](docs/README.md#lifecycle)
+name, never as a generic failure. Every operation is authorized against
+the company it acts on through `authorize_company_target/3`: another
+company needs `admin.company.tenant-wide.manage` as well, and the page's
+`can_lifecycle?` follows the same rule. The table is [`docs/README.md`](docs/README.md#lifecycle)
 and the bodies are `lifecycle.ex`. A page offers `lifecycle_operations/1`'s
 answer and nothing else; do not add a status select or a second transition
 list.

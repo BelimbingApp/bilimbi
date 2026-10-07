@@ -259,6 +259,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> Workspace.announce(%{kind: "core/company", id: company.id})
          |> assign(:is_primary, is_primary)
          |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+         |> assign(:can_lifecycle?, can_lifecycle?(scope, company_id))
          |> assign(:legal_entity_types, legal_entity_types)
          |> assign(:country_options, Geonames.country_options())
          |> assign(:parent_companies, parent_companies)
@@ -416,13 +417,24 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     edit_metadata
     save_metadata
     save_timezone
-    request_lifecycle
-    apply_lifecycle
   )
+
+  # A lifecycle operation is judged against the company it acts on, as the
+  # verb judges it: `admin.company.update`, plus the tenant-wide reach for a
+  # company other than the one the person signed in under.
+  @lifecycle_events ~w(request_lifecycle apply_lifecycle)
 
   @impl true
   def handle_event(event, params, socket) when event in @write_events do
     if can_update?(socket) do
+      write_event(event, params, socket)
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event(event, params, socket) when event in @lifecycle_events do
+    if can_lifecycle?(socket.assigns.current_scope.scope, socket.assigns.company.id) do
       write_event(event, params, socket)
     else
       {:noreply, write_forbidden(socket)}
@@ -813,6 +825,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     Authz.can(socket.assigns.current_scope.actor, @update_capability).allowed
   end
 
+  defp can_lifecycle?(scope, company_id) do
+    match?({:ok, _}, Company.authorize_company_target(scope, company_id, @update_capability))
+  end
+
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 
   # What the operator chose, as a refusal names it: the option's label when it
@@ -1035,7 +1051,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                    named verbs Company allows from here and no select. --%>
               <div id="company-status" class="flex flex-wrap items-center gap-3">
                 <.status_badge status={@company.status} />
-                <%= if @can_update? do %>
+                <%= if @can_lifecycle? do %>
                   <button
                     :for={operation <- Company.lifecycle_operations(@company.status)}
                     type="button"
@@ -1054,6 +1070,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                     Archiving is final.
                   </span>
                 <% end %>
+                <span
+                  :if={@can_update? and not @can_lifecycle?}
+                  id="company-status-reach"
+                  class="text-xs text-ink-muted"
+                >
+                  Changing the status of another company needs tenant-wide company management.
+                </span>
               </div>
             </:item>
             <:item title={fact_label("legal_entity_type_id")} id="detail-legal-entity-type">
