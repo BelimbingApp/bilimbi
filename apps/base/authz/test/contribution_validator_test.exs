@@ -100,11 +100,11 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
   end
 
   describe "field policies" do
-    @policy FieldPolicy.new!(tax_id: "admin.company.sensitive.view")
+    @policy FieldPolicy.new!(tax_id: "admin.record.secret.view")
     @base %{
       domains: %{"admin" => "Administrative operations"},
       verbs: ["view"],
-      capabilities: ["admin.company.sensitive.view"]
+      capabilities: ["admin.record.secret.view"]
     }
 
     test "keeps each declared policy by its record type" do

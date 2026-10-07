@@ -140,52 +140,44 @@ defmodule Bilimbi.Core.User.TestFixtures do
   end
 
   def install_user_authz_registry! do
+    authz =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{
+            id: "base/authz",
+            otp_app: :bilimbi_base_authz
+          },
+          payload: Bilimbi.Base.Authz.Contributions.contributions()[:authz]
+        },
+        %{
+          descriptor: %{
+            id: "core/company",
+            otp_app: :bilimbi_core_company
+          },
+          payload: %{
+            domains: %{"core" => "Core platform modules"},
+            capabilities: [
+              "admin.company.view",
+              "admin.company.list",
+              "admin.company.manage"
+            ],
+            roles: %{},
+            company_directory: Bilimbi.Core.Company.AuthzCompanyDirectory
+          }
+        },
+        %{
+          descriptor: %{
+            id: "core/user",
+            otp_app: :bilimbi_core_user
+          },
+          payload: Bilimbi.Core.User.Contributions.contributions()[:authz]
+        }
+      ])
+
     ContributionRegistry.put_consumers_for_test!(
-      %{settings: [], authz: user_authz_snapshot(), menu: []},
+      %{settings: [], authz: authz, menu: []},
       "user-test"
     )
-  end
-
-  @doc """
-  The validated Authz snapshot of Base Authz, Core Company's directory and
-  Core User's own capabilities. A test that signs a user in and reads a
-  company through `Bilimbi.Core.Company` needs it installed: Company's
-  summary withholds its sensitive fields through the reader's effective
-  capabilities, which the company directory resolves.
-  """
-  def user_authz_snapshot do
-    ContributionValidator.validate_contributions!([
-      %{
-        descriptor: %{
-          id: "base/authz",
-          otp_app: :bilimbi_base_authz
-        },
-        payload: Bilimbi.Base.Authz.Contributions.contributions()[:authz]
-      },
-      %{
-        descriptor: %{
-          id: "core/company",
-          otp_app: :bilimbi_core_company
-        },
-        payload: %{
-          domains: %{"core" => "Core platform modules"},
-          capabilities: [
-            "admin.company.view",
-            "admin.company.list",
-            "admin.company.manage"
-          ],
-          roles: %{},
-          company_directory: Bilimbi.Core.Company.AuthzCompanyDirectory
-        }
-      },
-      %{
-        descriptor: %{
-          id: "core/user",
-          otp_app: :bilimbi_core_user
-        },
-        payload: Bilimbi.Core.User.Contributions.contributions()[:authz]
-      }
-    ])
   end
 
   def insert_user!(attributes \\ %{}) do

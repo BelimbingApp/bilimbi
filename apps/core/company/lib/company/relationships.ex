@@ -48,7 +48,7 @@ defmodule Bilimbi.Core.Company.Relationships do
         summaries =
           (outgoing ++ incoming)
           |> Enum.map(&elem(&1, 1))
-          |> Summary.for_scope(scope)
+          |> Enum.map(&Summary.from_schema/1)
           |> Map.new(&{&1.id, &1})
 
         all_rels =
@@ -87,7 +87,7 @@ defmodule Bilimbi.Core.Company.Relationships do
             order_by: c.name
           )
           |> Repo.all()
-          |> Summary.for_scope(scope)
+          |> Enum.map(&Summary.from_schema/1)
 
         {:ok, companies}
     end

@@ -6,11 +6,6 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
   The Mix task `bilimbi.platform.provision` remains the CLI path; this screen
   is the authenticated operator UI. Numeric tenant or company IDs have no
   special meaning.
-
-  Tax ID and email follow the create form: an account without
-  `admin.company.sensitive.view` sees `<.withheld>` in their place and the
-  company is created without them, because `Company.create_company/3`
-  refuses a withheld field. The CLI path is not an account and sets them.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -59,7 +54,6 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
          |> assign(:page_title, "Set Up Platform Operator")
          |> assign(:active_nav, "admin.company")
          |> assign(:companies, companies)
-         |> assign(:withheld_fields, Company.withheld_fields(scope))
          |> assign(:mode, mode)
          |> assign_form(form_changeset(%{}))}
     end
@@ -96,7 +90,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
     changeset = form_changeset(params) |> Map.put(:action, :insert)
 
     if changeset.valid? do
-      attrs = create_attrs(changeset, socket.assigns.withheld_fields)
+      attrs = create_attrs(changeset)
 
       case Company.create_company(socket.assigns.current_scope.scope, attrs, is_primary: true) do
         {:ok, company} ->
@@ -227,16 +221,11 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 maxlength="255"
               />
               <.input
-                :if={:tax_id not in @withheld_fields}
                 field={@form[:tax_id]}
                 id="platform-operator-tax-id"
                 label="Tax ID"
                 maxlength="255"
               />
-              <div :if={:tax_id in @withheld_fields} class="mb-2">
-                <span class="mb-1 block text-sm font-semibold text-ink">Tax ID</span>
-                <.withheld id="platform-operator-tax-id-withheld" />
-              </div>
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.input
@@ -246,17 +235,12 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
                 maxlength="2"
               />
               <.input
-                :if={:email not in @withheld_fields}
                 field={@form[:email]}
                 id="platform-operator-email"
                 type="email"
                 label="Email"
                 maxlength="255"
               />
-              <div :if={:email in @withheld_fields} class="mb-2">
-                <span class="mb-1 block text-sm font-semibold text-ink">Email</span>
-                <.withheld id="platform-operator-email-withheld" />
-              </div>
               <.input
                 field={@form[:website]}
                 id="platform-operator-website"
@@ -294,23 +278,20 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
     |> validate_length(:name, min: 1, max: 255)
   end
 
-  defp create_attrs(changeset, withheld_fields) do
+  defp create_attrs(changeset) do
     name = get_field(changeset, :name)
 
-    Map.drop(
-      %{
-        name: name,
-        code: code_from_name(name),
-        status: "active",
-        legal_name: blank_to_nil(get_field(changeset, :legal_name)),
-        registration_number: blank_to_nil(get_field(changeset, :registration_number)),
-        tax_id: blank_to_nil(get_field(changeset, :tax_id)),
-        jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
-        email: blank_to_nil(get_field(changeset, :email)),
-        website: blank_to_nil(get_field(changeset, :website))
-      },
-      withheld_fields
-    )
+    %{
+      name: name,
+      code: code_from_name(name),
+      status: "active",
+      legal_name: blank_to_nil(get_field(changeset, :legal_name)),
+      registration_number: blank_to_nil(get_field(changeset, :registration_number)),
+      tax_id: blank_to_nil(get_field(changeset, :tax_id)),
+      jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
+      email: blank_to_nil(get_field(changeset, :email)),
+      website: blank_to_nil(get_field(changeset, :website))
+    }
   end
 
   # Belimbing `Company::creating` slugs a blank code; main's changeset still

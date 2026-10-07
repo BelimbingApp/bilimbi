@@ -78,11 +78,16 @@ panel, the mutations browser at `/audit/mutations` and any other caller list
 a change to such a field with `<.withheld>` and without its before and after
 values, whatever audit capability the reader holds.
 
-The first policy is Core Company's: `tax_id` and `email` need
-`admin.company.sensitive.view`, which the configured `tenant_owner` role
-receives. An existing installation carries it into its database with
-`mix bilimbi.authz.reconcile`; until then only `grant_all` roles see those
-two fields.
+No production field is marked yet. The owner's decision on #777 was to merge
+the mechanism without a field: the candidates it was built against, a
+company's tax ID and email, are not sensitive in this product. The whole
+seam is exercised by tests through fixture policies
+(`apps/base/authz/test/field_policy_test.exs`,
+`apps/base/audit/test/withheld_fields_test.exs`,
+`apps/base/grid/test/catalog_test.exs`), so the first module that has a real
+case declares one `FieldPolicy`, names it in `field_policies`, builds its
+summary through `redact/3` and renders `<.withheld>`, and nothing else has
+to change.
 
 ## A record in another company
 

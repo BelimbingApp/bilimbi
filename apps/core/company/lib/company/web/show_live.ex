@@ -51,14 +51,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   viewer without `admin.company.update` sees every fact with no editor, and
   every write re-asks Authz before it lands.
 
-  Tax ID and email are field-level authorized
-  (`Bilimbi.Core.Company.Summary.field_policy/0`): without
-  `admin.company.sensitive.view` the summary carries a
-  `Bilimbi.Base.Authz.Withheld` marker in their place, the fact renders
-  `<.withheld>` with no editor whatever the update capability says, a forged
-  `save_field` is refused by `Company.update_company/3` on that field, and
-  the record history shows those fields' changes as withheld too.
-
   The header's actions row carries the record's status, record history as the
   demoted labelled disclosure — the registry's `history` clock beside the
   visible word "History" — and a plain "← Back" link. History is that row's
@@ -82,7 +74,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Authz.Withheld
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
@@ -1640,17 +1631,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       |> assign(:dom_id, "company-#{String.replace(assigns.name, "_", "-")}")
       |> assign(:allow_empty, assigns.name in @nullable_inline_facts)
 
-    assigns = assign(assigns, :withheld?, Withheld.withheld?(assigns.value))
-
     ~H"""
-    <%!-- A withheld fact (`Bilimbi.Core.Company.Summary.field_policy/0`) is
-         the marker and nothing else, whether or not the viewer may update:
-         an editor cannot show what it would replace, and `update_company/3`
-         refuses the change anyway. --%>
-    <.withheld :if={@withheld?} id={"#{@dom_id}-withheld"} class={@class} />
-    <.commit_status :if={@withheld?} id={"#{@dom_id}-status"} status={@field_status[@name]} />
     <.inline_edit
-      :if={@can_update? and not @withheld?}
+      :if={@can_update?}
       id={@dom_id}
       name={@name}
       label={@label}
@@ -1661,10 +1644,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       status={@field_status[@name]}
       class={@class}
     />
-    <span
-      :if={not @can_update? and not @withheld?}
-      class={[@class, is_nil(@value) && "text-ink-muted"]}
-    >
+    <span :if={not @can_update?} class={[@class, is_nil(@value) && "text-ink-muted"]}>
       {@value || "—"}
     </span>
     """

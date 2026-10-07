@@ -14,7 +14,6 @@ defmodule Bilimbi.Core.Company do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Actor
-  alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
@@ -56,27 +55,11 @@ defmodule Bilimbi.Core.Company do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      company -> {:ok, Summary.for_scope(company, scope)}
+      company -> {:ok, Summary.from_schema(company)}
     end
   end
 
   def get_company(%Scope{}, _company_id), do: {:error, :not_found}
-
-  @doc """
-  The company fields the scope's actor may not see, in policy order.
-
-  `tax_id` and `email` need `admin.company.sensitive.view`
-  (`Bilimbi.Core.Company.Summary.field_policy/0`). Every summary this module
-  returns already carries `Bilimbi.Base.Authz.Withheld` in those fields for
-  such a reader; this names them for the update path and for the list
-  search, which does not match a withheld column. The audit views withhold
-  the same columns through the policy `Bilimbi.Core.Company.Contributions`
-  declares for `auditable_types/0`.
-  """
-  @spec withheld_fields(Scope.t()) :: [atom()]
-  def withheld_fields(%Scope{} = scope) do
-    Authz.withheld_fields(scope, Summary.field_policy())
-  end
 
   @doc """
   Locks one live Company row for a sibling workflow already inside the shared Repo transaction.
@@ -138,7 +121,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Summary.for_scope(scope)
+      |> Enum.map(&Summary.from_schema/1)
 
     {:ok, companies}
   end
@@ -172,7 +155,7 @@ defmodule Bilimbi.Core.Company do
         {:ok, %{total: 0, active: 0, company: nil}}
 
       {company, total, active} ->
-        {:ok, %{total: total, active: active, company: Summary.for_scope(company, scope)}}
+        {:ok, %{total: total, active: active, company: Summary.from_schema(company)}}
     end
   end
 
@@ -247,8 +230,7 @@ defmodule Bilimbi.Core.Company do
   Missing, deleted, and cross-tenant companies are indistinguishable. A
   sibling company additionally requires the explicit tenant-wide reach
   capability. The answer is the authorized company's id, not a summary: the
-  caller is acting on the company, not reading it, so no field policy is
-  evaluated.
+  caller is acting on the company, not reading it.
   """
   @spec authorize_company_target(Actor.t() | Scope.t(), term(), String.t()) ::
           {:ok, pos_integer()} | {:error, :not_found | :unauthorized}
@@ -365,9 +347,8 @@ defmodule Bilimbi.Core.Company do
 
   For a caller that only needs the company to exist before it acts on
   something attached to it. It runs the one tenant-scoped existence query of
-  `live_company?/2` and builds no summary, so it evaluates no field policy
-  and writes no decision. A caller that shows the company to a reader uses
-  `get_company/2`, which withholds what the reader may not see.
+  `live_company?/2` and builds no summary. A caller that shows the company to
+  a reader uses `get_company/2`.
   """
   @spec require_live_company(Scope.t(), term()) :: {:ok, pos_integer()} | {:error, :not_found}
   def require_live_company(%Scope{} = scope, company_id) do
@@ -379,9 +360,8 @@ defmodule Bilimbi.Core.Company do
   name a header or workspace strip shows (the legal name when there is one,
   otherwise the name, as `Summary.display_name/1` reads it).
 
-  One tenant-scoped query selecting those columns, so it evaluates no field
-  policy and writes no decision. A caller that needs any other fact of the
-  company uses `get_company/2`.
+  One tenant-scoped query selecting those columns. A caller that needs any
+  other fact of the company uses `get_company/2`.
   """
   @spec identity(Scope.t(), term()) ::
           {:ok, %{id: pos_integer(), code: String.t(), display_name: String.t()}}
@@ -408,13 +388,6 @@ defmodule Bilimbi.Core.Company do
   end
 
   def identity(%Scope{}, _company_id), do: {:error, :not_found}
-
-  @doc """
-  The columns the administration search matches for this scope's actor, in
-  match order. A sensitive column the actor may not see is not matched.
-  """
-  @spec searchable_columns(Scope.t()) :: [atom()]
-  def searchable_columns(%Scope{} = scope), do: AdministrationIndex.searchable_columns(scope)
 
   @doc """
   Names of the given live companies in this tenant.
@@ -485,8 +458,8 @@ defmodule Bilimbi.Core.Company do
 
   Capture records the schema's module name; the others are the name a row
   adopted from Belimbing carries. The record history reads all of them, and
-  `Bilimbi.Core.Company.Contributions` declares the company field policy
-  against each, so the audit views withhold the same columns as the page.
+  a field policy for companies, when one is declared, is keyed by each of
+  them in the `:authz` contribution so the audit views follow it.
   """
   @spec auditable_types() :: [String.t()]
   def auditable_types do
@@ -530,11 +503,6 @@ defmodule Bilimbi.Core.Company do
 
   When `is_primary: true` is passed, the write is executed inside a transaction
   and atomically designated as that tenant's primary company.
-
-  A field the scope's actor may not see (`withheld_fields/1`) is not theirs
-  to set on a new record either: attributes that name one are refused with
-  an error on that field, exactly as `update_company/3` refuses them, and
-  nothing is written.
   """
   @spec create_company(Scope.t(), map(), keyword()) ::
           {:ok, Summary.t()} | {:error, Ecto.Changeset.t()}
@@ -543,23 +511,20 @@ defmodule Bilimbi.Core.Company do
     is_primary? = Keyword.get(opts, :is_primary, false)
 
     Repo.transaction(fn ->
-      changeset =
-        tenant_id
-        |> Schema.creation_changeset(attributes)
-        |> FieldPolicy.refuse_attempts(withheld_fields(scope), attributes)
+      changeset = Schema.creation_changeset(tenant_id, attributes)
 
       case Repo.insert(changeset) do
         {:ok, company} ->
           if is_primary? do
             case assign_primary_company(scope, company.id) do
               {:ok, _status} ->
-                Summary.for_scope(company, scope)
+                Summary.from_schema(company)
 
               {:error, reason} ->
                 Repo.rollback(reason)
             end
           else
-            Summary.for_scope(company, scope)
+            Summary.from_schema(company)
           end
 
         {:error, changeset} ->
@@ -577,11 +542,6 @@ defmodule Bilimbi.Core.Company do
   `activate_company/3`, `reactivate_company/3`); an attribute map that
   carries `status` is refused with a changeset error on that field rather
   than silently dropped.
-
-  A field the scope's actor may not see (`withheld_fields/1`) is not theirs
-  to set either: attributes that name one are refused with an error on that
-  field, and nothing is written. The refusal is the same whatever value is
-  sent, the stored one included, so a caller cannot confirm a guess.
   """
   @spec update_company(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
@@ -599,10 +559,9 @@ defmodule Bilimbi.Core.Company do
       company ->
         company
         |> Schema.update_changeset(attributes)
-        |> FieldPolicy.refuse_attempts(withheld_fields(scope), attributes)
         |> Repo.update()
         |> case do
-          {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}
+          {:ok, updated} -> {:ok, Summary.from_schema(updated)}
           {:error, changeset} -> {:error, changeset}
         end
     end
@@ -689,7 +648,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Summary.for_scope(scope)
+      |> Enum.map(&Summary.from_schema/1)
 
     {:ok, companies}
   end

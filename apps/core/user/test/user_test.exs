@@ -25,7 +25,7 @@ defmodule Bilimbi.Core.UserTest do
       ])
 
     ContributionRegistry.put_consumers_for_test!(
-      %{settings: settings, authz: user_authz_snapshot(), menu: []},
+      %{settings: settings, authz: [], menu: []},
       "core-user-test"
     )
 
@@ -35,7 +35,6 @@ defmodule Bilimbi.Core.UserTest do
 
   setup do
     create_user_tables!()
-    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     SettingsFixtures.create_settings_table!()
 
     CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant A"})

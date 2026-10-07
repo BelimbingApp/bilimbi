@@ -16,8 +16,11 @@ defmodule Bilimbi.Base.Authz.FieldPolicy do
   any other. An unknown key withholds the field from everyone, because
   `Bilimbi.Base.Authz` fails closed on a key no module declares.
 
-      @policy FieldPolicy.new!(tax_id: "admin.company.sensitive.view",
-                               email: "admin.company.sensitive.view")
+      @policy FieldPolicy.new!(bank_account: "admin.payee.bank-account.view")
+
+  No production module declares one yet (the owner's decision on #777); the
+  Authz, Audit and Grid test suites exercise the seam through fixture
+  policies.
   """
 
   alias Bilimbi.Base.Authz.CapabilityKey

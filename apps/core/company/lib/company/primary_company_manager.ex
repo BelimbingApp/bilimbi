@@ -103,9 +103,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
       with {:ok, tenant} <- Tenancy.create_tenant(tenant_attributes),
            {:ok, company} <- insert_company(tenant.id, company_attributes),
            {:ok, _assignment} <- insert_assignment(tenant.id, company.id) do
-        # Provisioning has no reader: the summary is the new tenant's own
-        # system view, so its sensitive fields read as withheld.
-        %{tenant: tenant, company: Summary.for_scope(company, Scope.for_tenant(tenant))}
+        %{tenant: tenant, company: Summary.from_schema(company)}
       else
         {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
       end
@@ -132,7 +130,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
                {:ok, _assignment} <- insert_assignment(tenant.id, company.id) do
             %{
               tenant: tenant,
-              company: Summary.for_scope(company, Scope.for_tenant(tenant)),
+              company: Summary.from_schema(company),
               tenant_status: tenant_status,
               company_status: :created
             }

@@ -90,7 +90,7 @@ defmodule Bilimbi.Core.Company.Lifecycle do
              :ok <- check_standing(operation, scope, actor, company),
              {:ok, updated} <- Repo.update(Schema.transition_changeset(company, to(operation))),
              :ok <- record(scope, actor, operation, company, updated, reason) do
-          Summary.for_scope(updated, scope)
+          Summary.from_schema(updated)
         else
           {:error, reason} -> Repo.rollback(reason)
         end

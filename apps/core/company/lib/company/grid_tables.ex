@@ -6,15 +6,9 @@ defmodule Bilimbi.Core.Company.GridTables do
   which depend on this one.
   """
 
-  alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Core.Company.Grid.CompaniesSource
   alias Bilimbi.Core.Company.Grid.DepartmentsSource
   alias Bilimbi.Core.Company.Grid.LegalEntityTypesSource
-  alias Bilimbi.Core.Company.Summary
-
-  # The same key the summary withholds the field under, so the grid cannot
-  # show a column the record page withholds.
-  defp sensitive(field), do: FieldPolicy.capability!(Summary.field_policy(), field)
 
   @doc false
   def tables do
@@ -40,9 +34,9 @@ defmodule Bilimbi.Core.Company.GridTables do
             },
             %{id: "legal_name", label: "Legal name", type: :string},
             %{id: "registration_number", label: "Registration number", type: :string},
-            %{id: "tax_id", label: "Tax ID", type: :string, capability: sensitive(:tax_id)},
+            %{id: "tax_id", label: "Tax ID", type: :string},
             %{id: "jurisdiction", label: "Jurisdiction", type: :string},
-            %{id: "email", label: "Email", type: :string, capability: sensitive(:email)},
+            %{id: "email", label: "Email", type: :string},
             %{id: "website", label: "Website", type: :string},
             %{id: "created_at", label: "Created", type: :datetime},
             %{id: "updated_at", label: "Updated", type: :datetime},
