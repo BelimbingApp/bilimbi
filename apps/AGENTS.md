@@ -63,6 +63,10 @@ For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.Mi
 
 A test that runs host tasks such as `bilimbi.migrate` from the umbrella root takes its expected migrations from the root runtime, not from `Compatibility.migration_entries()` in the package VM. The package loads only its own closure, so a mounted Domain's migrations are missing there and the expectations stop matching. `workspace_migration_entries/1` in `apps/core/compatibility/test/platform_baseline_e2e_test.exs` and `MountedDomainFixture` in that package's `test/support/` show the pattern.
 
+## Tenant-owned reads
+
+A query over a tenant-owned table begins with `Tenancy.scope_query/2`; `BilimbiWeb.TenantScopeGateTest` (`apps/web/test/bilimbi_web/tenant_scope_gate_test.exs`) fails the build when `from x in Schema`, `join`, `Repo.get(Schema, id)` or `Schema |> where(...)` reaches a tenant-owned schema or table another way. Tenant-owned tables are derived from the installed schema contracts, never listed. A read that must legitimately span tenants (a row lock, a cross-tenant uniqueness proof, a join pinned by a composite foreign key) goes in that test's `@allowed` with its reason, reviewed with the code it excuses.
+
 ## Routes
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
