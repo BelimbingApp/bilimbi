@@ -36,6 +36,46 @@ a bare nullable column in the Base migration. Core Company contributes the
 named restricted foreign key and exact system/custom ownership check in its
 own later migration, so Base never depends upward on Core.
 
+## Field-level authorization
+
+Page-level authorization says whether a record may be opened. A field
+policy says, field by field, which of its values the reader may see. The
+owning module declares one `Bilimbi.Base.Authz.FieldPolicy` for its read
+model, naming each sensitive field with the capability that shows it, and
+builds every summary through `Authz.redact/3`, which replaces each field the
+scope's actor lacks the key for with a `Bilimbi.Base.Authz.Withheld` marker.
+The marker is explicit on purpose: an absent field reads as "none", a blank
+one as "empty", and this one as "there is a value you may not see". It
+renders through `<.withheld>` (Base UI) and offers no editor; interpolated
+anywhere else it still reads "Withheld", never the value, and it is not a
+string, so code that would compare or store it raises.
+
+The decision is made once per call from the reader's effective allow list,
+the same list the route gate reads, so a field and the pages that need its
+capability agree, and no decision-log row is written: nothing was attempted.
+`Authz.effective_capabilities/1` remembers that list in the calling process
+for the same actor, installed capabilities and grants, and every grant write
+through this module advances a node-local version that is part of the key;
+so a request or a page loads the actor's grants once however many company
+reads it makes, and a change made on the same node is seen by the next ask
+(the function's doc has the exact bound).
+A named system principal is judged by `can/4`. An anonymous system scope
+names nobody and is withheld every field. A write to a withheld field is
+refused by the owner through `FieldPolicy.refuse_changes/2`, with an error
+on that field. The owner's grid fields carry the same key
+(`Bilimbi.Base.Grid.Field`), so the column the record page withholds is
+not in that reader's catalog either, and a record page passes the same
+field names to the audit history panel so a change to the field is listed
+without its values.
+
+The first policy is Core Company's: `tax_id` and `email` need
+`admin.company.sensitive.view`, which the configured `tenant_owner` role
+receives. An existing installation carries it into its database with
+`mix bilimbi.authz.reconcile`; until then only `grant_all` roles see those
+two fields. Field-level authorization governs the record's own read models
+and its page; the Audit module's own log pages remain the audit
+capability's domain and show what capture recorded.
+
 ## A record in another company
 
 Grants are per company, and `can/4` judges the company the user is signed in

@@ -2167,6 +2167,20 @@
                   Pending
                 </.badge><.badge kind={:danger}>Suspended</.badge>
               </div>
+              <div
+                id="component-withheld"
+                class="space-y-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
+              >
+                <p class="text-xs text-ink-muted">
+                  A field the viewer may not see, beside an empty one: withheld is not blank.
+                </p>
+                <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
+                  <span class="text-ink-muted">Tax ID</span>
+                  <.withheld id="design-library-withheld" />
+                  <span class="text-ink-muted">Website</span>
+                  <span class="text-ink-muted">—</span>
+                </div>
+              </div>
             </div>
           </section>
 

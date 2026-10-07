@@ -31,9 +31,11 @@ Put `phx-change` on the `<form>`, and `phx-submit` aimed at the same handler. A 
 
 Flash `:success` only for a completed write. `:info` informs and confirms nothing. When one call can do either, take the kind from that outcome: a Countries update that did not update was rendered as a green success because the kind was fixed in advance. A refusal names its real cause. The Settings page blamed the modules when the reason was a permission. Kinds and timing live in `DESIGN.md` "Honest feedback" and in the docs on `flash_group/1` and `panel_notice/1`.
 
-## Withheld controls
+## Withheld controls and fields
 
 If a button or editor is absent, the page says why and what to do next, through `empty_state/1` (`title`, `reason`, or `forbidden`) or `<.table>`'s `<:empty>` slot. The Roles picker, a settings group, and an archived-company account each hid a control until the page said why. The component only speaks when it is used: a caller can still hide a control with `:if` and no `empty_state`, and nothing yet stops that.
+
+A field some readers of a record may not see is withheld by its owning module, not by the template: declare it in the module's `Bilimbi.Base.Authz.FieldPolicy`, build the summary through `Authz.redact/3`, and render the `Bilimbi.Base.Authz.Withheld` marker with `<.withheld>` and no editor. Do not branch a template on a capability to hide one value, blank it, or drop it from the struct: the value then still leaves the module through every other caller, and the reader cannot tell "withheld" from "empty". Company `tax_id` and `email` are the example (`Bilimbi.Core.Company.Summary.field_policy/0`); the contract is `apps/base/authz/docs/README.md` "Field-level authorization". A list search, a grid field and a history panel that show the same column follow the same policy: `Company.withheld_fields/1`, the grid field's `capability`, and the record history's `withheld` option are how.
 
 ## Clocks
 

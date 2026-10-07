@@ -19,17 +19,22 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.Diagnostics
   alias Bilimbi.Base.Authz.EffectivePermissions
   alias Bilimbi.Base.Authz.Evaluator
+  alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Authz.Resource
   alias Bilimbi.Base.Authz.RoleService
   alias Bilimbi.Base.Authz.SystemPrincipalGrant
   alias Bilimbi.Base.Authz.SystemPrincipalService
   alias Bilimbi.Base.Authz.SystemRoleReconciler
+  alias Bilimbi.Base.Authz.Withheld
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tenancy.SystemPrincipals
+
+  @effective_capabilities_memo {__MODULE__, :effective_capabilities}
+  @grants_version {__MODULE__, :grants_version}
 
   @doc """
   Builds an authorization principal from IDs the caller names.
@@ -229,6 +234,21 @@ defmodule Bilimbi.Base.Authz do
 
   `grant_all` is the boolean `EffectivePermissions.load/2` already computed.
   Callers that only need the allow list keep reading `:allowed`.
+
+  The answer is remembered in the calling process for the same actor, the
+  same installed capabilities and the same grants. The request edge asks
+  once per request and a LiveView once per mount, and every field policy a
+  module read applies afterwards (`withheld_fields/2`) asks again for the
+  same actor; without this memory a company read from a page would re-load
+  the actor's grants each time. Every grant write that goes through this
+  module (`create_role/3` to `reconcile_system_roles/1`) advances a version
+  on this node that is part of the key, so a change made here is seen by
+  the very next ask in any process. What a process remembers is therefore
+  as fresh as the request or page it serves, and fresher than the page's own
+  `current_scope.capabilities` for a change on the same node; a change on
+  another node reaches a long-lived process at its next mount, exactly as
+  that list does. A process serves one actor at a time: only the last
+  answer is kept.
   """
   @spec effective_capabilities(Actor.t()) :: %{
           allowed: [String.t()],
@@ -237,6 +257,24 @@ defmodule Bilimbi.Base.Authz do
         }
   def effective_capabilities(%Actor{} = actor) do
     registry = registry!()
+
+    key =
+      {Scope.tenant_id(actor.scope), Scope.platform_operator?(actor.scope), actor.type, actor.id,
+       actor.company_id, actor.acting_for_user_id,
+       :erlang.phash2({registry.capabilities, registry.platform_capabilities}), grants_version()}
+
+    case Process.get(@effective_capabilities_memo) do
+      {^key, result} ->
+        result
+
+      _other_actor_or_none ->
+        result = load_effective_capabilities(actor, registry)
+        Process.put(@effective_capabilities_memo, {key, result})
+        result
+    end
+  end
+
+  defp load_effective_capabilities(%Actor{} = actor, registry) do
     directory = directory!(registry)
     permissions = EffectivePermissions.load(actor, directory)
 
@@ -254,6 +292,87 @@ defmodule Bilimbi.Base.Authz do
       denied: EffectivePermissions.denied(permissions),
       grant_all: permissions.grant_all
     }
+  end
+
+  # The node-local version of persisted grants: every write through this
+  # facade advances it, and `effective_capabilities/1` keys its memory on it.
+  # A small integer in `:persistent_term` costs nothing to read and is
+  # written only when an administrator changes a grant.
+  defp grants_version, do: :persistent_term.get(@grants_version, 0)
+
+  defp grants_changed(result) do
+    :persistent_term.put(@grants_version, System.unique_integer([:positive, :monotonic]))
+    result
+  end
+
+  @doc """
+  The fields of `policy` the scope's actor may not see.
+
+  A field policy (`Bilimbi.Base.Authz.FieldPolicy`) names each sensitive
+  field of a read model with the capability that shows it. For a signed-in
+  user the answer comes from the same effective allow list the route gate
+  reads, so a field and the pages that need its capability agree; a field
+  the user lacks the key for is withheld without a decision-log row, because
+  nothing was attempted — the read model simply has that shape for that
+  reader. A named system principal (ADR 0017) is judged by `can/4`, one
+  logged decision per distinct capability. An anonymous system scope names
+  nobody and is withheld every field: a job or seed that needs a value reads
+  the row through its owner, not through a reader's view of it.
+
+  The result is in the policy's declaration order and is what the owning
+  module passes to `FieldPolicy.refuse_changes/2` on a write.
+  """
+  @spec withheld_fields(Scope.t(), FieldPolicy.t()) :: [atom()]
+  def withheld_fields(%Scope{} = scope, %FieldPolicy{} = policy) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user} ->
+        {:ok, actor} = scope_actor(scope)
+        FieldPolicy.withheld(policy, effective_capabilities(actor).allowed)
+
+      %TenancyActor{type: :system, system_principal: name} when is_binary(name) ->
+        held =
+          policy
+          |> FieldPolicy.capabilities()
+          |> Enum.filter(&can(scope, &1).allowed)
+
+        FieldPolicy.withheld(policy, held)
+
+      %TenancyActor{type: :system} ->
+        FieldPolicy.fields(policy)
+    end
+  end
+
+  @doc """
+  Replaces every field of `policy` the scope's actor may not see with a
+  `Bilimbi.Base.Authz.Withheld` marker, in one record or in each of a list.
+
+  The decision is made once per call (`withheld_fields/2`), not once per
+  record, so a list of three hundred rows costs what one row costs. Each
+  record must carry every field the policy names; a policy that names a
+  field the record lacks raises, because the policy and the read model it
+  governs are declared by the same module and must agree.
+
+  This is the enforcement point. An owning module applies it where its
+  read model is built from the row, so no caller — a page, a panel, a grid,
+  another module — can obtain the value without the capability. A template
+  then renders the marker with `<.withheld>` and offers no editor for it.
+  """
+  @spec redact(Scope.t(), FieldPolicy.t(), record) :: record when record: struct() | [struct()]
+  def redact(%Scope{} = scope, %FieldPolicy{} = policy, records) when is_list(records) do
+    case withheld_fields(scope, policy) do
+      [] -> records
+      withheld -> Enum.map(records, &withhold(&1, policy, withheld))
+    end
+  end
+
+  def redact(%Scope{} = scope, %FieldPolicy{} = policy, %_{} = record) do
+    withhold(record, policy, withheld_fields(scope, policy))
+  end
+
+  defp withhold(%_{} = record, policy, withheld) do
+    Enum.reduce(withheld, record, fn field, acc ->
+      Map.replace!(acc, field, %Withheld{capability: FieldPolicy.capability!(policy, field)})
+    end)
   end
 
   @doc """
@@ -326,7 +445,7 @@ defmodule Bilimbi.Base.Authz do
           {:ok, Bilimbi.Base.Authz.RoleSummary.t()}
           | {:error, :company_not_found | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes) do
-    RoleService.create_role(scope, company_id, attributes, registry!())
+    scope |> RoleService.create_role(company_id, attributes, registry!()) |> grants_changed()
   end
 
   @doc "Updates a custom role; system roles and cross-scope companies are rejected."
@@ -340,21 +459,23 @@ defmodule Bilimbi.Base.Authz do
              | :invalid_company_id
              | Ecto.Changeset.t()}
   def update_role(%Scope{} = scope, role_id, attributes) when is_map(attributes) do
-    RoleService.update_role(scope, role_id, attributes, registry!())
+    scope |> RoleService.update_role(role_id, attributes, registry!()) |> grants_changed()
   end
 
   @doc "Deletes a custom role and intentionally database-cascades its grants and assignments."
   @spec delete_role(Scope.t(), pos_integer()) ::
           {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
   def delete_role(%Scope{} = scope, role_id) do
-    RoleService.delete_role(scope, role_id, registry!())
+    scope |> RoleService.delete_role(role_id, registry!()) |> grants_changed()
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()]) ::
           {:ok, non_neg_integer()}
           | {:error, :role_not_found | :system_role | {:unknown_capabilities, [String.t()]}}
   def replace_role_capabilities(%Scope{} = scope, role_id, capabilities) do
-    RoleService.replace_role_capabilities(scope, role_id, capabilities, registry!())
+    scope
+    |> RoleService.replace_role_capabilities(role_id, capabilities, registry!())
+    |> grants_changed()
   end
 
   @spec assign_role(Scope.t(), pos_integer(), :user | :agent, pos_integer(), pos_integer()) ::
@@ -368,13 +489,14 @@ defmodule Bilimbi.Base.Authz do
       role_id,
       registry!()
     )
+    |> grants_changed()
   end
 
   @doc "Removes one scoped principal-role assignment by its durable assignment ID."
   @spec unassign_role(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, :unassigned | :not_found} | {:error, :role_not_found}
   def unassign_role(%Scope{} = scope, role_id, assignment_id) do
-    RoleService.unassign_role(scope, role_id, assignment_id, registry!())
+    scope |> RoleService.unassign_role(role_id, assignment_id, registry!()) |> grants_changed()
   end
 
   @doc """
@@ -435,6 +557,7 @@ defmodule Bilimbi.Base.Authz do
       allowed?,
       registry!()
     )
+    |> grants_changed()
   end
 
   @doc "Removes one visible persisted direct capability by its durable grant ID."
@@ -443,7 +566,7 @@ defmodule Bilimbi.Base.Authz do
           pos_integer()
         ) :: {:ok, :removed | :not_found}
   def remove_principal_capability(%Scope{} = scope, grant_id) do
-    RoleService.remove_principal_capability(scope, grant_id, registry!())
+    scope |> RoleService.remove_principal_capability(grant_id, registry!()) |> grants_changed()
   end
 
   @doc "Lists scoped direct principal capabilities through a bounded page, optionally for one principal."
@@ -504,7 +627,9 @@ defmodule Bilimbi.Base.Authz do
              | {:unknown_capabilities, [String.t()]}}
   def grant_system_capability(%Scope{} = scope, company_id, principal, capability) do
     with {:ok, granter} <- administrator(scope, "admin.authz.system-principal.grant") do
-      SystemPrincipalService.grant(scope, company_id, principal, capability, granter, registry!())
+      scope
+      |> SystemPrincipalService.grant(company_id, principal, capability, granter, registry!())
+      |> grants_changed()
     end
   end
 
@@ -529,6 +654,7 @@ defmodule Bilimbi.Base.Authz do
         granter,
         registry!()
       )
+      |> grants_changed()
     end
   end
 
@@ -558,7 +684,7 @@ defmodule Bilimbi.Base.Authz do
           {:ok, %{roles: non_neg_integer(), capabilities: non_neg_integer()}} | {:error, term()}
   def reconcile_system_roles(opts \\ []) do
     repo = Keyword.get(opts, :repo, Repo)
-    SystemRoleReconciler.reconcile(repo, registry!())
+    repo |> SystemRoleReconciler.reconcile(registry!()) |> grants_changed()
   end
 
   @doc """

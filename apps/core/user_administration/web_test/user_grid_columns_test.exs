@@ -114,7 +114,15 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
 
     # On a fresh page the address names no columns, and Email is one the page
     # draws itself: picking it would add nothing, so it is not offered. The
-    # email of the user's company is a different column and is.
+    # email of the user's company is a different column, and a sensitive one
+    # (`Bilimbi.Core.Company.Summary.field_policy/0`): it is offered only to
+    # an account holding `admin.company.sensitive.view`.
+    view |> form("#users-add-column", %{add: "email"}) |> render_change()
+    refute has_element?(view, "#users-suggest-email")
+    refute has_element?(view, "#users-suggest-company-email")
+
+    grant_capabilities!("admin.company.sensitive.view")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
     view |> form("#users-add-column", %{add: "email"}) |> render_change()
     refute has_element?(view, "#users-suggest-email")
     assert has_element?(view, "#users-suggest-company-email", "Company › Email")

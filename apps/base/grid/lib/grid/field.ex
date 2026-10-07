@@ -7,10 +7,18 @@ defmodule Bilimbi.Base.Grid.Field do
   (`Bilimbi.Base.Grid.ContributionValidator`); until then it is `nil`. `hidden` fields exist for links to join on and never
   appear as columns or suggestions. `values` names the closed set an `:enum`
   field takes, which the band lens colours categorically.
+
+  `capability` is field-level authorization: a field that carries one is in
+  the catalog only for an account that holds that key, in addition to the
+  table's own. It is the same key the owning module's
+  `Bilimbi.Base.Authz.FieldPolicy` names for that column, so a value the
+  record page withholds cannot be read as a grid column either. A table's
+  key, label and time fields, and the fields a link joins on, take none:
+  they are read with the table.
   """
 
   @types [:integer, :float, :decimal, :string, :boolean, :date, :datetime, :enum]
-  @keys [:id, :label, :type, :column, :hidden, :values]
+  @keys [:id, :label, :type, :column, :hidden, :values, :capability]
   @id_pattern ~r/^[a-z][a-z0-9_]*$/
 
   @enforce_keys [:id, :label, :type, :column]
@@ -19,7 +27,8 @@ defmodule Bilimbi.Base.Grid.Field do
             type: nil,
             column: nil,
             hidden: false,
-            values: nil
+            values: nil,
+            capability: nil
 
   @type type :: :integer | :float | :decimal | :string | :boolean | :date | :datetime | :enum
 
@@ -29,7 +38,8 @@ defmodule Bilimbi.Base.Grid.Field do
           type: type(),
           column: atom(),
           hidden: boolean(),
-          values: [String.t()] | nil
+          values: [String.t()] | nil,
+          capability: String.t() | nil
         }
 
   @doc "The field types a contribution may declare."
@@ -83,15 +93,27 @@ defmodule Bilimbi.Base.Grid.Field do
       invalid!(owner, attrs, "field #{id} column must be an atom")
     end
 
+    capability = Map.get(attrs, :capability)
+
+    unless is_nil(capability) or Bilimbi.Base.Authz.CapabilityKey.valid?(capability) do
+      invalid!(owner, attrs, "field #{id} capability must be a capability key")
+    end
+
     %__MODULE__{
       id: id,
       label: Map.get(attrs, :label, humanize(id)),
       type: type,
       column: column,
       hidden: Map.get(attrs, :hidden, false) == true,
-      values: values
+      values: values,
+      capability: capability
     }
   end
+
+  @doc "Whether an account holding `held` may read this field."
+  @spec readable?(t(), Enumerable.t()) :: boolean()
+  def readable?(%__MODULE__{capability: nil}, _held), do: true
+  def readable?(%__MODULE__{capability: capability}, held), do: capability in held
 
   defp fetch_string!(attrs, key, owner) do
     case Map.get(attrs, key) do

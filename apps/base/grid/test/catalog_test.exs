@@ -66,6 +66,47 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
     assert Grid.catalog(TestFixtures.system_scope(1)).tables == %{}
   end
 
+  test "a field with a capability of its own is in the catalog only for an account holding it" do
+    # `amount` is gated on the customers key. Grants accumulate on a test
+    # user, so the restricted reader is tenant 1 and the holder tenant 2.
+    install_orders!(fn fields ->
+      Enum.map(fields, fn
+        %{id: "amount"} = amount -> Map.put(amount, :capability, "admin.test.customer.view")
+        field -> field
+      end)
+    end)
+
+    without = Grid.catalog(TestFixtures.user_scope(~w(admin.test.order.view)))
+    {:ok, orders} = Grid.fetch_table(without, "orders")
+    refute Map.has_key?(orders.fields, "amount")
+    assert orders.field_order == ~w(id label status placed_at customer_id)
+
+    assert {:error, {"amount", {:unknown_segment, "amount", "orders"}}} =
+             Grid.resolve(without, orders, ["amount"])
+
+    refute Enum.any?(Catalog.suggest(without, orders, "amount"), &(&1.spec == "amount"))
+
+    holder = Grid.catalog(TestFixtures.other_tenant_scope(TestSources.capabilities()))
+    {:ok, orders} = Grid.fetch_table(holder, "orders")
+    assert orders.field_order == ~w(id label amount status placed_at customer_id)
+    assert {:ok, [_amount]} = Grid.resolve(holder, orders, ["amount"])
+
+    # Through a link the gated field is a rollup for the holder and nothing
+    # for the reader without it.
+    {:ok, customers} = Grid.fetch_table(holder, "customers")
+
+    assert Enum.any?(
+             Catalog.suggest(holder, customers, "amount"),
+             &(&1.spec == "orders.amount:sum")
+           )
+
+    partial =
+      Grid.catalog(TestFixtures.user_scope(~w(admin.test.order.view admin.test.country.view)))
+
+    {:ok, orders} = Grid.fetch_table(partial, "orders")
+    assert Catalog.suggest(partial, orders, "amount") == []
+  end
+
   test "a path through an unreadable table is refused even when the root is readable" do
     scope = TestFixtures.user_scope(~w(admin.test.order.view admin.test.customer.view))
     catalog = Grid.catalog(scope)

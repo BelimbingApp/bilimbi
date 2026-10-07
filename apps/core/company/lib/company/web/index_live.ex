@@ -78,10 +78,31 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
      |> assign(:index_state, state)
      |> assign(:companies_page, empty_page())
      |> assign(:filters_form, ListState.filters_form(state))
+     |> assign(:search_placeholder, search_placeholder(socket.assigns.current_scope.scope))
      |> assign(
        :columns,
        PageColumns.mount(socket.assigns.current_scope, "companies", @builtins)
      )}
+  end
+
+  # The placeholder names the columns this reader's search matches. Email is
+  # a sensitive column (`Company.withheld_fields/1`): a reader who may not see
+  # it is not searching it either, and the box says so.
+  defp search_placeholder(scope) do
+    columns =
+      Enum.reject(
+        [
+          {:name, "name"},
+          {:code, "code"},
+          {:legal_name, "legal name"},
+          {:email, "email"},
+          {:jurisdiction, "jurisdiction"}
+        ],
+        fn {column, _label} -> column in Company.withheld_fields(scope) end
+      )
+
+    {last, rest} = columns |> Enum.map(&elem(&1, 1)) |> List.pop_at(-1)
+    "Search by #{Enum.join(rest, ", ")}, or #{last}..."
   end
 
   @impl true
@@ -357,7 +378,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             field={@filters_form[:search]}
             id="companies-search"
             label="Search companies"
-            placeholder="Search by name, code, legal name, email, or jurisdiction..."
+            placeholder={@search_placeholder}
           />
           <:control
             type={:select}

@@ -21,7 +21,12 @@ defmodule Bilimbi.Base.Authz.MixProject do
   end
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}, {:phoenix, "~> 1.8.9"}, {:phoenix_live_view, "~> 1.2.0"}]
+    [
+      {:ecto_sql, "~> 3.14"},
+      {:phoenix, "~> 1.8.9"},
+      {:phoenix_html, "~> 4.3"},
+      {:phoenix_live_view, "~> 1.2.0"}
+    ]
   end
 
   defp aliases do

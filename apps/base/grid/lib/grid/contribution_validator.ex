@@ -19,6 +19,7 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionConsumer
 
+  alias Bilimbi.Base.Grid.Field
   alias Bilimbi.Base.Grid.Link
   alias Bilimbi.Base.Grid.Source
   alias Bilimbi.Base.Grid.Table
@@ -156,6 +157,17 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
         unless Map.has_key?(to.fields, to_field) do
           invalid!(owner, "link #{link.id} joins on #{to.id}.#{to_field}, which is not declared")
+        end
+
+        # A join field is read for every account that walks the link, so a
+        # field with a capability of its own cannot be one.
+        for {table, field_id} <- [{from, from_field}, {to, to_field}],
+            %Field{capability: capability} = Map.fetch!(table.fields, field_id),
+            is_binary(capability) do
+          invalid!(
+            owner,
+            "link #{link.id} joins on #{table.id}.#{field_id}, which carries a capability"
+          )
         end
 
         if link.kind == :one and to_field != to.key do

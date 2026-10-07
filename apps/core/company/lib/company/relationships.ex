@@ -37,7 +37,7 @@ defmodule Bilimbi.Core.Company.Relationships do
               direction: :outgoing,
               relationship: r,
               type: r.type,
-              other_company: Summary.from_schema(r.related_company),
+              other_company: Summary.for_scope(r.related_company, scope),
               effective_from: r.effective_from,
               effective_to: r.effective_to,
               is_active: Relationship.active?(r)
@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Company.Relationships do
               direction: :incoming,
               relationship: r,
               type: r.type,
-              other_company: Summary.from_schema(r.company),
+              other_company: Summary.for_scope(r.company, scope),
               effective_from: r.effective_from,
               effective_to: r.effective_to,
               is_active: Relationship.active?(r)
@@ -89,7 +89,7 @@ defmodule Bilimbi.Core.Company.Relationships do
             order_by: c.name
           )
           |> Repo.all()
-          |> Enum.map(&Summary.from_schema/1)
+          |> Summary.for_scope(scope)
 
         {:ok, companies}
     end

@@ -27,6 +27,7 @@ defmodule Bilimbi.Core.User.ActorVerifierTest do
 
   setup do
     UserFixtures.create_user_tables!()
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     SessionFixtures.create_sessions_table!()
 
     CompanyFixtures.insert_tenant!(%{id: 41})
@@ -42,7 +43,10 @@ defmodule Bilimbi.Core.User.ActorVerifierTest do
       email: "grace@example.com"
     })
 
-    ContributionRegistry.put_consumers_for_test!(%{actor_verifier: ActorVerifier}, nil)
+    ContributionRegistry.put_consumers_for_test!(
+      %{actor_verifier: ActorVerifier, authz: UserFixtures.user_authz_snapshot()},
+      nil
+    )
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
 

@@ -370,6 +370,51 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a field the viewer may not see.
+
+  Field-level authorization withholds one value from someone who may open
+  the rest of the record (`Bilimbi.Base.Authz.redact/3` puts a
+  `Bilimbi.Base.Authz.Withheld` marker in the field's place). This is how
+  that marker reads: the word "Withheld" with the registry's `conceal`
+  glyph, and the reason in its tooltip, so a field that is withheld and a
+  field that is empty never look alike. An empty field reads "—"; this reads
+  as a value the person is not shown. It carries no editor and no copy
+  button, and a page never renders an in-place control around it: an editor
+  cannot show what it would replace.
+
+  `reason` is the one permission wording of `<.empty_state forbidden>`,
+  because it is the same situation at the scale of one field.
+
+  ## Examples
+
+      <.withheld id="detail-tax-id-withheld" />
+      <.withheld id="salary-withheld" reason="You do not have permission to see salaries." />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:reason, :string,
+    default: "You do not have permission to see this field.",
+    doc: "why the value is withheld, as the tooltip and accessible description"
+  )
+
+  attr(:class, :any, default: nil)
+
+  def withheld(assigns) do
+    ~H"""
+    <span
+      id={@id}
+      data-withheld
+      title={@reason}
+      aria-description={@reason}
+      class={["inline-flex items-center gap-1 text-ink-muted", @class]}
+    >
+      <.icon name="conceal" class="size-4" />
+      <span>Withheld</span>
+    </span>
+    """
+  end
+
+  @doc """
   Renders a compact strip of related statistics.
 
   A stat strip is a small dashboard surface: its title identifies the subject

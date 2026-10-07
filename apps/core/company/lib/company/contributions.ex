@@ -56,12 +56,19 @@ defmodule Bilimbi.Core.Company.Contributions do
       grid: Bilimbi.Core.Company.GridTables.tables(),
       authz: %{
         domains: %{"core" => "Core platform modules"},
+        # `admin.company.sensitive.view` is field-level: it shows the tax ID
+        # and email of a company the reader may already open
+        # (`Bilimbi.Core.Company.Summary.field_policy/0`). It is granted to
+        # the configured owner role so an installation keeps seeing what it
+        # saw; `mix bilimbi.authz.reconcile` carries it into an existing
+        # database.
         capabilities: [
           "admin.company.view",
           "admin.company.list",
           "admin.company.create",
           "admin.company.update",
           "admin.company.delete",
+          "admin.company.sensitive.view",
           "admin.company.tenant-wide.manage"
         ],
         roles: %{
@@ -72,6 +79,7 @@ defmodule Bilimbi.Core.Company.Contributions do
               "admin.company.create",
               "admin.company.update",
               "admin.company.delete",
+              "admin.company.sensitive.view",
               "admin.company.tenant-wide.manage"
             ]
           }

@@ -372,7 +372,12 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     end
 
     test "renders complete company show page with all cards and sections", %{conn: conn} do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.sensitive.view"
+      ])
 
       {:ok, scope} = Tenancy.scope(41)
 
@@ -388,12 +393,18 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
           legal_name: "Bilimbi Industries Sdn Bhd",
           legal_entity_type_id: type.id,
           registration_number: "REG-12345",
-          tax_id: "TAX-98765",
           jurisdiction: "MY",
-          email: "hq@bilimbi.test",
           website: "https://bilimbi.test",
           scope_activities: ["Software Development", "Cloud Infrastructure"],
           metadata: %{"employees_count" => 50}
+        })
+
+      # Tax ID and email are field-level authorized, so a system scope
+      # cannot write them; the signed-in holder can.
+      {:ok, _updated} =
+        Company.update_company(holder_scope(), 73, %{
+          tax_id: "TAX-98765",
+          email: "hq@bilimbi.test"
         })
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
@@ -814,7 +825,14 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     end
 
     test "edits the company facts in place and each reports its own outcome", %{conn: conn} do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      # Tax ID and email edit in place only for a holder of the sensitive key.
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.sensitive.view"
+      ])
+
       {:ok, scope} = Tenancy.scope(41)
 
       {:ok, type} =
@@ -908,9 +926,14 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
     test "a refused commit keeps the stored value on screen and reports the reason on the fact",
          %{conn: conn} do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
-      {:ok, scope} = Tenancy.scope(41)
-      {:ok, _updated} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.sensitive.view"
+      ])
+
+      {:ok, _updated} = Company.update_company(holder_scope(), 73, %{email: "hq@bilimbi.test"})
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
@@ -925,7 +948,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#detail-email", "hq@bilimbi.test")
       refute has_element?(view, "#company-email-status", "Saved")
       refute has_element?(view, "#flash-error")
-      assert {:ok, %{email: "hq@bilimbi.test"}} = Company.get_company(scope, 73)
+      assert {:ok, %{email: "hq@bilimbi.test"}} = Company.get_company(holder_scope(), 73)
 
       # The hook never pushes a blanked required value; a forged one is
       # refused by the domain and the header keeps the stored name.
@@ -1696,5 +1719,141 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
   defp scope! do
     {:ok, scope} = Tenancy.scope(41)
     scope
+  end
+
+  describe "field-level authorization" do
+    # Tax ID and email need `admin.company.sensitive.view` on top of opening
+    # the page (#777). The summary withholds them, so the page cannot show
+    # them whatever the template does; these prove what the viewer meets.
+    setup do
+      {:ok, _} =
+        Company.update_company(holder_scope(), 73, %{
+          tax_id: "TAX-98765",
+          email: "hq@bilimbi.test"
+        })
+
+      :ok
+    end
+
+    test "a viewer without the capability sees the facts as withheld, never the value", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      refute html =~ "TAX-98765"
+      refute html =~ "hq@bilimbi.test"
+
+      # The marker, with its reason, in the fact's own cell: not blank, not
+      # "—", and not an editor even for an account that may update.
+      assert has_element?(
+               view,
+               "#detail-tax-id #company-tax-id-withheld[data-withheld][title='You do not have permission to see this field.']",
+               "Withheld"
+             )
+
+      assert has_element?(
+               view,
+               "#detail-email #company-email-withheld[data-withheld]",
+               "Withheld"
+             )
+
+      refute has_element?(view, "#detail-tax-id [phx-hook='InlineEdit']")
+      refute has_element?(view, "#detail-email [phx-hook='InlineEdit']")
+      refute has_element?(view, "#detail-tax-id", "—")
+
+      # The neighbouring facts still edit in place.
+      assert has_element?(view, "#detail-registration-number [phx-hook='InlineEdit']")
+
+      refute render(view) =~ "TAX-98765"
+    end
+
+    test "a forged save of a withheld fact is refused on the fact and writes nothing", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      render_hook(view, "save_field", %{"id" => "73", "tax_id" => "TAX-00000"})
+
+      assert has_element?(
+               view,
+               "#detail-tax-id [role='alert']",
+               "is withheld from this account and cannot be changed"
+             )
+
+      refute render(view) =~ "TAX-98765"
+      assert {:ok, %{tax_id: "TAX-98765"}} = Company.get_company(holder_scope(), 73)
+    end
+
+    test "a holder sees the values and edits them in place", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.sensitive.view"
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#detail-tax-id", "TAX-98765")
+      assert has_element?(view, "#detail-email", "hq@bilimbi.test")
+      refute has_element?(view, "[data-withheld]")
+      assert has_element?(view, "#company-tax-id[phx-hook='InlineEdit']")
+
+      render_hook(view, "save_field", %{"id" => "73", "tax_id" => "TAX-00000"})
+      assert has_element?(view, "#detail-tax-id", "TAX-00000")
+      assert {:ok, %{tax_id: "TAX-00000"}} = Company.get_company(holder_scope(), 73)
+    end
+
+    test "the record history shows a change to a withheld field as withheld", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.audit.log.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      view |> element("#company-record-history-toggle") |> render_click()
+
+      assert has_element?(view, "#company-record-history-panel", "tax_id")
+      assert has_element?(view, "#company-record-history-panel [data-withheld]", "Withheld")
+      refute render(view) =~ "TAX-98765"
+      refute render(view) =~ "hq@bilimbi.test"
+
+      grant_capabilities!("admin.company.sensitive.view")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      view |> element("#company-record-history-toggle") |> render_click()
+      assert has_element?(view, "#company-record-history-panel", "TAX-98765")
+    end
+
+    test "the companies list does not search a withheld email", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=hq%40bilimbi")
+      refute has_element?(view, "#companies-73")
+
+      assert has_element?(
+               view,
+               "#companies-search[placeholder='Search by name, code, legal name, or jurisdiction...']"
+             )
+
+      grant_capabilities!("admin.company.sensitive.view")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=hq%40bilimbi")
+      assert has_element?(view, "#companies-73", "Bilimbi Industries")
+
+      assert has_element?(
+               view,
+               "#companies-search[placeholder='Search by name, code, legal name, email, or jurisdiction...']"
+             )
+    end
+  end
+
+  # A second account at company 73 (user 92) holding the sensitive capability,
+  # as a module caller: a system scope cannot write a withheld field, and
+  # granting the key to the signed-in user 91 would change what the page
+  # under test shows them.
+  defp holder_scope do
+    grant_capabilities!("admin.company.sensitive.view", user_id: 92)
+    {:ok, scope} = Tenancy.scope(41)
+    Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
   end
 end

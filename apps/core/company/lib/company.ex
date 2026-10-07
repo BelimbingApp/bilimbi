@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Company do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
@@ -55,11 +56,26 @@ defmodule Bilimbi.Core.Company do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      company -> {:ok, Summary.from_schema(company)}
+      company -> {:ok, Summary.for_scope(company, scope)}
     end
   end
 
   def get_company(%Scope{}, _company_id), do: {:error, :not_found}
+
+  @doc """
+  The company fields the scope's actor may not see, in policy order.
+
+  `tax_id` and `email` need `admin.company.sensitive.view`
+  (`Bilimbi.Core.Company.Summary.field_policy/0`). Every summary this module
+  returns already carries `Bilimbi.Base.Authz.Withheld` in those fields for
+  such a reader; this names them for a surface that shows the same columns
+  from elsewhere, such as a record's audit history, and for the list search,
+  which does not match a withheld column.
+  """
+  @spec withheld_fields(Scope.t()) :: [atom()]
+  def withheld_fields(%Scope{} = scope) do
+    Authz.withheld_fields(scope, Summary.field_policy())
+  end
 
   @doc """
   Locks one live Company row for a sibling workflow already inside the shared Repo transaction.
@@ -121,7 +137,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Enum.map(&Summary.from_schema/1)
+      |> Summary.for_scope(scope)
 
     {:ok, companies}
   end
@@ -155,7 +171,7 @@ defmodule Bilimbi.Core.Company do
         {:ok, %{total: 0, active: 0, company: nil}}
 
       {company, total, active} ->
-        {:ok, %{total: total, active: active, company: Summary.from_schema(company)}}
+        {:ok, %{total: total, active: active, company: Summary.for_scope(company, scope)}}
     end
   end
 
@@ -457,13 +473,13 @@ defmodule Bilimbi.Core.Company do
           if is_primary? do
             case assign_primary_company(scope, company.id) do
               {:ok, _status} ->
-                Summary.from_schema(company)
+                Summary.for_scope(company, scope)
 
               {:error, reason} ->
                 Repo.rollback(reason)
             end
           else
-            Summary.from_schema(company)
+            Summary.for_scope(company, scope)
           end
 
         {:error, changeset} ->
@@ -481,6 +497,11 @@ defmodule Bilimbi.Core.Company do
   `activate_company/3`, `reactivate_company/3`); an attribute map that
   carries `status` is refused with a changeset error on that field rather
   than silently dropped.
+
+  A field the scope's actor may not see (`withheld_fields/1`) is not theirs
+  to change either: a change to it is refused with an error on that field,
+  and nothing is written. A caller that sends the stored value back is not
+  changing it and passes.
   """
   @spec update_company(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
@@ -498,9 +519,10 @@ defmodule Bilimbi.Core.Company do
       company ->
         company
         |> Schema.update_changeset(attributes)
+        |> FieldPolicy.refuse_changes(withheld_fields(scope))
         |> Repo.update()
         |> case do
-          {:ok, updated} -> {:ok, Summary.from_schema(updated)}
+          {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}
           {:error, changeset} -> {:error, changeset}
         end
     end
@@ -587,7 +609,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Enum.map(&Summary.from_schema/1)
+      |> Summary.for_scope(scope)
 
     {:ok, companies}
   end

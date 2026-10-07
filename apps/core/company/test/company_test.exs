@@ -530,12 +530,13 @@ defmodule Bilimbi.Core.CompanyTest do
     {:ok, owner} = Tenancy.scope(41)
     {:ok, other} = Tenancy.scope(42)
 
+    # `email` is field-level authorized, and a system scope is withheld it;
+    # `company_field_policy_test.exs` covers writing it as a holder.
     assert {:ok, updated} =
              Company.update_company(owner, 73, %{
                name: "Updated Name",
                legal_name: "Updated Legal Name Sdn. Bhd.",
                jurisdiction: "MY",
-               email: "info@updated.com",
                website: "https://updated.com",
                scope_activities: ["manufacturing", "distribution"],
                metadata: %{"notes" => "verified"}
@@ -546,7 +547,6 @@ defmodule Bilimbi.Core.CompanyTest do
     assert updated.legal_name == "Updated Legal Name Sdn. Bhd."
     assert updated.status == "active"
     assert updated.jurisdiction == "MY"
-    assert updated.email == "info@updated.com"
     assert updated.website == "https://updated.com"
     assert updated.scope_activities == ["manufacturing", "distribution"]
     assert updated.metadata == %{"notes" => "verified"}
@@ -633,12 +633,13 @@ defmodule Bilimbi.Core.CompanyTest do
                acme
     end
 
-    test "search matches name, code, legal name, email, and jurisdiction", %{owner: owner} do
+    test "search matches name, code, legal name, and jurisdiction", %{owner: owner} do
+      # Email is a sensitive column, matched only for a reader who may see
+      # it; a system scope may not (`company_field_policy_test.exs`).
       for {term, expected_id} <- [
             {"beta", 75},
             {"acme_ops", 73},
             {"Sdn. Bhd", 73},
-            {"ops@acme", 73},
             {"SG", 75}
           ] do
         assert {:ok, %AdministrationPage{entries: [%{id: ^expected_id}]}} =
@@ -648,6 +649,9 @@ defmodule Bilimbi.Core.CompanyTest do
 
       assert {:ok, %AdministrationPage{entries: [], total_entries: 0}} =
                Company.list_administration_page(owner, search: "no such company")
+
+      assert {:ok, %AdministrationPage{entries: [], total_entries: 0}} =
+               Company.list_administration_page(owner, search: "ops@acme")
     end
 
     test "status filter and sort orders", %{owner: owner} do

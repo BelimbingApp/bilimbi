@@ -99,6 +99,21 @@ yet freeze anything. There is no `delete_company` in this API today.
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
 queries `companies` directly (BLB-S1-010 option a).
 
+## Sensitive fields
+
+`tax_id` and `email` are field-level authorized
+(`Bilimbi.Core.Company.Summary.field_policy/0`): a reader without
+`admin.company.sensitive.view` gets a `Bilimbi.Base.Authz.Withheld` marker
+in those two fields of every summary this module returns, `update_company/3`
+refuses a change to them with an error on the field, the administration
+search does not match `email` for them, and the `companies` grid table
+leaves both fields out of their catalog. `withheld_fields/1` names the
+fields for a surface that shows the same columns from elsewhere, such as
+the record page's audit history. The configured `tenant_owner` role holds
+the capability; `mix bilimbi.authz.reconcile` carries it into an existing
+database. The seam itself is Base Authz's
+(`apps/base/authz/docs/README.md` "Field-level authorization").
+
 ## Authorized company reach
 
 `list_selectable_companies/2` and `authorize_company_target/3` combine an

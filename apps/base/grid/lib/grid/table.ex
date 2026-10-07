@@ -7,7 +7,9 @@ defmodule Bilimbi.Base.Grid.Table do
   of its rows, checked before a path may touch the table. `source` implements
   `Bilimbi.Base.Grid.Source`. `key` names the field that identifies a row,
   `label_field` the one that names it to a person, and `time_field` the one a
-  rollup orders by for "latest" and buckets by for a trend.
+  rollup orders by for "latest" and buckets by for a trend. A field may
+  carry a `capability` of its own (`Bilimbi.Base.Grid.Field`); the catalog
+  leaves it out for an account that lacks that key.
   """
 
   alias Bilimbi.Base.Grid.Field
@@ -100,9 +102,29 @@ defmodule Bilimbi.Base.Grid.Table do
           label_field: Map.get(attrs, :label_field),
           time_field: Map.get(attrs, :time_field)
         ],
-        not is_nil(field_id),
-        not Map.has_key?(field_map, field_id) do
-      invalid!(owner, attrs, "table #{id} #{name} #{inspect(field_id)} is not a declared field")
+        not is_nil(field_id) do
+      case Map.fetch(field_map, field_id) do
+        :error ->
+          invalid!(
+            owner,
+            attrs,
+            "table #{id} #{name} #{inspect(field_id)} is not a declared field"
+          )
+
+        # The key identifies a row, the label names it and the time field
+        # orders it: every reader of the table needs all three, so none of
+        # them can be withheld from one.
+        {:ok, %Field{capability: capability}} when is_binary(capability) ->
+          invalid!(
+            owner,
+            attrs,
+            "table #{id} #{name} #{inspect(field_id)} carries a capability; a table's key, " <>
+              "label and time fields are read with the table"
+          )
+
+        {:ok, %Field{}} ->
+          :ok
+      end
     end
 
     with %Field{type: type} <- Map.get(field_map, Map.get(attrs, :time_field)),

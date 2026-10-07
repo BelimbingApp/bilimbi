@@ -11,6 +11,8 @@ Shared components live in five modules: `lib/ui/components.ex`, and `icon.ex`, `
 Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components/forms.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
 The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value. If that audit write cannot land, refuse the reveal and send nothing — see the `:audit_unavailable` path in `BilimbiWeb.SecretReveal` and its LiveView coverage in `apps/base/settings/web_test/settings_secret_reveal_test.exs`.
 
+Use `<.withheld>` for a field the viewer may not see (a `Bilimbi.Base.Authz.Withheld` value in a summary), never a hand-written dash, blank, or "redacted" span, and never an editor around it. Its comment owns the wording and the glyph; `apps/base/authz/docs/README.md` "Field-level authorization" owns when a value is withheld.
+
 Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
 
 Use `<.tabs>` for sibling views of one page. Its comment owns the narrow-screen strip: one line, horizontal scroll, and edge controls only while a tab is out of view. A hand-rolled flex row of links clips the later labels on a phone.

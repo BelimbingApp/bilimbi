@@ -28,6 +28,14 @@ and keeps the tables whose capability the actor holds. Every later call
 takes that catalog, so there is no spelling of a path that reaches a table
 the account may not read.
 
+A field may carry a `capability` of its own, the key the owning module's
+`Bilimbi.Base.Authz.FieldPolicy` names for that column (Core Company's
+`tax_id` and `email`). The catalog leaves such a field out for an account
+that lacks the key, so the column the record page withholds cannot be
+added, suggested, rolled up or kept in a view here either. A table's key,
+label and time fields, and the fields a link joins on, cannot carry one:
+every reader of the table needs them.
+
 A source's query is built only for a real scope, never at boot: the
 snapshot validates declarations without calling `query/1`, and the catalog
 learns which key of the query each field is read from the first time a
