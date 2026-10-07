@@ -1883,7 +1883,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     end
   end
 
-  defp company_update_mutation!() do
+  defp company_update_mutation! do
     {:ok, mutations} = Audit.list_mutations(holder_scope())
 
     Enum.find(mutations, fn mutation ->
