@@ -25,7 +25,7 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.SystemPrincipalGrant
   alias Bilimbi.Base.Authz.SystemPrincipalService
   alias Bilimbi.Base.Authz.SystemRoleReconciler
-  alias Bilimbi.Base.Authz.Withheld
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
@@ -343,7 +343,7 @@ defmodule Bilimbi.Base.Authz do
 
   @doc """
   Replaces every field of `policy` the scope's actor may not see with a
-  `Bilimbi.Base.Authz.Withheld` marker, in one record or in each of a list.
+  `Bilimbi.Base.Authz.Restricted` marker, in one record or in each of a list.
 
   The decision is made once per call (`withheld_fields/2`), not once per
   record, so a list of three hundred rows costs what one row costs. Each
@@ -354,7 +354,7 @@ defmodule Bilimbi.Base.Authz do
   This is the enforcement point. An owning module applies it where its
   read model is built from the row, so no caller — a page, a panel, a grid,
   another module — can obtain the value without the capability. A template
-  then renders the marker with `<.withheld>` and offers no editor for it.
+  then renders the marker with `<.restricted>` and offers no editor for it.
   """
   @spec redact(Scope.t(), FieldPolicy.t(), record) :: record when record: struct() | [struct()]
   def redact(%Scope{} = scope, %FieldPolicy{} = policy, records) when is_list(records) do
@@ -370,7 +370,7 @@ defmodule Bilimbi.Base.Authz do
 
   defp withhold(%_{} = record, policy, withheld) do
     Enum.reduce(withheld, record, fn field, acc ->
-      Map.replace!(acc, field, %Withheld{capability: FieldPolicy.capability!(policy, field)})
+      Map.replace!(acc, field, %Restricted{capability: FieldPolicy.capability!(policy, field)})
     end)
   end
 

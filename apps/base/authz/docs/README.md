@@ -43,12 +43,15 @@ policy says, field by field, which of its values the reader may see. The
 owning module declares one `Bilimbi.Base.Authz.FieldPolicy` for its read
 model, naming each sensitive field with the capability that shows it, and
 builds every summary through `Authz.redact/3`, which replaces each field the
-scope's actor lacks the key for with a `Bilimbi.Base.Authz.Withheld` marker.
+scope's actor lacks the key for with a `Bilimbi.Base.Authz.Restricted` marker.
 The marker is explicit on purpose: an absent field reads as "none", a blank
 one as "empty", and this one as "there is a value you may not see". It
-renders through `<.withheld>` (Base UI) and offers no editor; interpolated
-anywhere else it still reads "Withheld", never the value, and it is not a
-string, so code that would compare or store it raises.
+renders through `<.restricted>` (Base UI): the word "Restricted", a lock,
+and a tooltip that tells the person what to do and names the permission the
+marker carries. It offers no editor, and a create or edit form shows the
+field as `<.restricted_field>`, a read-only row, never an omitted input.
+Interpolated anywhere else it still reads "Restricted", never the value, and
+it is not a string, so code that would compare or store it raises.
 
 The decision is made once per call from the reader's effective allow list,
 the same list the route gate reads, so a field and the pages that need its
@@ -75,7 +78,7 @@ for many types in one evaluation through Base Audit's
 `Bilimbi.Base.Audit.Authorization` seam, and `Bilimbi.Base.Audit` takes the
 withheld values out of every mutation it returns, so the record history
 panel, the mutations browser at `/audit/mutations` and any other caller list
-a change to such a field with `<.withheld>` and without its before and after
+a change to such a field with `<.restricted>` and without its before and after
 values, whatever audit capability the reader holds.
 
 No production field is marked yet. The owner's decision on #777 was to merge
@@ -86,7 +89,7 @@ seam is exercised by tests through fixture policies
 `apps/base/audit/test/withheld_fields_test.exs`,
 `apps/base/grid/test/catalog_test.exs`), so the first module that has a real
 case declares one `FieldPolicy`, names it in `field_policies`, builds its
-summary through `redact/3` and renders `<.withheld>`, and nothing else has
+summary through `redact/3` and renders `<.restricted>`, and nothing else has
 to change.
 
 ## A record in another company

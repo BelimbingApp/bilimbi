@@ -14,6 +14,135 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   alias Phoenix.LiveView.JS
 
   @doc """
+  Renders a field the viewer may not see.
+
+  Field-level authorization withholds one value from someone who may open
+  the rest of the record (`Bilimbi.Base.Authz.redact/3` puts a
+  `Bilimbi.Base.Authz.Restricted` marker in the field's place). This is how
+  that marker reads: the word "Restricted" with the registry's `restricted`
+  lock, and the reason in its tooltip and accessible description, so a field
+  that is withheld and a field that is empty never look alike. An empty
+  field reads "—"; this reads as a value the person is not shown. It carries
+  no editor and no copy button, and a page never renders an in-place control
+  around it: an editor cannot show what it would replace. In a create or
+  edit form the same field is `<.restricted_field>`, a read-only row, never
+  an omitted input.
+
+  The tooltip tells the person what to do: "You don't have access to this.
+  Ask your administrator." Pass `capability`, which the marker carries, and
+  it names the permission to ask for. `reason` replaces that sentence when a
+  page has a better one.
+
+  ## Examples
+
+      <.restricted id="detail-tax-id-restricted" capability={@company.tax_id.capability} />
+      <.restricted id="salary-restricted" reason="Salaries are shown to payroll only." />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:capability, :string,
+    default: nil,
+    doc: "the capability that would show the value, named in the tooltip when known"
+  )
+
+  attr(:reason, :string,
+    default: nil,
+    doc: "a page's own sentence for why the value is withheld; replaces the default tooltip"
+  )
+
+  attr(:class, :any, default: nil)
+
+  def restricted(assigns) do
+    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason(assigns.capability))
+
+    ~H"""
+    <span
+      id={@id}
+      data-restricted
+      data-capability={@capability}
+      title={@tooltip}
+      aria-description={@tooltip}
+      class={["inline-flex items-center gap-1 text-ink-muted", @class]}
+    >
+      <.icon name="restricted" class="size-4" />
+      <span>{gettext("Restricted")}</span>
+    </span>
+    """
+  end
+
+  @doc """
+  The sentence a restricted field explains itself with: what happened and
+  what to do, naming the permission when the caller knows it.
+  """
+  @spec restricted_reason(String.t() | nil) :: String.t()
+  def restricted_reason(nil),
+    do: gettext("You don't have access to this. Ask your administrator.")
+
+  def restricted_reason(capability) when is_binary(capability) do
+    gettext(
+      "You don't have access to this. Ask your administrator for the %{capability} permission.",
+      capability: capability
+    )
+  end
+
+  @doc """
+  A form row for a field the person may not see.
+
+  A create or edit form never omits a restricted field, and never renders an
+  input for it: an omitted field reads as "this form has no such field", and
+  an input would offer a write the module refuses. Instead the row keeps its
+  label and shows a greyed, read-only value cell carrying `<.restricted>`,
+  with the same tooltip, so the form reads the same as the record page. It
+  renders no `<input>` and no `name`, so nothing is submitted for the field;
+  the owning module still refuses a value a forged submit sends
+  (`Bilimbi.Base.Authz.FieldPolicy.refuse_attempts/3`).
+
+  ## Examples
+
+      <.restricted_field id="company-tax-id" label="Tax ID" capability={@policy.tax_id} />
+  """
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+
+  attr(:capability, :string,
+    default: nil,
+    doc: "the capability that would show the value, named in the tooltip when known"
+  )
+
+  attr(:reason, :string,
+    default: nil,
+    doc: "a page's own sentence, replacing the default tooltip"
+  )
+
+  attr(:wrapper_class, :any, default: nil)
+
+  def restricted_field(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :tooltip,
+        assigns.reason || restricted_reason(assigns.capability)
+      )
+
+    ~H"""
+    <div id={@id} class={@wrapper_class || "mb-4"} data-restricted-field>
+      <span id={"#{@id}-label"} class="mb-1.5 block text-sm font-medium text-ink">{@label}</span>
+      <div
+        id={"#{@id}-value"}
+        role="group"
+        aria-labelledby={"#{@id}-label"}
+        aria-readonly="true"
+        aria-description={@tooltip}
+        title={@tooltip}
+        class="flex min-h-10 w-full items-center rounded-lg border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted"
+      >
+        <.restricted id={"#{@id}-restricted"} capability={@capability} reason={@reason} />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a masked secret field with a reveal control by default.
 
   `subject` is the noun used by the control's accessible name. For a stored

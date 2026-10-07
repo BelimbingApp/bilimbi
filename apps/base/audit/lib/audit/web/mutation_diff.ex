@@ -20,7 +20,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   `Bilimbi.Base.Audit` from the owning module's field policy) is still a row,
   so the reader knows the record changed, but it carries no values: its row
   has `withheld: true` and both sides `:absent`, and a surface renders
-  `<.withheld>` in their place. That is different from a sensitive key,
+  `<.restricted>` in their place. That is different from a sensitive key,
   whose value capture itself redacted.
 
   Keys are classified as sensitive by the same substring rule both surfaces

@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicy do
   policy decides, field by field, which of its values the reader may see:
   the owning module declares each sensitive field with the capability that
   shows it, and `Bilimbi.Base.Authz.redact/3` replaces every field the
-  reader lacks with `Bilimbi.Base.Authz.Withheld`. The policy lives with the
+  reader lacks with `Bilimbi.Base.Authz.Restricted`. The policy lives with the
   read model it governs, declared once by the module that owns the table,
   and that one declaration drives its reads, its writes
   (`refuse_attempts/3`), and anything else that shows the same column, such

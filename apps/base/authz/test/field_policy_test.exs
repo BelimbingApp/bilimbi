@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Authz.PrincipalCapability
-  alias Bilimbi.Base.Authz.Withheld
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
@@ -74,10 +74,10 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
       assert %Record{id: 1, name: "Acme", tax_id: withheld, email: withheld} =
                Authz.redact(reader, @policy, record())
 
-      assert withheld == %Withheld{capability: @capability}
+      assert withheld == %Restricted{capability: @capability}
       assert Authz.withheld_fields(reader, @policy) == [:tax_id, :email]
 
-      assert [%Record{tax_id: %Withheld{}}, %Record{email: %Withheld{}}] =
+      assert [%Record{tax_id: %Restricted{}}, %Record{email: %Restricted{}}] =
                Authz.redact(reader, @policy, [record(), record()])
 
       # Withholding a field is the shape of the read model for this reader,
@@ -90,7 +90,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
 
       assert Authz.withheld_fields(system, @policy) == [:tax_id, :email]
 
-      assert %Record{tax_id: %Withheld{}, email: %Withheld{}} =
+      assert %Record{tax_id: %Restricted{}, email: %Restricted{}} =
                Authz.redact(system, @policy, record())
     end
 
@@ -128,7 +128,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
       assert Authz.withheld_fields(reader, @policy) == [:tax_id, :email]
       refute @capability in Authz.effective_capabilities(actor).allowed
 
-      assert %Record{tax_id: %Withheld{}, email: %Withheld{}} =
+      assert %Record{tax_id: %Restricted{}, email: %Restricted{}} =
                Authz.redact(reader, @policy, record())
     end
 
@@ -211,13 +211,13 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
     end
   end
 
-  describe "Withheld" do
+  describe "Restricted" do
     test "renders as the word, never as the value, and is not a string" do
-      withheld = %Withheld{capability: @capability}
+      withheld = %Restricted{capability: @capability}
 
-      assert Withheld.withheld?(withheld)
-      refute Withheld.withheld?("TAX-1")
-      assert Phoenix.HTML.Safe.to_iodata(withheld) |> IO.iodata_to_binary() == "Withheld"
+      assert Restricted.restricted?(withheld)
+      refute Restricted.restricted?("TAX-1")
+      assert Phoenix.HTML.Safe.to_iodata(withheld) |> IO.iodata_to_binary() == "Restricted"
       assert_raise Protocol.UndefinedError, fn -> to_string(withheld) end
     end
   end

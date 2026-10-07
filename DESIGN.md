@@ -304,11 +304,15 @@ page:
   write, its failure nouns and its forbidden-flash wording.
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
-- **A fact the viewer may not see** reads `<.withheld>`: the word, the
-  conceal glyph and the permission wording in its tooltip, with no editor
-  whatever the update capability says. It is never blank and never "—",
-  which mean "empty"; the owning module withholds the value before the page
-  sees it (`Bilimbi.Base.Authz.FieldPolicy`).
+- **A fact the viewer may not see** reads `<.restricted>`: the word
+  "Restricted", the registry's lock, and a tooltip that says what to do
+  ("You don't have access to this. Ask your administrator.", naming the
+  permission when the page knows it), with no editor whatever the update
+  capability says. It is never blank and never "—", which mean "empty"; the
+  owning module withholds the value before the page sees it
+  (`Bilimbi.Base.Authz.FieldPolicy`). A create or edit form shows the same
+  field as `<.restricted_field>`, a greyed read-only row that keeps its label
+  and submits nothing, never an omitted input.
 - **Facts the page cannot save stay read-only.** A relation another module
   owns (the employee's company), a date the text editor cannot commit
   truthfully (employment start and end) and a record with its own workflow

@@ -2168,18 +2168,49 @@
                 </.badge><.badge kind={:danger}>Suspended</.badge>
               </div>
               <div
-                id="component-withheld"
+                id="component-restricted"
                 class="space-y-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
               >
                 <p class="text-xs text-ink-muted">
-                  A field the viewer may not see, beside an empty one: withheld is not blank.
+                  A field the viewer may not see, beside an empty one: restricted is not blank.
+                  The lock's tooltip says what to do, and names the permission when the page
+                  knows it.
                 </p>
                 <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
-                  <span class="text-ink-muted">Tax ID</span>
-                  <.withheld id="design-library-withheld" />
+                  <span class="text-ink-muted">Bank account</span>
+                  <.restricted
+                    id="design-library-restricted"
+                    capability="admin.payee.bank-account.view"
+                  />
+                  <span class="text-ink-muted">Salary</span>
+                  <.restricted id="design-library-restricted-plain" />
+                  <span class="text-ink-muted">Bonus</span>
+                  <.restricted
+                    id="design-library-restricted-reason"
+                    reason="Bonuses are shown to payroll only."
+                  />
                   <span class="text-ink-muted">Website</span>
                   <span class="text-ink-muted">—</span>
                 </div>
+              </div>
+              <div
+                id="component-restricted-field"
+                class="space-y-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
+              >
+                <p class="text-xs text-ink-muted">
+                  The same field in a create or edit form: a read-only row that keeps its
+                  label, never an omitted input, and submits nothing.
+                </p>
+                <.restricted_field
+                  id="design-library-restricted-field"
+                  label="Bank account"
+                  capability="admin.payee.bank-account.view"
+                />
+                <.restricted_field
+                  id="design-library-restricted-field-reason"
+                  label="Bonus"
+                  reason="Bonuses are shown to payroll only."
+                />
               </div>
             </div>
           </section>
