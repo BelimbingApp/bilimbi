@@ -1,13 +1,16 @@
 defmodule BilimbiWeb.Release do
   @moduledoc """
-  Database commands for the `bilimbi` release, which has no Mix.
+  Database and initial setup commands for the `bilimbi` release, which has no Mix.
 
       bin/bilimbi eval "BilimbiWeb.Release.migrate()"
       bin/bilimbi eval "BilimbiWeb.Release.seed()"
+      bin/bilimbi eval "BilimbiWeb.Release.bootstrap()"
+      bin/bilimbi eval "BilimbiWeb.Release.adopt()"
 
-  They do what `mix bilimbi.migrate` and `mix bilimbi.seeds.run` do from the
-  umbrella root. Each first loads the host's whole application closure and
-  refuses to run unless it contains every module of the discovered graph.
+  Migration, seeding and adoption mirror their umbrella Mix commands.
+  Bootstrap seeds reference data and calls Core User's one-time installation
+  API. Each loads the host's whole application closure and refuses an
+  incomplete discovered graph before touching the database.
   """
 
   alias Bilimbi.Base.Database
@@ -46,6 +49,82 @@ defmodule BilimbiWeb.Release do
         raise "production seed #{failure.seed_id} failed: #{inspect(failure.reason)}"
     end
   end
+
+  @doc "Verifies and explicitly adopts an existing Belimbing schema before migration."
+  @spec adopt() :: :ok
+  def adopt do
+    load_closure!(@app)
+    ModuleRegistry.complete_modules!()
+
+    {:ok, result, _started} =
+      Ecto.Migrator.with_repo(Repo, &Bilimbi.Core.Compatibility.adopt(&1, []))
+
+    case result do
+      {:ok, status} -> IO.puts("Schema #{status}")
+      {:error, reason} -> raise "schema adoption refused: #{inspect(reason)}"
+    end
+
+    :ok
+  end
+
+  @doc """
+  Runs reference seeds and the one-time initial-administrator bootstrap.
+
+  Identity comes from BOOT_TENANT_NAME, BOOT_COMPANY_NAME, BOOT_COMPANY_CODE,
+  BOOT_ADMIN_NAME and BOOT_ADMIN_EMAIL. Read the password from stdin, never
+  command arguments or the persistent environment file. A blank line is valid
+  on a completed repeat. This command has no HTTP entry point.
+  """
+  @spec bootstrap() :: :ok
+  def bootstrap do
+    attributes = %{
+      tenant_name: System.fetch_env!("BOOT_TENANT_NAME"),
+      company_name: System.fetch_env!("BOOT_COMPANY_NAME"),
+      company_code: System.fetch_env!("BOOT_COMPANY_CODE"),
+      admin_name: System.fetch_env!("BOOT_ADMIN_NAME"),
+      admin_email: System.fetch_env!("BOOT_ADMIN_EMAIL"),
+      password: bootstrap_password()
+    }
+
+    seed()
+
+    case Bilimbi.Core.User.bootstrap_platform_admin(attributes) do
+      {:ok, status} -> IO.puts("Administrator bootstrap: #{status}")
+      {:error, reason} -> raise "administrator bootstrap refused: #{bootstrap_failure(reason)}"
+    end
+
+    :ok
+  end
+
+  defp bootstrap_password do
+    case IO.read(:stdio, :line) do
+      line when is_binary(line) ->
+        line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
+
+      _eof_or_error ->
+        nil
+    end
+  end
+
+  defp bootstrap_failure(:existing_users),
+    do: "accounts already exist; use adopt/upgrade and existing administrator recovery"
+
+  defp bootstrap_failure(:existing_platform_operator),
+    do: "a platform operator already exists without a bootstrap receipt; use adopt/upgrade"
+
+  defp bootstrap_failure(:bootstrap_identity_conflict),
+    do:
+      "setup already completed for another identity; repeat the original identity or use upgrade"
+
+  defp bootstrap_failure(:password_required), do: "provide a password for initial setup"
+
+  defp bootstrap_failure(:system_roles_missing),
+    do: "system roles are missing; explicitly reconcile system roles before repeating setup"
+
+  defp bootstrap_failure(:invalid_bootstrap_attributes),
+    do: "check tenant/company names, company code, administrator name/email and password"
+
+  defp bootstrap_failure(reason), do: Atom.to_string(reason)
 
   @doc """
   Starts the module applications without the endpoint, job processing, or

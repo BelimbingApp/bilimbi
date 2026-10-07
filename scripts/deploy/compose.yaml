@@ -1,0 +1,28 @@
+services:
+  app:
+    image: ${BILIMBI_IMAGE:?Set BILIMBI_IMAGE to a versioned image or digest}
+    env_file:
+      - path: ${BILIMBI_ENV_FILE:?Set BILIMBI_ENV_FILE to the protected release environment}
+        format: raw
+    environment:
+      PHX_SERVER: "true"
+      PORT: "4000"
+      GEONAMES_CACHE_DIR: /var/lib/bilimbi/geonames
+    ports:
+      - "127.0.0.1:${BILIMBI_PORT:-4000}:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - state:/var/lib/bilimbi
+    tmpfs:
+      - /tmp
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  state:

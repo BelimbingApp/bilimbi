@@ -1,4 +1,4 @@
-FROM ubuntu:26.04
+FROM ubuntu:26.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,3 +21,17 @@ RUN test -n "$RELEASE_VERSION" && \
     MIX_ENV=prod mise exec -- mix release bilimbi && \
     mkdir -p /out && \
     tar -C _build/prod/rel -czf "/out/bilimbi-${RELEASE_VERSION}-ubuntu-26.04-amd64.tar.gz" bilimbi
+
+FROM ubuntu:26.04 AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libssl3t64 libncurses6 libstdc++6 && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --gid 10001 bilimbi && \
+    useradd --uid 10001 --gid bilimbi --home /var/lib/bilimbi --shell /usr/sbin/nologin bilimbi && \
+    install -d -o bilimbi -g bilimbi /var/lib/bilimbi
+WORKDIR /opt/bilimbi
+COPY --from=build /src/_build/prod/rel/bilimbi/ ./
+ENV PHX_SERVER=true PORT=4000 RELEASE_TMP=/tmp GEONAMES_CACHE_DIR=/var/lib/bilimbi/geonames
+USER bilimbi
+EXPOSE 4000
+CMD ["bin/bilimbi", "start"]

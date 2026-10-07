@@ -23,6 +23,7 @@ and reset-token hashes never leave the module; account reads return
 | `dashboard_summary(scope)` | Total/verified/unverified counts plus the first five accounts by ID; same tenant visibility as `list_users/1`, with credentials excluded from the query |
 | `get_user(scope, company_id, user_id)` | One user inside that company |
 | `register_user(scope, company_id, attributes)` | Create an unverified account from plaintext `:password` |
+| `bootstrap_platform_admin(attributes)` | Trusted installation command; provisions one explicitly selected administrator with a durable receipt and retained audit action. Repeats preserve revocations. See [deployment contract](../../../../docs/deploy/README.md#bootstrap-contract-and-recovery). |
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete. A person must hold `admin.user.delete` when the call runs; `delete_user/3` owns that check |
@@ -47,6 +48,12 @@ count, read, and delete for the signed-in user do the same.
 ## Tables
 
 Five, reproducing the canonical shape exactly.
+
+The Bilimbi-only `bilimbi_user_bootstrap` receipt is separate from these five
+compatible tables. Its singleton retains the selected installation identities
+and historical account/company/tenant IDs, without secrets or cascading foreign
+keys. `SchemaContract.bootstrap_receipt/0` owns its structural specification;
+it is excluded from the Belimbing adoption baseline.
 
 | Table | Notes |
 |---|---|

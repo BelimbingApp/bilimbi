@@ -79,6 +79,13 @@ jobs:
       - name: Enforce greppable AGENTS.md mandates
         run: .github/scripts/mandates.sh
 
+      - name: Check deployment adapters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/setup-native.sh scripts/setup-docker.sh scripts/deploy/*.sh rel/env.sh.eex
+          bash scripts/deploy/test-setup.sh
+
       - name: Audit known dependency vulnerabilities
         run: mix deps.audit
 

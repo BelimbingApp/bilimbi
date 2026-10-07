@@ -18,6 +18,27 @@ defmodule Bilimbi.Core.User.SchemaContract do
     [users(), password_reset_tokens(), user_pins(), user_database_queries(), notifications()]
   end
 
+  @doc "Bilimbi-only bootstrap receipt; excluded from the adopted compatibility baseline."
+  def bootstrap_receipt do
+    %{
+      name: "bilimbi_user_bootstrap",
+      columns: %{
+        "id" => column(:bigint, false),
+        "tenant_name" => column({:varchar, 255}, false),
+        "company_name" => column({:varchar, 255}, false),
+        "company_code" => column({:varchar, 255}, false),
+        "admin_email" => column({:varchar, 255}, false),
+        "user_id" => column(:bigint, false),
+        "company_id" => column(:bigint, false),
+        "tenant_id" => column(:bigint, false),
+        "completed_at" => column({:timestamp, 0}, false)
+      },
+      indexes: %{"bilimbi_user_bootstrap_pkey" => index(["id"], true)},
+      foreign_keys: %{},
+      checks: %{"bilimbi_user_bootstrap_singleton" => %{expression: "id = 1", validated: true}}
+    }
+  end
+
   defp users do
     %{
       name: "users",

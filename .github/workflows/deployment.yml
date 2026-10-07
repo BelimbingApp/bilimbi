@@ -1,0 +1,30 @@
+name: Deployment smoke
+on:
+  pull_request:
+    paths:
+      - scripts/deploy/**
+      - scripts/setup-*.sh
+      - apps/core/user/**
+      - apps/web/lib/bilimbi_web/release.ex
+      - .github/workflows/deployment.yml
+      - mix.lock
+      - .mise.toml
+      - .dockerignore
+      - rel/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Exercise native setup in a disposable Ubuntu container
+        run: >-
+          docker run --rm -e CI=true -v "$PWD:/src:ro" -w /src ubuntu:26.04
+          bash scripts/deploy/test-native.sh
+      - name: Build runtime image
+        run: bash scripts/deploy/build-image.sh ci
+      - name: Exercise release setup against PostgreSQL
+        run: bash scripts/deploy/smoke-docker.sh bilimbi:ci

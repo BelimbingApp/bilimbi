@@ -42,6 +42,9 @@ defmodule BilimbiWeb.TenantScopeGateTest do
   # {path relative to the workspace root, "function/arity", schema or table}
   # => the reason this read may span tenants.
   @allowed %{
+    {"apps/core/user/lib/user/admin_bootstrap.ex", "run/1",
+     "Bilimbi.Core.User.BootstrapReceipt"} =>
+      "The owner reads one global installation receipt before a tenant exists; its tenant_id is historical attribution, not tenancy ownership. The trusted bootstrap exposes only completion status and preserves revoked access.",
     {"apps/base/workflow/lib/workflow/coordination.ex", "append_event/6",
      "Bilimbi.Base.Workflow.EventSchema"} =>
       "Appends to a run the caller's scoped read already proved; the sequence is that run's, keyed by run id.",

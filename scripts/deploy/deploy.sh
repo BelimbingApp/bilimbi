@@ -5,6 +5,8 @@ set -euo pipefail
 archive=${1:?usage: sudo deploy.sh /path/to/tarball VERSION [KEEP_COUNT]}
 version=${2:?usage: sudo deploy.sh /path/to/tarball VERSION [KEEP_COUNT]}
 keep=${3:-5}
+mode=${4:-upgrade}
+[[ "$mode" == upgrade || "$mode" == adopt ]] || { echo "Invalid deployment mode" >&2; exit 2; }
 [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Invalid version" >&2; exit 2; }
 if ! [[ "$keep" =~ ^[0-9]+$ ]] || ((keep < 2)); then
   echo "KEEP_COUNT must be at least 2" >&2; exit 2
@@ -50,6 +52,9 @@ set -a
 source /etc/bilimbi/bilimbi.env
 set +a
 unset PHX_SERVER
+if [[ "$mode" == adopt ]]; then
+  runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.adopt()'
+fi
 runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.migrate()'
 
 ln -sfn "$target" "$root/.current.next"

@@ -43,6 +43,12 @@ defmodule BilimbiWeb.ReleaseTest do
 
       assert Application.get_env(:bilimbi_base_queue, :queues) == queues
     end
+
+    test "adoption refuses it before touching the database" do
+      assert_raise ArgumentError, ~r/cannot see installed modules domain\/unmounted/, fn ->
+        Release.adopt()
+      end
+    end
   end
 
   describe "seed" do

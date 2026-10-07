@@ -13,9 +13,10 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
       Email: ai@agent.my
       Password: bilimbi-dev
 
-  It is safe to run more than once. Existing platform identity and login rows
-  are resolved rather than duplicated, and an existing login password is never
-  reset.
+  It seeds installed production reference data, then uses User's one-time
+  administrator bootstrap. Repeats preserve passwords and revoked roles.
+  Existing identities without a bootstrap receipt are refused rather than
+  promoted. The owning modules then contribute their development sample data.
 
   This task refuses to run outside the `dev` Mix environment.
   """
@@ -23,6 +24,7 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
   use Mix.Task
 
   alias Bilimbi.Base.ModuleRegistry
+  alias Bilimbi.Base.Database
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -30,10 +32,7 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
   @tenant_name "Bilimbi local development"
   @company_attributes %{
     name: "Bilimbi Development",
-    code: "bilimbi_dev",
-    legal_name: "Bilimbi Development",
-    jurisdiction: "MY",
-    metadata: %{"purpose" => "local_development"}
+    code: "bilimbi_dev"
   }
   @user_attributes %{
     name: "AI Agent",
@@ -47,40 +46,35 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
     ensure_development!()
     Mix.Task.run("app.start")
 
-    with {:ok, result} <-
-           Company.provision_platform_operator(@tenant_name, @company_attributes),
-         {:ok, scope} <- Tenancy.scope(result.tenant.id),
-         {:ok, user_status} <- ensure_user(scope, result.company.id) do
-      seeded = run_module_seeds!(scope, result.company.id)
+    with {:ok, _seeds} <- Database.run_production_seeds(Database.installed_production_seeds!()),
+         {:ok, status} <- User.bootstrap_platform_admin(bootstrap_attributes()),
+         {:ok, company} <- Company.platform_operator_company(),
+         {:ok, scope} <- Tenancy.scope(company.tenant_id) do
+      seeded = run_module_seeds!(scope, company.id)
 
       Mix.shell().info(
-        "Development seed ready: tenant #{result.tenant.id} (#{result.tenant_status}), " <>
-          "company #{result.company.id} (#{result.company_status}), " <>
-          user_message(user_status) <>
+        "Development seed ready: administrator #{status}, " <>
+          user_message(status) <>
           module_seed_message(seeded)
       )
     else
-      {:error, %Ecto.Changeset{} = changeset} ->
-        Mix.raise("development seed failed: #{inspect(changeset.errors)}")
-
-      {:error, reason} ->
+      {:error, reason} when is_atom(reason) ->
         Mix.raise("development seed failed: #{inspect(reason)}")
+
+      {:error, _seed_failure} ->
+        Mix.raise("development reference seed failed; inspect the production-seed ledger")
     end
   end
 
-  defp ensure_user(scope, company_id) do
-    with {:ok, users} <- User.list_company_users(scope, company_id) do
-      case Enum.find(users, &(&1.email == @user_attributes.email)) do
-        nil ->
-          case User.register_user(scope, company_id, @user_attributes) do
-            {:ok, _user} -> {:ok, :created}
-            {:error, reason} -> {:error, reason}
-          end
-
-        _user ->
-          {:ok, :existing}
-      end
-    end
+  defp bootstrap_attributes do
+    %{
+      tenant_name: @tenant_name,
+      company_name: @company_attributes.name,
+      company_code: @company_attributes.code,
+      admin_name: @user_attributes.name,
+      admin_email: @user_attributes.email,
+      password: @user_attributes.password
+    }
   end
 
   # Each installed module may own dev sample data at `priv/dev_seed.exs` (declared
@@ -108,7 +102,7 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
     "user #{@user_attributes.email} (created). Password: #{@user_attributes.password}."
   end
 
-  defp user_message(:existing) do
+  defp user_message(:already_completed) do
     "user #{@user_attributes.email} (existing; password preserved)."
   end
 

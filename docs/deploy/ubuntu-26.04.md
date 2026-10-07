@@ -1,5 +1,11 @@
 # Ubuntu 26.04 production deployment
 
+For normal installation, adoption and upgrades use
+[`scripts/setup-native.sh`](../../scripts/setup-native.sh), following
+[Deployment and initial setup](README.md). The sections below describe the
+native adapter's build, configuration and underlying recovery steps. For
+other Linux distributions use the [Docker deployment path](README.md#docker-setup).
+
 This runbook installs one Bilimbi release on an Ubuntu 26.04 x86-64 host with
 PostgreSQL 18 and Caddy. Build releases on **Ubuntu 26.04 for the same CPU
 architecture** as the server. A release bundles Erlang and native libraries;
@@ -177,3 +183,9 @@ sudo bash bootstrap-admin.sh \
 Use an address you control and verify the account's email through the normal
 application flow. If an existing Belimbing database already has administrators,
 inspect its identity and role assignments before creating another.
+
+Bootstrap now calls the shared one-time application command. It refuses an
+existing installation without its own receipt. Matching repeats preserve
+passwords and role revocations; a different administrator identity is refused.
+Use the explicit `adopt` mode for a Belimbing database and `upgrade` for later
+releases. Neither mode provisions an administrator.
