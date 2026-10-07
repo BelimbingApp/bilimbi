@@ -64,6 +64,7 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "tile" => "hero-squares-plus",
              "reveal" => "hero-eye",
              "conceal" => "hero-eye-slash",
+             "restricted" => "hero-lock-closed",
              "filter" => "hero-funnel",
              "search" => "hero-magnifying-glass",
              "sort" => "hero-chevron-up-down",

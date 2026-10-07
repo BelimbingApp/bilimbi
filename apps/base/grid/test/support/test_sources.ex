@@ -271,7 +271,7 @@ defmodule Bilimbi.Base.Grid.TestSources do
 
   @doc "Every capability the test domain declares."
   def capabilities do
-    ~w(admin.test.order.view admin.test.customer.view admin.test.country.view admin.test.line.view admin.test.tag.view)
+    ~w(admin.test.order.view admin.test.customer.view admin.test.country.view admin.test.line.view admin.test.tag.view admin.authz.field.manage)
   end
 
   # Kept so the module's own `import Ecto.Query` is used and the file mirrors a source.

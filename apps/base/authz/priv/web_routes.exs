@@ -42,5 +42,11 @@
     live: Bilimbi.Base.Authz.Web.DecisionLogsLive,
     session: :auth,
     capability: "admin.authz.decision-log.list"
+  },
+  %{
+    path: "/authz/field-access",
+    live: Bilimbi.Base.Authz.Web.FieldAccessLive,
+    session: :auth,
+    capability: "admin.authz.field.manage"
   }
 ]

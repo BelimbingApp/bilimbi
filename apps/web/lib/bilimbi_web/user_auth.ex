@@ -752,8 +752,8 @@ defmodule BilimbiWeb.UserAuth do
   defp company_name_for(_scope, nil), do: nil
 
   defp company_name_for(%Scope{} = scope, company_id) do
-    case Company.get_company(scope, company_id) do
-      {:ok, company} -> Company.Summary.display_name(company)
+    case Company.identity(scope, company_id) do
+      {:ok, %{display_name: name}} -> name
       _ -> nil
     end
   end

@@ -314,7 +314,8 @@ defmodule Bilimbi.Core.Address do
   @spec list_company_addresses(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_company_addresses(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company_result(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <-
+           normalize_company_result(Company.require_live_company(scope, company_id)) do
       company_addressable_identity = Company.addressable_identity()
 
       addresses =
@@ -342,7 +343,8 @@ defmodule Bilimbi.Core.Address do
   @spec list_company_attached_addresses(Scope.t(), pos_integer()) ::
           {:ok, [AttachedAddress.t()]} | {:error, :company_not_found}
   def list_company_attached_addresses(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company_result(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <-
+           normalize_company_result(Company.require_live_company(scope, company_id)) do
       company_addressable_identity = Company.addressable_identity()
 
       attached =
@@ -430,7 +432,8 @@ defmodule Bilimbi.Core.Address do
   @spec list_available_company_addresses(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_available_company_addresses(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company_result(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <-
+           normalize_company_result(Company.require_live_company(scope, company_id)) do
       company_addressable_identity = Company.addressable_identity()
 
       addresses =
@@ -602,7 +605,7 @@ defmodule Bilimbi.Core.Address do
   end
 
   defp require_company!(%Scope{} = scope, company_id) do
-    case Company.get_company(scope, company_id) do
+    case Company.require_live_company(scope, company_id) do
       {:ok, company} -> company
       {:error, :not_found} -> Repo.rollback(:company_not_found)
     end

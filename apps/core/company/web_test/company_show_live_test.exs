@@ -4,6 +4,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
@@ -388,13 +389,14 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
           legal_name: "Bilimbi Industries Sdn Bhd",
           legal_entity_type_id: type.id,
           registration_number: "REG-12345",
-          tax_id: "TAX-98765",
           jurisdiction: "MY",
-          email: "hq@bilimbi.test",
           website: "https://bilimbi.test",
           scope_activities: ["Software Development", "Cloud Infrastructure"],
           metadata: %{"employees_count" => 50}
         })
+
+      {:ok, _updated} =
+        Company.update_company(scope, 73, %{tax_id: "TAX-98765", email: "hq@bilimbi.test"})
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
@@ -815,6 +817,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
     test "edits the company facts in place and each reports its own outcome", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
       {:ok, scope} = Tenancy.scope(41)
 
       {:ok, type} =
@@ -909,6 +912,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
     test "a refused commit keeps the stored value on screen and reports the reason on the fact",
          %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
       {:ok, scope} = Tenancy.scope(41)
       {:ok, _updated} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
 
@@ -1696,5 +1700,94 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
   defp scope! do
     {:ok, scope} = Tenancy.scope(41)
     scope
+  end
+
+  describe "field access" do
+    # An operator (user 92, holding admin.authz.field.manage) restricts the
+    # company email to a Finance role. The signed-in user 91 holds no role.
+    setup do
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, _} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
+      grant_capabilities!("admin.authz.field.manage", user_id: 92)
+      operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
+      {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
+      {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [finance.id])
+      %{operator: operator, finance: finance}
+    end
+
+    test "a viewer without the role sees the fact as Restricted, never the value", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      refute html =~ "hq@bilimbi.test"
+
+      assert has_element?(
+               view,
+               "#detail-email #company-email-restricted[data-restricted][title=\"You don't have access to this. Ask your administrator for the Finance role.\"]",
+               "Restricted"
+             )
+
+      refute has_element?(view, "#detail-email [phx-hook='InlineEdit']")
+      assert has_element?(view, "#detail-tax-id [phx-hook='InlineEdit']")
+      refute render(view) =~ "hq@bilimbi.test"
+    end
+
+    test "a forged save of a restricted fact is refused on the fact and writes nothing", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      render_hook(view, "save_field", %{"id" => "73", "email" => "guess@bilimbi.test"})
+
+      assert has_element?(
+               view,
+               "#detail-email [role='alert']",
+               "is restricted and cannot be changed"
+             )
+
+      refute render(view) =~ "hq@bilimbi.test"
+
+      {:ok, scope} = Tenancy.scope(41)
+      assert {:ok, %{email: %Bilimbi.Base.Authz.Restricted{}}} = Company.get_company(scope, 73)
+    end
+
+    test "a holder of the role sees and edits the value", %{
+      conn: conn,
+      operator: operator,
+      finance: finance
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#detail-email", "hq@bilimbi.test")
+      refute has_element?(view, "[data-restricted]")
+      assert has_element?(view, "#company-email[phx-hook='InlineEdit']")
+    end
+
+    test "the record history shows the field's change as Restricted", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.audit.log.list"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      view |> element("#company-record-history-toggle") |> render_click()
+
+      assert has_element?(view, "#company-record-history-panel", "email")
+      assert has_element?(view, "#company-record-history-panel [data-restricted]", "Restricted")
+      refute render(view) =~ "hq@bilimbi.test"
+    end
+
+    test "the companies list does not search the restricted email", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=hq%40bilimbi")
+      refute has_element?(view, "#companies-73")
+
+      assert has_element?(
+               view,
+               "#companies-search[placeholder='Search by name, code, legal name, or jurisdiction...']"
+             )
+    end
   end
 end

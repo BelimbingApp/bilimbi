@@ -43,6 +43,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     the decision, so one dialog both collects it and, for the irreversible
     archive, confirms it with the same consequence-first shape.
 
+  A fact an operator restricted to roles the viewer lacks (Administration >
+  Authorization > Field Access) reads `<.restricted>` with no editor, the
+  jurisdiction and website facts included, and `Company.update_company/3`
+  refuses a forged write to it whatever value it carries.
+
   Each fact reports its own outcome through the shared commit status that
   `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
   flight, "Saved" once stored, and an alert on the fact naming the rejected
@@ -74,6 +79,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
@@ -363,10 +369,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     else
       _ -> %{}
     end
-  end
-
-  defp company_auditable_types do
-    ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", Company.addressable_identity()]
   end
 
   defp not_found(socket) do
@@ -988,7 +990,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 current_scope={@current_scope}
                 opts={
                   %{
-                    auditable_types: company_auditable_types(),
+                    auditable_types: Company.auditable_types(),
                     auditable_id: @company.id,
                     record: @company
                   }
@@ -1112,7 +1114,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               />
             </:item>
             <:item title={fact_label("jurisdiction")} id="detail-jurisdiction">
+              <.restricted
+                :if={Restricted.restricted?(@company.jurisdiction)}
+                id="company-jurisdiction-restricted"
+                roles={@company.jurisdiction.roles}
+              />
               <.choice_fact
+                :if={not Restricted.restricted?(@company.jurisdiction)}
                 id="company-jurisdiction"
                 name="jurisdiction"
                 value={@company.jurisdiction}
@@ -1135,14 +1143,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             </:item>
             <:item title={fact_label("website")} id="detail-website">
               <.text_fact
-                :if={@can_update?}
+                :if={@can_update? or Restricted.restricted?(@company.website)}
                 name="website"
                 company={@company}
                 can_update?={@can_update?}
                 field_status={@field_status}
               />
               <a
-                :if={not @can_update? and @company.website}
+                :if={
+                  not @can_update? and not Restricted.restricted?(@company.website) and
+                    @company.website
+                }
                 href={@company.website}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1150,7 +1161,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               >
                 {@company.website}
               </a>
-              <span :if={not @can_update? and !@company.website} class="text-ink-muted">—</span>
+              <span
+                :if={
+                  not @can_update? and not Restricted.restricted?(@company.website) and
+                    !@company.website
+                }
+                class="text-ink-muted"
+              >
+                —
+              </span>
             </:item>
             <:item title={fact_label("parent_id")} id="detail-parent">
               <.choice_fact
@@ -1338,7 +1357,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               </span>
             </:col>
             <:col :let={child} label="Jurisdiction">
-              <span class="text-sm text-ink-subtle">
+              <.restricted
+                :if={Restricted.restricted?(child.jurisdiction)}
+                id={"child-#{child.id}-jurisdiction-restricted"}
+                roles={child.jurisdiction.roles}
+              />
+              <span
+                :if={not Restricted.restricted?(child.jurisdiction)}
+                class="text-sm text-ink-subtle"
+              >
                 {child.jurisdiction || "—"}
               </span>
             </:col>
@@ -1635,9 +1662,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       |> assign(:dom_id, "company-#{String.replace(assigns.name, "_", "-")}")
       |> assign(:allow_empty, assigns.name in @nullable_inline_facts)
 
+    assigns = assign(assigns, :restricted?, Restricted.restricted?(assigns.value))
+
     ~H"""
+    <%!-- A fact an operator restricted to roles the viewer lacks
+         (`Bilimbi.Core.Company.Summary.for_scope/2`) is the marker and nothing
+         else, whether or not the viewer may update: an editor cannot show what
+         it would replace, and `update_company/3` refuses the change anyway. --%>
+    <.restricted
+      :if={@restricted?}
+      id={"#{@dom_id}-restricted"}
+      roles={@value.roles}
+      class={@class}
+    />
+    <.commit_status :if={@restricted?} id={"#{@dom_id}-status"} status={@field_status[@name]} />
     <.inline_edit
-      :if={@can_update?}
+      :if={@can_update? and not @restricted?}
       id={@dom_id}
       name={@name}
       label={@label}
@@ -1648,7 +1688,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       status={@field_status[@name]}
       class={@class}
     />
-    <span :if={not @can_update?} class={[@class, is_nil(@value) && "text-ink-muted"]}>
+    <span
+      :if={not @can_update? and not @restricted?}
+      class={[@class, is_nil(@value) && "text-ink-muted"]}
+    >
       {@value || "—"}
     </span>
     """

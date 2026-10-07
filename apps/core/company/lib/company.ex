@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Company do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
@@ -46,6 +47,34 @@ defmodule Bilimbi.Core.Company do
   @type lifecycle_error :: Lifecycle.error()
   @manage_across_tenant_capability "admin.company.tenant-wide.manage"
 
+  @doc """
+  The company fields the scope's actor may not see, as
+  `%{summary key => Bilimbi.Base.Authz.Restricted}`.
+
+  An operator restricts a field of the `companies` catalog table to roles
+  (`Bilimbi.Base.Authz.put_field_restriction/4`); everyone else reads it as
+  the same marker in every summary this module returns, may not set it on
+  create or update, does not search it, and does not see it as a grid column.
+  The create forms use the keys to show those fields as read-only rows and
+  the markers to name the roles that see them. One evaluation answers both.
+  """
+  @spec restricted_field_markers(Scope.t()) :: %{atom() => Restricted.t()}
+  def restricted_field_markers(%Scope{} = scope) do
+    blank = %Summary{id: 0, tenant_id: 0, name: "", code: "", status: ""}
+
+    for {key, %Restricted{} = marker} <-
+          scope |> Authz.redact(Summary.table_id(), blank) |> Map.from_struct(),
+        into: %{},
+        do: {key, marker}
+  end
+
+  @doc """
+  The columns the administration search matches for this scope's actor, in
+  match order. A restricted column the actor may not see is not matched.
+  """
+  @spec searchable_columns(Scope.t()) :: [atom()]
+  def searchable_columns(%Scope{} = scope), do: AdministrationIndex.searchable_columns(scope)
+
   @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
   def get_company(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
     query =
@@ -55,7 +84,7 @@ defmodule Bilimbi.Core.Company do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      company -> {:ok, Summary.from_schema(company)}
+      company -> {:ok, Summary.for_scope(company, scope)}
     end
   end
 
@@ -121,7 +150,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Enum.map(&Summary.from_schema/1)
+      |> Summary.for_scope(scope)
 
     {:ok, companies}
   end
@@ -155,7 +184,7 @@ defmodule Bilimbi.Core.Company do
         {:ok, %{total: 0, active: 0, company: nil}}
 
       {company, total, active} ->
-        {:ok, %{total: total, active: active, company: Summary.from_schema(company)}}
+        {:ok, %{total: total, active: active, company: Summary.for_scope(company, scope)}}
     end
   end
 
@@ -229,7 +258,9 @@ defmodule Bilimbi.Core.Company do
 
   Missing, deleted, and cross-tenant companies are indistinguishable. A
   sibling company additionally requires the explicit tenant-wide reach
-  capability.
+  capability. The answer is the authorized company's summary, as the reader
+  may see it, so a page that authorizes a target can also name it; a caller
+  that needs only existence uses `require_live_company/2`.
   """
   @spec authorize_company_target(Actor.t() | Scope.t(), term(), String.t()) ::
           {:ok, Summary.t()} | {:error, :not_found | :unauthorized}
@@ -342,6 +373,53 @@ defmodule Bilimbi.Core.Company do
   def live_company?(%Scope{}, _company_id), do: false
 
   @doc """
+  Confirms one company is live in this tenant, returning its id.
+
+  For a caller that only needs the company to exist before it acts on
+  something attached to it. It runs the one tenant-scoped existence query of
+  `live_company?/2` and builds no summary. A caller that shows the company to
+  a reader uses `get_company/2`.
+  """
+  @spec require_live_company(Scope.t(), term()) :: {:ok, pos_integer()} | {:error, :not_found}
+  def require_live_company(%Scope{} = scope, company_id) do
+    if live_company?(scope, company_id), do: {:ok, company_id}, else: {:error, :not_found}
+  end
+
+  @doc """
+  The identity of one live company in this tenant: its id, its code and the
+  name a header or workspace strip shows (the legal name when there is one,
+  otherwise the name, as `Summary.display_name/1` reads it).
+
+  One tenant-scoped query selecting those columns. A caller that needs any
+  other fact of the company uses `get_company/2`.
+  """
+  @spec identity(Scope.t(), term()) ::
+          {:ok, %{id: pos_integer(), code: String.t(), display_name: String.t()}}
+          | {:error, :not_found}
+  def identity(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
+    query =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id == ^company_id and is_nil(company.deleted_at),
+        select: %{
+          id: company.id,
+          code: company.code,
+          legal_name: company.legal_name,
+          name: company.name
+        }
+      )
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :not_found}
+
+      row ->
+        {:ok, %{id: row.id, code: row.code, display_name: Summary.display_name(row)}}
+    end
+  end
+
+  def identity(%Scope{}, _company_id), do: {:error, :not_found}
+
+  @doc """
   Names of the given live companies in this tenant.
 
   Missing, soft-deleted, and other-tenant ids are omitted. The value is
@@ -405,12 +483,25 @@ defmodule Bilimbi.Core.Company do
   @spec addressable_identity() :: String.t()
   def addressable_identity, do: "App\\Core\\Company\\Models\\Company"
 
+  @doc """
+  Every `auditable_type` a company's audit rows are recorded under.
+
+  Capture records the schema's module name; the others are the name a row
+  adopted from Belimbing carries. The record history reads all of them, and
+  `Bilimbi.Core.Company.GridTables` declares them as the `companies` table's
+  `record_types`, so a field access restriction reaches the audit views.
+  """
+  @spec auditable_types() :: [String.t()]
+  def auditable_types do
+    ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", addressable_identity()]
+  end
+
   @doc "Whether a department belongs to the requested tenant-owned company."
   @spec department_belongs_to_company?(Scope.t(), pos_integer(), pos_integer()) :: boolean()
   def department_belongs_to_company?(%Scope{} = scope, company_id, department_id)
       when is_integer(department_id) and department_id > 0 do
-    case get_company(scope, company_id) do
-      {:ok, _company} ->
+    case require_live_company(scope, company_id) do
+      {:ok, _company_id} ->
         Repo.exists?(
           from(department in Department,
             where: department.id == ^department_id and department.company_id == ^company_id
@@ -450,20 +541,23 @@ defmodule Bilimbi.Core.Company do
     is_primary? = Keyword.get(opts, :is_primary, false)
 
     Repo.transaction(fn ->
-      changeset = Schema.creation_changeset(tenant_id, attributes)
+      changeset =
+        tenant_id
+        |> Schema.creation_changeset(attributes)
+        |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
 
       case Repo.insert(changeset) do
         {:ok, company} ->
           if is_primary? do
             case assign_primary_company(scope, company.id) do
               {:ok, _status} ->
-                Summary.from_schema(company)
+                Summary.for_scope(company, scope)
 
               {:error, reason} ->
                 Repo.rollback(reason)
             end
           else
-            Summary.from_schema(company)
+            Summary.for_scope(company, scope)
           end
 
         {:error, changeset} ->
@@ -475,6 +569,11 @@ defmodule Bilimbi.Core.Company do
 
   @doc """
   Updates a live Company record scoped to the caller's tenant.
+
+  A field an operator restricted to roles the scope's actor lacks
+  (`restricted_field_markers/1`) is not theirs to set: attributes that name one are
+  refused with an error on that field, whatever value they carry, and
+  nothing is written.
 
   `status` is not an attribute this path writes. A status change is one of
   the lifecycle operations below (`archive_company/3`, `suspend_company/3`,
@@ -498,9 +597,10 @@ defmodule Bilimbi.Core.Company do
       company ->
         company
         |> Schema.update_changeset(attributes)
+        |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
         |> Repo.update()
         |> case do
-          {:ok, updated} -> {:ok, Summary.from_schema(updated)}
+          {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}
           {:error, changeset} -> {:error, changeset}
         end
     end
@@ -587,7 +687,7 @@ defmodule Bilimbi.Core.Company do
         order_by: company.id
       )
       |> Repo.all()
-      |> Enum.map(&Summary.from_schema/1)
+      |> Summary.for_scope(scope)
 
     {:ok, companies}
   end

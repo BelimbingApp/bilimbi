@@ -12,6 +12,10 @@ defmodule Bilimbi.Base.Audit.Web.MutationDetails do
   follows the open state. Opening moves focus into the diff. A second
   activation closes it. Click-away is not a close: a reader selecting text
   in the diff must not lose it.
+
+  A field the owning module withholds from this reader
+  (`Bilimbi.Base.Audit.Web.MutationDiff`) is a row with `<.restricted>` and no
+  values; `Bilimbi.Base.Audit` already took them out of the mutation.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -74,11 +78,15 @@ defmodule Bilimbi.Base.Audit.Web.MutationDetails do
           class="flex items-baseline gap-2 font-mono text-xs"
         >
           <span class="min-w-[100px] font-semibold text-ink-muted">{diff.field}:</span>
+          <.restricted :if={diff.withheld} id={"mutation-#{@mutation.id}-#{diff.field}-restricted"} />
           <code :if={diff.sensitive} class="text-ink-muted italic">
             <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-old"} value={diff.old} /> →
             <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-new"} value={diff.new} />
           </code>
-          <div :if={!diff.sensitive} class="flex items-baseline gap-1.5 flex-wrap">
+          <div
+            :if={not diff.sensitive and not diff.withheld}
+            class="flex items-baseline gap-1.5 flex-wrap"
+          >
             <code class="text-status-danger">
               <.diff_value id={"mutation-#{@mutation.id}-#{diff.field}-old"} value={diff.old} />
             </code>

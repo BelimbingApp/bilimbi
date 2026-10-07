@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.User do
   (`app/Core/User/Livewire/Users/Index.php:110-111`) left-joins `companies` and
   filters `companies.tenant_id`, so a user with no company is invisible to
   every tenant-scoped read. Single-company reads go through
-  `Company.get_company/2`; the tenant-wide list goes through
+  `Company.require_live_company/2`; the tenant-wide list goes through
   `Company.list_tenant_company_ids/1` so this module never queries `companies`.
 
   Soft-deleted companies: Belimbing's raw join still returns those users.
@@ -111,7 +111,7 @@ defmodule Bilimbi.Core.User do
   @spec list_company_users(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_company_users(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       users =
         from(user in Schema,
           where: user.company_id == ^company_id,
@@ -207,7 +207,7 @@ defmodule Bilimbi.Core.User do
   @spec get_user(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error()}
   def get_user(%Scope{} = scope, company_id, user_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, Summary.from_schema(user)}
     else
@@ -288,7 +288,7 @@ defmodule Bilimbi.Core.User do
   @spec register_user(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
   def register_user(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       company_id
       |> Schema.creation_changeset(attributes)
       |> validate_employee(scope, company_id)
@@ -432,7 +432,7 @@ defmodule Bilimbi.Core.User do
           | {:error, :company_not_found | :invalid_or_expired_token | Changeset.t()}
   def verify_email(%Scope{} = scope, company_id, token, secret, opts \\ []) do
     with {:ok, {user_id, email}} <- EmailVerification.verify(token, secret, opts),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id),
          true <- Plug.Crypto.secure_compare(user.email, email) do
       if user.email_verified_at do
@@ -603,7 +603,7 @@ defmodule Bilimbi.Core.User do
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def update_user(%Scope{} = scope, company_id, user_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       user
       |> Schema.update_changeset(attributes)
@@ -682,7 +682,7 @@ defmodule Bilimbi.Core.User do
           :ok | {:error, lookup_error() | :forbidden}
   def delete_user(%Scope{} = scope, company_id, user_id) do
     with :ok <- authorize_delete(scope),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, _} = Repo.delete(user)
       :ok
@@ -915,7 +915,7 @@ defmodule Bilimbi.Core.User do
   def notifiable_identity, do: "App\\Core\\User\\Models\\User"
 
   defp scoped_user(scope, company_id, user_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, user}
     else

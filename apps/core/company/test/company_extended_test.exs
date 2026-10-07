@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.Company.ExtendedTest do
 
   setup do
     create_company_identity_tables!()
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
     create_departments_table!()
     create_legal_entity_types_table!()
     create_external_access_tables!()

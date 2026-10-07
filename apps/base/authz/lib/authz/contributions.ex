@@ -52,7 +52,8 @@ defmodule Bilimbi.Base.Authz.Contributions do
     "admin.authz.decision-log.list",
     "admin.authz.system-principal.list",
     "admin.authz.system-principal.grant",
-    "admin.authz.system-principal.revoke"
+    "admin.authz.system-principal.revoke",
+    "admin.authz.field.manage"
   ]
 
   @impl true
@@ -114,6 +115,15 @@ defmodule Bilimbi.Base.Authz.Contributions do
           route: "/authz/decision-logs",
           capability: "admin.authz.decision-log.list",
           order: 50
+        },
+        %{
+          id: "admin.authz.field-access",
+          label: "Field Access",
+          icon: "lock-closed",
+          parent: "admin.authz",
+          route: "/authz/field-access",
+          capability: "admin.authz.field.manage",
+          order: 60
         }
       ],
       settings: %{
@@ -144,7 +154,10 @@ defmodule Bilimbi.Base.Authz.Contributions do
           "tenant_owner" => %{
             name: "Tenant Owner",
             description:
-              "Full control within a single tenant: commerce, AI, messaging, company, employees, and addresses. No platform administration."
+              "Full control within a single tenant: commerce, AI, messaging, company, employees, and addresses. No platform administration.",
+            # Which fields a tenant's roles may see is the operator's call,
+            # not a developer's: the owner role manages field access.
+            capabilities: ["admin.authz.field.manage"]
           },
           "auditor" => %{
             name: "Auditor",

@@ -15,6 +15,51 @@ defmodule Bilimbi.Base.Grid.ContributionValidatorTest do
     %{tables: [Map.merge(orders, overrides) |> Map.put(:links, [])]}
   end
 
+  test "a field's protected flag must be a boolean" do
+    assert_raise ArgumentError, ~r/field amount protected must be a boolean/, fn ->
+      validate(orders_only(%{fields: mark_field("amount", protected: "yes")}))
+    end
+
+    %{tables: %{"orders" => orders}} =
+      validate(orders_only(%{fields: mark_field("amount", protected: true)}))
+
+    assert orders.fields["amount"].protected
+    refute orders.fields["label"].protected
+  end
+
+  test "record types are distinct strings claimed by one table" do
+    assert_raise ArgumentError,
+                 ~r/table orders record_types must be distinct non-empty strings/,
+                 fn ->
+                   validate(orders_only(%{record_types: ["Test.Order", "Test.Order"]}))
+                 end
+
+    %{tables: %{"orders" => orders}} = validate(orders_only(%{record_types: ["Test.Order"]}))
+    assert orders.record_types == ["Test.Order"]
+
+    %{tables: [orders, customers | rest]} = TestSources.tables()
+
+    assert_raise ArgumentError,
+                 ~r/record types must belong to one table: Test.Order claimed by/,
+                 fn ->
+                   validate(%{
+                     tables: [
+                       Map.put(orders, :record_types, ["Test.Order"]),
+                       Map.put(customers, :record_types, ["Test.Order"]) | rest
+                     ]
+                   })
+                 end
+  end
+
+  defp mark_field(field_id, attrs) do
+    [orders | _rest] = TestSources.tables().tables
+
+    Enum.map(orders.fields, fn
+      %{id: ^field_id} = field -> Map.merge(field, Map.new(attrs))
+      field -> field
+    end)
+  end
+
   test "an empty contribution set is an empty catalog" do
     assert ContributionValidator.validate_contributions!([]) == %{tables: %{}}
   end

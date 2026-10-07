@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Grid.CatalogTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.Grid
   alias Bilimbi.Base.Grid.Catalog
@@ -10,6 +11,7 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
 
   setup do
     AuthzFixtures.create_authz_tables!()
+    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
     TestFixtures.install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)
     :ok
@@ -64,6 +66,34 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
 
   test "a system scope names nobody and reads nothing" do
     assert Grid.catalog(TestFixtures.system_scope(1)).tables == %{}
+  end
+
+  test "a field an operator restricted is in the catalog only for an account holding one of its roles" do
+    # The restriction is tenant 1's, on orders.amount, for the Finance role.
+    operator = TestFixtures.user_scope(~w(admin.authz.field.manage admin.test.order.view))
+    {:ok, finance} = Authz.create_role(operator, 10, %{name: "Finance", code: "finance"})
+    {:ok, _} = Authz.put_field_restriction(operator, "orders", "amount", [finance.id])
+
+    without = Grid.catalog(operator)
+    {:ok, orders} = Grid.fetch_table(without, "orders")
+    refute Map.has_key?(orders.fields, "amount")
+    assert orders.field_order == ~w(id label status placed_at customer_id)
+
+    assert {:error, {"amount", {:unknown_segment, "amount", "orders"}}} =
+             Grid.resolve(without, orders, ["amount"])
+
+    refute Enum.any?(Catalog.suggest(without, orders, "amount"), &(&1.spec == "amount"))
+
+    {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 7, finance.id)
+    holder = Grid.catalog(operator)
+    {:ok, orders} = Grid.fetch_table(holder, "orders")
+    assert orders.field_order == ~w(id label amount status placed_at customer_id)
+    assert {:ok, [_amount]} = Grid.resolve(holder, orders, ["amount"])
+
+    # Another tenant's catalog is untouched by tenant 1's restriction.
+    other = Grid.catalog(TestFixtures.other_tenant_scope(~w(admin.test.order.view)))
+    {:ok, orders} = Grid.fetch_table(other, "orders")
+    assert Map.has_key?(orders.fields, "amount")
   end
 
   test "a path through an unreadable table is refused even when the root is readable" do

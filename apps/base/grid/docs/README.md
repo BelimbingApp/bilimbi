@@ -28,6 +28,17 @@ and keeps the tables whose capability the actor holds. Every later call
 takes that catalog, so there is no spelling of a path that reaches a table
 the account may not read.
 
+An operator may restrict a field of the catalog to roles at runtime
+(Administration › Authorization › Field Access, `Bilimbi.Base.Authz`), and
+the catalog leaves such a field out for an account that holds none of them,
+so the column the record page withholds cannot be added, suggested, rolled
+up or kept in a view here either. A table's key, label and time fields,
+hidden fields and the fields a link joins on are never offered for
+restriction, and a module marks a field its own logic needs `protected:
+true`. A table declares `record_types`, the `auditable_type` values its
+rows are recorded under, so a restriction reaches the audit views of those
+rows; a type belongs to one table.
+
 A source's query is built only for a real scope, never at boot: the
 snapshot validates declarations without calling `query/1`, and the catalog
 learns which key of the query each field is read from the first time a

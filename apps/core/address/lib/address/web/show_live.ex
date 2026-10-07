@@ -830,7 +830,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
              owners,
              &(&1.owner_type == :company and &1.owner_id == company_id)
            ),
-         {:ok, _company} <- Bilimbi.Core.Company.get_company(scope, company_id) do
+         {:ok, _company} <- Bilimbi.Core.Company.require_live_company(scope, company_id) do
       company_id
     else
       _ -> nil

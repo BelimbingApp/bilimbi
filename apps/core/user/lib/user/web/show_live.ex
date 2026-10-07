@@ -1666,7 +1666,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # dialog opens or a second write (creating an employee to link) lands.
   defp archived_company?(socket) do
     scope = socket.assigns.current_scope.scope
-    match?({:error, :not_found}, Company.get_company(scope, socket.assigns.user.company_id))
+
+    match?(
+      {:error, :not_found},
+      Company.require_live_company(scope, socket.assigns.user.company_id)
+    )
   end
 
   @impl true

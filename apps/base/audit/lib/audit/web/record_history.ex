@@ -41,6 +41,17 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   Values inside a diff render through `Bilimbi.Base.Audit.Web.MutationDiff`,
   so a stored timestamp shows in the page's chosen clock, the same as the
   entry's own time beside the badge.
+
+  ## Fields the reader may not see
+
+  A change to a field the record's owner withholds from this reader is
+  listed, so the reader knows the record changed, but its values render
+  `<.restricted>`: the trail is the same record the page shows, and a value
+  the page withholds is not disclosed by its history. `Bilimbi.Base.Audit`
+  takes those values out of the entries it returns, from the owner's field
+  policy, so this panel and the mutations table agree without being told.
+  Capture-time redaction (`sensitive`) is a different thing and stays
+  "redacted".
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -163,9 +174,14 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
               >
                 <span class="truncate font-semibold text-ink-muted">{diff.field}</span>
                 <span class="min-w-0 truncate text-ink">
+                  <.restricted
+                    :if={diff.withheld}
+                    id={"#{@id}-entry-#{entry.id}-#{diff.field}-restricted"}
+                  />
                   <%= if diff.sensitive do %>
                     redacted
-                  <% else %>
+                  <% end %>
+                  <%= if not diff.sensitive and not diff.withheld do %>
                     <.diff_value
                       id={"#{@id}-entry-#{entry.id}-#{diff.field}-old"}
                       value={diff.old}

@@ -14,6 +14,139 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   alias Phoenix.LiveView.JS
 
   @doc """
+  Renders a field the viewer may not see.
+
+  Field-level authorization withholds one value from someone who may open
+  the rest of the record (`Bilimbi.Base.Authz.redact/3` puts a
+  `Bilimbi.Base.Authz.Restricted` marker in the field's place). This is how
+  that marker reads: the word "Restricted" with the registry's `restricted`
+  lock, and the reason in its tooltip and accessible description, so a field
+  that is withheld and a field that is empty never look alike. An empty
+  field reads "—"; this reads as a value the person is not shown. It carries
+  no editor and no copy button, and a page never renders an in-place control
+  around it: an editor cannot show what it would replace. In a create or
+  edit form the same field is `<.restricted_field>`, a read-only row, never
+  an omitted input.
+
+  The tooltip tells the person what to do: "You don't have access to this.
+  Ask your administrator." Pass `roles`, the names of the roles that see the
+  field (`roles` of the `Bilimbi.Base.Authz.Restricted` marker), and the
+  sentence names them: "... for the Finance role." or "... for one of the
+  roles Audit, Finance." `reason` replaces the whole sentence when a page has
+  a better one.
+
+  ## Examples
+
+      <.restricted id="detail-email-restricted" roles={@company.email.roles} />
+      <.restricted id="salary-restricted" reason="Salaries are shown to payroll only." />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:roles, :list,
+    default: [],
+    doc: "the names of the roles that see the field, as the marker carries them"
+  )
+
+  attr(:reason, :string,
+    default: nil,
+    doc: "a page's own sentence for why the value is withheld; replaces the default tooltip"
+  )
+
+  attr(:class, :any, default: nil)
+
+  def restricted(assigns) do
+    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason(assigns.roles))
+
+    ~H"""
+    <span
+      id={@id}
+      data-restricted
+      title={@tooltip}
+      aria-description={@tooltip}
+      class={["inline-flex items-center gap-1 text-ink-muted", @class]}
+    >
+      <.icon name="restricted" class="size-4" />
+      <span>{gettext("Restricted")}</span>
+    </span>
+    """
+  end
+
+  @doc """
+  The sentence a restricted field explains itself with: what happened and
+  what to do, naming the roles that see the field when there are any.
+  """
+  @spec restricted_reason([String.t()]) :: String.t()
+  def restricted_reason([]),
+    do: gettext("You don't have access to this. Ask your administrator.")
+
+  def restricted_reason([_ | _] = roles) do
+    ngettext(
+      "You don't have access to this. Ask your administrator for the %{role} role.",
+      "You don't have access to this. Ask your administrator for one of the roles %{roles}.",
+      length(roles),
+      role: hd(roles),
+      roles: Enum.join(roles, ", ")
+    )
+  end
+
+  @doc """
+  A form row for a field the person may not see.
+
+  A create or edit form never omits a restricted field, and never renders an
+  input for it: an omitted field reads as "this form has no such field", and
+  an input would offer a write the module refuses. Instead the row keeps its
+  label and shows a greyed, read-only value cell carrying `<.restricted>`,
+  with the same tooltip, so the form reads the same as the record page. It
+  renders no `<input>` and no `name`, so nothing is submitted for the field;
+  the owning module still refuses a value a forged submit sends
+  (`Bilimbi.Base.Authz.refuse_restricted_attempts/4`).
+
+  ## Examples
+
+      <.restricted_field id="company-email" label="Email" roles={["Tenant Owner"]} />
+  """
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+
+  attr(:roles, :list,
+    default: [],
+    doc: "the names of the roles that see the field, as the marker carries them"
+  )
+
+  attr(:reason, :string,
+    default: nil,
+    doc: "a page's own sentence, replacing the default tooltip"
+  )
+
+  attr(:wrapper_class, :any, default: nil)
+
+  def restricted_field(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :tooltip,
+        assigns.reason || restricted_reason(assigns.roles)
+      )
+
+    ~H"""
+    <div id={@id} class={@wrapper_class || "mb-4"} data-restricted-field>
+      <span id={"#{@id}-label"} class="mb-1.5 block text-sm font-medium text-ink">{@label}</span>
+      <div
+        id={"#{@id}-value"}
+        role="group"
+        aria-labelledby={"#{@id}-label"}
+        aria-readonly="true"
+        aria-description={@tooltip}
+        title={@tooltip}
+        class="flex min-h-10 w-full items-center rounded-lg border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted"
+      >
+        <.restricted id={"#{@id}-restricted"} roles={@roles} reason={@reason} />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a masked secret field with a reveal control by default.
 
   `subject` is the noun used by the control's accessible name. For a stored

@@ -31,9 +31,11 @@ Put `phx-change` on the `<form>`, and `phx-submit` aimed at the same handler. A 
 
 Flash `:success` only for a completed write. `:info` informs and confirms nothing. When one call can do either, take the kind from that outcome: a Countries update that did not update was rendered as a green success because the kind was fixed in advance. A refusal names its real cause. The Settings page blamed the modules when the reason was a permission. Kinds and timing live in `DESIGN.md` "Honest feedback" and in the docs on `flash_group/1` and `panel_notice/1`.
 
-## Withheld controls
+## Withheld controls and fields
 
 If a button or editor is absent, the page says why and what to do next, through `empty_state/1` (`title`, `reason`, or `forbidden`) or `<.table>`'s `<:empty>` slot. The Roles picker, a settings group, and an archived-company account each hid a control until the page said why. The component only speaks when it is used: a caller can still hide a control with `:if` and no `empty_state`, and nothing yet stops that.
+
+A field some readers of a record may not see is restricted by the operator at runtime (Administration › Authorization › Field Access), never by a capability in code: a module makes its read model restrictable by building every summary through `Bilimbi.Base.Authz.redact/3` with its grid table id, refusing a write that names a restricted field through `Authz.refuse_restricted_attempts/4`, declaring the table's `record_types` (so the audit views follow) and `protected: true` on the fields its own logic needs, and rendering the `Bilimbi.Base.Authz.Restricted` marker with `<.restricted>` (passing `roles={marker.roles}` so the tooltip names the roles) and no editor, or `<.restricted_field>` in a create or edit form. Do not branch a template on a capability to hide one value, blank it, or drop it from the struct: the value then still leaves the module through every other caller, and the reader cannot tell "restricted" from "empty". Core Company is the example (`Bilimbi.Core.Company.Summary.for_scope/2`); `apps/base/authz/docs/README.md` "Field-level authorization" is the contract. Do not list field names in the audit module, and do not read the grants once and keep them: every check reads afresh.
 
 ## Clocks
 

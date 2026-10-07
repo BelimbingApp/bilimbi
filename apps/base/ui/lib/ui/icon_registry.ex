@@ -106,6 +106,7 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "view" => "hero-eye",
     "reveal" => "hero-eye",
     "conceal" => "hero-eye-slash",
+    "restricted" => "hero-lock-closed",
     "filter" => "hero-funnel",
     "search" => "hero-magnifying-glass",
     "sort" => "hero-chevron-up-down",

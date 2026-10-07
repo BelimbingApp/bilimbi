@@ -103,6 +103,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
       with {:ok, tenant} <- Tenancy.create_tenant(tenant_attributes),
            {:ok, company} <- insert_company(tenant.id, company_attributes),
            {:ok, _assignment} <- insert_assignment(tenant.id, company.id) do
+        # A new tenant has no restrictions yet, and provisioning has no reader.
         %{tenant: tenant, company: Summary.from_schema(company)}
       else
         {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)

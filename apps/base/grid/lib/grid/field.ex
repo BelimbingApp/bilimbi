@@ -7,10 +7,16 @@ defmodule Bilimbi.Base.Grid.Field do
   (`Bilimbi.Base.Grid.ContributionValidator`); until then it is `nil`. `hidden` fields exist for links to join on and never
   appear as columns or suggestions. `values` names the closed set an `:enum`
   field takes, which the band lens colours categorically.
+
+  `protected` marks a field an operator may never restrict
+  (`Bilimbi.Base.Authz.field_restriction_catalog/0`): one the owning
+  module's own logic needs every reader to see, such as a company's code.
+  A table's key, label and time fields, hidden fields and the fields a link
+  joins on are protected without saying so.
   """
 
   @types [:integer, :float, :decimal, :string, :boolean, :date, :datetime, :enum]
-  @keys [:id, :label, :type, :column, :hidden, :values]
+  @keys [:id, :label, :type, :column, :hidden, :values, :protected]
   @id_pattern ~r/^[a-z][a-z0-9_]*$/
 
   @enforce_keys [:id, :label, :type, :column]
@@ -19,7 +25,8 @@ defmodule Bilimbi.Base.Grid.Field do
             type: nil,
             column: nil,
             hidden: false,
-            values: nil
+            values: nil,
+            protected: false
 
   @type type :: :integer | :float | :decimal | :string | :boolean | :date | :datetime | :enum
 
@@ -29,7 +36,8 @@ defmodule Bilimbi.Base.Grid.Field do
           type: type(),
           column: atom(),
           hidden: boolean(),
-          values: [String.t()] | nil
+          values: [String.t()] | nil,
+          protected: boolean()
         }
 
   @doc "The field types a contribution may declare."
@@ -83,13 +91,20 @@ defmodule Bilimbi.Base.Grid.Field do
       invalid!(owner, attrs, "field #{id} column must be an atom")
     end
 
+    protected = Map.get(attrs, :protected, false)
+
+    unless is_boolean(protected) do
+      invalid!(owner, attrs, "field #{id} protected must be a boolean")
+    end
+
     %__MODULE__{
       id: id,
       label: Map.get(attrs, :label, humanize(id)),
       type: type,
       column: column,
       hidden: Map.get(attrs, :hidden, false) == true,
-      values: values
+      values: values,
+      protected: protected
     }
   end
 

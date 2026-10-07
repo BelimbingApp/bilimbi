@@ -17,13 +17,13 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
     case Integer.parse(id) do
       {company_id, ""} ->
-        case Company.get_company(scope, company_id) do
+        case Company.identity(scope, company_id) do
           {:ok, company} ->
             {:ok, relationships} = Company.list_relationships(scope, company_id)
 
             {:ok,
              socket
-             |> assign(:page_title, "#{Company.Summary.display_name(company)} — Relationships")
+             |> assign(:page_title, "#{company.display_name} — Relationships")
              |> assign(:active_nav, "admin.company")
              |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
@@ -341,7 +341,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page variant={:detail}>
         <.header>
-          {Company.Summary.display_name(@company)} — Relationships
+          {@company.display_name} — Relationships
           <:subtitle>
             <code class="text-xs font-medium">{@company.code}</code>
           </:subtitle>
@@ -349,7 +349,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             <.back_link
               id="relationships-back"
               navigate={~p"/companies/#{@company.id}"}
-              title={"Back to #{Company.Summary.display_name(@company)}"}
+              title={"Back to #{@company.display_name}"}
             />
           </:actions>
         </.header>
@@ -448,7 +448,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
           <:description>
             {if @modal_action == :new,
               do:
-                "Establish a corporate relationship between #{Company.Summary.display_name(@company)} and another company.",
+                "Establish a corporate relationship between #{@company.display_name} and another company.",
               else:
                 "Update effective date range for relationship with #{@editing_rel.other_company.name}."}
           </:description>

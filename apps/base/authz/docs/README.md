@@ -30,11 +30,77 @@ for screens whose entire data set or workflow is platform-wide. Do not infer
 platform authority from a key prefix or rely on each adapter to add its own
 tenant check.
 
-Base owns the six `base_authz_*` tables: the five compatible ones and the
-Bilimbi-only `base_authz_system_principal_capabilities`. `base_authz_roles.company_id` remains
+Base owns the eight `base_authz_*` tables: the five compatible ones, pinned
+in its schema contract, and the Bilimbi-only
+`base_authz_system_principal_capabilities`, `base_authz_field_restrictions`
+and `base_authz_field_restriction_roles`, which adoption of a Belimbing
+database leaves to the pending Bilimbi-only migrations. `base_authz_roles.company_id` remains
 a bare nullable column in the Base migration. Core Company contributes the
 named restricted foreign key and exact system/custom ownership check in its
 own later migration, so Base never depends upward on Core.
+
+## Field-level authorization
+
+Page-level authorization says whether a record may be opened. Field access
+says, field by field, which of its values a reader may see, and it is the
+operator's prerogative, not a developer's: an operator holding
+`admin.authz.field.manage` (the configured `tenant_owner` and `core_admin`
+roles) restricts a field at Administration › Authorization › Field Access
+by picking a table and a field from the installed catalog and the roles that
+still see it. The vocabulary is `Bilimbi.Base.Grid`'s catalog of tables and
+fields; Base Authz reads that snapshot as data and depends on no Grid
+module. The picker never offers a field every reader needs: a table's key,
+label and time fields, hidden fields, fields a link joins on, and fields the
+owning module marked `protected: true` (`Bilimbi.Base.Grid.Field`).
+
+A restriction is tenant-scoped runtime data in the Bilimbi-only
+`base_authz_field_restrictions` and `base_authz_field_restriction_roles`
+tables (`Authz.put_field_restriction/4`, `remove_field_restriction/2`,
+`list_field_restrictions/1`). Each write commits with a retained
+`authz.field_restriction.set` or `.removed` audit action naming who
+restricted what to which roles, and the rows are audited like every write.
+
+For a reader, `Authz.restricted_fields/1` answers `%{table => %{field =>
+[role names]}}` from the roles assigned to the scope's actor in the company
+they signed in at: one query for the tenant's restrictions and, only when
+there are any, one for the actor's roles. Nothing is kept between calls, so a
+revoked role or a lifted restriction takes effect on the next check, on any
+node and inside an open LiveView, and no decision-log row is written. A
+system scope, named or not, holds no roles and is withheld every restricted
+field. The owning module builds its read model through `Authz.redact/3`,
+which replaces each restricted field with a `Bilimbi.Base.Authz.Restricted`
+marker carrying the roles that see it. The marker is explicit on purpose: an
+absent field reads as "none", a blank one as "empty", and this one as "there
+is a value you may not see". It renders through `<.restricted>` (Base UI):
+the word "Restricted", a lock, and a tooltip that tells the person what to do
+and names the roles to ask for. It offers no editor, and a create or edit
+form shows the field as `<.restricted_field>`, a read-only row, never an
+omitted input. Interpolated anywhere else it still reads "Restricted", never
+the value, and it is not a string, so code that would compare or store it
+raises.
+
+A write that names a restricted field is refused by the owner through
+`Authz.refuse_restricted_attempts/4`, with an error on that field whatever
+value it carries, the stored one included, so a refusal cannot confirm a
+guess. The grid catalog (`Bilimbi.Base.Grid.Catalog.for_scope/1`) leaves a
+restricted field out for that reader, so the column cannot be added,
+suggested, rolled up or kept in a view. The audit views follow through the
+table's `record_types`: `Authz.withheld_fields_by_type/2` maps the
+`auditable_type` an audit row carries to its table, Base Audit asks it
+through `Bilimbi.Base.Audit.Authorization` and takes the values out of every
+mutation it returns, so the record history panel and `/audit/mutations` list
+a change to such a field with `<.restricted>` and without its values,
+whatever audit capability the reader holds.
+
+Core Company is the first module wired to the seam: every summary goes
+through `Summary.for_scope/2`, `create_company/3` and `update_company/3`
+refuse restricted fields, the administration search skips a restricted
+column, and the `companies` grid table declares its `record_types` and
+protects `code` and `status`. A module that owns another catalog table does
+the same at its read model and its writes; the tests in
+`apps/base/authz/test/field_restrictions_test.exs`,
+`apps/base/grid/test/catalog_test.exs` and
+`apps/core/company/test/company_lookup_test.exs` show the shape.
 
 ## A record in another company
 

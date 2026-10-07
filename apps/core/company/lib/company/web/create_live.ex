@@ -46,6 +46,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
          |> assign(:parent_companies, companies)
          |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
          |> assign(:country_options, Bilimbi.Core.Geonames.country_options())
+         |> assign_restricted()
          |> assign_form(form_changeset(%{"status" => "active"}))}
 
       {:error, :unauthorized} ->
@@ -75,7 +76,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
       |> Map.put(:action, :insert)
 
     with true <- changeset.valid?,
-         {:ok, attrs} <- domain_attrs(changeset) do
+         {:ok, attrs} <- domain_attrs(changeset, socket.assigns.restricted_fields) do
       case Company.create_company(socket.assigns.current_scope.scope, attrs) do
         {:ok, _company} ->
           {:noreply,
@@ -159,39 +160,74 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 options={legal_entity_type_options(@legal_entity_types)}
               />
               <.input
+                :if={:registration_number not in @restricted_fields}
                 field={@form[:registration_number]}
                 id="company-registration-number"
                 label="Registration Number"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:registration_number in @restricted_fields}
+                id="company-registration-number-restricted"
+                label="Registration Number"
+                roles={@restricted_markers.registration_number.roles}
+              />
               <.input
+                :if={:tax_id not in @restricted_fields}
                 field={@form[:tax_id]}
                 id="company-tax-id"
                 label="Tax ID"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:tax_id in @restricted_fields}
+                id="company-tax-id-restricted"
+                label="Tax ID"
+                roles={@restricted_markers.tax_id.roles}
+              />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.combobox
+                :if={:jurisdiction not in @restricted_fields}
                 field={@form[:jurisdiction]}
                 id="company-jurisdiction"
                 label="Jurisdiction"
                 placeholder="Select country..."
                 options={@country_options}
               />
+              <.restricted_field
+                :if={:jurisdiction in @restricted_fields}
+                id="company-jurisdiction-restricted"
+                label="Jurisdiction"
+                roles={@restricted_markers.jurisdiction.roles}
+              />
               <.input
+                :if={:email not in @restricted_fields}
                 field={@form[:email]}
                 id="company-email"
                 type="email"
                 label="Email"
                 maxlength="255"
               />
+              <.restricted_field
+                :if={:email in @restricted_fields}
+                id="company-email-restricted"
+                label="Email"
+                roles={@restricted_markers.email.roles}
+              />
               <.input
+                :if={:website not in @restricted_fields}
                 field={@form[:website]}
                 id="company-website"
                 label="Website"
                 placeholder="example.com"
                 maxlength="255"
+              />
+              <.restricted_field
+                :if={:website in @restricted_fields}
+                id="company-website-restricted"
+                label="Website"
+                roles={@restricted_markers.website.roles}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-2">
@@ -282,24 +318,29 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     end
   end
 
-  defp domain_attrs(%Changeset{} = changeset) do
+  # A restricted field never reaches the attributes: the form showed no input
+  # for it, and `create_company/3` would refuse the key anyway.
+  defp domain_attrs(%Changeset{} = changeset, restricted_fields) do
     if changeset.valid? do
       {:ok,
-       %{
-         parent_id: get_field(changeset, :parent_id),
-         name: get_field(changeset, :name),
-         code: blank_to_nil(get_field(changeset, :code)),
-         status: get_field(changeset, :status),
-         legal_name: blank_to_nil(get_field(changeset, :legal_name)),
-         registration_number: blank_to_nil(get_field(changeset, :registration_number)),
-         tax_id: blank_to_nil(get_field(changeset, :tax_id)),
-         legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
-         jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
-         email: blank_to_nil(get_field(changeset, :email)),
-         website: blank_to_nil(get_field(changeset, :website)),
-         scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
-         metadata: decode_object(get_field(changeset, :metadata_json))
-       }}
+       Map.drop(
+         %{
+           parent_id: get_field(changeset, :parent_id),
+           name: get_field(changeset, :name),
+           code: blank_to_nil(get_field(changeset, :code)),
+           status: get_field(changeset, :status),
+           legal_name: blank_to_nil(get_field(changeset, :legal_name)),
+           registration_number: blank_to_nil(get_field(changeset, :registration_number)),
+           tax_id: blank_to_nil(get_field(changeset, :tax_id)),
+           legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
+           jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
+           email: blank_to_nil(get_field(changeset, :email)),
+           website: blank_to_nil(get_field(changeset, :website)),
+           scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
+           metadata: decode_object(get_field(changeset, :metadata_json))
+         },
+         restricted_fields
+       )}
     else
       {:error, changeset}
     end
@@ -314,6 +355,14 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   defp blank_to_nil(value) when value in [nil, ""], do: nil
   defp blank_to_nil(value), do: value
+
+  defp assign_restricted(socket) do
+    markers = Company.restricted_field_markers(socket.assigns.current_scope.scope)
+
+    socket
+    |> assign(:restricted_markers, markers)
+    |> assign(:restricted_fields, Map.keys(markers))
+  end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :company))

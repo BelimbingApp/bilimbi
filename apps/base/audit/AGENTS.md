@@ -18,6 +18,8 @@ Silencing capture is not done from this folder. `Bilimbi.Base.Database.WriteCapt
 
 A retention change goes through `toggle_retained/2`, which asks `Bilimbi.Base.Audit.Authorization`. The workspace wires that to Base Authz in `config/config.exs`. Do not add a `base/authz` dependency: Authz already depends on Audit, and discovery rejects the cycle. The actions screen's `can_manage` assign only shows the control.
 
+A value of a field an operator restricted (`Bilimbi.Base.Authz.put_field_restriction/4`, reaching this module through the grid table's `record_types`) is taken out of every `Mutation` the read functions return, through `Bilimbi.Base.Audit.Authorization.withheld_fields/2`. A screen renders `Mutation.withheld` as `<.restricted>`; do not list field names here, and do not read `old_values` or `new_values` from a schema, which would skip that policy.
+
 ## Maintaining this file
 
 Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.
