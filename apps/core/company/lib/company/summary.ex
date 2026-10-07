@@ -56,8 +56,8 @@ defmodule Bilimbi.Core.Company.Summary do
           metadata: map() | nil
         }
 
-  @spec display_name(t()) :: String.t()
-  def display_name(%__MODULE__{legal_name: legal_name, name: name}) do
+  @spec display_name(%{legal_name: String.t() | nil, name: String.t()}) :: String.t()
+  def display_name(%{legal_name: legal_name, name: name}) do
     if present?(legal_name), do: legal_name, else: name
   end
 

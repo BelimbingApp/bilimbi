@@ -19,9 +19,9 @@ defmodule BilimbiWeb.SettingsCompanyScope do
 
   @impl true
   def authorize(%{scope: %Scope{} = scope, actor: %Actor{} = actor}, id) do
-    with {:ok, company} <-
+    with {:ok, company_id} <-
            Company.authorize_company_target(actor, id, @capability) do
-      {:ok, SettingScope.company(company.id, Scope.tenant_id(scope))}
+      {:ok, SettingScope.company(company_id, Scope.tenant_id(scope))}
     end
   end
 end

@@ -159,8 +159,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
     # Company info
     company_name =
-      case Company.get_company(scope, company_id) do
-        {:ok, company} -> Company.Summary.display_name(company)
+      case Company.display_name(scope, company_id) do
+        {:ok, name} -> name
         _ -> "Company"
       end
 

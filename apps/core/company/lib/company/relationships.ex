@@ -28,21 +28,10 @@ defmodule Bilimbi.Core.Company.Relationships do
             join: rc in assoc(r, :related_company),
             join: t in assoc(r, :type),
             where: r.company_id == ^company_id and is_nil(r.deleted_at) and is_nil(rc.deleted_at),
-            preload: [related_company: rc, type: t]
+            preload: [type: t],
+            select: {r, rc}
           )
           |> Repo.all()
-          |> Enum.map(fn r ->
-            %{
-              id: r.id,
-              direction: :outgoing,
-              relationship: r,
-              type: r.type,
-              other_company: Summary.for_scope(r.related_company, scope),
-              effective_from: r.effective_from,
-              effective_to: r.effective_to,
-              is_active: Relationship.active?(r)
-            }
-          end)
 
         incoming =
           from(r in Relationship,
@@ -51,28 +40,37 @@ defmodule Bilimbi.Core.Company.Relationships do
             where:
               r.related_company_id == ^company_id and is_nil(r.deleted_at) and
                 is_nil(c.deleted_at),
-            preload: [company: c, type: t]
+            preload: [type: t],
+            select: {r, c}
           )
           |> Repo.all()
-          |> Enum.map(fn r ->
-            %{
-              id: r.id,
-              direction: :incoming,
-              relationship: r,
-              type: r.type,
-              other_company: Summary.for_scope(r.company, scope),
-              effective_from: r.effective_from,
-              effective_to: r.effective_to,
-              is_active: Relationship.active?(r)
-            }
-          end)
+
+        summaries =
+          (outgoing ++ incoming)
+          |> Enum.map(&elem(&1, 1))
+          |> Summary.for_scope(scope)
+          |> Map.new(&{&1.id, &1})
 
         all_rels =
-          (outgoing ++ incoming)
+          (Enum.map(outgoing, &item(&1, :outgoing, summaries)) ++
+             Enum.map(incoming, &item(&1, :incoming, summaries)))
           |> Enum.sort_by(fn item -> {item.other_company.name, item.type.name} end)
 
         {:ok, all_rels}
     end
+  end
+
+  defp item({r, other}, direction, summaries) do
+    %{
+      id: r.id,
+      direction: direction,
+      relationship: r,
+      type: r.type,
+      other_company: Map.fetch!(summaries, other.id),
+      effective_from: r.effective_from,
+      effective_to: r.effective_to,
+      is_active: Relationship.active?(r)
+    }
   end
 
   @spec list_available_related_companies(Scope.t(), pos_integer()) ::
@@ -139,7 +137,7 @@ defmodule Bilimbi.Core.Company.Relationships do
             |> Relationship.changeset(attrs)
             |> Repo.insert()
             |> case do
-              {:ok, rel} -> {:ok, Repo.preload(rel, [:type, :related_company, :company])}
+              {:ok, rel} -> {:ok, Repo.preload(rel, [:type])}
               {:error, changeset} -> {:error, changeset}
             end
 
@@ -175,7 +173,7 @@ defmodule Bilimbi.Core.Company.Relationships do
               r.id == ^relationship_id and
                 (r.company_id == ^company_id or r.related_company_id == ^company_id) and
                 is_nil(r.deleted_at),
-            preload: [:type, :related_company, :company]
+            preload: [:type]
           )
 
         case Repo.one(query) do

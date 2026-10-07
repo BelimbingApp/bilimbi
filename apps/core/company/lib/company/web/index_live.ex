@@ -86,22 +86,15 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   end
 
   # The placeholder names the columns this reader's search matches. Email is
-  # a sensitive column (`Company.withheld_fields/1`): a reader who may not see
+  # a sensitive column (`Company.searchable_columns/1`): a reader who may not see
   # it is not searching it either, and the box says so.
   defp search_placeholder(scope) do
-    columns =
-      Enum.reject(
-        [
-          {:name, "name"},
-          {:code, "code"},
-          {:legal_name, "legal name"},
-          {:email, "email"},
-          {:jurisdiction, "jurisdiction"}
-        ],
-        fn {column, _label} -> column in Company.withheld_fields(scope) end
-      )
+    {last, rest} =
+      scope
+      |> Company.searchable_columns()
+      |> Enum.map(&(&1 |> Atom.to_string() |> String.replace("_", " ")))
+      |> List.pop_at(-1)
 
-    {last, rest} = columns |> Enum.map(&elem(&1, 1)) |> List.pop_at(-1)
     "Search by #{Enum.join(rest, ", ")}, or #{last}..."
   end
 

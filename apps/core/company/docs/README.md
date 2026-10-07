@@ -94,8 +94,30 @@ yet freeze anything. There is no `delete_company` in this API today.
 | `live_company_ids_query/1` | Excluded — id query of the same set as `list_companies/1` |
 | `list_live_company_ids/1` | Excluded — id-only form of `list_companies/1` |
 | `live_company?/2` | Excluded — one id, existence only |
+| `display_name/2` | Excluded — one id; the legal name or name from one tenant-scoped query, with no field policy evaluated |
 | `require_live_company/2` | Excluded — `{:ok, id}` or `{:error, :not_found}` from the same existence query; builds no summary, evaluates no field policy and writes no decision, so an existence-only caller uses it instead of `get_company/2` |
 | `list_tenant_company_ids/1` | Included — Belimbing-compatible user listing seam |
+
+A caller picks the cheapest read that answers its question. `get_company/2`
+returns the summary, so it evaluates the field policy: only a caller that
+shows the summary to a reader uses it. A caller that needs only existence or
+the id uses `require_live_company/2`, and one that needs only the name uses
+`display_name/2`. `authorize_company_target/3` answers the authorized
+company's id for the same reason.
+
+Callers of `get_company/2` after the sweep for #777 (no mounted Domain or
+Extension repository is present in this tree, so none is listed):
+
+- Kept, because they read the summary: `Company.Web.ShowLive` (every fact),
+  `Company.Web.RelationshipsLive` and `Company.Web.DepartmentsLive` (code and
+  display name of the page's company).
+- Switched to `require_live_company/2`: Core Employee (every `normalize_company`
+  check), Core User (every `normalize_company` check, the archived-company
+  checks on the user page and its access panel), Core Address (the company
+  guards and the address page), `Company.department_belongs_to_company?/3`,
+  `authorize_company_target/3`, and the platform-operator designation page.
+- Switched to `display_name/2`: `BilimbiWeb.UserAuth` (the workspace strip, once
+  per request) and the employee page's company name.
 
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
 queries `companies` directly (BLB-S1-010 option a).

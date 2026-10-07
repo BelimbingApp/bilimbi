@@ -170,6 +170,68 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
              Company.update_company(reader, @company_id, %{tax_id: "TAX-00000", name: "Again"})
   end
 
+  test "relationships carry the other company only as the redacted summary", %{reader: reader} do
+    grant!("admin.company.update")
+    create_external_access_tables!()
+    insert_relationship_type!(11)
+
+    assert {:ok, created} =
+             Company.create_relationship(reader, @company_id, %{
+               related_company_id: @sibling_id,
+               relationship_type_id: 11
+             })
+
+    assert {:ok, updated} =
+             Company.update_relationship(reader, @company_id, created.id, %{
+               effective_to: ~D[2027-01-01]
+             })
+
+    for rel <- [created, updated] do
+      assert %Ecto.Association.NotLoaded{} = rel.related_company
+      assert %Ecto.Association.NotLoaded{} = rel.company
+    end
+
+    assert {:ok, [outgoing]} = Company.list_relationships(reader, @company_id)
+    assert {:ok, [incoming]} = Company.list_relationships(reader, @sibling_id)
+
+    for {item, other_id} <- [{outgoing, @sibling_id}, {incoming, @company_id}] do
+      assert %Summary{id: ^other_id, tax_id: %Withheld{}, email: %Withheld{}} = item.other_company
+      assert %Ecto.Association.NotLoaded{} = item.relationship.related_company
+      assert %Ecto.Association.NotLoaded{} = item.relationship.company
+    end
+
+    for value <- ["TAX-11111", "sibling@bilimbi.test", "TAX-98765", "hq@bilimbi.test"] do
+      refute inspect([created, updated, outgoing, incoming]) =~ value
+    end
+
+    grant!(@sensitive)
+    assert {:ok, [holder_view]} = Company.list_relationships(reader, @company_id)
+    assert %Summary{tax_id: "TAX-11111"} = holder_view.other_company
+  end
+
+  test "a relationship list evaluates the field policy once, however many rows it holds", %{
+    reader: reader
+  } do
+    grant!("admin.company.update")
+    create_external_access_tables!()
+    insert_relationship_type!(11)
+    insert_relationship_type!(12)
+
+    for type_id <- [11, 12] do
+      assert {:ok, _} =
+               Company.create_relationship(reader, @company_id, %{
+                 related_company_id: @sibling_id,
+                 relationship_type_id: type_id
+               })
+    end
+
+    {{:ok, items}, queries} =
+      capture_queries(fn -> Company.list_relationships(reader, @company_id) end)
+
+    assert length(items) == 2
+    assert Enum.count(queries, &(&1 =~ "base_authz_principal_capabilities")) <= 1
+  end
+
   test "the existence check evaluates no permission and writes no decision", %{reader: reader} do
     {found, found_queries} =
       capture_queries(fn -> Company.require_live_company(reader, @company_id) end)

@@ -52,7 +52,7 @@ defmodule Bilimbi.Core.CompanySelectableCompaniesTest do
     assert {:ok, companies} = Company.list_selectable_companies(scope, @operation)
     assert Enum.map(companies, & &1.id) == [@home_company_id]
 
-    assert {:ok, %{id: @home_company_id}} =
+    assert {:ok, @home_company_id} =
              Company.authorize_company_target(scope, @home_company_id, @operation)
 
     assert {:error, :unauthorized} =
@@ -68,7 +68,7 @@ defmodule Bilimbi.Core.CompanySelectableCompaniesTest do
     assert {:ok, companies} = Company.list_selectable_companies(scope, @operation)
     assert Enum.map(companies, & &1.id) == [@home_company_id, @sibling_company_id]
 
-    assert {:ok, %{id: @sibling_company_id}} =
+    assert {:ok, @sibling_company_id} =
              Company.authorize_company_target(scope, @sibling_company_id, @operation)
 
     assert {:error, :not_found} =

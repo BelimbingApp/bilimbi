@@ -246,10 +246,12 @@ defmodule Bilimbi.Core.Company do
 
   Missing, deleted, and cross-tenant companies are indistinguishable. A
   sibling company additionally requires the explicit tenant-wide reach
-  capability.
+  capability. The answer is the authorized company's id, not a summary: the
+  caller is acting on the company, not reading it, so no field policy is
+  evaluated.
   """
   @spec authorize_company_target(Actor.t() | Scope.t(), term(), String.t()) ::
-          {:ok, Summary.t()} | {:error, :not_found | :unauthorized}
+          {:ok, pos_integer()} | {:error, :not_found | :unauthorized}
   def authorize_company_target(%Scope{} = scope, company_id, operation_capability)
       when is_binary(operation_capability) do
     case Authz.scope_actor(scope) do
@@ -261,11 +263,11 @@ defmodule Bilimbi.Core.Company do
   def authorize_company_target(%Actor{} = actor, company_id, operation_capability)
       when is_integer(company_id) and company_id > 0 and is_binary(operation_capability) do
     with true <- capability_allowed?(actor, operation_capability),
-         {:ok, company} <- get_company(actor.scope, company_id),
+         {:ok, company_id} <- require_live_company(actor.scope, company_id),
          true <-
-           company.id == actor.company_id or
+           company_id == actor.company_id or
              capability_allowed?(actor, @manage_across_tenant_capability) do
-      {:ok, company}
+      {:ok, company_id}
     else
       false -> {:error, :unauthorized}
       {:error, :not_found} = error -> error
@@ -373,6 +375,38 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
+  The display name of one live company in this tenant.
+
+  The name a header or workspace strip shows: the legal name when there is
+  one, otherwise the name, as `Summary.display_name/1` reads it. One
+  tenant-scoped query selecting those two columns, so it evaluates no field
+  policy and writes no decision. A caller that needs any other fact of the
+  company uses `get_company/2`.
+  """
+  @spec display_name(Scope.t(), term()) :: {:ok, String.t()} | {:error, :not_found}
+  def display_name(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
+    query =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id == ^company_id and is_nil(company.deleted_at),
+        select: %{legal_name: company.legal_name, name: company.name}
+      )
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      names -> {:ok, Summary.display_name(names)}
+    end
+  end
+
+  def display_name(%Scope{}, _company_id), do: {:error, :not_found}
+
+  @doc """
+  The columns the administration search matches for this scope's actor, in
+  match order. A sensitive column the actor may not see is not matched.
+  """
+  @spec searchable_columns(Scope.t()) :: [atom()]
+  def searchable_columns(%Scope{} = scope), do: AdministrationIndex.searchable_columns(scope)
+
+  @doc """
   Names of the given live companies in this tenant.
 
   Missing, soft-deleted, and other-tenant ids are omitted. The value is
@@ -453,8 +487,8 @@ defmodule Bilimbi.Core.Company do
   @spec department_belongs_to_company?(Scope.t(), pos_integer(), pos_integer()) :: boolean()
   def department_belongs_to_company?(%Scope{} = scope, company_id, department_id)
       when is_integer(department_id) and department_id > 0 do
-    case get_company(scope, company_id) do
-      {:ok, _company} ->
+    case require_live_company(scope, company_id) do
+      {:ok, _company_id} ->
         Repo.exists?(
           from(department in Department,
             where: department.id == ^department_id and department.company_id == ^company_id
