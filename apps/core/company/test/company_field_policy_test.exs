@@ -232,6 +232,69 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
     assert Enum.count(queries, &(&1 =~ "base_authz_principal_capabilities")) <= 1
   end
 
+  test "create_company refuses a withheld field exactly as update does, and writes nothing", %{
+    reader: reader
+  } do
+    before = length(elem(Company.list_companies(reader), 1))
+
+    for attributes <- [
+          %{name: "Quiet Co", tax_id: "TAX-NEW"},
+          %{name: "Quiet Co", tax_id: nil},
+          %{"name" => "Quiet Co", "tax_id" => "TAX-NEW"},
+          %{"name" => "Quiet Co", "tax_id" => ""}
+        ] do
+      assert {:error, changeset} = Company.create_company(reader, attributes)
+
+      assert errors_on(changeset) == %{
+               tax_id: ["is withheld from this account and cannot be changed"]
+             }
+    end
+
+    assert {:error, changeset} =
+             Company.create_company(reader, %{name: "Quiet Co", email: "ops@example.test"})
+
+    assert errors_on(changeset) == %{
+             email: ["is withheld from this account and cannot be changed"]
+           }
+
+    assert length(elem(Company.list_companies(reader), 1)) == before
+
+    assert {:ok, %Summary{name: "Quiet Co", tax_id: %Withheld{}}} =
+             Company.create_company(reader, %{name: "Quiet Co"})
+  end
+
+  test "create_company lets a holder set the fields, and still validates them", %{reader: reader} do
+    grant!(@sensitive)
+
+    assert {:error, changeset} =
+             Company.create_company(reader, %{name: "Bad Email Co", email: "not-an-address"})
+
+    assert {:email, {_message, [validation: :format]}} = List.keyfind(changeset.errors, :email, 0)
+
+    assert {:ok, %Summary{tax_id: "TAX-NEW", email: "ops@example.test"}} =
+             Company.create_company(reader, %{
+               name: "Open Co",
+               tax_id: "TAX-NEW",
+               email: "ops@example.test"
+             })
+  end
+
+  test "the identity lookup runs no permission evaluation and writes no decision", %{
+    reader: reader
+  } do
+    {found, queries} = capture_queries(fn -> Company.identity(reader, @company_id) end)
+
+    assert {:ok,
+            %{id: @company_id, code: "bilimbi_industries", display_name: "Bilimbi Industries"}} =
+             found
+
+    assert length(queries) == 1
+    refute Enum.any?(queries, &(&1 =~ "base_authz"))
+    assert Repo.aggregate(DecisionLog, :count) == 0
+    assert {:error, :not_found} = Company.identity(reader, 999)
+    assert {:error, :not_found} = Company.identity(reader, "73")
+  end
+
   test "the existence check evaluates no permission and writes no decision", %{reader: reader} do
     {found, found_queries} =
       capture_queries(fn -> Company.require_live_company(reader, @company_id) end)

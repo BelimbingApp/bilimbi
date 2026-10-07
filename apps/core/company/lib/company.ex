@@ -375,29 +375,39 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
-  The display name of one live company in this tenant.
+  The identity of one live company in this tenant: its id, its code and the
+  name a header or workspace strip shows (the legal name when there is one,
+  otherwise the name, as `Summary.display_name/1` reads it).
 
-  The name a header or workspace strip shows: the legal name when there is
-  one, otherwise the name, as `Summary.display_name/1` reads it. One
-  tenant-scoped query selecting those two columns, so it evaluates no field
+  One tenant-scoped query selecting those columns, so it evaluates no field
   policy and writes no decision. A caller that needs any other fact of the
   company uses `get_company/2`.
   """
-  @spec display_name(Scope.t(), term()) :: {:ok, String.t()} | {:error, :not_found}
-  def display_name(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
+  @spec identity(Scope.t(), term()) ::
+          {:ok, %{id: pos_integer(), code: String.t(), display_name: String.t()}}
+          | {:error, :not_found}
+  def identity(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
     query =
       from(company in Tenancy.scope_query(Schema, scope),
         where: company.id == ^company_id and is_nil(company.deleted_at),
-        select: %{legal_name: company.legal_name, name: company.name}
+        select: %{
+          id: company.id,
+          code: company.code,
+          legal_name: company.legal_name,
+          name: company.name
+        }
       )
 
     case Repo.one(query) do
-      nil -> {:error, :not_found}
-      names -> {:ok, Summary.display_name(names)}
+      nil ->
+        {:error, :not_found}
+
+      row ->
+        {:ok, %{id: row.id, code: row.code, display_name: Summary.display_name(row)}}
     end
   end
 
-  def display_name(%Scope{}, _company_id), do: {:error, :not_found}
+  def identity(%Scope{}, _company_id), do: {:error, :not_found}
 
   @doc """
   The columns the administration search matches for this scope's actor, in
@@ -520,6 +530,11 @@ defmodule Bilimbi.Core.Company do
 
   When `is_primary: true` is passed, the write is executed inside a transaction
   and atomically designated as that tenant's primary company.
+
+  A field the scope's actor may not see (`withheld_fields/1`) is not theirs
+  to set on a new record either: attributes that name one are refused with
+  an error on that field, exactly as `update_company/3` refuses them, and
+  nothing is written.
   """
   @spec create_company(Scope.t(), map(), keyword()) ::
           {:ok, Summary.t()} | {:error, Ecto.Changeset.t()}
@@ -528,7 +543,10 @@ defmodule Bilimbi.Core.Company do
     is_primary? = Keyword.get(opts, :is_primary, false)
 
     Repo.transaction(fn ->
-      changeset = Schema.creation_changeset(tenant_id, attributes)
+      changeset =
+        tenant_id
+        |> Schema.creation_changeset(attributes)
+        |> FieldPolicy.refuse_attempts(withheld_fields(scope), attributes)
 
       case Repo.insert(changeset) do
         {:ok, company} ->

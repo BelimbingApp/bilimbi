@@ -86,6 +86,60 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
       assert created.code == "north_branch"
     end
 
+    test "an account without the sensitive capability is not offered tax ID or email", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.create", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      refute has_element?(view, "#company-tax-id")
+      refute has_element?(view, "#company-email")
+      assert has_element?(view, "#company-tax-id-withheld[data-withheld]", "Withheld")
+      assert has_element?(view, "#company-email-withheld[data-withheld]", "Withheld")
+
+      view
+      |> form("#company-form", company: %{name: "Quiet Branch", status: "active"})
+      |> render_submit()
+
+      assert_redirect(view)
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      assert Enum.find(companies, &(&1.name == "Quiet Branch"))
+    end
+
+    test "a holder is offered tax ID and email and they are stored", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.create",
+        "admin.company.view",
+        "admin.company.sensitive.view"
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(view, "#company-tax-id")
+      assert has_element?(view, "#company-email")
+      refute has_element?(view, "[data-withheld]")
+
+      view
+      |> form("#company-form",
+        company: %{
+          name: "Open Branch",
+          status: "active",
+          tax_id: "TAX-4242",
+          email: "open@bilimbi.test"
+        }
+      )
+      |> render_submit()
+
+      assert_redirect(view)
+
+      assert %{tax_id: "TAX-4242", email: "open@bilimbi.test"} =
+               Repo.get_by(Bilimbi.Core.Company.Schema, name: "Open Branch")
+    end
+
     test "company-scoped actor sees only their company as parent and cannot forge a sibling",
          %{conn: conn} do
       grant_capabilities!(["admin.company.create"])

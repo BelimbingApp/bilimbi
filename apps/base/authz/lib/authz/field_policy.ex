@@ -94,7 +94,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicy do
   A value the reader may not see is not theirs to write either: an editor
   cannot show what it would replace, and a write that lands blind is
   indistinguishable from an accident. The owning module calls this on its
-  update changeset with the fields `Bilimbi.Base.Authz.withheld_fields/2`
+  create and update changesets with the fields `Bilimbi.Base.Authz.withheld_fields/2`
   returned for the same scope and the attributes it was handed, so the API
   refuses what the page never offered.
 

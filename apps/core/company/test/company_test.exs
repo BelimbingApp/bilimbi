@@ -487,20 +487,6 @@ defmodule Bilimbi.Core.CompanyTest do
     end
   end
 
-  test "create_company rejects an email that is not an address" do
-    insert_tenant!()
-    {:ok, scope} = Tenancy.scope(41)
-
-    assert {:error, changeset} =
-             Company.create_company(scope, %{name: "Bad Email Co", email: "not-an-address"})
-
-    assert {:email, {_message, [validation: :format]}} =
-             List.keyfind(changeset.errors, :email, 0)
-
-    assert {:ok, %Summary{}} =
-             Company.create_company(scope, %{name: "Good Email Co", email: "ops@example.test"})
-  end
-
   test "create_company validates jurisdiction against known geonames countries" do
     GeonamesFixtures.create_geonames_tables!()
     GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})

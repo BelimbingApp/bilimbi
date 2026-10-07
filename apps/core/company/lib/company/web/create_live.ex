@@ -2,6 +2,11 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
   @moduledoc """
   Create-company form. Persistence stays in `Bilimbi.Core.Company.create_company/3`.
 
+  A field the signed-in account may not see (`Bilimbi.Core.Company.withheld_fields/1`,
+  the tax ID and email without `admin.company.sensitive.view`) is not offered
+  either: the form shows `<.withheld>` in its place and never sends the key,
+  and `create_company/3` refuses it if a forged submit does.
+
   Belimbing: `app/Core/Company/Livewire/Companies/Create.php`.
   """
 
@@ -43,6 +48,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
          socket
          |> assign(:page_title, "Create Company")
          |> assign(:active_nav, "admin.company")
+         |> assign(:withheld_fields, Company.withheld_fields(socket.assigns.current_scope.scope))
          |> assign(:parent_companies, companies)
          |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
          |> assign(:country_options, Bilimbi.Core.Geonames.country_options())
@@ -75,7 +81,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
       |> Map.put(:action, :insert)
 
     with true <- changeset.valid?,
-         {:ok, attrs} <- domain_attrs(changeset) do
+         {:ok, attrs} <- domain_attrs(changeset, socket.assigns.withheld_fields) do
       case Company.create_company(socket.assigns.current_scope.scope, attrs) do
         {:ok, _company} ->
           {:noreply,
@@ -165,11 +171,16 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 maxlength="255"
               />
               <.input
+                :if={:tax_id not in @withheld_fields}
                 field={@form[:tax_id]}
                 id="company-tax-id"
                 label="Tax ID"
                 maxlength="255"
               />
+              <div :if={:tax_id in @withheld_fields} class="mb-2">
+                <span class="mb-1 block text-sm font-semibold text-ink">Tax ID</span>
+                <.withheld id="company-tax-id-withheld" />
+              </div>
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
               <.combobox
@@ -180,12 +191,17 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 options={@country_options}
               />
               <.input
+                :if={:email not in @withheld_fields}
                 field={@form[:email]}
                 id="company-email"
                 type="email"
                 label="Email"
                 maxlength="255"
               />
+              <div :if={:email in @withheld_fields} class="mb-2">
+                <span class="mb-1 block text-sm font-semibold text-ink">Email</span>
+                <.withheld id="company-email-withheld" />
+              </div>
               <.input
                 field={@form[:website]}
                 id="company-website"
@@ -282,24 +298,27 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
     end
   end
 
-  defp domain_attrs(%Changeset{} = changeset) do
+  defp domain_attrs(%Changeset{} = changeset, withheld_fields) do
     if changeset.valid? do
       {:ok,
-       %{
-         parent_id: get_field(changeset, :parent_id),
-         name: get_field(changeset, :name),
-         code: blank_to_nil(get_field(changeset, :code)),
-         status: get_field(changeset, :status),
-         legal_name: blank_to_nil(get_field(changeset, :legal_name)),
-         registration_number: blank_to_nil(get_field(changeset, :registration_number)),
-         tax_id: blank_to_nil(get_field(changeset, :tax_id)),
-         legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
-         jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
-         email: blank_to_nil(get_field(changeset, :email)),
-         website: blank_to_nil(get_field(changeset, :website)),
-         scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
-         metadata: decode_object(get_field(changeset, :metadata_json))
-       }}
+       Map.drop(
+         %{
+           parent_id: get_field(changeset, :parent_id),
+           name: get_field(changeset, :name),
+           code: blank_to_nil(get_field(changeset, :code)),
+           status: get_field(changeset, :status),
+           legal_name: blank_to_nil(get_field(changeset, :legal_name)),
+           registration_number: blank_to_nil(get_field(changeset, :registration_number)),
+           tax_id: blank_to_nil(get_field(changeset, :tax_id)),
+           legal_entity_type_id: get_field(changeset, :legal_entity_type_id),
+           jurisdiction: blank_to_nil(get_field(changeset, :jurisdiction)),
+           email: blank_to_nil(get_field(changeset, :email)),
+           website: blank_to_nil(get_field(changeset, :website)),
+           scope_activities: decode_object(get_field(changeset, :scope_activities_json)),
+           metadata: decode_object(get_field(changeset, :metadata_json))
+         },
+         withheld_fields
+       )}
     else
       {:error, changeset}
     end

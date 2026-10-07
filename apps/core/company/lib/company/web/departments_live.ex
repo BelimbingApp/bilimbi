@@ -18,14 +18,14 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
     case Integer.parse(id) do
       {company_id, ""} ->
-        case Company.get_company(scope, company_id) do
+        case Company.identity(scope, company_id) do
           {:ok, company} ->
             {:ok, departments} = Company.list_departments(scope, company_id)
             department_head_names = resolve_department_heads(scope, departments)
 
             {:ok,
              socket
-             |> assign(:page_title, "#{Company.Summary.display_name(company)} — Departments")
+             |> assign(:page_title, "#{company.display_name} — Departments")
              |> assign(:active_nav, "admin.company")
              |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
@@ -418,7 +418,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page variant={:detail}>
         <.header>
-          {Company.Summary.display_name(@company)} — Departments
+          {@company.display_name} — Departments
           <:subtitle>
             <code class="text-xs font-medium">{@company.code}</code>
           </:subtitle>
@@ -426,7 +426,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             <.back_link
               id="departments-back"
               navigate={~p"/companies/#{@company.id}"}
-              title={"Back to #{Company.Summary.display_name(@company)}"}
+              title={"Back to #{@company.display_name}"}
             />
           </:actions>
         </.header>
@@ -551,9 +551,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           on_cancel={JS.push("close_modal")}
         >
           <:description>
-            Select an available department type to establish in {Company.Summary.display_name(
-              @company
-            )}.
+            Select an available department type to establish in {@company.display_name}.
           </:description>
 
           <.form
