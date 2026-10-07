@@ -10,9 +10,11 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Authz.Withheld
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Core.Company
@@ -168,6 +170,28 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
              Company.update_company(reader, @company_id, %{tax_id: "TAX-00000", name: "Again"})
   end
 
+  test "the existence check evaluates no permission and writes no decision", %{reader: reader} do
+    {found, found_queries} =
+      capture_queries(fn -> Company.require_live_company(reader, @company_id) end)
+
+    {missing, _queries} = capture_queries(fn -> Company.require_live_company(reader, 999) end)
+
+    assert found == {:ok, @company_id}
+    assert missing == {:error, :not_found}
+
+    assert {{:error, :not_found}, _} =
+             capture_queries(fn -> Company.require_live_company(reader, "73") end)
+
+    assert length(found_queries) == 1
+    refute Enum.any?(found_queries, &(&1 =~ "base_authz"))
+    assert Repo.aggregate(DecisionLog, :count) == 0
+
+    {_summary, summary_queries} =
+      capture_queries(fn -> Company.get_company(reader, @company_id) end)
+
+    assert Enum.any?(summary_queries, &(&1 =~ "base_authz"))
+  end
+
   test "the list search matches email only for a reader who may see it", %{reader: reader} do
     assert {:ok, %{entries: []}} = Company.list_administration_page(reader, search: "hq@bilimbi")
 
@@ -178,6 +202,30 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
 
     assert {:ok, %{entries: [%{id: @company_id}]}} =
              Company.list_administration_page(reader, search: "hq@bilimbi")
+  end
+
+  defp capture_queries(fun) do
+    handler = "company-existence-#{System.unique_integer([:positive])}"
+    parent = self()
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _, _, metadata, _ -> send(parent, {:company_query, metadata.query}) end,
+      nil
+    )
+
+    result = fun.()
+    :telemetry.detach(handler)
+    {result, receive_queries([])}
+  end
+
+  defp receive_queries(queries) do
+    receive do
+      {:company_query, query} -> receive_queries([query | queries])
+    after
+      20 -> Enum.reverse(queries)
+    end
   end
 
   defp holder_scope do

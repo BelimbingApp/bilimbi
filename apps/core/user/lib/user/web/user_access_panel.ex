@@ -728,7 +728,11 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
   # refused, and the refusal is this panel's own words.
   defp archived_company?(socket) do
     scope = socket.assigns.current_scope.scope
-    match?({:error, :not_found}, Company.get_company(scope, socket.assigns.user.company_id))
+
+    match?(
+      {:error, :not_found},
+      Company.require_live_company(scope, socket.assigns.user.company_id)
+    )
   end
 
   @impl true

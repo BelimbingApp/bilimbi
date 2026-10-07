@@ -82,7 +82,7 @@ defmodule Bilimbi.Core.Employee do
   def list_administration_page(%Scope{} = scope, company_id, options)
       when is_integer(company_id) and company_id > 0 do
     with {:ok, normalized_options} <- AdministrationIndex.normalize_options(options),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       {:ok, AdministrationIndex.page(company_id, normalized_options)}
     end
   end
@@ -92,7 +92,7 @@ defmodule Bilimbi.Core.Employee do
   @spec list_employees(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
   def list_employees(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       {:ok, list_company_summaries(company_id)}
     end
   end
@@ -100,7 +100,7 @@ defmodule Bilimbi.Core.Employee do
   @spec get_employee(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error()}
   def get_employee(%Scope{} = scope, company_id, employee_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       {:ok, Summary.from_schema(employee)}
     else
@@ -201,7 +201,7 @@ defmodule Bilimbi.Core.Employee do
   @spec list_subordinates(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, lookup_error()}
   def list_subordinates(%Scope{} = scope, company_id, supervisor_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id) do
       subordinates =
         from(employee in Schema,
@@ -222,7 +222,7 @@ defmodule Bilimbi.Core.Employee do
   @spec list_available_subordinates(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, lookup_error()}
   def list_available_subordinates(%Scope{} = scope, company_id, supervisor_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id) do
       employees =
         from(employee in Schema,
@@ -259,7 +259,7 @@ defmodule Bilimbi.Core.Employee do
            }}
           | {:error, lookup_error()}
   def supervision_lists(%Scope{} = scope, company_id, employee_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, employee_id) do
       employees = list_company_summaries(company_id)
 
@@ -284,7 +284,7 @@ defmodule Bilimbi.Core.Employee do
   @spec assign_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def assign_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
          %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
       if subordinate.id == supervisor_id do
@@ -307,7 +307,7 @@ defmodule Bilimbi.Core.Employee do
   @spec remove_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def remove_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
          %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
       if subordinate.supervisor_id == supervisor_id do
@@ -349,7 +349,7 @@ defmodule Bilimbi.Core.Employee do
   @spec create_employee(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       company_id
       |> Schema.creation_changeset(attributes)
       |> reject_reserved_orchestrator_number()
@@ -361,7 +361,7 @@ defmodule Bilimbi.Core.Employee do
   @spec update_employee(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def update_employee(%Scope{} = scope, company_id, employee_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       employee
       |> Schema.update_changeset(attributes)
@@ -379,7 +379,7 @@ defmodule Bilimbi.Core.Employee do
           :ok | {:error, lookup_error() | :forbidden}
   def delete_employee(%Scope{} = scope, company_id, employee_id) do
     with :ok <- authorize(scope, "admin.employee.delete"),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
@@ -459,7 +459,7 @@ defmodule Bilimbi.Core.Employee do
   @spec list_employee_types(Scope.t(), pos_integer()) ::
           {:ok, [TypeSummary.t()]} | {:error, :company_not_found}
   def list_employee_types(%Scope{} = scope, company_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       types =
         from(type in EmployeeType,
           where:
@@ -488,7 +488,7 @@ defmodule Bilimbi.Core.Employee do
   def list_type_administration_page(%Scope{} = scope, company_id, options)
       when is_integer(company_id) and company_id > 0 do
     with {:ok, normalized_options} <- TypeAdministrationIndex.normalize_options(options),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       {:ok, TypeAdministrationIndex.page(company_id, normalized_options)}
     end
   end
@@ -501,7 +501,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, TypeSummary.t()} | {:error, :company_not_found | :type_not_found}
   def get_employee_type(%Scope{} = scope, company_id, type_id)
       when is_integer(company_id) and is_integer(type_id) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       case Repo.get(EmployeeType, type_id) do
         nil ->
           {:error, :type_not_found}
@@ -521,7 +521,7 @@ defmodule Bilimbi.Core.Employee do
   @spec create_employee_type(Scope.t(), pos_integer(), map()) ::
           {:ok, TypeSummary.t()} | {:error, :company_not_found | Changeset.t()}
   def create_employee_type(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          {:ok, type} <-
            company_id
            |> EmployeeType.custom_changeset(attributes)
@@ -536,7 +536,7 @@ defmodule Bilimbi.Core.Employee do
           | {:error, :company_not_found | :type_not_found | :is_system | Changeset.t()}
   def update_employee_type(%Scope{} = scope, company_id, type_id, attributes)
       when is_integer(company_id) and is_integer(type_id) and is_map(attributes) do
-    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
          {:ok, type} <- fetch_company_employee_type(company_id, type_id) do
       type
       |> EmployeeType.update_changeset(attributes)
@@ -554,7 +554,7 @@ defmodule Bilimbi.Core.Employee do
   def delete_employee_type(%Scope{} = scope, company_id, type_id)
       when is_integer(company_id) and is_integer(type_id) do
     with :ok <- authorize(scope, "admin.employee-type.delete"),
-         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
       Repo.transaction(fn ->
         case Repo.one(
                from(type in EmployeeType,

@@ -359,6 +359,20 @@ defmodule Bilimbi.Core.Company do
   def live_company?(%Scope{}, _company_id), do: false
 
   @doc """
+  Confirms one company is live in this tenant, returning its id.
+
+  For a caller that only needs the company to exist before it acts on
+  something attached to it. It runs the one tenant-scoped existence query of
+  `live_company?/2` and builds no summary, so it evaluates no field policy
+  and writes no decision. A caller that shows the company to a reader uses
+  `get_company/2`, which withholds what the reader may not see.
+  """
+  @spec require_live_company(Scope.t(), term()) :: {:ok, pos_integer()} | {:error, :not_found}
+  def require_live_company(%Scope{} = scope, company_id) do
+    if live_company?(scope, company_id), do: {:ok, company_id}, else: {:error, :not_found}
+  end
+
+  @doc """
   Names of the given live companies in this tenant.
 
   Missing, soft-deleted, and other-tenant ids are omitted. The value is

@@ -94,6 +94,7 @@ yet freeze anything. There is no `delete_company` in this API today.
 | `live_company_ids_query/1` | Excluded — id query of the same set as `list_companies/1` |
 | `list_live_company_ids/1` | Excluded — id-only form of `list_companies/1` |
 | `live_company?/2` | Excluded — one id, existence only |
+| `require_live_company/2` | Excluded — `{:ok, id}` or `{:error, :not_found}` from the same existence query; builds no summary, evaluates no field policy and writes no decision, so an existence-only caller uses it instead of `get_company/2` |
 | `list_tenant_company_ids/1` | Included — Belimbing-compatible user listing seam |
 
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never

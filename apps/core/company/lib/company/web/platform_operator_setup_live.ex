@@ -68,12 +68,12 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
     scope = socket.assigns.current_scope.scope
 
     with {company_id, ""} <- Integer.parse(to_string(raw_id)),
-         {:ok, company} <- Company.get_company(scope, company_id),
-         {:ok, _} <- Company.assign_primary_company(scope, company.id) do
+         {:ok, company_id} <- Company.require_live_company(scope, company_id),
+         {:ok, _} <- Company.assign_primary_company(scope, company_id) do
       {:noreply,
        socket
        |> put_flash(:success, "Platform-operator primary company designated successfully.")
-       |> push_navigate(to: ~p"/companies/#{company.id}")}
+       |> push_navigate(to: ~p"/companies/#{company_id}")}
     else
       :error ->
         {:noreply, put_flash(socket, :error, "Select a company in this workspace.")}
