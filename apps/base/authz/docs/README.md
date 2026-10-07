@@ -59,9 +59,10 @@ any node and inside a LiveView that is already open. A whole field policy is
 one evaluation (`Authz.withheld_fields/2` asks once however many fields it
 names, and `redact/3` once for a whole list).
 A named system principal is judged by `can/4`. An anonymous system scope
-names nobody and is withheld every field. A write to a withheld field is
-refused by the owner through `FieldPolicy.refuse_changes/2`, with an error
-on that field. The owner's grid fields carry the same key
+names nobody and is withheld every field. A write that names a withheld field is
+refused by the owner through `FieldPolicy.refuse_attempts/3`, with an error
+on that field, whatever value it carries: the refusal never depends on what is
+stored, so it cannot confirm a guess. The owner's grid fields carry the same key
 (`Bilimbi.Base.Grid.Field`), so the column the record page withholds is
 not in that reader's catalog either.
 

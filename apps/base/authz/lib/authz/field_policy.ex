@@ -9,7 +9,7 @@ defmodule Bilimbi.Base.Authz.FieldPolicy do
   reader lacks with `Bilimbi.Base.Authz.Withheld`. The policy lives with the
   read model it governs, declared once by the module that owns the table,
   and that one declaration drives its reads, its writes
-  (`refuse_changes/2`), and anything else that shows the same column, such
+  (`refuse_attempts/3`), and anything else that shows the same column, such
   as the module's grid fields.
 
   The capability is an ordinary registered key, declared and granted like
@@ -89,20 +89,25 @@ defmodule Bilimbi.Base.Authz.FieldPolicy do
   end
 
   @doc """
-  Refuses a change to any field in `withheld` with an error on that field.
+  Refuses any attempt to set a field in `withheld`, with an error on that field.
 
-  A value the reader may not see is not theirs to change either: an editor
+  A value the reader may not see is not theirs to write either: an editor
   cannot show what it would replace, and a write that lands blind is
   indistinguishable from an accident. The owning module calls this on its
   update changeset with the fields `Bilimbi.Base.Authz.withheld_fields/2`
-  returned for the same scope, so the API refuses what the page never
-  offered. A change that leaves the field as it is, which Ecto already
-  drops, is not a change and passes.
+  returned for the same scope and the attributes it was handed, so the API
+  refuses what the page never offered.
+
+  The refusal depends on the field being named in `attributes`, under an atom
+  or a string key, and never on the value or on what is stored: a guess that
+  equals the stored value and one that does not are refused alike, so the
+  write path cannot confirm a value its caller may not see.
   """
-  @spec refuse_changes(Ecto.Changeset.t(), [atom()]) :: Ecto.Changeset.t()
-  def refuse_changes(%Ecto.Changeset{} = changeset, withheld) when is_list(withheld) do
+  @spec refuse_attempts(Ecto.Changeset.t(), [atom()], map()) :: Ecto.Changeset.t()
+  def refuse_attempts(%Ecto.Changeset{} = changeset, withheld, attributes)
+      when is_list(withheld) and is_map(attributes) do
     Enum.reduce(withheld, changeset, fn field, acc ->
-      if Map.has_key?(acc.changes, field) do
+      if Map.has_key?(attributes, field) or Map.has_key?(attributes, Atom.to_string(field)) do
         Ecto.Changeset.add_error(
           acc,
           field,

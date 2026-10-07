@@ -222,34 +222,58 @@ defmodule Bilimbi.Base.Authz.FieldPolicyTest do
     end
   end
 
-  describe "FieldPolicy.refuse_changes/2" do
-    test "refuses a change to a withheld field and leaves other changes alone" do
-      changeset =
-        {%{tax_id: "TAX-1", email: "a@example.com", name: "Acme"},
-         %{tax_id: :string, email: :string, name: :string}}
-        |> Ecto.Changeset.cast(%{tax_id: "TAX-2", name: "Acme Ltd", email: "a@example.com"}, [
-          :tax_id,
-          :email,
-          :name
-        ])
-        |> FieldPolicy.refuse_changes([:tax_id, :email])
+  describe "FieldPolicy.refuse_attempts/3" do
+    @refusal {"is withheld from this account and cannot be changed", []}
 
-      refute changeset.valid?
-
-      assert changeset.errors == [
-               tax_id: {"is withheld from this account and cannot be changed", []}
-             ]
-
-      assert Ecto.Changeset.get_change(changeset, :name) == "Acme Ltd"
+    defp changeset(attributes) do
+      {%{tax_id: "TAX-1", email: "a@example.com", name: "Acme"},
+       %{tax_id: :string, email: :string, name: :string}}
+      |> Ecto.Changeset.cast(attributes, [:tax_id, :email, :name])
     end
 
-    test "passes a changeset that changes nothing withheld" do
-      changeset =
-        {%{tax_id: "TAX-1", name: "Acme"}, %{tax_id: :string, name: :string}}
-        |> Ecto.Changeset.cast(%{name: "Acme Ltd"}, [:tax_id, :name])
-        |> FieldPolicy.refuse_changes([:tax_id])
+    test "refuses naming a withheld field, by atom or string key, and leaves other changes alone" do
+      attributes = %{tax_id: "TAX-2", name: "Acme Ltd", email: "a@example.com"}
 
-      assert changeset.valid?
+      changeset =
+        attributes
+        |> changeset()
+        |> FieldPolicy.refuse_attempts([:tax_id, :email], attributes)
+
+      refute changeset.valid?
+      assert Keyword.get_values(changeset.errors, :tax_id) == [@refusal]
+      assert Keyword.get_values(changeset.errors, :email) == [@refusal]
+      assert Ecto.Changeset.get_change(changeset, :name) == "Acme Ltd"
+
+      stringed = %{"tax_id" => "TAX-2"}
+
+      assert [tax_id: @refusal] ==
+               stringed
+               |> changeset()
+               |> FieldPolicy.refuse_attempts([:tax_id], stringed)
+               |> Map.fetch!(:errors)
+    end
+
+    test "the stored value and a wrong one are refused identically" do
+      refusals =
+        for value <- ["TAX-1", "TAX-2", nil, ""] do
+          attributes = %{tax_id: value}
+
+          attributes
+          |> changeset()
+          |> FieldPolicy.refuse_attempts([:tax_id], attributes)
+          |> Map.fetch!(:errors)
+        end
+
+      assert refusals == List.duplicate([tax_id: @refusal], 4)
+    end
+
+    test "passes attributes that name nothing withheld" do
+      attributes = %{name: "Acme Ltd"}
+
+      assert attributes
+             |> changeset()
+             |> FieldPolicy.refuse_attempts([:tax_id], attributes)
+             |> Map.fetch!(:valid?)
     end
   end
 

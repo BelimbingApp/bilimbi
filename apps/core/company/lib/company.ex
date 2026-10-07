@@ -513,9 +513,9 @@ defmodule Bilimbi.Core.Company do
   than silently dropped.
 
   A field the scope's actor may not see (`withheld_fields/1`) is not theirs
-  to change either: a change to it is refused with an error on that field,
-  and nothing is written. A caller that sends the stored value back is not
-  changing it and passes.
+  to set either: attributes that name one are refused with an error on that
+  field, and nothing is written. The refusal is the same whatever value is
+  sent, the stored one included, so a caller cannot confirm a guess.
   """
   @spec update_company(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
@@ -533,7 +533,7 @@ defmodule Bilimbi.Core.Company do
       company ->
         company
         |> Schema.update_changeset(attributes)
-        |> FieldPolicy.refuse_changes(withheld_fields(scope))
+        |> FieldPolicy.refuse_attempts(withheld_fields(scope), attributes)
         |> Repo.update()
         |> case do
           {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}

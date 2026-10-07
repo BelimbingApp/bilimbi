@@ -133,20 +133,39 @@ defmodule Bilimbi.Core.CompanyFieldPolicyTest do
              Company.get_company(holder, @company_id)
   end
 
-  test "a holder changes the field, and sending the stored value back is not a change", %{
-    reader: reader
-  } do
+  test "a reader without the capability gets the same refusal for the stored value and a wrong one",
+       %{reader: reader} do
+    grant!("admin.company.update")
+
+    for field <- [:tax_id, :email], key <- [field, Atom.to_string(field)] do
+      stored = if field == :tax_id, do: "TAX-98765", else: "hq@bilimbi.test"
+      wrong = if field == :tax_id, do: "TAX-00000", else: "guess@bilimbi.test"
+
+      assert {:error, correct} = Company.update_company(reader, @company_id, %{key => stored})
+      assert {:error, guess} = Company.update_company(reader, @company_id, %{key => wrong})
+
+      assert errors_on(correct) == %{
+               field => ["is withheld from this account and cannot be changed"]
+             }
+
+      assert errors_on(correct) == errors_on(guess)
+      assert correct.errors == guess.errors
+    end
+
+    {:ok, holder} = holder_scope()
+
+    assert {:ok, %Summary{tax_id: "TAX-98765", email: "hq@bilimbi.test"}} =
+             Company.get_company(holder, @company_id)
+  end
+
+  test "a holder changes the field", %{reader: reader} do
     grant!(@sensitive)
 
     assert {:ok, %Summary{tax_id: "TAX-00000"}} =
              Company.update_company(reader, @company_id, %{tax_id: "TAX-00000"})
 
-    {:ok, system_scope} = Tenancy.scope(41)
-    without = Authentication.sign_in(system_scope, @user_id, @sibling_id)
-    grant!("admin.company.update", @sibling_id)
-
-    assert {:ok, %Summary{tax_id: %Withheld{}}} =
-             Company.update_company(without, @company_id, %{tax_id: "TAX-00000", name: "Still"})
+    assert {:ok, %Summary{tax_id: "TAX-00000"}} =
+             Company.update_company(reader, @company_id, %{tax_id: "TAX-00000", name: "Again"})
   end
 
   test "the list search matches email only for a reader who may see it", %{reader: reader} do

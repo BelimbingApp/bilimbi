@@ -282,7 +282,7 @@ defmodule Bilimbi.Base.Authz do
   withholds the field on the very next one.
 
   The result is in the policy's declaration order and is what the owning
-  module passes to `FieldPolicy.refuse_changes/2` on a write.
+  module passes to `FieldPolicy.refuse_attempts/3` on a write.
   """
   @spec withheld_fields(Scope.t(), FieldPolicy.t()) :: [atom()]
   def withheld_fields(%Scope{} = scope, %FieldPolicy{} = policy) do
