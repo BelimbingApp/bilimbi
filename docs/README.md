@@ -13,7 +13,7 @@ install it. These pages hold the detail.
 | Composition model: Platform, Domains, Extensions | [0010 Composition model](./architecture/0010_composition-model.md) |
 | Database architecture | [Database Architecture](./architecture/database.md) |
 | Inbound webhooks: module registration, limits, audit | [Inbound webhooks](./architecture/inbound-webhooks.md) |
-| Architecture decisions (ADRs) | [Decision records](./architecture/decisions/) |
+| Architecture decisions (ADRs), statuses and who may change them | [Decision records](./architecture/decisions/README.md) |
 | Porting stages from Belimbing | [Porting stages](./PORTING_STAGES.md) |
 | Team of architects and AI contributors | [CONTRIBUTORS.md](../CONTRIBUTORS.md) |
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
