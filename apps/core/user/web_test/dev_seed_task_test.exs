@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
   import Bilimbi.Core.User.TestFixtures
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
 
@@ -49,8 +50,10 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     assert company.code == "bilimbi_dev"
     assert company.name == "Bilimbi Development"
     assert company.legal_name == "Bilimbi Development"
-    assert company.jurisdiction == "MY"
-    assert company.metadata == %{"purpose" => "local_development"}
+    assert {:ok, scope} = Tenancy.scope(company.tenant_id)
+    assert {:ok, profile} = Company.get_company(scope, company.id)
+    assert profile.jurisdiction == "MY"
+    assert profile.metadata == %{"purpose" => "local_development"}
     assert {:ok, user} = User.authenticate("ai@agent.my", "bilimbi-dev")
 
     password_hash = stored_password(user.id)
