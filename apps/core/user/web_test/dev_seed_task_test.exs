@@ -3,10 +3,12 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
 
   import Bilimbi.Core.User.TestFixtures
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
 
   setup do
+    previous_snapshot = ContributionRegistry.snapshot!()
     create_user_tables!()
     create_bootstrap_receipt_table!()
     Bilimbi.Core.Address.TestFixtures.create_address_tables!()
@@ -29,7 +31,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
       Mix.env(previous_env)
       Mix.shell(previous_shell)
       Mix.Task.reenable("bilimbi.dev.seed")
-      Bilimbi.Base.ModuleRegistry.ContributionRegistry.clear_for_test!()
+      ContributionRegistry.put_snapshot_for_test!(previous_snapshot)
     end)
 
     :ok
