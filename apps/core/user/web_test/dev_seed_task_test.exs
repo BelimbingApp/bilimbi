@@ -46,6 +46,9 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     assert {:ok, company} = Company.platform_operator_company()
     assert company.code == "bilimbi_dev"
     assert company.name == "Bilimbi Development"
+    assert company.legal_name == "Bilimbi Development"
+    assert company.jurisdiction == "MY"
+    assert company.metadata == %{"purpose" => "local_development"}
     assert {:ok, user} = User.authenticate("ai@agent.my", "bilimbi-dev")
 
     password_hash = stored_password(user.id)

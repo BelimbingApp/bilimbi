@@ -55,10 +55,13 @@ defmodule Bilimbi.Core.User.AdminBootstrap do
 
     result =
       unwrap!(
-        Company.provision_platform_operator(attributes.tenant_name, %{
-          name: attributes.company_name,
-          code: attributes.company_code
-        })
+        Company.provision_platform_operator(
+          attributes.tenant_name,
+          Map.merge(Map.take(attributes, [:legal_name, :jurisdiction, :metadata]), %{
+            name: attributes.company_name,
+            code: attributes.company_code
+          })
+        )
       )
 
     # Another trusted provisioning command can create an operator without

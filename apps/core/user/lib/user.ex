@@ -74,7 +74,9 @@ defmodule Bilimbi.Core.User do
 
   This trusted installation API accepts atom-keyed `:tenant_name`,
   `:company_name`, `:company_code`, `:admin_name`, `:admin_email`, and
-  `:password`. It refuses any pre-existing account or platform operator
+  `:password`. Optional `:legal_name`, `:jurisdiction` and `:metadata` initialize
+  the company profile only on first provisioning. It refuses any pre-existing
+  account or platform operator
   without its own completed receipt; adopted installations use their existing
   administrators. System roles must already have been seeded.
 

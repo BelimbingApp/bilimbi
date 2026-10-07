@@ -23,8 +23,8 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
 
   use Mix.Task
 
-  alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -32,7 +32,10 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
   @tenant_name "Bilimbi local development"
   @company_attributes %{
     name: "Bilimbi Development",
-    code: "bilimbi_dev"
+    code: "bilimbi_dev",
+    legal_name: "Bilimbi Development",
+    jurisdiction: "MY",
+    metadata: %{"purpose" => "local_development"}
   }
   @user_attributes %{
     name: "AI Agent",
@@ -71,6 +74,9 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
       tenant_name: @tenant_name,
       company_name: @company_attributes.name,
       company_code: @company_attributes.code,
+      legal_name: @company_attributes.legal_name,
+      jurisdiction: @company_attributes.jurisdiction,
+      metadata: @company_attributes.metadata,
       admin_name: @user_attributes.name,
       admin_email: @user_attributes.email,
       password: @user_attributes.password
