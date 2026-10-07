@@ -21,11 +21,11 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.Evaluator
   alias Bilimbi.Base.Authz.FieldPolicy
   alias Bilimbi.Base.Authz.Resource
+  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.Authz.RoleService
   alias Bilimbi.Base.Authz.SystemPrincipalGrant
   alias Bilimbi.Base.Authz.SystemPrincipalService
   alias Bilimbi.Base.Authz.SystemRoleReconciler
-  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
