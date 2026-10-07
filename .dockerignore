@@ -5,3 +5,9 @@ deps
 **/node_modules
 **/.elixir_ls
 *.tar.gz
+dist
+.codex
+**/.env
+**/.env.*
+**/*.env
+!**/.env.example

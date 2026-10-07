@@ -3,11 +3,20 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
 
   import Bilimbi.Core.User.TestFixtures
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
 
   setup do
+    previous_snapshot = ContributionRegistry.snapshot!()
     create_user_tables!()
+    create_bootstrap_receipt_table!()
+    Bilimbi.Core.Address.TestFixtures.create_address_tables!()
+    Bilimbi.Base.Settings.TestFixtures.create_settings_table!()
+    Bilimbi.Base.Authz.TestFixtures.create_authz_tables!()
+    Bilimbi.Base.Audit.TestFixtures.create_audit_tables!()
+    install_user_authz_registry!()
     # core/company is loaded here, so the task discovers and runs its dev seed;
     # give it the department-types table its sample data needs.
     Bilimbi.Core.Company.TestFixtures.create_department_types_table!()
@@ -23,6 +32,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
       Mix.env(previous_env)
       Mix.shell(previous_shell)
       Mix.Task.reenable("bilimbi.dev.seed")
+      ContributionRegistry.put_snapshot_for_test!(previous_snapshot)
     end)
 
     :ok
@@ -32,14 +42,18 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     assert :ok = Mix.Task.run("bilimbi.dev.seed")
     assert_receive {:mix_shell, :info, [first_message]}
 
-    assert first_message =~
-             ~r/tenant \d+ \(created\), company \d+ \(created\), user ai@agent.my \(created\)/
+    assert first_message =~ "administrator created"
 
     assert first_message =~ "Password: bilimbi-dev."
 
     assert {:ok, company} = Company.platform_operator_company()
     assert company.code == "bilimbi_dev"
     assert company.name == "Bilimbi Development"
+    assert company.legal_name == "Bilimbi Development"
+    assert {:ok, scope} = Tenancy.scope(company.tenant_id)
+    assert {:ok, profile} = Company.get_company(scope, company.id)
+    assert profile.jurisdiction == "MY"
+    assert profile.metadata == %{"purpose" => "local_development"}
     assert {:ok, user} = User.authenticate("ai@agent.my", "bilimbi-dev")
 
     password_hash = stored_password(user.id)
@@ -49,8 +63,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     assert :ok = Mix.Task.run("bilimbi.dev.seed")
     assert_receive {:mix_shell, :info, [second_message]}
 
-    assert second_message =~
-             ~r/tenant \d+ \(existing\), company \d+ \(existing\), user ai@agent.my \(existing; password preserved\)/
+    assert second_message =~ "administrator already_completed"
 
     refute second_message =~ "Password:"
     assert stored_password(user.id) == password_hash

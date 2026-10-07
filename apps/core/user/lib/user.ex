@@ -69,6 +69,28 @@ defmodule Bilimbi.Core.User do
           | :unauthorized
   @type credential_error :: :invalid_credentials | :credential_upgrade_failed
 
+  @doc """
+  Provisions the explicitly selected initial platform administrator once.
+
+  This trusted installation API accepts atom-keyed `:tenant_name`,
+  `:company_name`, `:company_code`, `:admin_name`, `:admin_email`, and
+  `:password`. Optional `:legal_name`, `:jurisdiction` and `:metadata` initialize
+  the company profile only on first provisioning. It refuses any pre-existing
+  account or platform operator
+  without its own completed receipt; adopted installations use their existing
+  administrators. System roles must already have been seeded.
+
+  Creation, role assignment, receipt, and retained console audit action commit
+  together. Concurrent calls serialize against account creation. Matching
+  repeats return `:already_completed` without changing passwords, names or
+  grants, including revoked grants. Different installation identities fail.
+  Password is required only for first provisioning. Never expose this API as
+  an HTTP route. Release and development setup are the trusted callers.
+  """
+  @spec bootstrap_platform_admin(map()) ::
+          {:ok, :created | :already_completed} | {:error, atom()}
+  defdelegate bootstrap_platform_admin(attributes), to: Bilimbi.Core.User.AdminBootstrap, as: :run
+
   @preference_keys [
     "ai.last_used_model_hints",
     "ui.dashboard.layout",

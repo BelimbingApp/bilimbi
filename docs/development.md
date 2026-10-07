@@ -30,9 +30,12 @@ baseline creates no tenant or company rows; platform-operator and
 primary-company provisioning are explicit setup steps and numeric IDs carry no
 runtime meaning.
 
-`mix bilimbi.dev.seed` provisions the development platform tenant, its company,
-and the login `ai@agent.my` / `bilimbi-dev`. It runs only in the `dev`
-environment and is safe to repeat.
+`mix bilimbi.dev.seed` seeds installed reference data, provisions the development
+platform tenant/company, and bootstraps `ai@agent.my` / `bilimbi-dev` with
+`core_admin` through the [shared bootstrap contract](deploy/README.md#bootstrap-contract-and-recovery).
+It runs only in `dev`. Matching repeats preserve passwords and revoked roles.
+Existing identities without a bootstrap receipt are refused rather than
+promoted; use existing administration or a separate fresh development database.
 
 ## Provisioning identity
 

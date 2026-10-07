@@ -83,6 +83,29 @@ defmodule Bilimbi.Core.User.TestFixtures do
     SQL.query!(Repo, "CREATE UNIQUE INDEX users_email_unique ON users (email)", [])
   end
 
+  def create_bootstrap_receipt_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
+
+    SQL.query!(
+      Repo,
+      """
+      #{TestTables.create(persistent)} bilimbi_user_bootstrap (
+        id bigint PRIMARY KEY,
+        tenant_name varchar(255) NOT NULL,
+        company_name varchar(255) NOT NULL,
+        company_code varchar(255) NOT NULL,
+        admin_email varchar(255) NOT NULL,
+        user_id bigint NOT NULL,
+        company_id bigint NOT NULL,
+        tenant_id bigint NOT NULL,
+        completed_at timestamp(0) without time zone NOT NULL,
+        CONSTRAINT bilimbi_user_bootstrap_singleton CHECK (id = 1)
+      ) #{TestTables.on_commit(persistent)}
+      """,
+      []
+    )
+  end
+
   def create_user_database_queries_table! do
     SQL.query!(
       Repo,

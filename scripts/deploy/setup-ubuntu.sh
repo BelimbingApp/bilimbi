@@ -7,7 +7,7 @@ set -euo pipefail
 [[ "$ID" == ubuntu && "$VERSION_ID" == 26.04 ]] || { echo "Ubuntu 26.04 required" >&2; exit 2; }
 
 apt-get update
-apt-get install -y ca-certificates curl gnupg postgresql-common caddy
+apt-get install -y ca-certificates curl gnupg postgresql-common caddy libssl3t64 libncurses6 libstdc++6
 install -d -m 0755 /etc/apt/keyrings
 curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --batch --yes --dearmor -o /etc/apt/keyrings/postgresql.gpg.tmp
 chmod 0644 /etc/apt/keyrings/postgresql.gpg.tmp

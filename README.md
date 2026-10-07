@@ -69,8 +69,9 @@ verify it runs.
    the server you have. Use the same value in every later shell.
 5. Setup: run `mix setup`. It fetches dependencies, creates the database,
    runs every installed migration, and builds the web assets.
-6. Development identity: run `mix bilimbi.dev.seed`. It creates the platform
-   tenant, a company, and the login `ai@agent.my` / `bilimbi-dev`.
+6. Development identity: run `mix bilimbi.dev.seed`. It seeds system roles,
+   creates the platform tenant/company and explicitly bootstraps the initial
+   administrator `ai@agent.my` / `bilimbi-dev`. Repeats preserve revoked roles.
 7. Run: start `mix bilimbi.server` in the background and wait until it logs
    that the endpoint is running on port 4000.
 8. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
@@ -132,5 +133,5 @@ Setup for real tenants, production mail, and the developer commands are in
 More documentation is in [`docs/`](./docs/README.md). Bilimbi is released
 under the [MIT License](./LICENSE).
 
-Production installation on Ubuntu 26.04 is covered by the
-[deployment guide](./docs/deploy/ubuntu-26.04.md).
+Use the [deployment and setup guide](docs/deploy/README.md) for native Ubuntu
+26.04 installation or Docker deployment on other Linux distributions.
