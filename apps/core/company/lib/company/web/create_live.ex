@@ -9,7 +9,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   import Ecto.Changeset
 
-  alias Bilimbi.Base.Authz.Restricted
   alias Bilimbi.Base.UI.FormErrors
   alias Bilimbi.Core.Company
   alias Ecto.Changeset
