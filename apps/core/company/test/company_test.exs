@@ -534,7 +534,6 @@ defmodule Bilimbi.Core.CompanyTest do
              Company.update_company(owner, 73, %{
                name: "Updated Name",
                legal_name: "Updated Legal Name Sdn. Bhd.",
-               status: "suspended",
                jurisdiction: "MY",
                email: "info@updated.com",
                website: "https://updated.com",
@@ -545,7 +544,7 @@ defmodule Bilimbi.Core.CompanyTest do
     assert updated.id == 73
     assert updated.name == "Updated Name"
     assert updated.legal_name == "Updated Legal Name Sdn. Bhd."
-    assert updated.status == "suspended"
+    assert updated.status == "active"
     assert updated.jurisdiction == "MY"
     assert updated.email == "info@updated.com"
     assert updated.website == "https://updated.com"
@@ -555,8 +554,9 @@ defmodule Bilimbi.Core.CompanyTest do
     assert {:error, :not_found} = Company.update_company(other, 73, %{name: "Hacked"})
     assert {:error, :not_found} = Company.update_company(owner, 9999, %{name: "Nonexistent"})
 
-    # Validation errors
-    assert {:error, changeset} = Company.update_company(owner, 73, %{status: "invalid_status"})
+    # Status is not an attribute of the update path: a lifecycle operation
+    # changes it (`company_lifecycle_test.exs`), and the key is refused here.
+    assert {:error, changeset} = Company.update_company(owner, 73, %{status: "suspended"})
     assert {:status, _} = List.keyfind(changeset.errors, :status, 0)
   end
 

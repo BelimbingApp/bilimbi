@@ -17,6 +17,17 @@ Legal entity type, department type, and relationship writes take that same scope
 
 Reference types, departments, relationships, and external accesses live in `reference_types.ex`, `departments.ex`, `relationships.ex`, and `external_accesses.ex`. `company.ex` keeps the public names with `defdelegate`; the `@doc` on those functions there owns the contract. Add the next aggregate beside those modules, not as more queries in `company.ex`.
 
+## Status is a lifecycle
+
+A company's status changes only through `archive_company/3`,
+`suspend_company/3`, `activate_company/3` or `reactivate_company/3`, which
+check the capability, judge the transition and record a retained
+`company.<event>` audit action in one transaction. `update_company/3`
+refuses a `status` key. The table is [`docs/README.md`](docs/README.md#lifecycle)
+and the bodies are `lifecycle.ex`. A page offers `lifecycle_operations/1`'s
+answer and nothing else; do not add a status select or a second transition
+list.
+
 ## Maintaining this file
 
 Keep this note short. Point at the function docs; do not copy them.
