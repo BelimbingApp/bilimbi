@@ -70,7 +70,10 @@ defmodule Bilimbi.Core.User.AdminBootstrap do
     scope = unwrap!(Tenancy.scope(result.tenant.id))
 
     role =
-      Enum.find(Authz.list_roles(scope), &(&1.is_system and &1.code == "core_admin" and &1.grant_all)) ||
+      Enum.find(
+        Authz.list_roles(scope),
+        &(&1.is_system and &1.code == "core_admin" and &1.grant_all)
+      ) ||
         Repo.rollback(:system_roles_missing)
 
     user =
