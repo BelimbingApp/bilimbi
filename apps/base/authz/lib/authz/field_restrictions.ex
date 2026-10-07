@@ -145,24 +145,22 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
       transaction(fn ->
         now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
-        restriction =
-          case Repo.one(
-                 from(r in Tenancy.scope_query(FieldRestriction, scope),
-                   where: r.table_id == ^table_id and r.field_id == ^field_id
-                 )
-               ) do
-            nil ->
-              Repo.insert!(%FieldRestriction{
+        {1, [restriction]} =
+          Repo.insert_all(
+            FieldRestriction,
+            [
+              %{
                 tenant_id: tenant_id,
                 table_id: table_id,
-                field_id: field_id
-              })
-
-            existing ->
-              existing
-              |> Ecto.Changeset.change(updated_at: now)
-              |> Repo.update!()
-          end
+                field_id: field_id,
+                created_at: now,
+                updated_at: now
+              }
+            ],
+            on_conflict: {:replace, [:updated_at]},
+            conflict_target: [:tenant_id, :table_id, :field_id],
+            returning: [:id, :table_id, :field_id]
+          )
 
         Repo.delete_all(
           from(rr in FieldRestrictionRole, where: rr.restriction_id == ^restriction.id)

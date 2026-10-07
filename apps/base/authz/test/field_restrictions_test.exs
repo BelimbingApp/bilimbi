@@ -182,6 +182,39 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
       assert Enum.all?(actions, &(&1.actor_type == "user" and &1.actor_id == 7))
     end
 
+    test "putting over a row that already exists replaces its roles and leaves one row", %{
+      operator: operator,
+      scope: scope,
+      viewer: viewer,
+      finance: finance
+    } do
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      {1, nil} =
+        Bilimbi.Base.Repo.insert_all(
+          Bilimbi.Base.Authz.FieldRestriction,
+          [
+            %{
+              tenant_id: Bilimbi.Base.Tenancy.Scope.tenant_id(scope),
+              table_id: "records",
+              field_id: "tax_id",
+              created_at: now,
+              updated_at: now
+            }
+          ]
+        )
+
+      for roles <- [[finance.id], [viewer.id, finance.id]] do
+        assert {:ok, %FieldRestrictionSummary{role_ids: role_ids}} =
+                 Authz.put_field_restriction(operator, "records", "tax_id", roles)
+
+        assert role_ids == Enum.sort(roles)
+      end
+
+      assert {:ok, [%FieldRestrictionSummary{field_id: "tax_id"}]} =
+               Authz.list_field_restrictions(operator)
+    end
+
     test "another tenant neither sees nor removes it", %{operator: operator, finance: finance} do
       assert {:ok, restriction} =
                Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])
