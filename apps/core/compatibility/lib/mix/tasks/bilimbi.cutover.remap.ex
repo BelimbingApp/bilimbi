@@ -57,76 +57,9 @@ defmodule Mix.Tasks.Bilimbi.Cutover.Remap do
     end)
   end
 
-  defp print_report(%{dry_run: dry_run?, steps: steps}) do
-    Mix.shell().info(
-      if dry_run?, do: "Cutover remap DRY RUN — no rows written.", else: "Cutover remap complete."
-    )
-
-    for step <- Cutover.steps() do
-      print_step(step, Map.fetch!(steps, step))
-    end
+  defp print_report(report) do
+    Enum.each(Cutover.report_lines(report), fn line -> Mix.shell().info(line) end)
   end
-
-  defp print_step(:pins, counts) do
-    Mix.shell().info(
-      "user_pins: examined=#{counts.examined} changed=#{counts.changed} unchanged=#{counts.unchanged} unmapped=#{counts.unmapped} icons_changed=#{counts.icons_changed}"
-    )
-
-    Enum.each(counts.residue, fn entry ->
-      Mix.shell().info(
-        "  UNMAPPED pin_id=#{entry.pin_id} user_id=#{entry.user_id}#{who(entry)} label=#{inspect(entry.label)} url=#{inspect(entry.url)} reason=#{inspect(entry.reason)}"
-      )
-    end)
-
-    Enum.each(counts.remainder, fn entry ->
-      Mix.shell().info(
-        "  REMAINDER icon=#{inspect(entry.icon)} example_pin_id=#{entry.example_pin_id} user_id=#{entry.user_id}"
-      )
-    end)
-  end
-
-  defp print_step(:query_icons, counts) do
-    Mix.shell().info(
-      "user_database_queries icons: examined=#{counts.examined} changed=#{counts.changed} remainder=#{counts.unmapped}"
-    )
-
-    Enum.each(counts.remainder, fn entry ->
-      Mix.shell().info(
-        "  REMAINDER icon=#{inspect(entry.icon)} example_query_id=#{entry.example_query_id} user_id=#{entry.user_id}"
-      )
-    end)
-  end
-
-  defp print_step(:notifications, counts) do
-    Mix.shell().info(
-      "notifications: examined=#{counts.examined} changed=#{counts.changed} unchanged=#{counts.unchanged} unmapped=#{counts.unmapped}"
-    )
-
-    Enum.each(counts.residue, fn entry ->
-      Mix.shell().info(
-        "  UNMAPPED notification_id=#{entry.notification_id} notifiable_id=#{entry.notifiable_id} type=#{inspect(entry.type)} url=#{inspect(entry.url)} reason=#{inspect(entry.reason)}"
-      )
-    end)
-  end
-
-  defp print_step(:grants, counts) do
-    Mix.shell().info("authz grants (report only, never mutated): undeclared=#{counts.undeclared}")
-
-    Enum.each(counts.role_grants, fn grant ->
-      Mix.shell().info(
-        "  UNDECLARED role grant role_id=#{grant.role_id} capability=#{inspect(grant.capability)}"
-      )
-    end)
-
-    Enum.each(counts.principal_grants, fn grant ->
-      Mix.shell().info(
-        "  UNDECLARED principal grant principal=#{grant.principal_type}:#{grant.principal_id} company_id=#{inspect(grant.company_id)} capability=#{inspect(grant.capability)} allowed=#{grant.allowed}"
-      )
-    end)
-  end
-
-  defp who(%{user_email: nil}), do: ""
-  defp who(%{user_email: email}), do: " (#{email})"
 
   defp with_repo!(repo, operation) do
     case Ecto.Migrator.with_repo(repo, operation, mode: :temporary) do

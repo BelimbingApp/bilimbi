@@ -92,6 +92,40 @@ defmodule Bilimbi.Core.Compatibility do
     run_and_record(repo, schema, installed, opts)
   end
 
+  @doc """
+  Whether the schema holds a Belimbing database that Bilimbi has not adopted:
+  Laravel's `migrations` table exists but the Bilimbi ledger is missing or
+  empty. Migrating such a database would run baseline DDL against tables that
+  already exist, so a deployment must adopt it first.
+
+  Only `migrations` and the ledger are read; adoption itself decides whether
+  the schema is compatible.
+  """
+  @spec unadopted_belimbing?(Ecto.Repo.t(), keyword()) :: boolean()
+  def unadopted_belimbing?(repo \\ Repo, opts \\ []) do
+    schema = Keyword.get(opts, :prefix, "public")
+    quoted = SchemaVerifier.quote_identifier!(schema)
+
+    [[laravel]] = SQL.query!(repo, "SELECT to_regclass($1)::text", ["#{quoted}.migrations"]).rows
+    not is_nil(laravel) and ledger_versions(repo, schema) in [:missing, []]
+  end
+
+  @doc """
+  Raises unless `migrate/2` is safe: refuses an unadopted Belimbing database
+  and names the adoption sequence.
+  """
+  @spec ensure_adopted!(Ecto.Repo.t(), keyword()) :: :ok
+  def ensure_adopted!(repo \\ Repo, opts \\ []) do
+    if unadopted_belimbing?(repo, opts) do
+      raise ArgumentError,
+            "this is an existing Belimbing database that Bilimbi has not adopted; " <>
+              "refusing to migrate. Run verify, adopt, remap (dry run, then real) before migrate " <>
+              "(docs/migrating-from-belimbing.md)"
+    end
+
+    :ok
+  end
+
   defp run_and_record(repo, schema, installed, opts) do
     migrations = Enum.map(installed, &{&1.version, &1.module})
 

@@ -5,9 +5,15 @@ defmodule BilimbiWeb.Release do
       bin/bilimbi eval "BilimbiWeb.Release.migrate()"
       bin/bilimbi eval "BilimbiWeb.Release.seed()"
       bin/bilimbi eval "BilimbiWeb.Release.bootstrap()"
+      bin/bilimbi eval "BilimbiWeb.Release.verify()"
       bin/bilimbi eval "BilimbiWeb.Release.adopt()"
+      bin/bilimbi eval "BilimbiWeb.Release.remap_dry_run()"
+      bin/bilimbi eval "BilimbiWeb.Release.remap()"
 
-  Migration, seeding and adoption mirror their umbrella Mix commands.
+  Migration, seeding, verification, adoption and remapping mirror their
+  umbrella Mix commands. An existing Belimbing database takes them in the
+  order verify, adopt, remap_dry_run, remap, migrate, seed; `migrate` refuses
+  an unadopted Belimbing database, so a deployment cannot skip the first four.
   Bootstrap seeds reference data and calls Core User's one-time installation
   API. Each loads the host's whole application closure and refuses an
   incomplete discovered graph before touching the database.
@@ -27,7 +33,66 @@ defmodule BilimbiWeb.Release do
     ModuleRegistry.complete_modules!()
 
     {:ok, _result, _started} =
-      Ecto.Migrator.with_repo(Repo, &Bilimbi.Core.Compatibility.migrate(&1, []))
+      Ecto.Migrator.with_repo(Repo, fn repo ->
+        :ok = Bilimbi.Core.Compatibility.ensure_adopted!(repo, [])
+        Bilimbi.Core.Compatibility.migrate(repo, [])
+      end)
+
+    :ok
+  end
+
+  @doc """
+  Read-only check of every installed schema contract and live-data invariant.
+  Raises, naming each drift, when the schema is not compatible.
+  """
+  @spec verify() :: :ok
+  def verify do
+    load_closure!(@app)
+    ModuleRegistry.complete_modules!()
+
+    {:ok, result, _started} =
+      Ecto.Migrator.with_repo(Repo, &Bilimbi.Core.Compatibility.verify(&1, []))
+
+    case result do
+      :ok ->
+        IO.puts("Bilimbi compatibility schema verified.")
+
+      {:error, errors} ->
+        raise "Bilimbi compatibility schema drift detected:\n" <>
+                Enum.map_join(errors, "\n", &"  - #{&1}")
+    end
+
+    :ok
+  end
+
+  @doc "Reports the cutover remap without writing; run it before `remap/0`."
+  @spec remap_dry_run() :: :ok
+  def remap_dry_run, do: remap_values(true)
+
+  @doc """
+  Remaps Belimbing stored values Bilimbi interprets differently. Run once
+  after `adopt/0`; it is idempotent.
+  """
+  @spec remap() :: :ok
+  def remap, do: remap_values(false)
+
+  defp remap_values(dry_run?) do
+    load_closure!(@app)
+    ModuleRegistry.complete_modules!()
+    ContributionRegistry.install!()
+
+    {:ok, result, _started} =
+      Ecto.Migrator.with_repo(Repo, fn repo ->
+        Bilimbi.Core.Compatibility.Cutover.run(repo: repo, dry_run: dry_run?)
+      end)
+
+    case result do
+      {:ok, report} ->
+        report |> Bilimbi.Core.Compatibility.Cutover.report_lines() |> Enum.each(&IO.puts/1)
+
+      {:error, message} ->
+        raise "cutover remap failed: #{message}"
+    end
 
     :ok
   end

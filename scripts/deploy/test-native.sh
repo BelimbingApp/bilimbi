@@ -86,6 +86,50 @@ absent prepare
 absent deploy
 grep -qx 'CONFIG=original' /etc/bilimbi/bilimbi.env
 
+# Exercise the real deploy.sh with the release and service commands doubled.
+getent group bilimbi >/dev/null || groupadd bilimbi
+mkdir -p "$test_dir/pkg/bilimbi/bin"
+cat > "$test_dir/pkg/bilimbi/bin/bilimbi" <<'SH'
+#!/usr/bin/env bash
+printf 'release %s\n' "$*" >> "$SETUP_TEST_LOG"
+[[ "$*" != *"${REFUSE_STEP:-none}"* ]]
+SH
+chmod +x "$test_dir/pkg/bilimbi/bin/bilimbi"
+cat > "$test_dir/bin/runuser" <<'SH'
+#!/usr/bin/env bash
+shift 3
+exec "$@"
+SH
+printf '#!/usr/bin/env bash\nprintf 200\n' > "$test_dir/bin/curl"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$test_dir/bin/sleep"
+chmod +x "$test_dir/bin/"*
+deploy() { # VERSION MODE
+  local package="$test_dir/bilimbi-$1-ubuntu-26.04-amd64.tar.gz"
+  tar -czf "$package" -C "$test_dir/pkg" bilimbi
+  (cd "$test_dir" && sha256sum "$(basename "$package")" > "$package.sha256")
+  bash "$root/scripts/deploy/deploy.sh" "$package" "$1" 5 "$2"
+}
+position() { grep -n -- "$1" "$SETUP_TEST_LOG" | head -n 1 | cut -d: -f1; }
+
+reset_log
+deploy adopt-1 adopt
+[[ $(grep '^release' "$SETUP_TEST_LOG" | tr '\n' '|') == \
+  'release eval BilimbiWeb.Release.verify()|release eval BilimbiWeb.Release.adopt()|release eval BilimbiWeb.Release.remap_dry_run()|release eval BilimbiWeb.Release.remap()|release eval BilimbiWeb.Release.migrate()|' ]]
+
+reset_log
+if REFUSE_STEP='Release.adopt()' deploy adopt-2 adopt; then exit 1; fi
+contains 'Release.verify()'
+absent 'Release.remap'
+absent 'Release.migrate()'
+[[ $(readlink /opt/bilimbi/current) == /opt/bilimbi/releases/adopt-1 ]]
+
+reset_log
+deploy upgrade-1 upgrade
+contains 'Release.migrate()'
+absent 'Release.verify()'
+absent 'Release.adopt()'
+absent 'Release.remap'
+
 printf 'ID=unsupported\nVERSION_ID=1\n' > /etc/os-release
 reset_log
 if run upgrade "$test_dir/archive" test; then exit 1; fi

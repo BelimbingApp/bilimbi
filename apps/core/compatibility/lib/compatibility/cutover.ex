@@ -251,6 +251,65 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     e in Error -> {:error, e.message}
   end
 
+  @doc """
+  The operator-facing report lines for a `run/1` result, one string per line.
+
+  `mix bilimbi.cutover.remap` and `BilimbiWeb.Release.remap/0` both print
+  these, so a dry run reads the same from a checkout and from a release.
+  """
+  @spec report_lines(report()) :: [String.t()]
+  def report_lines(%{dry_run: dry_run?, steps: steps}) do
+    header =
+      if dry_run?, do: "Cutover remap DRY RUN — no rows written.", else: "Cutover remap complete."
+
+    [header | Enum.flat_map(@steps, &step_lines(&1, Map.fetch!(steps, &1)))]
+  end
+
+  defp step_lines(:pins, counts) do
+    [
+      "user_pins: examined=#{counts.examined} changed=#{counts.changed} unchanged=#{counts.unchanged} unmapped=#{counts.unmapped} icons_changed=#{counts.icons_changed}"
+      | Enum.map(counts.residue, fn entry ->
+          "  UNMAPPED pin_id=#{entry.pin_id} user_id=#{entry.user_id}#{who(entry)} label=#{inspect(entry.label)} url=#{inspect(entry.url)} reason=#{inspect(entry.reason)}"
+        end) ++
+          Enum.map(counts.remainder, fn entry ->
+            "  REMAINDER icon=#{inspect(entry.icon)} example_pin_id=#{entry.example_pin_id} user_id=#{entry.user_id}"
+          end)
+    ]
+  end
+
+  defp step_lines(:query_icons, counts) do
+    [
+      "user_database_queries icons: examined=#{counts.examined} changed=#{counts.changed} remainder=#{counts.unmapped}"
+      | Enum.map(counts.remainder, fn entry ->
+          "  REMAINDER icon=#{inspect(entry.icon)} example_query_id=#{entry.example_query_id} user_id=#{entry.user_id}"
+        end)
+    ]
+  end
+
+  defp step_lines(:notifications, counts) do
+    [
+      "notifications: examined=#{counts.examined} changed=#{counts.changed} unchanged=#{counts.unchanged} unmapped=#{counts.unmapped}"
+      | Enum.map(counts.residue, fn entry ->
+          "  UNMAPPED notification_id=#{entry.notification_id} notifiable_id=#{entry.notifiable_id} type=#{inspect(entry.type)} url=#{inspect(entry.url)} reason=#{inspect(entry.reason)}"
+        end)
+    ]
+  end
+
+  defp step_lines(:grants, counts) do
+    [
+      "authz grants (report only, never mutated): undeclared=#{counts.undeclared}"
+      | Enum.map(counts.role_grants, fn grant ->
+          "  UNDECLARED role grant role_id=#{grant.role_id} capability=#{inspect(grant.capability)}"
+        end) ++
+          Enum.map(counts.principal_grants, fn grant ->
+            "  UNDECLARED principal grant principal=#{grant.principal_type}:#{grant.principal_id} company_id=#{inspect(grant.company_id)} capability=#{inspect(grant.capability)} allowed=#{grant.allowed}"
+          end)
+    ]
+  end
+
+  defp who(%{user_email: nil}), do: ""
+  defp who(%{user_email: email}), do: " (#{email})"
+
   defp context!(opts) do
     prefix = Keyword.get(opts, :prefix, "public")
 

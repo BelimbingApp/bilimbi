@@ -291,6 +291,33 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
   end
 
+  test "migration is refused on an unadopted Belimbing database until it is adopted", %{
+    schema: schema
+  } do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+
+    # A fresh database has neither Laravel's migrations table nor a ledger.
+    refute Compatibility.unadopted_belimbing?(MigrationTestRepo, prefix: schema)
+    assert :ok = Compatibility.ensure_adopted!(MigrationTestRepo, prefix: schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s|CREATE TABLE "#{schema}".migrations (id serial PRIMARY KEY, migration varchar NOT NULL, batch integer NOT NULL)|,
+      []
+    )
+
+    assert Compatibility.unadopted_belimbing?(MigrationTestRepo, prefix: schema)
+
+    assert_raise ArgumentError, ~r/not adopted.*verify, adopt, remap/s, fn ->
+      Compatibility.ensure_adopted!(MigrationTestRepo, prefix: schema)
+    end
+
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+    refute Compatibility.unadopted_belimbing?(MigrationTestRepo, prefix: schema)
+    assert :ok = Compatibility.ensure_adopted!(MigrationTestRepo, prefix: schema)
+  end
+
   test "adoption advances a verified prefix from an earlier Bilimbi baseline", %{schema: schema} do
     Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
     previous_versions = Enum.take(Compatibility.baseline_versions(), 3)

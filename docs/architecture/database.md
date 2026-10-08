@@ -219,7 +219,9 @@ and `seeds.run` therefore call `ModuleRegistry.complete_modules!/0` first and
 refuse to run unless every discovered module is loaded. The `bilimbi` release
 runs the same work without Mix through
 `bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and
-`bin/bilimbi eval "BilimbiWeb.Release.seed()"`.
+`bin/bilimbi eval "BilimbiWeb.Release.seed()"`. It also offers `verify()`,
+`adopt()`, `remap_dry_run()` and `remap()` for an existing Belimbing database,
+and `migrate()` refuses one that is not yet adopted.
 
 ## Compatibility lifecycle
 
