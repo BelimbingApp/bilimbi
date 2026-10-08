@@ -42,3 +42,4 @@ approval, and the PR must say so. Otherwise the record stays Proposed.
 | [0017 Routine system work runs as a named system principal](./0017-named-system-principals.md) | Accepted |
 | [0018 Workflow status definitions and owner adapters](./0018-workflow-status-contribution-consumer.md) | Accepted |
 | [0019 Grid table catalog as a contribution consumer](./0019-grid-contribution-consumer.md) | Accepted |
+| [0020 Per-owner migration ledger and absent optional structure at adoption](./0020-per-owner-ledger-and-absent-optional-structure.md) | Proposed |

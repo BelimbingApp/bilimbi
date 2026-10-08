@@ -11,6 +11,11 @@ identity
 > This ADR records the compatibility and adoption decision. The current
 > normative operating rules are centralized in
 > [Bilimbi Database Architecture](../database.md).
+> [ADR 0020](./0020-per-owner-ledger-and-absent-optional-structure.md)
+> amends two rules below: the ledger prefix is judged per owner and class
+> rather than across the whole composition, and a Domain or Extension whose
+> owned structure is wholly absent is left for `mix bilimbi.migrate` to
+> create rather than refused as drift.
 
 ## Context
 

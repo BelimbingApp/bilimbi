@@ -5,6 +5,14 @@ defmodule Bilimbi.Core.Compatibility do
   Fresh databases run the owned Ecto migrations. Existing Belimbing databases
   must pass strict verification before their current state is recorded in
   Bilimbi's independent migration ledger.
+
+  A mounted Domain or Extension maps a Belimbing module an installation may
+  never have had. One whose owned structure is wholly absent is not drift:
+  verification and adoption leave its compatible baselines pending, and
+  `migrate/2` creates them as on a fresh database (`absent_modules/2`). The
+  Platform maps Belimbing's own tables, so a Platform module with none is a
+  database behind the compatibility source, and a partly present owner of
+  any layer is drift.
   """
 
   alias Bilimbi.Base.Database.SchemaVerifier
@@ -14,6 +22,7 @@ defmodule Bilimbi.Core.Compatibility do
   alias Ecto.Adapters.SQL
 
   @compatibility_source "e70b4d33c0b10790e681f4c2b5095d85a53bc918"
+  @optional_layers [:domain, :extension]
 
   @doc "The name of Bilimbi's own migration ledger table (`bilimbi_schema_migrations`)."
   @spec migration_source() :: String.t()
@@ -72,24 +81,24 @@ defmodule Bilimbi.Core.Compatibility do
   end
 
   @doc """
-  Runs every installed migration through the single ledger and records provenance.
+  Runs every pending installed migration through the single ledger and
+  records provenance.
 
-  A ledger whose recorded versions are not class-valid raises `ArgumentError`.
+  A ledger that is not valid for every owner raises `ArgumentError`. Pending
+  migrations run in version order among themselves; one dated before a
+  recorded version is expected when a Domain or Extension was mounted after
+  the Platform migrated, when adoption left an absent owner's baseline for
+  this command, or when a later compatible baseline was adopted while an
+  earlier Bilimbi-only migration was pending. `Ecto.Migrator.run/4` never
+  refuses such a version itself; the ledger validation here is the guard.
   """
   @spec migrate(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate(repo \\ Repo, opts \\ []) do
     installed = installed_migrations()
     schema = Keyword.get(opts, :prefix, "public")
     _ = SchemaVerifier.quote_identifier!(schema)
-
-    strict_version_order = strict_version_order?(repo, schema, installed)
-
-    opts =
-      opts
-      |> Keyword.put(:all, true)
-      |> Keyword.put(:strict_version_order, strict_version_order)
-
-    run_and_record(repo, schema, installed, opts)
+    validate_ledger!(repo, schema, installed)
+    run_and_record(repo, schema, installed, Keyword.put(opts, :all, true))
   end
 
   @doc """
@@ -148,47 +157,112 @@ defmodule Bilimbi.Core.Compatibility do
     baselines = Enum.filter(installed_migrations(), &(&1.disposition == :compatible_baseline))
     schema = Keyword.get(opts, :prefix, "public")
     _ = SchemaVerifier.quote_identifier!(schema)
-
-    opts =
-      opts
-      |> Keyword.put(:all, true)
-      |> Keyword.put(:strict_version_order, false)
-
-    run_and_record(repo, schema, baselines, opts)
+    run_and_record(repo, schema, baselines, Keyword.put(opts, :all, true))
   end
 
   @doc """
   Verifies the live schema against every installed module's schema contract and
   live-data invariants.
 
-  Returns `:ok` or `{:error, messages}`.
+  An absent Domain or Extension (`absent_modules/2`) is skipped: it has no
+  structure to verify and no invariant to hold. Returns `:ok` or
+  `{:error, messages}`.
   """
   @spec verify(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
   def verify(repo \\ Repo, opts \\ []) do
-    contracts =
-      ModuleRegistry.installed_modules!()
-      |> Enum.reject(&is_nil(&1.schema_contract))
-      |> Enum.map(& &1.schema_contract)
+    case verification(repo, opts) do
+      {:ok, _absent} -> :ok
+      {:error, errors} -> {:error, errors}
+    end
+  end
 
-    table_specs = Enum.flat_map(contracts, & &1.tables())
+  @doc """
+  The stable IDs of the installed Domain or Extension modules whose owned
+  structure is wholly absent from the database.
 
-    contributions =
-      Enum.flat_map(contracts, fn contract ->
-        if function_exported?(contract, :contributions, 0),
-          do: contract.contributions(),
-          else: []
-      end)
+  The Belimbing module such an owner maps was never installed there, so
+  verification does not report its tables as missing, adoption leaves its
+  compatible baselines unrecorded, and `migrate/2` creates them. An owner
+  with a recorded version is never absent: its structure was applied, and a
+  table missing afterwards is drift.
+  """
+  @spec absent_modules(Ecto.Repo.t(), keyword()) :: [String.t()]
+  def absent_modules(repo \\ Repo, opts \\ []) do
+    for {descriptor, :absent} <- owners_by_presence(repo, opts), do: descriptor.id
+  end
+
+  @doc """
+  One line per absent module, for the verify, adopt, and release commands to
+  print after success, so the operator knows which compatible baselines the
+  migrate command will create rather than adopt.
+  """
+  @spec absent_module_report(Ecto.Repo.t(), keyword()) :: [String.t()]
+  def absent_module_report(repo \\ Repo, opts \\ []) do
+    for id <- absent_modules(repo, opts) do
+      "#{id}: no owned structure exists in this database; " <>
+        "the migrate command creates its compatible baseline."
+    end
+  end
+
+  defp verification(repo, opts) do
+    owners = owners_by_presence(repo, opts)
+    present = for {descriptor, :present} <- owners, do: descriptor.schema_contract
+    absent = for {descriptor, :absent} <- owners, do: descriptor.id
+    table_specs = Enum.flat_map(present, & &1.tables())
+    contributions = Enum.flat_map(present, &contributions/1)
 
     with :ok <- SchemaVerifier.verify(repo, table_specs, opts),
-         :ok <- SchemaVerifier.verify_contributions(repo, contributions, opts) do
-      verify_invariants(contracts, repo, opts)
+         :ok <- SchemaVerifier.verify_contributions(repo, contributions, opts),
+         :ok <- verify_invariants(present, repo, opts) do
+      {:ok, absent}
     end
+  end
+
+  # Every installed module with a schema contract, and whether its owned
+  # structure is present or absent. Only a Domain or Extension with no
+  # recorded version can be absent: the Platform maps Belimbing's own tables,
+  # so a Platform module with none is a database behind the compatibility
+  # source, which verification then reports table by table.
+  defp owners_by_presence(repo, opts) do
+    schema = Keyword.get(opts, :prefix, "public")
+    _ = SchemaVerifier.quote_identifier!(schema)
+
+    recorded =
+      case ledger_versions(repo, schema) do
+        :missing -> []
+        versions -> versions
+      end
+
+    applied_owners =
+      for %{version: version, owner_id: owner_id} <- installed_migrations(),
+          version in recorded,
+          uniq: true,
+          do: owner_id
+
+    ModuleRegistry.installed_modules!()
+    |> Enum.reject(&is_nil(&1.schema_contract))
+    |> Enum.map(fn descriptor ->
+      contract = descriptor.schema_contract
+
+      absent? =
+        descriptor.layer in @optional_layers and descriptor.id not in applied_owners and
+          SchemaVerifier.absent?(repo, contract.tables(), contributions(contract), opts)
+
+      {descriptor, if(absent?, do: :absent, else: :present)}
+    end)
+  end
+
+  defp contributions(contract) do
+    Code.ensure_loaded!(contract)
+    if function_exported?(contract, :contributions, 0), do: contract.contributions(), else: []
   end
 
   @doc """
   Adopts an existing Belimbing database: verifies it strictly, then records the
   compatible baselines in the ledger.
 
+  The baselines of an absent Domain or Extension (`absent_modules/2`) are
+  not recorded: there is nothing to adopt, and `migrate/2` creates them.
   Returns `{:ok, :adopted | :advanced | :already_adopted}`, or an error for
   structural drift or a conflicting ledger.
   """
@@ -214,29 +288,30 @@ defmodule Bilimbi.Core.Compatibility do
       ["bilimbi-schema-adoption:#{schema}"]
     )
 
-    case verify(repo, opts) do
-      :ok -> adopt_ledger(repo, schema)
+    case verification(repo, opts) do
+      {:ok, absent} -> adopt_ledger(repo, schema, absent)
       {:error, errors} -> repo.rollback({:schema_drift, errors})
     end
   end
 
-  defp adopt_ledger(repo, schema) do
+  defp adopt_ledger(repo, schema, absent) do
     installed = installed_migrations()
+    adoptable = Enum.reject(installed, &(&1.owner_id in absent))
 
     case ledger_versions(repo, schema) do
       :missing ->
         create_ledger!(repo, schema)
-        record_baselines!(repo, schema, installed, [])
+        record_baselines!(repo, schema, installed, adoptable, [])
         {:ok, :adopted}
 
       [] ->
-        record_baselines!(repo, schema, installed, [])
+        record_baselines!(repo, schema, installed, adoptable, [])
         {:ok, :adopted}
 
       versions ->
         case validate_ledger(repo, schema, installed, versions) do
           :ok ->
-            if record_baselines!(repo, schema, installed, versions) == [],
+            if record_baselines!(repo, schema, installed, adoptable, versions) == [],
               do: {:ok, :already_adopted},
               else: {:ok, :advanced}
 
@@ -246,10 +321,11 @@ defmodule Bilimbi.Core.Compatibility do
     end
   end
 
-  # Records the compatible baselines the ledger lacks and the provenance of
-  # every applied version, returning the baselines it recorded.
-  defp record_baselines!(repo, schema, installed, versions) do
-    missing = baseline_versions(installed) -- versions
+  # Records the compatible baselines the ledger lacks, except an absent
+  # owner's, which stay pending for migrate, and the provenance of every
+  # applied version, returning the baselines it recorded.
+  defp record_baselines!(repo, schema, installed, adoptable, versions) do
+    missing = baseline_versions(adoptable) -- versions
     if missing != [], do: record_versions!(repo, schema, missing)
     MigrationProvenance.record!(repo, schema, installed, versions ++ missing)
     missing
@@ -259,19 +335,19 @@ defmodule Bilimbi.Core.Compatibility do
     for %{disposition: :compatible_baseline, version: version} <- installed, do: version
   end
 
-  defp strict_version_order?(repo, schema, installed) do
+  defp validate_ledger!(repo, schema, installed) do
     case ledger_versions(repo, schema) do
       :missing ->
-        true
+        :ok
 
       versions ->
         case validate_ledger(repo, schema, installed, versions) do
           :ok ->
-            not class_valid_gap?(installed, versions)
+            :ok
 
           {:error, conflicts} ->
             raise ArgumentError,
-                  "Bilimbi migration ledger is not class-valid:\n" <>
+                  "Bilimbi migration ledger is not valid:\n" <>
                     Enum.map_join(conflicts, "\n", &"  - #{&1}")
         end
     end
@@ -279,40 +355,40 @@ defmodule Bilimbi.Core.Compatibility do
 
   # Every recorded version must be explained -- by an installed migration or,
   # for a Domain or Extension that has since been unmounted, by retained
-  # provenance -- and the installed versions recorded in each class must be a
-  # prefix of that class's sequence.
+  # provenance -- and, for each owner, the recorded versions in each class
+  # must be a prefix of that owner's class sequence.
+  #
+  # Owners are independent of one another: a Domain mounted after the
+  # Platform migrated ships earlier-dated versions that are all pending, and
+  # a Domain whose Belimbing module an installation never had keeps its
+  # baseline pending behind recorded Platform baselines. A gap inside one
+  # owner's own sequence, and a ledger no installed module or retained
+  # provenance explains, still fail closed.
   defp validate_ledger(repo, schema, installed, versions) do
     installed_ids = Enum.map(ModuleRegistry.installed_modules!(), & &1.id)
     provenance = MigrationProvenance.fetch(repo, schema)
 
     conflicts =
       MigrationProvenance.conflicts(installed, versions, provenance, installed_ids) ++
-        class_conflicts(installed, versions, :compatible_baseline) ++
-        class_conflicts(installed, versions, :bilimbi_only)
+        owner_class_conflicts(installed, versions)
 
     if conflicts == [], do: :ok, else: {:error, conflicts}
   end
 
-  defp class_conflicts(installed, versions, disposition) do
-    class_versions = for %{disposition: ^disposition, version: v} <- installed, do: v
-    recorded = Enum.filter(class_versions, &(&1 in versions))
+  defp owner_class_conflicts(installed, versions) do
+    installed
+    |> Enum.group_by(&{&1.owner_id, &1.disposition}, & &1.version)
+    |> Enum.sort()
+    |> Enum.flat_map(fn {{owner_id, disposition}, sequence} ->
+      recorded = Enum.filter(sequence, &(&1 in versions))
 
-    if prefix?(class_versions, recorded),
-      do: [],
-      else: [
-        "recorded #{disposition} versions #{inspect(recorded)} are not a prefix of #{inspect(class_versions)}"
-      ]
-  end
-
-  defp prefix?(versions, recorded) do
-    Enum.take(versions, length(recorded)) == recorded
-  end
-
-  defp class_valid_gap?(_entries, []), do: false
-
-  defp class_valid_gap?(installed, versions) do
-    latest_recorded = Enum.max(versions)
-    Enum.any?(installed, &(&1.version < latest_recorded and &1.version not in versions))
+      if List.starts_with?(sequence, recorded),
+        do: [],
+        else: [
+          "recorded #{disposition} versions #{inspect(recorded)} of #{owner_id} " <>
+            "are not a prefix of its sequence #{inspect(sequence)}"
+        ]
+    end)
   end
 
   defp ledger_versions(repo, schema) do

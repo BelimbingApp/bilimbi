@@ -6,7 +6,9 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
       mix bilimbi.schema.verify --prefix custom_schema
 
   The task is read-only and exits with an error when owned structure or
-  bootstrap invariants drift.
+  bootstrap invariants drift. A mounted Domain or Extension whose owned
+  structure is wholly absent is reported, not refused: `mix bilimbi.migrate`
+  creates its compatible baseline.
   """
 
   use Mix.Task
@@ -30,6 +32,11 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
     case Bilimbi.Core.Compatibility.verify(repo, opts) do
       :ok ->
         Mix.shell().info("Bilimbi compatibility schema verified.")
+
+        Enum.each(
+          Bilimbi.Core.Compatibility.absent_module_report(repo, opts),
+          &Mix.shell().info(&1)
+        )
 
       {:error, errors} ->
         details = Enum.map_join(errors, "\n", &"  - #{&1}")
