@@ -146,9 +146,11 @@ defmodule Bilimbi.Base.Schedule do
     with :ok <- authorize(scope, @execute) do
       triggered_by = triggered_by(scope)
 
-      operator_action(scope, "schedule.run.queued", key, %{}, fn ->
+      scope
+      |> operator_action("schedule.run.queued", key, %{}, fn ->
         enqueue_manual(key, triggered_by)
       end)
+      |> record_refused_overlap(key, triggered_by)
     end
   end
 
@@ -294,8 +296,31 @@ defmodule Bilimbi.Base.Schedule do
   no person. `run_now/2` is the form that records who asked.
   """
   @spec run_now(String.t()) :: {:ok, Queue.JobRef.t()} | {:error, atom()}
-  def run_now(key) when is_binary(key), do: enqueue_manual(key, nil)
+  def run_now(key) when is_binary(key),
+    do: key |> enqueue_manual(nil) |> record_refused_overlap(key, nil)
+
   def run_now(_key), do: {:error, :not_found}
+
+  # A refused run is history too. It is written here, after any operator
+  # transaction has rolled back, so the refusal that rolls it back cannot
+  # discard the row naming who asked.
+  defp record_refused_overlap({:error, :overlap} = refused, key, triggered_by) do
+    case definition(key) do
+      %Definition{} = definition ->
+        Scheduler.record_overlap(definition, DateTime.utc_now(), :manual, triggered_by)
+
+      nil ->
+        :ok
+    end
+
+    refused
+  rescue
+    _error -> {:error, :overlap}
+  catch
+    :exit, _reason -> {:error, :overlap}
+  end
+
+  defp record_refused_overlap(result, _key, _triggered_by), do: result
 
   defp enqueue_manual(key, triggered_by) do
     case definition(key) do

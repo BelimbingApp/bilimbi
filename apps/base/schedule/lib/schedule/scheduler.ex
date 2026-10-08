@@ -64,7 +64,10 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   @doc false
   @spec enqueue_due(Definition.t(), DateTime.t()) :: {:ok, Queue.JobRef.t()} | {:error, atom()}
   def enqueue_due(%Definition{} = definition, %DateTime{} = intended_at) do
-    enqueue_occurrence(definition, intended_at, :scheduled)
+    with {:error, :overlap} = refused <- enqueue_occurrence(definition, intended_at, :scheduled) do
+      record_overlap(definition, intended_at, :scheduled, nil)
+      refused
+    end
   end
 
   @doc false
@@ -123,21 +126,13 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
         {:error, reason}
 
       {:error, :claimable, :overlap, _changes} ->
-        best_effort_record_overlap(definition, intended_at, trigger, triggered_by)
         {:error, :overlap}
 
       {:error, :claimable, reason, _changes} ->
         {:error, reason}
 
       {:error, :occurrence, changeset, _changes} ->
-        case occurrence_error(changeset) do
-          {:error, :overlap} = error ->
-            best_effort_record_overlap(definition, intended_at, trigger, triggered_by)
-            error
-
-          error ->
-            error
-        end
+        occurrence_error(changeset)
 
       {:error, :job, reason, _changes} ->
         {:error, reason}
@@ -357,7 +352,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
     )
   end
 
-  defp best_effort_record_overlap(definition, intended_at, trigger, triggered_by) do
+  @doc false
+  def record_overlap(definition, intended_at, trigger, triggered_by) do
+    triggered_by = triggered_by || %{user_id: nil, name: nil}
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     Repo.insert!(%Run{

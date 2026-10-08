@@ -475,15 +475,10 @@ defmodule Bilimbi.Base.ScheduleTest do
     definition: definition
   } do
     assert :ok = Schedule.review_definition(definition.key, true)
-    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+    operator = granted_operator([@execute])
+    assert {:ok, %JobRef{}} = Schedule.run_now(operator, definition.key)
 
-    asked = %{user_id: 91, name: "Ada"}
-
-    assert {:error, :overlap} =
-             Scheduler.enqueue_occurrence(definition, DateTime.utc_now(), :manual,
-               triggered_by: asked
-             )
-
+    assert {:error, :overlap} = Schedule.run_now(operator, definition.key)
     assert {:error, :overlap} = Schedule.run_now(definition.key)
 
     assert [refused_by_person, refused_anonymously] =
@@ -494,7 +489,7 @@ defmodule Bilimbi.Base.ScheduleTest do
                )
              )
 
-    assert %{trigger: "manual", triggered_by_user_id: 91, triggered_by_name: "Ada"} =
+    assert %{trigger: "manual", triggered_by_user_id: 91, output_excerpt: "overlap"} =
              refused_by_person
 
     assert %{trigger: "manual", triggered_by_user_id: nil, triggered_by_name: nil} =
