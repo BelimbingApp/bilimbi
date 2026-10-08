@@ -214,7 +214,8 @@ a Bilimbi-only version. A later compatible baseline can therefore be adopted
 while an earlier Bilimbi-only migration remains pending; the operational
 migrate command accepts that validated class gap and executes the pending
 migration normally. A fresh database runs both classes; a foreign or
-class-non-prefix ledger remains a conflict.
+class-non-prefix ledger remains a conflict. ADR 0020 judges that prefix per
+owner rather than across the whole composition.
 
 Verification checks owned columns, types, nullability, defaults, named indexes
 including the partial predicate, single and composite foreign keys, and
