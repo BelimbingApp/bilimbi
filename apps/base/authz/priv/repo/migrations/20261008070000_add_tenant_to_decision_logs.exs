@@ -11,6 +11,9 @@ defmodule Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs do
   # company. A row with no company has no derivable tenant and stays null; the
   # platform operator's decision log page still lists it. An adopted database
   # arrives with Belimbing's backfill already applied.
+  #
+  # Base does not depend on Core, so the backfill runs only where Core's
+  # `companies` table exists; a Base-only database has no company to read.
   use Ecto.Migration
 
   def change do
@@ -26,11 +29,19 @@ defmodule Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs do
   end
 
   defp backfill_from_company do
+    companies = qualified_table("companies")
+
     """
-    UPDATE #{qualified_table("base_authz_decision_logs")} AS log
-    SET tenant_id = company.tenant_id
-    FROM #{qualified_table("companies")} AS company
-    WHERE log.company_id = company.id AND log.tenant_id IS NULL
+    DO $backfill$
+    BEGIN
+      IF to_regclass('#{String.replace(companies, "'", "''")}') IS NOT NULL THEN
+        UPDATE #{qualified_table("base_authz_decision_logs")} AS log
+        SET tenant_id = company.tenant_id
+        FROM #{companies} AS company
+        WHERE log.company_id = company.id AND log.tenant_id IS NULL;
+      END IF;
+    END
+    $backfill$
     """
   end
 
