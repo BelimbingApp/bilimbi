@@ -68,9 +68,15 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   end
 
   @doc false
-  def enqueue_occurrence(%Definition{} = definition, %DateTime{} = intended_at, trigger)
-      when trigger in [:manual, :scheduled] do
+  def enqueue_occurrence(
+        %Definition{} = definition,
+        %DateTime{} = intended_at,
+        trigger,
+        opts \\ []
+      )
+      when trigger in [:manual, :scheduled] and is_list(opts) do
     intended_at = DateTime.truncate(intended_at, :microsecond)
+    triggered_by = Keyword.get(opts, :triggered_by) || %{user_id: nil, name: nil}
     overlap_key = if definition.overlap == :forbid, do: @source <> ":" <> definition.key
 
     multi =
@@ -100,7 +106,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
           "expression" => if(trigger == :scheduled, do: definition.expression),
           "fingerprint" => Administration.fingerprint(definition),
           "intended_at" => DateTime.to_iso8601(intended_at),
-          "trigger" => Atom.to_string(trigger)
+          "trigger" => Atom.to_string(trigger),
+          "triggered_by_user_id" => triggered_by.user_id,
+          "triggered_by_name" => triggered_by.name
         })
       end)
       |> Multi.update(:record_job, fn %{occurrence: occurrence, job: job} ->

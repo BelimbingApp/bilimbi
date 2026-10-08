@@ -269,6 +269,12 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     refute has_element?(executor, "#schedule-task-test-schedule-pause")
     assert render_click(executor, "run_now", %{"key" => definition.key}) =~ "Run queued."
     assert Repo.exists?(Occurrence)
+
+    # History names the person who clicked, resolved through the directory
+    # at dispatch and kept on the run.
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    {:ok, history, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+    assert has_element?(history, "#schedule-runs", "Run now by Ada Lovelace")
   end
 
   test "enabling a paused task says it stays paused until resumed", %{

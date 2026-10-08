@@ -10,6 +10,7 @@
     "base/authz",
     "base/database",
     "base/module_registry",
+    "base/principal_directory",
     "base/queue",
     "base/settings",
     "base/tenancy",
@@ -19,7 +20,8 @@
   migration_dispositions: %{
     20_260_813_114_301 => :compatible_baseline,
     20_260_821_100_001 => :bilimbi_only,
-    20_261_003_120_002 => :bilimbi_only
+    20_261_003_120_002 => :bilimbi_only,
+    20_261_008_070_100 => :compatible_baseline
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Base.Schedule.SchemaContract,

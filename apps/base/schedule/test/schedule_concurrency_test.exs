@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.Definition
+  alias Bilimbi.Base.Schedule.Migrations.AddTriggerProvenanceToRuns
   alias Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline, as: CreateScheduleBaseline
   alias Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime
   alias Bilimbi.Base.Schedule.Occurrence
@@ -84,6 +85,11 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
     )
 
     Ecto.Migrator.up(Repo, 20_260_821_100_001, CreateOccurrenceRuntime,
+      log: false,
+      dynamic_repo: repos.observer
+    )
+
+    Ecto.Migrator.up(Repo, 20_261_008_070_100, AddTriggerProvenanceToRuns,
       log: false,
       dynamic_repo: repos.observer
     )
@@ -244,7 +250,8 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
           "../../settings/priv/repo/migrations/20260811093952_create_base_settings_compatibility_baseline.exs",
           "../../queue/priv/repo/migrations/20260820130000_create_base_queue_oban_runtime.exs",
           "../priv/repo/migrations/20260813114301_create_base_schedule_compatibility_baseline.exs",
-          "../priv/repo/migrations/20260821100001_create_base_schedule_occurrence_runtime.exs"
+          "../priv/repo/migrations/20260821100001_create_base_schedule_occurrence_runtime.exs",
+          "../priv/repo/migrations/20261008070100_add_trigger_provenance_to_runs.exs"
         ] do
       Code.require_file(Path.expand(path, __DIR__))
     end

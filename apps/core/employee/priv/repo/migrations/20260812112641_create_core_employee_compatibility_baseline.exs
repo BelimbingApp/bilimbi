@@ -72,7 +72,15 @@ defmodule Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline do
       timestamps(type: :naive_datetime, null: true, inserted_at: :created_at)
     end
 
-    create unique_index(:employee_types, [:code], name: :employee_types_code_unique)
+    # Laravel's `unique('code')` is a table constraint, not a bare unique
+    # index. Migration 20260817173000 drops it as a constraint on both a
+    # fresh and an adopted database, so the baseline creates what Laravel
+    # creates.
+    execute """
+    ALTER TABLE #{quoted_prefix()}.employee_types
+    ADD CONSTRAINT employee_types_code_unique UNIQUE (code)
+    """
+
     create index(:employee_types, [:company_id])
     create index(:employee_types, [:company_id, :code])
   end

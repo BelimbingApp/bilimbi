@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.Authz.Administration do
   alias Bilimbi.Base.Authz.RoleSummary
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
 
   @default_page_size 25
@@ -154,8 +155,12 @@ defmodule Bilimbi.Base.Authz.Administration do
 
     visibility = company_visibility(scope, company_ids(scope, registry))
 
+    # Decisions are read by the tenant they were made in, exactly as Belimbing
+    # reads them; a row logged with no tenant is on no tenant's page.
     query =
-      from(log in DecisionLog, where: ^visibility)
+      DecisionLog
+      |> Tenancy.scope_query(scope)
+      |> where(^visibility)
       |> maybe_search_decision_logs(search!(opts[:search]))
       |> maybe_filter_allowed(allowed!(opts[:allowed]))
 

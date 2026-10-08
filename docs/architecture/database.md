@@ -276,6 +276,20 @@ owner is drift, and the Platform is never absent; the rule is
 and its operation is the
 [Core Compatibility contract](../../apps/core/compatibility/docs/README.md).
 
+The reference schema is what upstream Belimbing's own migrations create at
+the commit `Bilimbi.Core.Compatibility.compatibility_source/0` names. A
+schema-only dump of that database is committed as
+`apps/core/compatibility/test/fixtures/belimbing/schema.sql`, and
+`BelimbingSchemaAdoptionE2ETest` runs verify, adopt, and migrate against it.
+A baseline proved only against databases Bilimbi's own baselines built proves
+nothing about adoption: Laravel's `unique()` is a table constraint, so a later
+migration drops the constraint, not an index; an index Belimbing ships is a
+compatible baseline, never Bilimbi-only work; and a column upstream added
+after the first baseline is a further `:compatible_baseline` migration that
+names the upstream file, so an existing Bilimbi database upgrades through
+`mix bilimbi.migrate` while an adopted one records it without DDL. When the
+compatibility source advances, regenerate the fixture in the same change.
+
 Run the remap's `--dry-run` first on cutover day (it is the read-only
 value verifier: shape verification stays `bilimbi.schema.verify`), read the
 residue it names, then run the real remap before opening traffic. Pass the
@@ -345,7 +359,8 @@ When adding or changing persistent behavior:
 5. use a globally unique migration version and exact disposition;
 6. update both sides of a cross-module contribution atomically;
 7. update the schema contract and live-data invariants;
-8. verify fresh migration and, when relevant, existing-schema adoption;
+8. verify fresh migration and, for any compatible baseline, adoption of the
+   Belimbing schema fixture;
 9. run `mix bilimbi.migrations`, focused tests, formatting, and the required
    repository checks; and
 10. update this specification only when the database architecture changes,

@@ -52,6 +52,9 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
       columns: %{
         "id" => column(:bigint, false, {:sequence, "base_schedule_runs_id_seq"}),
         "source" => column({:varchar, 40}, false, {:string, "scheduler"}),
+        "trigger" => column({:varchar, 20}, false, {:string, "scheduled"}),
+        "triggered_by_user_id" => column(:bigint),
+        "triggered_by_name" => column({:varchar, 255}),
         "key" => column({:varchar, 255}, false),
         "name" => column({:varchar, 255}, false),
         "expression" => column({:varchar, 64}),
@@ -67,6 +70,7 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
       indexes: %{
         "base_schedule_runs_pkey" => index(["id"], true),
         "base_schedule_runs_source_index" => index(["source"]),
+        "base_schedule_runs_triggered_by_user_id_index" => index(["triggered_by_user_id"]),
         "base_schedule_runs_key_index" => index(["key"]),
         "base_schedule_runs_name_index" => index(["name"]),
         "base_schedule_runs_status_index" => index(["status"]),

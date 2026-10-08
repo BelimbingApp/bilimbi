@@ -6,6 +6,9 @@ defmodule Bilimbi.Base.Schedule.Run do
   @primary_key {:id, :id, autogenerate: true}
   schema "base_schedule_runs" do
     field :source, :string, default: "scheduler"
+    field :trigger, :string, default: "scheduled"
+    field :triggered_by_user_id, :id
+    field :triggered_by_name, :string
     field :key, :string
     field :name, :string
     field :expression, :string

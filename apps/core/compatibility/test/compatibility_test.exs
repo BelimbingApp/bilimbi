@@ -345,8 +345,9 @@ defmodule Bilimbi.Core.CompatibilityTest do
     synthetic_version = install_synthetic_migration!()
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") == nil
-    assert relation(MigrationTestRepo, schema, "users_company_id_index") == nil
-    assert relation(MigrationTestRepo, schema, "users_employee_id_index") == nil
+    # Belimbing ships both account indexes, so the baseline-only state has them.
+    assert relation(MigrationTestRepo, schema, "users_company_id_index") != nil
+    assert relation(MigrationTestRepo, schema, "users_employee_id_index") != nil
 
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
 

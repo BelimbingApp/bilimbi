@@ -14,6 +14,9 @@ defmodule Bilimbi.Base.Schedule.TestFixtures do
       CREATE TEMPORARY TABLE IF NOT EXISTS base_schedule_runs (
         id bigserial PRIMARY KEY,
         source varchar(40) NOT NULL DEFAULT 'scheduler',
+        trigger varchar(20) NOT NULL DEFAULT 'scheduled',
+        triggered_by_user_id bigint,
+        triggered_by_name varchar(255),
         key varchar(255) NOT NULL,
         name varchar(255) NOT NULL,
         expression varchar(64),
@@ -28,6 +31,10 @@ defmodule Bilimbi.Base.Schedule.TestFixtures do
       ) ON COMMIT PRESERVE ROWS
       """,
       "CREATE INDEX IF NOT EXISTS base_schedule_runs_source_index ON base_schedule_runs (source)",
+      """
+      CREATE INDEX IF NOT EXISTS base_schedule_runs_triggered_by_user_id_index
+        ON base_schedule_runs (triggered_by_user_id)
+      """,
       "CREATE INDEX IF NOT EXISTS base_schedule_runs_key_index ON base_schedule_runs (key)",
       "CREATE INDEX IF NOT EXISTS base_schedule_runs_name_index ON base_schedule_runs (name)",
       "CREATE INDEX IF NOT EXISTS base_schedule_runs_status_index ON base_schedule_runs (status)",

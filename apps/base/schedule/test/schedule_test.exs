@@ -259,6 +259,35 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert Settings.get("schedule.history.keep_days") == 45
   end
 
+  test "a manual run records who asked for it and a scopeless one records nobody", %{
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    operator = granted_operator([@execute])
+
+    # The definition forbids overlap, so each manual run drains before the next.
+    assert {:ok, %JobRef{id: operator_job_id}} = Schedule.run_now(operator, definition.key)
+
+    assert %{"__bilimbi_schedule__" => %{"trigger" => "manual", "triggered_by_user_id" => 91}} =
+             Repo.one!(from(job in Oban.Job, where: job.id == ^operator_job_id, select: job.args))
+
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert {:ok, %JobRef{id: anonymous_job_id}} = Schedule.run_now(definition.key)
+
+    assert %{"__bilimbi_schedule__" => %{"trigger" => "manual", "triggered_by_user_id" => nil}} =
+             Repo.one!(
+               from(job in Oban.Job, where: job.id == ^anonymous_job_id, select: job.args)
+             )
+
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+
+    assert {:ok, %{entries: entries}} = Schedule.list_runs(sort_by: :started_at, sort_dir: :asc)
+    assert [operator_run, anonymous_run] = entries
+
+    assert %{trigger: "manual", triggered_by_user_id: 91} = operator_run
+    assert %{trigger: "manual", triggered_by_user_id: nil, triggered_by_name: nil} = anonymous_run
+  end
+
   test "diagnostics distinguish recorder failure from Queue evidence" do
     diagnostics = Schedule.diagnostics()
     assert diagnostics.queue == :available

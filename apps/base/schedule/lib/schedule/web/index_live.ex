@@ -673,6 +673,15 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp run_result(%{exit_code: exit_code}) when is_integer(exit_code), do: "Exit #{exit_code}"
   defp run_result(run), do: status_label(run.status)
 
+  defp trigger_label(%{trigger: "manual", triggered_by_name: name}) when is_binary(name),
+    do: "Run now by #{name}"
+
+  defp trigger_label(%{trigger: "manual", triggered_by_user_id: id}) when is_integer(id),
+    do: "Run now by user #{id}"
+
+  defp trigger_label(%{trigger: "manual"}), do: "Run now"
+  defp trigger_label(_run), do: "Scheduled"
+
   defp due_label(:none_due), do: "No work currently due"
   defp due_label(:due), do: "Work is due"
   defp due_label(:unknown), do: "Unknown"

@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Schedule do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule.Administration
@@ -24,6 +25,7 @@ defmodule Bilimbi.Base.Schedule do
   alias Bilimbi.Base.Schedule.Suppression
   alias Bilimbi.Base.Schedule.TaskSummary
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
 
   @source "scheduler"
@@ -142,7 +144,11 @@ defmodule Bilimbi.Base.Schedule do
           {:ok, Queue.JobRef.t()} | {:error, atom()}
   def run_now(%Scope{} = scope, key) when is_binary(key) do
     with :ok <- authorize(scope, @execute) do
-      operator_action(scope, "schedule.run.queued", key, %{}, fn -> run_now(key) end)
+      triggered_by = triggered_by(scope)
+
+      operator_action(scope, "schedule.run.queued", key, %{}, fn ->
+        enqueue_manual(key, triggered_by)
+      end)
     end
   end
 
@@ -281,12 +287,22 @@ defmodule Bilimbi.Base.Schedule do
 
   def resume(_key), do: {:error, :not_found}
 
-  @doc "Queues one operator-requested occurrence; execution is never inline."
+  @doc """
+  Queues one operator-requested occurrence; execution is never inline.
+
+  Without a scope nobody is named for the run: history shows "Run now" with
+  no person. `run_now/2` is the form that records who asked.
+  """
   @spec run_now(String.t()) :: {:ok, Queue.JobRef.t()} | {:error, atom()}
-  def run_now(key) when is_binary(key) do
+  def run_now(key) when is_binary(key), do: enqueue_manual(key, nil)
+  def run_now(_key), do: {:error, :not_found}
+
+  defp enqueue_manual(key, triggered_by) do
     case definition(key) do
       %Definition{} = definition ->
-        Scheduler.enqueue_occurrence(definition, DateTime.utc_now(), :manual)
+        Scheduler.enqueue_occurrence(definition, DateTime.utc_now(), :manual,
+          triggered_by: triggered_by
+        )
 
       nil ->
         {:error, :not_found}
@@ -297,7 +313,31 @@ defmodule Bilimbi.Base.Schedule do
     :exit, _reason -> {:error, :unavailable}
   end
 
-  def run_now(_key), do: {:error, :not_found}
+  # Who clicked Run now, captured at dispatch: the user's id from the sealed
+  # actor, and the display name the principal directory gives that id in this
+  # tenant. The name is denormalised onto the run so history never needs a
+  # Base-to-Core read; a name the directory cannot resolve stays nil and the
+  # id still identifies the person.
+  defp triggered_by(%Scope{} = scope) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user, user_id: user_id} ->
+        %{user_id: user_id, name: principal_name(scope, user_id)}
+
+      %TenancyActor{} ->
+        nil
+    end
+  end
+
+  # The name is best effort: an installation whose directory names no users
+  # still queues the run, recorded by id alone.
+  defp principal_name(%Scope{} = scope, user_id) do
+    case PrincipalDirectory.rank(scope, [{:user, user_id}]) do
+      {:ok, [%{name: name}]} when is_binary(name) -> name
+      _unresolved -> nil
+    end
+  rescue
+    _no_directory -> nil
+  end
 
   @doc false
   @spec latest_scheduled_occurrences([String.t()]) :: %{optional(String.t()) => DateTime.t()}

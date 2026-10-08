@@ -476,6 +476,9 @@ defmodule Bilimbi.Base.Schedule.Administration do
     %RunSummary{
       id: run.id,
       source: run.source,
+      trigger: run.trigger,
+      triggered_by_user_id: run.triggered_by_user_id,
+      triggered_by_name: run.triggered_by_name,
       key: run.key,
       name: run.name,
       expression: run.expression,
