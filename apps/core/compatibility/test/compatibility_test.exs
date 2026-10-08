@@ -345,9 +345,8 @@ defmodule Bilimbi.Core.CompatibilityTest do
     synthetic_version = install_synthetic_migration!()
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") == nil
-    # Belimbing ships both account indexes, so the baseline-only state has them.
-    assert relation(MigrationTestRepo, schema, "users_company_id_index") != nil
-    assert relation(MigrationTestRepo, schema, "users_employee_id_index") != nil
+    assert relation(MigrationTestRepo, schema, "users_company_id_index") == nil
+    assert relation(MigrationTestRepo, schema, "users_employee_id_index") == nil
 
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
 
@@ -370,6 +369,112 @@ defmodule Bilimbi.Core.CompatibilityTest do
 
     assert {:ok, :already_adopted} =
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
+  end
+
+  test "migrate accepts the account indexes a Belimbing database already has", %{schema: schema} do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+
+    for column <- ~w(company_id employee_id) do
+      SQL.query!(
+        MigrationTestRepo,
+        "CREATE INDEX users_#{column}_index ON \"#{schema}\".users (#{column})",
+        []
+      )
+    end
+
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) != []
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+
+    assert recorded_versions(MigrationTestRepo, schema) ==
+             Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+  end
+
+  test "a database migrated before the tenant and provenance columns still migrates", %{
+    schema: schema
+  } do
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    account_indexes = 20_260_821_213_100
+    decision_log_tenant = 20_261_008_070_000
+    run_provenance = 20_261_008_070_100
+
+    assert %{disposition: "bilimbi_only"} =
+             Compatibility.MigrationProvenance.fetch(MigrationTestRepo, schema)[account_indexes]
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(ALTER TABLE "#{schema}".base_authz_decision_logs DROP COLUMN tenant_id),
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      ALTER TABLE "#{schema}".base_schedule_runs
+      DROP COLUMN trigger, DROP COLUMN triggered_by_name, DROP COLUMN triggered_by_user_id
+      """,
+      []
+    )
+
+    for version <- [decision_log_tenant, run_provenance] do
+      SQL.query!(
+        MigrationTestRepo,
+        ~s(DELETE FROM "#{schema}".bilimbi_schema_migrations WHERE version = $1),
+        [version]
+      )
+
+      SQL.query!(
+        MigrationTestRepo,
+        ~s(DELETE FROM "#{schema}".bilimbi_migration_provenance WHERE version = $1),
+        [version]
+      )
+    end
+
+    [[tenant_id]] =
+      SQL.query!(
+        MigrationTestRepo,
+        "INSERT INTO \"#{schema}\".tenants (name) VALUES ('Acme') RETURNING id",
+        []
+      ).rows
+
+    [[company_id]] =
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".companies (name, code, tenant_id)
+        VALUES ('Acme Ltd', 'ACME', $1) RETURNING id
+        """,
+        [tenant_id]
+      ).rows
+
+    for log_company_id <- [company_id, nil] do
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".base_authz_decision_logs
+          (company_id, actor_type, actor_id, capability, allowed, reason_code, occurred_at)
+        VALUES ($1, 'user', 1, 'core.users.view', true, 'granted', now())
+        """,
+        [log_company_id]
+      )
+    end
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) ==
+             [decision_log_tenant, run_provenance]
+
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+
+    assert [[^tenant_id, ^company_id], [nil, nil]] =
+             SQL.query!(
+               MigrationTestRepo,
+               """
+               SELECT tenant_id, company_id FROM "#{schema}".base_authz_decision_logs ORDER BY id
+               """,
+               []
+             ).rows
   end
 
   test "adoption rejects a gap inside one owner's baselines and unknown ledger versions", %{

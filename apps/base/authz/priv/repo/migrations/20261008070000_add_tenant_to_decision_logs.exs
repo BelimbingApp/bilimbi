@@ -7,9 +7,10 @@ defmodule Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs do
   #
   # Belimbing backfilled its pre-tenancy rows with its licensee tenant. Bilimbi
   # gives numeric ID 1 no meaning and has no equivalent constant, so rows a
-  # fresh Bilimbi database logged before this column exist keep a null tenant
-  # and stay out of every tenant's page. An adopted database arrives with
-  # Belimbing's backfill already applied.
+  # fresh Bilimbi database logged before this column take the tenant of their
+  # company. A row with no company has no derivable tenant and stays null; the
+  # platform operator's decision log page still lists it. An adopted database
+  # arrives with Belimbing's backfill already applied.
   use Ecto.Migration
 
   def change do
@@ -17,8 +18,28 @@ defmodule Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs do
       add :tenant_id, :bigint
     end
 
+    execute(backfill_from_company(), "SELECT 1")
+
     create index(:base_authz_decision_logs, [:tenant_id],
              name: :base_authz_decision_logs_tenant_id_index
            )
   end
+
+  defp backfill_from_company do
+    """
+    UPDATE #{qualified_table("base_authz_decision_logs")} AS log
+    SET tenant_id = company.tenant_id
+    FROM #{qualified_table("companies")} AS company
+    WHERE log.company_id = company.id AND log.tenant_id IS NULL
+    """
+  end
+
+  defp qualified_table(table_name) do
+    case prefix() do
+      nil -> quote_identifier(table_name)
+      migration_prefix -> "#{quote_identifier(migration_prefix)}.#{quote_identifier(table_name)}"
+    end
+  end
+
+  defp quote_identifier(identifier), do: "\"#{String.replace(identifier, "\"", "\"\"")}\""
 end

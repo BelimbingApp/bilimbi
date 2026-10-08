@@ -449,6 +449,36 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
   end
 
+  test "a manual run refused for overlap is recorded with who asked for it", %{
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+
+    asked = %{user_id: 91, name: "Ada"}
+
+    assert {:error, :overlap} =
+             Scheduler.enqueue_occurrence(definition, DateTime.utc_now(), :manual,
+               triggered_by: asked
+             )
+
+    assert {:error, :overlap} = Schedule.run_now(definition.key)
+
+    assert [refused_by_person, refused_anonymously] =
+             Repo.all(
+               from(row in Run,
+                 where: row.key == ^definition.key and row.status == "skipped",
+                 order_by: row.id
+               )
+             )
+
+    assert %{trigger: "manual", triggered_by_user_id: 91, triggered_by_name: "Ada"} =
+             refused_by_person
+
+    assert %{trigger: "manual", triggered_by_user_id: nil, triggered_by_name: nil} =
+             refused_anonymously
+  end
+
   test "a directly forged Queue job cannot bypass its durable occurrence claim", %{
     definition: definition
   } do

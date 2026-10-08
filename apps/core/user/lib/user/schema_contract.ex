@@ -56,7 +56,9 @@ defmodule Bilimbi.Core.User.SchemaContract do
       },
       indexes: %{
         "users_pkey" => index(["id"], true),
-        "users_email_unique" => index(["email"], true),
+        "users_email_unique" => index(["email"], true)
+      },
+      optional_indexes: %{
         "users_company_id_index" => index(["company_id"]),
         "users_employee_id_index" => index(["employee_id"])
       },

@@ -435,6 +435,38 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
              Authz.list_decision_logs(TenancyFixtures.scope(2))
   end
 
+  test "a decision logged with no tenant is listed for the platform operator alone" do
+    occurred_at = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    for {tenant_id, actor_id} <- [{1, 801}, {nil, 802}] do
+      Repo.insert!(
+        DecisionLog.changeset(%{
+          tenant_id: tenant_id,
+          company_id: 10,
+          actor_type: "user",
+          actor_id: actor_id,
+          capability: "admin.test.record.view",
+          allowed: true,
+          reason_code: "allowed_directly",
+          occurred_at: occurred_at
+        })
+      )
+    end
+
+    actor_ids = fn scope ->
+      scope
+      |> Authz.list_decision_logs(page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.map(& &1.actor_id)
+      |> Enum.filter(&(&1 in [801, 802]))
+      |> Enum.sort()
+    end
+
+    assert actor_ids.(TenancyFixtures.scope(1, true)) == [801, 802]
+    assert actor_ids.(TenancyFixtures.scope(1, false)) == [801]
+    assert actor_ids.(TenancyFixtures.scope(2, false)) == []
+  end
+
   # The directory doubles name users 5, 7 and 9 and agents 5 and 7, and refuse
   # every other id. From Base's side a principal in another tenant and one that
   # no longer exists are the same answer -- no name -- which is exactly the

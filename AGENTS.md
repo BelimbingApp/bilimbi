@@ -248,7 +248,8 @@ drift. The command table, dispositions, and provenance rules are
 execution". A compatible baseline is proved against the Laravel-generated
 schema fixture in `apps/core/compatibility/test/fixtures/belimbing/`, never
 only against Bilimbi's own baselines: Laravel's `unique()` is a table
-constraint, and an index Belimbing ships belongs to the baseline.
+constraint, and a shipped migration that creates an index Belimbing
+already has creates it only if absent.
 
 ### Module boundaries fixed by compatibility
 

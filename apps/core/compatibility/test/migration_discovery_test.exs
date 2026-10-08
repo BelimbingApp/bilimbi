@@ -133,7 +133,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
-             :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

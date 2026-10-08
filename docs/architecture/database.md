@@ -283,8 +283,9 @@ schema-only dump of that database is committed as
 `BelimbingSchemaAdoptionE2ETest` runs verify, adopt, and migrate against it.
 A baseline proved only against databases Bilimbi's own baselines built proves
 nothing about adoption: Laravel's `unique()` is a table constraint, so a later
-migration drops the constraint, not an index; an index Belimbing ships is a
-compatible baseline, never Bilimbi-only work; and a column upstream added
+migration drops the constraint, not an index; a migration already shipped as
+Bilimbi-only keeps that disposition (the ledger retains it) and creates an
+index Belimbing also has only if absent; and a column upstream added
 after the first baseline is a further `:compatible_baseline` migration that
 names the upstream file, so an existing Bilimbi database upgrades through
 `mix bilimbi.migrate` while an adopted one records it without DDL. When the

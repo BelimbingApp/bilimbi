@@ -42,6 +42,9 @@ defmodule BilimbiWeb.TenantScopeGateTest do
   # {path relative to the workspace root, "function/arity", schema or table}
   # => the reason this read may span tenants.
   @allowed %{
+    {"apps/base/authz/lib/authz/administration.ex", "tenant_decision_logs/1",
+     "Bilimbi.Base.Authz.DecisionLog"} =>
+      "The platform operator's page also lists decisions logged with no tenant; the tenant match is spelled out beside that one extra condition.",
     {"apps/base/authz/lib/authz.ex", "prune_decision_logs/0", "Bilimbi.Base.Authz.DecisionLog"} =>
       "Retention pruning is installation-wide housekeeping run by the schedule, not a tenant's read: it deletes by age alone and returns only a count.",
     {"apps/core/user/lib/user/admin_bootstrap.ex", "run/1", "Bilimbi.Core.User.BootstrapReceipt"} =>

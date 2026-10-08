@@ -123,7 +123,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
         {:error, reason}
 
       {:error, :claimable, :overlap, _changes} ->
-        best_effort_record_overlap(definition, intended_at, trigger)
+        best_effort_record_overlap(definition, intended_at, trigger, triggered_by)
         {:error, :overlap}
 
       {:error, :claimable, reason, _changes} ->
@@ -132,7 +132,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
       {:error, :occurrence, changeset, _changes} ->
         case occurrence_error(changeset) do
           {:error, :overlap} = error ->
-            best_effort_record_overlap(definition, intended_at, trigger)
+            best_effort_record_overlap(definition, intended_at, trigger, triggered_by)
             error
 
           error ->
@@ -357,7 +357,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
     )
   end
 
-  defp best_effort_record_overlap(definition, intended_at, trigger) do
+  defp best_effort_record_overlap(definition, intended_at, trigger, triggered_by) do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     Repo.insert!(%Run{
@@ -365,6 +365,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
       key: definition.key,
       name: definition.task_name,
       expression: if(trigger == :scheduled, do: definition.expression),
+      trigger: Atom.to_string(trigger),
+      triggered_by_user_id: triggered_by.user_id,
+      triggered_by_name: triggered_by.name,
       status: "skipped",
       started_at: DateTime.to_naive(intended_at) |> NaiveDateTime.truncate(:second),
       finished_at: now,

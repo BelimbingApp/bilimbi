@@ -155,11 +155,9 @@ defmodule Bilimbi.Base.Authz.Administration do
 
     visibility = company_visibility(scope, company_ids(scope, registry))
 
-    # Decisions are read by the tenant they were made in, exactly as Belimbing
-    # reads them; a row logged with no tenant is on no tenant's page.
     query =
-      DecisionLog
-      |> Tenancy.scope_query(scope)
+      scope
+      |> tenant_decision_logs()
       |> where(^visibility)
       |> maybe_search_decision_logs(search!(opts[:search]))
       |> maybe_filter_allowed(allowed!(opts[:allowed]))
@@ -696,6 +694,21 @@ defmodule Bilimbi.Base.Authz.Administration do
   defp total_pages(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
 
   defp company_ids(%Scope{} = scope, registry), do: directory!(registry).company_ids(scope)
+
+  # Decisions are read by the tenant they were made in. A row with no tenant
+  # (logged before the column existed, with no company to derive one from)
+  # belongs to no tenant, so only the platform operator's page lists it.
+  defp tenant_decision_logs(%Scope{} = scope) do
+    if Scope.platform_operator?(scope) do
+      tenant_id = Scope.tenant_id(scope)
+
+      from log in DecisionLog,
+        as: :scoped,
+        where: log.tenant_id == ^tenant_id or is_nil(log.tenant_id)
+    else
+      Tenancy.scope_query(DecisionLog, scope)
+    end
+  end
 
   defp company_visibility(%Scope{} = scope, company_ids) do
     if Scope.platform_operator?(scope) do
