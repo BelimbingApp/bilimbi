@@ -332,6 +332,7 @@
           </:col>
           <:col :let={run} label="Source" sort="source" sort_id="schedule-runs-sort-source">
             <.badge>{run.source}</.badge>
+            <p class="mt-1 text-xs text-ink-muted">{trigger_label(run)}</p>
           </:col>
           <:col :let={run} label="Status" sort="status" sort_id="schedule-runs-sort-status">
             <.badge kind={status_kind(run.status)}>{status_label(run.status)}</.badge>

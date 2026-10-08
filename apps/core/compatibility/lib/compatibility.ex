@@ -21,14 +21,20 @@ defmodule Bilimbi.Core.Compatibility do
   alias Bilimbi.Core.Compatibility.MigrationProvenance
   alias Ecto.Adapters.SQL
 
-  @compatibility_source "e70b4d33c0b10790e681f4c2b5095d85a53bc918"
+  # The schema-only fixture under `test/fixtures/belimbing/` is dumped from
+  # this commit; the fixture test checks the two agree.
+  @compatibility_source "9ed3f3f04d62b3b8c3d4a7d1b30d30310cc23316"
   @optional_layers [:domain, :extension]
 
   @doc "The name of Bilimbi's own migration ledger table (`bilimbi_schema_migrations`)."
   @spec migration_source() :: String.t()
   def migration_source, do: migration_source(Repo)
 
-  @doc "The Belimbing merge commit whose schema is the compatibility reference."
+  @doc """
+  The upstream Belimbing commit whose Laravel-generated schema is the
+  compatibility reference. Every installed compatible baseline must verify
+  against a database that commit's migrations created.
+  """
   @spec compatibility_source() :: String.t()
   def compatibility_source, do: @compatibility_source
 

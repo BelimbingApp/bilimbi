@@ -92,6 +92,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       """
       #{TestTables.create(persistent)} IF NOT EXISTS base_authz_decision_logs (
         id bigserial PRIMARY KEY,
+        tenant_id bigint,
         company_id bigint,
         actor_type varchar(40) NOT NULL,
         actor_id bigint NOT NULL,

@@ -55,6 +55,12 @@ cutover. Removed definitions intentionally leave orphan history and
 suppressions for operator disposition. Laravel queue relations and payloads
 remain inert and are never translated.
 
+Each run records how it started (`trigger`: `scheduled` or `manual`) and, for a
+manual Run now, the user and display name behind it. The name is denormalised
+at dispatch and best effort; the user id alone still identifies the person. A
+manual run refused for overlap is recorded as a skipped run with the same
+provenance.
+
 The occurrence and definition-review relations are Bilimbi-only runtime state
 and are never adopted as compatible migrations. Run history is best effort:
 recorder or retention failure is logged with only bounded source/key facts and

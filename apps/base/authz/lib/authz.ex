@@ -126,6 +126,7 @@ defmodule Bilimbi.Base.Authz do
         :ok =
           DatabaseDecisionLogger.log_system_principal(
             name,
+            scope,
             company_id,
             capability,
             resource,

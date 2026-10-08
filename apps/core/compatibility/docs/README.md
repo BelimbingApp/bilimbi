@@ -73,6 +73,17 @@ A Domain or Extension may therefore be mounted before the first adoption or
 later, on an installation that has already taken newer Platform migrations;
 the per-owner ledger rule above accepts its pending versions either way.
 
+## Belimbing schema fixture
+
+`test/fixtures/belimbing/schema.sql` is a schema-only dump of a database that
+upstream Belimbing's own migrations created at the commit
+`Compatibility.compatibility_source/0` returns. `BelimbingSchemaAdoptionE2ETest`
+loads it into a throwaway database and runs verify, adopt, migrate, and verify
+again from the umbrella root. That is the proof that a compatible baseline
+matches what Laravel makes; the Platform-only end-to-end test, which adopts a
+database Bilimbi's own baselines built, cannot show that. The fixture's README
+holds the rules and the regeneration command.
+
 ## Cutover value remediation
 
 Adoption proves shape; it cannot prove meaning. Some adopted rows load cleanly

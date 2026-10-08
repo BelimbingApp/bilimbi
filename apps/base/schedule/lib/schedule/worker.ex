@@ -49,25 +49,7 @@ defmodule Bilimbi.Base.Schedule.Worker do
 
   def validate_args(_worker, _args), do: {:error, :missing_schedule_metadata}
 
-  defp validate_metadata(%{
-         "occurrence_id" => occurrence_id,
-         "source" => source,
-         "key" => key,
-         "name" => name,
-         "expression" => expression,
-         "fingerprint" => fingerprint,
-         "intended_at" => intended_at,
-         "trigger" => trigger
-       })
-       when is_integer(occurrence_id) and occurrence_id > 0 and is_binary(source) and
-              byte_size(source) in 1..40 and is_binary(key) and byte_size(key) in 1..255 and
-              is_binary(name) and byte_size(name) in 1..255 and
-              (is_nil(expression) or (is_binary(expression) and byte_size(expression) <= 64)) and
-              is_binary(fingerprint) and byte_size(fingerprint) == 64 and
-              trigger in ["manual", "scheduled"] do
-    case DateTime.from_iso8601(intended_at) do
-      {:ok, datetime, 0} ->
-        {:ok,
+  defp validate_metadata(
          %{
            "occurrence_id" => occurrence_id,
            "source" => source,
@@ -75,14 +57,46 @@ defmodule Bilimbi.Base.Schedule.Worker do
            "name" => name,
            "expression" => expression,
            "fingerprint" => fingerprint,
-           "intended_at" => DateTime.to_iso8601(datetime),
+           "intended_at" => intended_at,
            "trigger" => trigger
-         }}
+         } = metadata
+       )
+       when is_integer(occurrence_id) and occurrence_id > 0 and is_binary(source) and
+              byte_size(source) in 1..40 and is_binary(key) and byte_size(key) in 1..255 and
+              is_binary(name) and byte_size(name) in 1..255 and
+              (is_nil(expression) or (is_binary(expression) and byte_size(expression) <= 64)) and
+              is_binary(fingerprint) and byte_size(fingerprint) == 64 and
+              trigger in ["manual", "scheduled"] do
+    # The two provenance keys arrived with the trigger column; a job enqueued
+    # before them carries neither, and reads as a run nobody is named for.
+    triggered_by_user_id = Map.get(metadata, "triggered_by_user_id")
+    triggered_by_name = Map.get(metadata, "triggered_by_name")
 
-      _invalid ->
-        {:error, :invalid_schedule_time}
+    with {:ok, datetime, 0} <- DateTime.from_iso8601(intended_at),
+         true <- valid_triggered_by?(triggered_by_user_id, triggered_by_name) do
+      {:ok,
+       %{
+         "occurrence_id" => occurrence_id,
+         "source" => source,
+         "key" => key,
+         "name" => name,
+         "expression" => expression,
+         "fingerprint" => fingerprint,
+         "intended_at" => DateTime.to_iso8601(datetime),
+         "trigger" => trigger,
+         "triggered_by_user_id" => triggered_by_user_id,
+         "triggered_by_name" => triggered_by_name
+       }}
+    else
+      false -> {:error, :invalid_schedule_metadata}
+      _invalid -> {:error, :invalid_schedule_time}
     end
   end
 
   defp validate_metadata(_metadata), do: {:error, :invalid_schedule_metadata}
+
+  defp valid_triggered_by?(user_id, name) do
+    (is_nil(user_id) or (is_integer(user_id) and user_id > 0)) and
+      (is_nil(name) or (is_binary(name) and String.length(name) in 1..255))
+  end
 end

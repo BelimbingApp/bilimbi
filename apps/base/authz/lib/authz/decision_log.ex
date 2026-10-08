@@ -6,6 +6,7 @@ defmodule Bilimbi.Base.Authz.DecisionLog do
   import Ecto.Changeset
 
   schema "base_authz_decision_logs" do
+    field :tenant_id, :id
     field :company_id, :id
     field :actor_type, :string
     field :actor_id, :id
@@ -28,6 +29,7 @@ defmodule Bilimbi.Base.Authz.DecisionLog do
   def changeset(attributes) do
     %__MODULE__{}
     |> cast(attributes, [
+      :tenant_id,
       :company_id,
       :actor_type,
       :actor_id,

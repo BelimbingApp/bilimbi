@@ -245,7 +245,11 @@ Verify an existing Belimbing database with `mix bilimbi.schema.verify`, then
 baseline it with `mix bilimbi.schema.adopt`; adoption refuses structural
 drift. The command table, dispositions, and provenance rules are
 `docs/architecture/database.md` "Migration contract" and "Ledger and
-execution".
+execution". A compatible baseline is proved against the Laravel-generated
+schema fixture in `apps/core/compatibility/test/fixtures/belimbing/`, never
+only against Bilimbi's own baselines: Laravel's `unique()` is a table
+constraint, and a shipped migration that creates an index Belimbing
+already has creates it only if absent.
 
 ### Module boundaries fixed by compatibility
 

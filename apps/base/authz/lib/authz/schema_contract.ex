@@ -6,6 +6,10 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
   Migration `20261003120001` adds `company_id`, then `occurred_at` and `id`
   descending. An adopted Belimbing database verifies without it. A present
   index must match those columns and that order.
+
+  `base_authz_decision_logs.tenant_id` and its index are part of the
+  compatible baseline: Belimbing added them after the first Authz baseline
+  (`20261008070000` here), and every adopted database has them.
   """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
@@ -134,6 +138,7 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
       name: "base_authz_decision_logs",
       columns: %{
         "id" => column(:bigint, false, {:sequence, "base_authz_decision_logs_id_seq"}),
+        "tenant_id" => column(:bigint),
         "company_id" => column(:bigint),
         "actor_type" => column({:varchar, 40}, false),
         "actor_id" => column(:bigint, false),
@@ -152,6 +157,7 @@ defmodule Bilimbi.Base.Authz.SchemaContract do
       },
       indexes: %{
         "base_authz_decision_logs_pkey" => index(["id"], true),
+        "base_authz_decision_logs_tenant_id_index" => index(["tenant_id"]),
         "base_authz_decision_logs_company_id_index" => index(["company_id"]),
         "base_authz_decision_logs_actor_type_index" => index(["actor_type"]),
         "base_authz_decision_logs_actor_id_index" => index(["actor_id"]),

@@ -52,6 +52,9 @@ defmodule Bilimbi.Base.Schedule.Execution do
   defp best_effort_start(metadata) do
     Repo.insert!(%Run{
       source: metadata["source"],
+      trigger: metadata["trigger"],
+      triggered_by_user_id: metadata["triggered_by_user_id"],
+      triggered_by_name: metadata["triggered_by_name"],
       key: metadata["key"],
       name: metadata["name"],
       expression: metadata["expression"],

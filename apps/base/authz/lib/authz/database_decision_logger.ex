@@ -10,12 +10,17 @@ defmodule Bilimbi.Base.Authz.DatabaseDecisionLogger do
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.Resource
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Scope
 
+  # Every row names the tenant the decision was made in, read back with an
+  # exact match by the tenant-scoped decision log page. The actor's scope is
+  # that tenant; there is no ambient fallback.
   @impl true
   def log(%Actor{} = actor, capability, resource, %Decision{} = decision, context)
       when is_binary(capability) and is_map(context) do
     persist(
       %{
+        tenant_id: Scope.tenant_id(actor.scope),
         company_id: actor.company_id,
         actor_type: Actor.principal_type(actor),
         actor_id: actor.id,
@@ -33,16 +38,31 @@ defmodule Bilimbi.Base.Authz.DatabaseDecisionLogger do
   # caller-supplied context key can override.
   @spec log_system_principal(
           String.t(),
+          Scope.t(),
           pos_integer(),
           String.t(),
           Resource.t() | nil,
           Decision.t(),
           map()
         ) :: :ok
-  def log_system_principal(principal, company_id, capability, resource, decision, context)
+  def log_system_principal(
+        principal,
+        %Scope{} = scope,
+        company_id,
+        capability,
+        resource,
+        decision,
+        context
+      )
       when is_binary(principal) and is_binary(capability) and is_map(context) do
     persist(
-      %{company_id: company_id, actor_type: "system", actor_id: 0, acting_for_user_id: nil},
+      %{
+        tenant_id: Scope.tenant_id(scope),
+        company_id: company_id,
+        actor_type: "system",
+        actor_id: 0,
+        acting_for_user_id: nil
+      },
       capability,
       resource,
       decision,
@@ -54,6 +74,7 @@ defmodule Bilimbi.Base.Authz.DatabaseDecisionLogger do
 
   defp persist(actor_attributes, capability, resource, %Decision{} = decision, context) do
     attributes = %{
+      tenant_id: actor_attributes.tenant_id,
       company_id: actor_attributes.company_id,
       actor_type: actor_attributes.actor_type,
       actor_id: actor_attributes.actor_id,

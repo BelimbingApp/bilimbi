@@ -64,13 +64,22 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   @doc false
   @spec enqueue_due(Definition.t(), DateTime.t()) :: {:ok, Queue.JobRef.t()} | {:error, atom()}
   def enqueue_due(%Definition{} = definition, %DateTime{} = intended_at) do
-    enqueue_occurrence(definition, intended_at, :scheduled)
+    with {:error, :overlap} = refused <- enqueue_occurrence(definition, intended_at, :scheduled) do
+      record_overlap(definition, intended_at, :scheduled, nil)
+      refused
+    end
   end
 
   @doc false
-  def enqueue_occurrence(%Definition{} = definition, %DateTime{} = intended_at, trigger)
-      when trigger in [:manual, :scheduled] do
+  def enqueue_occurrence(
+        %Definition{} = definition,
+        %DateTime{} = intended_at,
+        trigger,
+        opts \\ []
+      )
+      when trigger in [:manual, :scheduled] and is_list(opts) do
     intended_at = DateTime.truncate(intended_at, :microsecond)
+    triggered_by = Keyword.get(opts, :triggered_by) || %{user_id: nil, name: nil}
     overlap_key = if definition.overlap == :forbid, do: @source <> ":" <> definition.key
 
     multi =
@@ -100,7 +109,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
           "expression" => if(trigger == :scheduled, do: definition.expression),
           "fingerprint" => Administration.fingerprint(definition),
           "intended_at" => DateTime.to_iso8601(intended_at),
-          "trigger" => Atom.to_string(trigger)
+          "trigger" => Atom.to_string(trigger),
+          "triggered_by_user_id" => triggered_by.user_id,
+          "triggered_by_name" => triggered_by.name
         })
       end)
       |> Multi.update(:record_job, fn %{occurrence: occurrence, job: job} ->
@@ -115,21 +126,13 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
         {:error, reason}
 
       {:error, :claimable, :overlap, _changes} ->
-        best_effort_record_overlap(definition, intended_at, trigger)
         {:error, :overlap}
 
       {:error, :claimable, reason, _changes} ->
         {:error, reason}
 
       {:error, :occurrence, changeset, _changes} ->
-        case occurrence_error(changeset) do
-          {:error, :overlap} = error ->
-            best_effort_record_overlap(definition, intended_at, trigger)
-            error
-
-          error ->
-            error
-        end
+        occurrence_error(changeset)
 
       {:error, :job, reason, _changes} ->
         {:error, reason}
@@ -349,7 +352,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
     )
   end
 
-  defp best_effort_record_overlap(definition, intended_at, trigger) do
+  @doc false
+  def record_overlap(definition, intended_at, trigger, triggered_by) do
+    triggered_by = triggered_by || %{user_id: nil, name: nil}
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     Repo.insert!(%Run{
@@ -357,6 +362,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
       key: definition.key,
       name: definition.task_name,
       expression: if(trigger == :scheduled, do: definition.expression),
+      trigger: Atom.to_string(trigger),
+      triggered_by_user_id: triggered_by.user_id,
+      triggered_by_name: triggered_by.name,
       status: "skipped",
       started_at: DateTime.to_naive(intended_at) |> NaiveDateTime.truncate(:second),
       finished_at: now,

@@ -9,22 +9,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
   @moduletag timeout: 180_000
 
+  import Bilimbi.Core.Compatibility.HostTaskHarness
+
   alias Bilimbi.Base.Database
-  alias Bilimbi.Base.Database.SchemaVerifier
-  alias Bilimbi.Base.Repo
-  alias Bilimbi.Core.Compatibility.MigrationTestRepo
   alias Bilimbi.Core.Compatibility.MountedDomainFixture
   alias Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnostics
   alias Bilimbi.Core.Compatibility.PlatformBaselineTestRepo
   alias Ecto.Adapters.SQL
-  alias Ecto.Adapters.SQL.Sandbox
-
-  @package_root Path.expand("..", __DIR__)
-  # Production entry points refuse a runtime that cannot see the whole graph
-  # (`ModuleRegistry.complete_modules!/0`). This package's closure is partial,
-  # so they run from the umbrella root, as an operator runs them.
-  @workspace_root Path.expand("../../../..", __DIR__)
-  @host_tasks ~w(bilimbi.migrate bilimbi.rollback bilimbi.schema.verify bilimbi.schema.adopt bilimbi.seeds.run)
 
   setup_all %{mounted_domain: mounted_domain} do
     # Load this package's runtime smoke and schema fixtures before nested
@@ -51,71 +42,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     %{base_env: env, migration_entries: entries}
   end
 
-  setup %{base_env: base_env} = context do
-    PlatformBaselineFailureDiagnostics.capture(context, :setup, fn ->
-      repo_options =
-        Repo.config()
-        |> Keyword.put(:name, MigrationTestRepo)
-        |> Keyword.put(:pool, DBConnection.ConnectionPool)
-        |> Keyword.put(:pool_size, 4)
-
-      Application.put_env(:bilimbi_base_database, MigrationTestRepo, repo_options)
-
-      on_exit(fn ->
-        PlatformBaselineFailureDiagnostics.capture(context, :cleanup, fn ->
-          Application.delete_env(:bilimbi_base_database, MigrationTestRepo)
-        end)
-      end)
-
-      start_supervised!(MigrationTestRepo)
-
-      partition =
-        "bilimbi_e2e_#{System.system_time(:microsecond)}_#{System.unique_integer([:positive])}"
-
-      database = "bilimbi_test_#{partition}"
-      quoted_database = SchemaVerifier.quote_identifier!(database)
-
-      SQL.query!(MigrationTestRepo, "CREATE DATABASE #{quoted_database}", [])
-
-      on_exit(fn ->
-        PlatformBaselineFailureDiagnostics.capture(context, :cleanup, fn ->
-          Sandbox.unboxed_run(Repo, fn ->
-            SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database} WITH (FORCE)", [])
-          end)
-        end)
-      end)
-
-      platform_repo_options =
-        Repo.config()
-        |> Keyword.put(:name, PlatformBaselineTestRepo)
-        |> Keyword.put(:database, database)
-        |> Keyword.put(:pool, DBConnection.ConnectionPool)
-        |> Keyword.put(:pool_size, 1)
-
-      Application.put_env(
-        :bilimbi_base_database,
-        PlatformBaselineTestRepo,
-        platform_repo_options
-      )
-
-      on_exit(fn ->
-        PlatformBaselineFailureDiagnostics.capture(context, :cleanup, fn ->
-          Application.delete_env(:bilimbi_base_database, PlatformBaselineTestRepo)
-        end)
-      end)
-
-      start_supervised!(PlatformBaselineTestRepo)
-      assert PlatformBaselineTestRepo.config()[:pool_size] == 1
-
-      %{
-        env:
-          [
-            {"MIX_TEST_PARTITION", "_#{partition}"},
-            {"BILIMBI_RUNTIME_SCHEMA_FIXTURE", "enabled"}
-          ] ++ base_env
-      }
-    end)
-  end
+  setup context, do: setup_databases(context)
 
   test "the operational fresh install verifies and supports the public identity APIs",
        %{env: env, migration_entries: entries} = context do
@@ -372,154 +299,5 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
                  []
                ).rows
     end)
-  end
-
-  # Every installed migration as the umbrella root's runtime, the one the
-  # host tasks run in, discovers it.
-  defp workspace_migration_entries(env) do
-    {output, status} =
-      System.cmd(
-        System.find_executable("mix"),
-        [
-          "run",
-          "--no-start",
-          "-e",
-          ~s[IO.puts("migration_entries:" <> Base.encode64(:erlang.term_to_binary(] <>
-            ~s[Bilimbi.Core.Compatibility.migration_entries())))]
-        ],
-        cd: @workspace_root,
-        env: [{"MIX_ENV", "test"} | env],
-        stderr_to_stdout: true
-      )
-
-    assert status == 0, "mix run failed with status #{status}:\n#{output}"
-    [encoded] = Regex.run(~r/^migration_entries:(\S+)$/m, output, capture: :all_but_first)
-    encoded |> Base.decode64!() |> :erlang.binary_to_term()
-  end
-
-  defp migrate_baselines_only!(env) do
-    {output, status} =
-      System.cmd(
-        System.find_executable("mix"),
-        [
-          "run",
-          "--no-start",
-          "-e",
-          "Bilimbi.Base.ModuleRegistry.complete_modules!(); " <>
-            "{:ok, _, _} = Ecto.Migrator.with_repo(Bilimbi.Base.Repo, " <>
-            "&Bilimbi.Core.Compatibility.migrate_baseline(&1, log: false))"
-        ],
-        cd: @workspace_root,
-        env: [{"MIX_ENV", "test"} | env],
-        stderr_to_stdout: true
-      )
-
-    PlatformBaselineFailureDiagnostics.record_nested_mix(
-      "run",
-      ["migrate_baseline"],
-      status,
-      output
-    )
-
-    assert status == 0, "baseline-only migrate failed with status #{status}:\n#{output}"
-  end
-
-  defp run_mix!(task, args, env) do
-    case run_mix(task, args, env) do
-      {output, 0} ->
-        output
-
-      {output, status} ->
-        flunk("mix #{task} failed with status #{status}:\n#{output}")
-    end
-  end
-
-  defp run_mix(task, args, env) do
-    {output, status} =
-      System.cmd(
-        System.find_executable("mix"),
-        [task | args],
-        cd: if(task in @host_tasks, do: @workspace_root, else: @package_root),
-        env: [{"MIX_ENV", "test"} | env],
-        stderr_to_stdout: true
-      )
-
-    PlatformBaselineFailureDiagnostics.record_nested_mix(task, args, status, output)
-    {output, status}
-  end
-
-  defp assert_runtime_start_fails!(env, boundary) do
-    {output, status} = run_mix("app.start", [], env)
-
-    assert status != 0
-
-    case boundary do
-      :queue ->
-        assert output =~ "Oban migrations have not been run"
-
-      :employee ->
-        assert output =~ "required runtime schema is missing: employee_types_system_company_check"
-    end
-  end
-
-  defp recorded_versions do
-    SQL.query!(
-      PlatformBaselineTestRepo,
-      "SELECT version FROM bilimbi_schema_migrations ORDER BY version",
-      []
-    ).rows
-    |> Enum.map(fn [version] -> version end)
-  end
-
-  defp rollback_step_to(entries, module) do
-    entries
-    |> Enum.reverse()
-    |> Enum.find_index(fn {_version, migration_module, _disposition} ->
-      migration_module == module
-    end)
-    |> case do
-      nil -> raise ArgumentError, "unknown migration module: #{inspect(module)}"
-      index -> index + 1
-    end
-  end
-
-  defp relation(table) do
-    [[relation]] =
-      SQL.query!(PlatformBaselineTestRepo, "SELECT to_regclass($1)::text", [table]).rows
-
-    relation
-  end
-
-  defp oban_migrated_version do
-    Oban.Migrations.Postgres.migrated_version(repo: PlatformBaselineTestRepo)
-  end
-
-  defp install_legacy_queue_sentinels! do
-    for table <- ~w(jobs job_batches failed_jobs) do
-      SQL.query!(
-        PlatformBaselineTestRepo,
-        "CREATE TABLE #{table} (id bigint PRIMARY KEY, payload text NOT NULL)",
-        []
-      )
-
-      SQL.query!(
-        PlatformBaselineTestRepo,
-        "INSERT INTO #{table} (id, payload) VALUES (1, $1)",
-        ["legacy-#{table}-payload"]
-      )
-    end
-  end
-
-  defp assert_legacy_queue_sentinels_unchanged! do
-    for table <- ~w(jobs job_batches failed_jobs) do
-      expected_payload = "legacy-#{table}-payload"
-
-      assert [[1, ^expected_payload]] =
-               SQL.query!(
-                 PlatformBaselineTestRepo,
-                 "SELECT id, payload FROM #{table}",
-                 []
-               ).rows
-    end
   end
 end
