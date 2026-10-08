@@ -24,8 +24,10 @@ must create a fresh PostgreSQL schema compatible with Belimbing and must adopt
 an existing Belimbing database without replaying creation DDL or treating
 Laravel migration history as Bilimbi migration history.
 
-The compatibility reference is Belimbing merge commit
-`e70b4d33c0b10790e681f4c2b5095d85a53bc918` from PR #245. That change replaced
+The compatibility reference was Belimbing merge commit
+`e70b4d33c0b10790e681f4c2b5095d85a53bc918` from PR #245; it has since advanced
+to the commit `Bilimbi.Core.Compatibility.compatibility_source/0` returns (see
+[Bilimbi Database Architecture](../database.md)). That change replaced
 runtime ID-1 meaning with explicit tenancy. Its upgrade files run in this global
 order:
 
