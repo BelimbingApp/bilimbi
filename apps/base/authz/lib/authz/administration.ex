@@ -699,14 +699,12 @@ defmodule Bilimbi.Base.Authz.Administration do
   # (logged before the column existed, with no company to derive one from)
   # belongs to no tenant, so only the platform operator's page lists it.
   defp tenant_decision_logs(%Scope{} = scope) do
-    if Scope.platform_operator?(scope) do
-      tenant_id = Scope.tenant_id(scope)
+    query = Tenancy.scope_query(DecisionLog, scope)
 
-      from log in DecisionLog,
-        as: :scoped,
-        where: log.tenant_id == ^tenant_id or is_nil(log.tenant_id)
+    if Scope.platform_operator?(scope) do
+      or_where(query, [log], is_nil(log.tenant_id))
     else
-      Tenancy.scope_query(DecisionLog, scope)
+      query
     end
   end
 
