@@ -172,6 +172,11 @@ see or remove those rows. A platform-operator scope sees them alongside its
 normal company scope and may remove them by durable row ID, which keeps global
 authority auditable without exposing it to a tenant administrator.
 
+Every decision-log row names the tenant it was made in
+(`base_authz_decision_logs.tenant_id`), and the page matches it exactly. A
+row left with no tenant, because it has no company to derive one from, is
+listed only for the platform-operator scope.
+
 `get_role/2` returns a role with immutable capability keys and only the
 principal assignments visible through the caller's company directory.
 `list_principal_role_assignments/4` returns one principal's visible persisted

@@ -72,6 +72,7 @@ are [ADR 0020](../../../../docs/architecture/decisions/0020-per-owner-ledger-and
 A Domain or Extension may therefore be mounted before the first adoption or
 later, on an installation that has already taken newer Platform migrations;
 the per-owner ledger rule above accepts its pending versions either way.
+
 ## Belimbing schema fixture
 
 `test/fixtures/belimbing/schema.sql` is a schema-only dump of a database that
