@@ -288,6 +288,28 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert %{trigger: "manual", triggered_by_user_id: nil, triggered_by_name: nil} = anonymous_run
   end
 
+  test "a display name longer than the run column is clamped and still queues the run", %{
+    definition: definition
+  } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    operator = granted_operator([@execute])
+
+    snapshot = ContributionRegistry.snapshot!()
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(snapshot.consumers.principal_directory, %{
+        user: Bilimbi.Base.Schedule.TestUserDirectory
+      })
+    )
+
+    assert {:ok, %JobRef{}} = Schedule.run_now(operator, definition.key)
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+
+    assert {:ok, %{entries: [run]}} = Schedule.list_runs()
+    assert run.triggered_by_user_id == 91
+    assert run.triggered_by_name == String.duplicate("日", 255)
+  end
+
   test "diagnostics distinguish recorder failure from Queue evidence" do
     diagnostics = Schedule.diagnostics()
     assert diagnostics.queue == :available

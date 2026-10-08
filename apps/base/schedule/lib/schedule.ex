@@ -332,7 +332,7 @@ defmodule Bilimbi.Base.Schedule do
   # still queues the run, recorded by id alone.
   defp principal_name(%Scope{} = scope, user_id) do
     case PrincipalDirectory.rank(scope, [{:user, user_id}]) do
-      {:ok, [%{name: name}]} when is_binary(name) -> name
+      {:ok, [%{name: name}]} when is_binary(name) and name != "" -> String.slice(name, 0, 255)
       _unresolved -> nil
     end
   rescue

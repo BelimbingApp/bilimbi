@@ -97,6 +97,6 @@ defmodule Bilimbi.Base.Schedule.Worker do
 
   defp valid_triggered_by?(user_id, name) do
     (is_nil(user_id) or (is_integer(user_id) and user_id > 0)) and
-      (is_nil(name) or (is_binary(name) and byte_size(name) in 1..255))
+      (is_nil(name) or (is_binary(name) and String.length(name) in 1..255))
   end
 end
