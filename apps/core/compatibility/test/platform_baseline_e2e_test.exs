@@ -214,6 +214,42 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     end)
   end
 
+  test "operational commands leave an absent Domain's baseline for migrate to create",
+       %{env: env, migration_entries: entries} = context do
+    if context.mounted_domain do
+      PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
+        baseline_versions = for {version, _module, :compatible_baseline} <- entries, do: version
+        domain_baseline = MountedDomainFixture.baseline_version()
+        baseline_table = MountedDomainFixture.baseline_table()
+
+        # An existing Belimbing database whose installation never had the
+        # Belimbing module the Domain maps: every Platform baseline's
+        # structure, none of the Domain's, and no Bilimbi ledger.
+        migrate_baselines_only!(env)
+        SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
+        SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_migration_provenance", [])
+        SQL.query!(PlatformBaselineTestRepo, "DROP TABLE #{baseline_table}", [])
+
+        note = "e2e_fixture/ledger: no owned structure exists in this database"
+        verified = run_mix!("bilimbi.schema.verify", [], env)
+        assert verified =~ "Bilimbi compatibility schema verified."
+        assert verified =~ note
+
+        adopted = run_mix!("bilimbi.schema.adopt", [], env)
+        assert adopted =~ "Existing Belimbing schema verified and adopted by Bilimbi."
+        assert adopted =~ note
+        assert recorded_versions() == baseline_versions -- [domain_baseline]
+        assert relation(baseline_table) == nil
+
+        run_mix!("bilimbi.migrate", ["--quiet"], env)
+        assert recorded_versions() == Enum.map(entries, &elem(&1, 0))
+        assert relation(baseline_table) == baseline_table
+        assert relation(MountedDomainFixture.table()) == MountedDomainFixture.table()
+        refute run_mix!("bilimbi.schema.verify", [], env) =~ note
+      end)
+    end
+  end
+
   test "rollback refuses to discard active postcode override provenance",
        %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->

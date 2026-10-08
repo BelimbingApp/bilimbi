@@ -51,11 +51,16 @@ defmodule BilimbiWeb.Release do
     ModuleRegistry.complete_modules!()
 
     {:ok, result, _started} =
-      Ecto.Migrator.with_repo(Repo, &Bilimbi.Core.Compatibility.verify(&1, []))
+      Ecto.Migrator.with_repo(Repo, fn repo ->
+        with :ok <- Bilimbi.Core.Compatibility.verify(repo, []) do
+          {:ok, Bilimbi.Core.Compatibility.absent_module_report(repo, [])}
+        end
+      end)
 
     case result do
-      :ok ->
+      {:ok, absent} ->
         IO.puts("Bilimbi compatibility schema verified.")
+        Enum.each(absent, &IO.puts/1)
 
       {:error, errors} ->
         raise "Bilimbi compatibility schema drift detected:\n" <>
@@ -122,11 +127,19 @@ defmodule BilimbiWeb.Release do
     ModuleRegistry.complete_modules!()
 
     {:ok, result, _started} =
-      Ecto.Migrator.with_repo(Repo, &Bilimbi.Core.Compatibility.adopt(&1, []))
+      Ecto.Migrator.with_repo(Repo, fn repo ->
+        with {:ok, status} <- Bilimbi.Core.Compatibility.adopt(repo, []) do
+          {:ok, status, Bilimbi.Core.Compatibility.absent_module_report(repo, [])}
+        end
+      end)
 
     case result do
-      {:ok, status} -> IO.puts("Schema #{status}")
-      {:error, reason} -> raise "schema adoption refused: #{inspect(reason)}"
+      {:ok, status, absent} ->
+        IO.puts("Schema #{status}")
+        Enum.each(absent, &IO.puts/1)
+
+      {:error, reason} ->
+        raise "schema adoption refused: #{inspect(reason)}"
     end
 
     :ok

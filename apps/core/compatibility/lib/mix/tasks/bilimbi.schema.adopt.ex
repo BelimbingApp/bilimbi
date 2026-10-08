@@ -6,7 +6,9 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
       mix bilimbi.schema.adopt
       mix bilimbi.schema.adopt --prefix custom_schema
 
-  Adoption refuses drift and never changes Laravel's `migrations` table.
+  Adoption refuses drift and never changes Laravel's `migrations` table. A
+  mounted Domain or Extension whose owned structure is wholly absent is left
+  pending for `mix bilimbi.migrate`, which creates its compatible baseline.
   """
 
   use Mix.Task
@@ -30,12 +32,15 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
     case Bilimbi.Core.Compatibility.adopt(repo, opts) do
       {:ok, :adopted} ->
         Mix.shell().info("Existing Belimbing schema verified and adopted by Bilimbi.")
+        report_absent(repo, opts)
 
       {:ok, :advanced} ->
         Mix.shell().info("Verified schema and advanced the existing Bilimbi baseline ledger.")
+        report_absent(repo, opts)
 
       {:ok, :already_adopted} ->
         Mix.shell().info("Bilimbi compatibility baselines are already recorded.")
+        report_absent(repo, opts)
 
       {:error, {:schema_drift, errors}} ->
         details = Enum.map_join(errors, "\n", &"  - #{&1}")
@@ -46,6 +51,10 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
           "Schema adoption refused because the Bilimbi ledger contains #{inspect(versions)}"
         )
     end
+  end
+
+  defp report_absent(repo, opts) do
+    Enum.each(Bilimbi.Core.Compatibility.absent_module_report(repo, opts), &Mix.shell().info(&1))
   end
 
   defp with_repo!(repo, operation) do

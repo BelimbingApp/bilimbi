@@ -11,6 +11,11 @@ identity
 > This ADR records the compatibility and adoption decision. The current
 > normative operating rules are centralized in
 > [Bilimbi Database Architecture](../database.md).
+> [ADR 0020](./0020-per-owner-ledger-and-absent-optional-structure.md)
+> amends two rules below: the ledger prefix is judged per owner and class
+> rather than across the whole composition, and a Domain or Extension whose
+> owned structure is wholly absent is left for `mix bilimbi.migrate` to
+> create rather than refused as drift.
 
 ## Context
 
@@ -209,7 +214,8 @@ a Bilimbi-only version. A later compatible baseline can therefore be adopted
 while an earlier Bilimbi-only migration remains pending; the operational
 migrate command accepts that validated class gap and executes the pending
 migration normally. A fresh database runs both classes; a foreign or
-class-non-prefix ledger remains a conflict.
+class-non-prefix ledger remains a conflict. ADR 0020 judges that prefix per
+owner rather than across the whole composition.
 
 Verification checks owned columns, types, nullability, defaults, named indexes
 including the partial predicate, single and composite foreign keys, and

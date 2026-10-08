@@ -7,6 +7,9 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
   requires, numbered after every Platform Bilimbi-only migration, and a
   Bilimbi-only migration after that.
 
+  `InProcessDomain` is the counterpart for a test that calls `Compatibility`
+  directly in this VM; it never touches the checkout.
+
   Git ignores everything below `apps/domains/`, so the fixture never reaches a
   commit. A marker file tells a stale fixture from a real mounted repository:
   `unmount!/0` removes a fixture a killed run left behind and refuses to touch

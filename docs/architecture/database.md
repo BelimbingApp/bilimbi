@@ -7,7 +7,7 @@
 **Purpose:** Define Bilimbi's database ownership, dependency, migration,
 compatibility, verification, adoption, and seeding rules.
 
-**Last Updated:** 2026-10-03
+**Last Updated:** 2026-10-08
 
 ## Purpose and authority
 
@@ -124,7 +124,10 @@ The referenced structure must exist before the depending migration runs.
 Installed contributors are discovered in the validated descriptor graph;
 dependencies precede dependants and the layer order is Base, Core, Domain,
 then Extension. Globally unique Ecto versions provide the executable ordering
-across the discovered paths and must preserve those dependencies.
+across the discovered paths and must preserve those dependencies. A pending
+migration always runs after every recorded one, so a Domain or Extension
+mounted after the Platform migrated runs its earlier-dated versions against
+the dependency structure that already exists.
 
 Repository proximity, filename discovery order, and a table already existing
 in one developer database are not ordering contracts.
@@ -196,7 +199,13 @@ The normal operational commands are:
 Run migrations through these Bilimbi tasks rather than a single module path.
 The installed graph is validated before migration paths are exposed;
 `mix bilimbi.migrate` additionally validates dispositions and the ledger before
-execution.
+execution. The ledger rule is per owner: for each installed module and each
+disposition class, the recorded versions must be a prefix of that owner's
+class sequence, and every recorded version must be explained by an installed
+migration or by retained provenance. Owners are independent, so a Domain or
+Extension can be mounted after the Platform migrated and its earlier-dated
+versions are simply pending; a gap inside one owner's sequence fails closed
+([ADR 0020](./decisions/0020-per-owner-ledger-and-absent-optional-structure.md)).
 
 Beside the ledger, `bilimbi_migration_provenance` records, for every applied
 version, the stable ID and layer of the module that shipped it, its
@@ -254,9 +263,18 @@ An existing database follows three explicit steps:
    in place by captain's decision. Nothing is ever deleted.
 
 Adoption refuses structural drift, invariant failures, unknown ledger
-versions, and invalid class ordering. It never modifies business data or
-Laravel's ledger. Pending Bilimbi-only migrations remain pending and run later
-through `mix bilimbi.migrate`.
+versions, and a gap inside an owner's sequence. It never modifies business
+data or Laravel's ledger. Pending Bilimbi-only migrations remain pending and
+run later through `mix bilimbi.migrate`.
+
+A mounted Domain or Extension whose owned structure is wholly absent, because
+the installation never had the Belimbing module it maps, is not drift: its
+compatible baselines also remain pending, and `mix bilimbi.migrate` creates
+them. The verify and adopt commands name each such owner. A partly present
+owner is drift, and the Platform is never absent; the rule is
+[ADR 0020](./decisions/0020-per-owner-ledger-and-absent-optional-structure.md)
+and its operation is the
+[Core Compatibility contract](../../apps/core/compatibility/docs/README.md).
 
 Run the remap's `--dry-run` first on cutover day (it is the read-only
 value verifier: shape verification stays `bilimbi.schema.verify`), read the
@@ -276,6 +294,11 @@ columns, PostgreSQL types, nullability, defaults, named indexes, predicates,
 foreign keys, and checks supported by the verifier. Index specs include an
 optional `:order` key: a boolean list aligned with `:columns` where `true`
 means descending and an absent or `nil` value means all columns ascend.
+
+A Domain or Extension contract's `tables/0` lists exactly the tables its
+compatible baselines create: whether the owner is absent from a database is
+judged on those tables, so a Bilimbi-only table listed there would make the
+owner partly present on every database that has its Belimbing module.
 
 Contracts may declare `optional_indexes` alongside the mandatory `indexes`.
 Optional indexes may be absent (an adopted Belimbing database without them
@@ -335,5 +358,6 @@ When adding or changing persistent behavior:
 - [ADR 0003: Physical deep-module packages](./decisions/0003-physical-deep-module-packages.md)
 - [ADR 0005: Laravel framework tables and job runtime](./decisions/0005-laravel-framework-tables-and-job-runtime.md)
 - [ADR 0007: Contained Core User Administration integration read](./decisions/0007-core-user-administration-integration-read.md)
+- [ADR 0020: Per-owner migration ledger and absent optional structure at adoption](./decisions/0020-per-owner-ledger-and-absent-optional-structure.md)
 - [Base Database operational contract](../../apps/base/database/docs/README.md)
 - [Core Compatibility operational contract](../../apps/core/compatibility/docs/README.md)

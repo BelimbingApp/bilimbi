@@ -64,6 +64,14 @@ refuses a database that has not been adopted.
 Adoption refuses schema drift and records the verified baselines in
 `bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.
 
+A mounted Domain or Extension may map a Belimbing module the installation
+never had; Factory's item master is Belimbing's Commerce table, which a
+customer without Commerce does not have. Verification and adoption report
+such an owner instead of refusing it, and `mix bilimbi.migrate`, which
+follows the remap, creates its baseline. A Domain can also be mounted later,
+after the Platform has been adopted and migrated; its migrations are pending
+and run on the next migrate.
+
 The schemas already match, so the remaining cutover work is stored values
 Bilimbi reads differently. `mix bilimbi.cutover.remap` remaps pin and
 notification URLs (always recomputing the pin hash) and `heroicon-` names, and

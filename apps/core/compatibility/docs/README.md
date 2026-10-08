@@ -25,13 +25,18 @@ reverse migration, dual-running, or parity with Laravel source, routes, or UI.
 
 Every owned migration version is explicitly classified by its descriptor.
 Adoption records only verified compatible baselines and leaves Bilimbi-only
-migrations pending. Recorded versions must be installed, and the recorded
-versions in each class must be a prefix of that class's deterministic sequence.
-The operational `mix bilimbi.migrate` command validates that state through this
-module before choosing strict timestamp ordering. A class-valid gap may occur
-when a later compatible baseline was adopted while an earlier Bilimbi-only
-migration remains pending; arbitrary, foreign, or class-non-prefix ledgers fail
-closed.
+migrations pending. Recorded versions must be installed, and for each owner
+the recorded versions in each class must be a prefix of that owner's class
+sequence. Owners are independent: a Domain or Extension mounted after the
+Platform migrated ships earlier-dated versions that are all pending, and an
+absent owner (below) keeps its baseline pending behind recorded Platform
+baselines; a later compatible baseline may likewise be adopted while an
+earlier Bilimbi-only migration remains pending. `mix bilimbi.migrate`
+validates the ledger through this module before running anything, and the
+pending migrations then run after every recorded one, in version order among
+themselves. `Ecto.Migrator.run/4` never refuses an older pending version
+itself, so this validation is the ordering guard. A gap inside one owner's
+sequence, and an arbitrary or foreign ledger, fail closed.
 
 A recorded version that no installed migration ships belonged to a Domain or
 Extension that has since been unmounted, or it is unexplained. The private
@@ -42,6 +47,31 @@ Only a retired Domain or Extension owner explains a missing version; a remount
 must match the retained owner, disposition, and checksum. The contract is in
 [Bilimbi Database Architecture](../../../../docs/architecture/database.md)
 under "Ledger and execution".
+
+## A mounted Domain or Extension the database never had
+
+A Domain or Extension maps a Belimbing module an installation may never have
+installed: Factory Inventory's compatible baseline is Belimbing's Commerce
+item master, and a customer without Commerce has no such table. That owner
+is absent, not drift, when none of the tables its schema contract names
+exists, none of the objects it contributes to other tables exists, and none
+of its versions is recorded (`Bilimbi.Core.Compatibility.absent_modules/2`).
+Verification skips it, adoption records every other owner's baselines and
+leaves its unrecorded, and `mix bilimbi.migrate` creates its baseline and
+runs its Bilimbi-only migrations as on a fresh database. The verify and
+adopt commands print one line per absent owner so the operator knows what
+migrate will create.
+
+A partly present owner is still drift: one table missing while another
+exists, a present table that differs from the contract, or a contributed
+object found while the tables are missing. The Platform is never absent;
+Base and Core map Belimbing's own tables, so a Platform module with none is
+a database behind the compatibility source. The decision and its reasoning
+are [ADR 0020](../../../../docs/architecture/decisions/0020-per-owner-ledger-and-absent-optional-structure.md).
+
+A Domain or Extension may therefore be mounted before the first adoption or
+later, on an installation that has already taken newer Platform migrations;
+the per-owner ledger rule above accepts its pending versions either way.
 
 ## Cutover value remediation
 

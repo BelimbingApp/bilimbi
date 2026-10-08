@@ -371,9 +371,17 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
   end
 
-  test "adoption rejects non-prefix and unknown ledger versions", %{schema: schema} do
+  test "adoption rejects a gap inside one owner's baselines and unknown ledger versions", %{
+    schema: schema
+  } do
     Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
-    [first_version | _rest] = Compatibility.baseline_versions()
+
+    # Core Company ships two baselines; a ledger holding only its second is
+    # not a prefix of that owner's sequence.
+    [first_version | _rest] =
+      for {version, module, :compatible_baseline} <- Compatibility.migration_entries(),
+          String.starts_with?(inspect(module), "Bilimbi.Core.Company."),
+          do: version
 
     SQL.query!(
       MigrationTestRepo,
@@ -415,6 +423,25 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
 
     assert "companies: missing column legal_name" in errors
+    assert relation(MigrationTestRepo, schema, "bilimbi_schema_migrations") == nil
+  end
+
+  test "a Platform module whose tables are all absent is drift", %{schema: schema} do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+
+    # Only a Domain or Extension may be absent from a Belimbing database: the
+    # Platform maps Belimbing's own tables, so a Platform module with none is
+    # a database behind the compatibility source, never one to create.
+    SQL.query!(MigrationTestRepo, ~s(DROP TABLE "#{schema}".sessions), [])
+
+    assert {:error, errors} = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert "missing table #{schema}.sessions" in errors
+    assert Compatibility.absent_modules(MigrationTestRepo, prefix: schema) == []
+
+    assert {:error, {:schema_drift, _errors}} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
     assert relation(MigrationTestRepo, schema, "bilimbi_schema_migrations") == nil
   end
 

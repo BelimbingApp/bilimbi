@@ -96,6 +96,45 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     if errors == [], do: :ok, else: {:error, errors}
   end
 
+  @doc """
+  Whether none of an owner's structure exists: no owned table, and no named
+  object it contributes to another table.
+
+  An owner with no table to own is never absent; it has nothing to create.
+  Compatibility uses this to tell a Domain or Extension whose Belimbing
+  module an installation never had, which its compatible baseline will
+  create, from one that is partly present, which is drift.
+  """
+  @spec absent?(Ecto.Repo.t(), [table_spec()], [table_contribution_spec()], keyword()) ::
+          boolean()
+  def absent?(_repo, [], _contributions, _opts), do: false
+
+  def absent?(repo, table_specs, contributions, opts) do
+    schema = Keyword.get(opts, :prefix, "public")
+    validate_identifier!(schema)
+
+    Enum.all?(table_specs, &(columns(repo, schema, &1.name) == %{})) and
+      Enum.all?(contributions, &(contributed_objects(repo, schema, &1) == []))
+  end
+
+  # The names of a contribution's objects that exist on its table.
+  defp contributed_objects(repo, schema, spec) do
+    if columns(repo, schema, spec.name) == %{} do
+      []
+    else
+      Enum.flat_map(
+        [
+          {:indexes, indexes(repo, schema, spec.name)},
+          {:foreign_keys, foreign_keys(repo, schema, spec.name)},
+          {:checks, checks(repo, schema, spec.name)}
+        ],
+        fn {key, actual} ->
+          spec |> Map.get(key, %{}) |> Map.keys() |> Enum.filter(&Map.has_key?(actual, &1))
+        end
+      )
+    end
+  end
+
   @doc "Validates and quotes a PostgreSQL identifier for contract-owned SQL."
   @spec quote_identifier!(String.t()) :: String.t()
   def quote_identifier!(identifier) do

@@ -42,9 +42,10 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
     %{schema: schema}
   end
 
-  test "operational task runs a pending Bilimbi-only migration across a class-valid gap", %{
-    schema: schema
-  } do
+  test "operational task runs a pending Bilimbi-only migration behind an adopted later baseline",
+       %{
+         schema: schema
+       } do
     Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
 
     SQL.query!(
