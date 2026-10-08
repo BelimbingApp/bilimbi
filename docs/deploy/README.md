@@ -8,7 +8,7 @@ building so the release contains the complete composition.
 | Mode | Behavior |
 |---|---|
 | `install` | Prepare/deploy, migrate, seed reference data, and provision the explicitly selected initial administrator |
-| `adopt` | Verify and adopt a Belimbing schema, migrate, seed reference data, and retain existing identities and administrators |
+| `adopt` | Verify, adopt and remap a Belimbing database, then migrate, seed reference data, and retain existing identities and administrators |
 | `upgrade` | Migrate and deploy; never provision an administrator or overwrite operator configuration |
 
 The native adapter currently supports Ubuntu 26.04 x86-64. The Docker image
@@ -53,8 +53,19 @@ legacy encryption key, then use:
 sudo bash scripts/setup-native.sh adopt ARCHIVE VERSION ENV_FILE CADDY_FILE
 ```
 
-Adoption runs structural and data-invariant verification before recording the
-compatible baseline; it never chooses an administrator. For later releases:
+Adoption runs these release commands in order, stopping at the first failure:
+`Release.verify()` (read-only structural and data-invariant check),
+`Release.adopt()` (records the compatible baseline), `Release.remap_dry_run()`
+(reports stored-value changes and writes nothing), `Release.remap()`, then
+`Release.migrate()` and `Release.seed()`. Read the dry-run report in the setup
+output; its residue (unmapped pins, undeclared grants) is for an operator
+decision and is never deleted. It never chooses an administrator. Every step
+is repeatable.
+
+`Release.migrate()`, which every `upgrade` runs, refuses an existing Belimbing
+database that has not been adopted (Laravel's `migrations` table present, no
+Bilimbi ledger), so `upgrade` or `deploy.sh` cannot be the first step on one.
+For later releases:
 
 ```bash
 sudo bash scripts/setup-native.sh upgrade ARCHIVE VERSION

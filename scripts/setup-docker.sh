@@ -35,7 +35,11 @@ run_release() {
   "${compose[@]}" run --rm --no-deps -T app bin/bilimbi eval "$1" </dev/null
 }
 if [[ "$mode" == adopt ]]; then
-  run_release 'BilimbiWeb.Release.adopt()'
+  # An existing Belimbing database takes these in order, each stopping setup
+  # on failure; migrate comes last and refuses an unadopted one.
+  for step in verify adopt remap_dry_run remap; do
+    run_release "BilimbiWeb.Release.$step()"
+  done
 fi
 run_release 'BilimbiWeb.Release.migrate()'
 case "$mode" in

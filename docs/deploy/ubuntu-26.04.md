@@ -142,8 +142,13 @@ sudo journalctl -u bilimbi -n 100 --no-pager
 curl -fsS -o /dev/null -w '%{http_code}\n' https://<your-domain>/
 ```
 
-Copy [`deploy.sh`](../../scripts/deploy/deploy.sh) to the server first. The
-script verifies SHA-256, unpacks into `/opt/bilimbi/releases/<version>`, runs
+Copy [`deploy.sh`](../../scripts/deploy/deploy.sh) to the server first. For an
+existing Belimbing database pass `adopt` as a fourth argument
+(`deploy.sh ARCHIVE VERSION 5 adopt`); the script then runs
+`Release.verify()`, `Release.adopt()`, `Release.remap_dry_run()` and
+`Release.remap()` first, stopping on any failure. Without it, `migrate` refuses
+an unadopted Belimbing database. The script verifies SHA-256, unpacks into
+`/opt/bilimbi/releases/<version>`, runs
 `BilimbiWeb.Release.migrate()`, switches `/opt/bilimbi/current`, restarts the
 service, and requires HTTP 200 from the local sign-in page at `/`. On a failed
 health check it restores the previous symlink and restarts it. It keeps at

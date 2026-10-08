@@ -21,8 +21,8 @@ case "$*" in
     IFS= read -r password
     [[ "$password" == "${EXPECTED_PASSWORD:-test-password}" ]] || exit 42
     ;;
+  *'run --rm --no-deps -T'*"${REFUSE_STEP:-none}") exit 43 ;;
   *'run --rm --no-deps -T'*'Release.adopt()')
-    [[ ${REFUSE_ADOPTION:-no} == no ]] || exit 43
     # Deliberately drain stdin like the real Compose client.
     cat >/dev/null
     ;;
@@ -62,14 +62,16 @@ absent 'Release.adopt()'
 
 reset_log
 run adopt bilimbi:test "$test_dir/release.env"
-contains 'Release.adopt()'
-contains 'Release.seed()'
+steps=$(grep -o 'Release\.[a-z_]*()' "$SETUP_TEST_LOG" | tr '\n' ' ')
+[[ "$steps" == 'Release.verify() Release.adopt() Release.remap_dry_run() Release.remap() Release.migrate() Release.seed() ' ]]
 absent 'Release.bootstrap()'
 
-reset_log
-if REFUSE_ADOPTION=yes run adopt bilimbi:test "$test_dir/release.env"; then exit 1; fi
-absent 'Release.migrate()'
-absent 'up -d'
+for refused in verify adopt remap_dry_run remap; do
+  reset_log
+  if REFUSE_STEP="Release.$refused()" run adopt bilimbi:test "$test_dir/release.env"; then exit 1; fi
+  absent 'Release.migrate()'
+  absent 'up -d'
+done
 
 reset_log
 if HEALTH_STATUS=503 run upgrade bilimbi:test "$test_dir/release.env"; then exit 1; fi

@@ -52,10 +52,15 @@ set -a
 source /etc/bilimbi/bilimbi.env
 set +a
 unset PHX_SERVER
+release_eval() { runuser -u bilimbi -- "$target/bin/bilimbi" eval "$1" </dev/null; }
 if [[ "$mode" == adopt ]]; then
-  runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.adopt()' </dev/null
+  # An existing Belimbing database takes these in order, each stopping the
+  # deployment on failure; migrate comes last and refuses an unadopted one.
+  for step in verify adopt remap_dry_run remap; do
+    release_eval "BilimbiWeb.Release.$step()"
+  done
 fi
-runuser -u bilimbi -- "$target/bin/bilimbi" eval 'BilimbiWeb.Release.migrate()' </dev/null
+release_eval 'BilimbiWeb.Release.migrate()'
 
 ln -sfn "$target" "$root/.current.next"
 mv -Tf "$root/.current.next" "$current"
