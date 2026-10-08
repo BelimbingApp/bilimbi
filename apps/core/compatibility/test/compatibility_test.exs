@@ -400,6 +400,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     account_indexes = 20_260_821_213_100
     decision_log_tenant = 20_261_008_070_000
     run_provenance = 20_261_008_070_100
+    log_backfill = 20_261_008_070_200
 
     assert %{disposition: "bilimbi_only"} =
              Compatibility.MigrationProvenance.fetch(MigrationTestRepo, schema)[account_indexes]
@@ -419,7 +420,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
       []
     )
 
-    for version <- [decision_log_tenant, run_provenance] do
+    for version <- [decision_log_tenant, run_provenance, log_backfill] do
       SQL.query!(
         MigrationTestRepo,
         ~s(DELETE FROM "#{schema}".bilimbi_schema_migrations WHERE version = $1),
@@ -463,7 +464,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     end
 
     assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) ==
-             [decision_log_tenant, run_provenance]
+             [decision_log_tenant, run_provenance, log_backfill]
 
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
 
