@@ -31,6 +31,10 @@ Put `phx-change` on the `<form>`, and `phx-submit` aimed at the same handler. A 
 
 Flash `:success` only for a completed write. `:info` informs and confirms nothing. When one call can do either, take the kind from that outcome: a Countries update that did not update was rendered as a green success because the kind was fixed in advance. A refusal names its real cause. The Settings page blamed the modules when the reason was a permission. Kinds and timing live in `DESIGN.md` "Honest feedback" and in the docs on `flash_group/1` and `panel_notice/1`.
 
+## Confirmations
+
+A control confirms only when the acting user cannot undo it from the same page; one the page reverses on its own (assign again, add again, lift the rule) commits on click and reports through the flash, however much it costs. The list in `DESIGN.md` "Confirmation dialogs" is the inventory; keep it true when adding or removing a dialog. `own_account?/1` in `apps/core/user/lib/user/web/user_access_panel.ex` is the shape for a control that is undoable for everyone except the acting user: it confirms on the acting user's own account only.
+
 ## Withheld controls and fields
 
 If a button or editor is absent, the page says why and what to do next, through `empty_state/1` (`title`, `reason`, or `forbidden`) or `<.table>`'s `<:empty>` slot. The Roles picker, a settings group, and an archived-company account each hid a control until the page said why. The component only speaks when it is used: a caller can still hide a control with `:if` and no `empty_state`, and nothing yet stops that.

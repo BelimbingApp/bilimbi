@@ -58,7 +58,6 @@ defmodule BilimbiWeb.UserShowAccessTest do
     [assignment] = assignments.entries
 
     view |> element("#remove-role-#{assignment.id}") |> render_click()
-    view |> element("#user-authz-confirm-confirm") |> render_click()
     assert has_element?(view, "#user-roles-heading + span", "0")
   end
 
@@ -97,7 +96,6 @@ defmodule BilimbiWeb.UserShowAccessTest do
 
     # Deny role-derived capability
     view |> element("#deny-cap-admin-company-view") |> render_click()
-    view |> element("#user-authz-confirm-confirm") |> render_click()
     assert has_element?(view, "#flash-group", "denied")
 
     assert has_element?(
@@ -108,7 +106,6 @@ defmodule BilimbiWeb.UserShowAccessTest do
 
     # Remove denial
     view |> element("#remove-denial-admin-company-view") |> render_click()
-    view |> element("#user-authz-confirm-confirm") |> render_click()
     assert has_element?(view, "#flash-group", "The deny rule for admin.company.view was removed.")
 
     # Grant direct capability "admin.company.list"
@@ -121,7 +118,6 @@ defmodule BilimbiWeb.UserShowAccessTest do
 
     # Remove direct capability grant
     view |> element("#remove-direct-cap-admin-company-list") |> render_click()
-    view |> element("#user-authz-confirm-confirm") |> render_click()
 
     assert has_element?(
              view,
@@ -130,11 +126,11 @@ defmodule BilimbiWeb.UserShowAccessTest do
            )
   end
 
-  # Every control on this card changes authorization for a real person, so
-  # each one confirms through the shared dialog and names the role or
-  # capability it is about -- a bare "Remove this role?" does not tell the
-  # administrator which of several badges they are about to act on.
-  test "confirms role removal and names the role and the user", %{conn: conn} do
+  # A change the administrator can undo from the same card commits on click:
+  # a removed role is assigned again from the picker, a removed grant added
+  # again, a deny rule lifted from the denied list. No dialog stands in the
+  # way, and the outcome names the role and the person.
+  test "removes another user's role on click, without a dialog", %{conn: conn} do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     {:ok, role} = Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Editor", code: "editor"})
 
@@ -157,48 +153,24 @@ defmodule BilimbiWeb.UserShowAccessTest do
     [assignment] = assignments.entries
 
     refute has_element?(view, "#remove-role-#{assignment.id}[data-confirm]")
-    view |> element("#remove-role-#{assignment.id}") |> render_click()
-
-    assert_modal_dialog(
-      view,
-      "user-authz-confirm",
-      "The Editor role will be removed from Grace Hopper."
-    )
-
-    assert has_element?(view, "dialog#user-authz-confirm[role='alertdialog']")
-
-    assert has_element?(
-             view,
-             "#user-authz-confirm-description",
-             "They lose every capability this role grants unless another role or direct grant " <>
-               "also provides it. The role can be assigned again."
-           )
-
-    # Cancelling keeps the role.
-    view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
-    refute has_element?(view, "#user-authz-confirm")
-    assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # A confirm with nothing held is a stale click and changes nothing.
     view |> with_target("#user-access-panel") |> render_click("remove_role", %{})
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
-    # Confirming removes it and reports the completed write as a success.
     view |> element("#remove-role-#{assignment.id}") |> render_click()
 
-    assert has_element?(
-             view,
-             "#user-authz-confirm-confirm[phx-disable-with='Removing…']",
-             "Remove"
-           )
-
-    view |> element("#user-authz-confirm-confirm") |> render_click()
     refute has_element?(view, "#user-authz-confirm")
     assert has_element?(view, "#flash-success", "The Editor role was removed.")
     refute has_element?(view, "#assigned-roles-list", "Editor")
+    assert Bilimbi.Base.Authz.list_principal_role_assignments(scope, :user, 92).entries == []
+
+    # The way back is the picker, which offers the role again.
+    view |> element("#toggle-assign-roles-btn") |> render_click()
+    assert has_element?(view, "#assign-roles-form", "Editor")
   end
 
-  test "confirms every capability control and names the capability and the user", %{conn: conn} do
+  test "changes another user's capability rules on click, without a dialog", %{conn: conn} do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     {:ok, role} = Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Auditor", code: "auditor"})
 
@@ -222,64 +194,16 @@ defmodule BilimbiWeb.UserShowAccessTest do
 
     view |> element("#toggle-permissions-btn") |> render_click()
 
-    # Denying a role-derived capability revokes it, so it confirms first, with
-    # the verb the dialog's danger action carries.
+    # Denying a role-derived capability is lifted again from the denied list.
     refute has_element?(view, "#deny-cap-admin-company-view[data-confirm]")
     view |> element("#deny-cap-admin-company-view") |> render_click()
-
-    assert_modal_dialog(
-      view,
-      "user-authz-confirm",
-      "admin.company.view will be denied for Grace Hopper."
-    )
-
-    assert has_element?(
-             view,
-             "#user-authz-confirm-description",
-             "The deny rule overrides every role that grants it and takes effect at once. " <>
-               "It can be removed again from the denied list."
-           )
-
-    # Cancelling changes nothing.
-    view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
-    refute has_element?(view, "#user-authz-confirm")
-    refute has_element?(view, "#denied-cap-badge-admin-company-view")
-
-    view |> element("#deny-cap-admin-company-view") |> render_click()
-
-    assert has_element?(
-             view,
-             "#user-authz-confirm-confirm[phx-disable-with='Denying…']",
-             "Deny"
-           )
-
-    view |> element("#user-authz-confirm-confirm") |> render_click()
     refute has_element?(view, "#user-authz-confirm")
     assert has_element?(view, "#flash-success", "admin.company.view is denied for Grace Hopper.")
     assert has_element?(view, "#denied-cap-badge-admin-company-view")
 
-    # Removing the deny rule restores access rather than revoking it, so the
-    # copy says that instead of borrowing the revocation wording.
     refute has_element?(view, "#remove-denial-admin-company-view[data-confirm]")
     view |> element("#remove-denial-admin-company-view") |> render_click()
-
-    assert_modal_dialog(
-      view,
-      "user-authz-confirm",
-      "The deny rule for admin.company.view will be removed."
-    )
-
-    assert has_element?(
-             view,
-             "#user-authz-confirm-description",
-             "Grace Hopper regains this capability from any role or direct grant that provides it."
-           )
-
-    view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
-    assert has_element?(view, "#denied-cap-badge-admin-company-view")
-
-    view |> element("#remove-denial-admin-company-view") |> render_click()
-    view |> element("#user-authz-confirm-confirm", "Remove") |> render_click()
+    refute has_element?(view, "#user-authz-confirm")
 
     assert has_element?(
              view,
@@ -293,28 +217,9 @@ defmodule BilimbiWeb.UserShowAccessTest do
     |> form("#add-capabilities-form")
     |> render_submit(%{"capability_keys" => ["admin.company.list"]})
 
-    # Removing a direct grant says what still keeps the capability in place.
     refute has_element?(view, "#remove-direct-cap-admin-company-list[data-confirm]")
     view |> element("#remove-direct-cap-admin-company-list") |> render_click()
-
-    assert_modal_dialog(
-      view,
-      "user-authz-confirm",
-      "The direct grant of admin.company.list will be removed from Grace Hopper."
-    )
-
-    assert has_element?(
-             view,
-             "#user-authz-confirm-description",
-             "They keep this capability only if an assigned role still grants it. " <>
-               "The grant can be added again."
-           )
-
-    view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
-    assert has_element?(view, "#cap-badge-admin-company-list")
-
-    view |> element("#remove-direct-cap-admin-company-list") |> render_click()
-    view |> element("#user-authz-confirm-confirm", "Remove") |> render_click()
+    refute has_element?(view, "#user-authz-confirm")
 
     assert has_element?(
              view,
@@ -323,6 +228,134 @@ defmodule BilimbiWeb.UserShowAccessTest do
            )
 
     refute has_element?(view, "#cap-badge-admin-company-list")
+
+    # The way back: the picker offers the capability again.
+    assert has_element?(view, "#add-capabilities-form", "admin.company.list")
+  end
+
+  # The pickers only offer what the acting user holds, so a change to one's
+  # own account may not be one they can take back. Every change there
+  # confirms first; the same change to another user commits on click.
+  describe "the acting user's own account" do
+    setup do
+      {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+      {:ok, editor} =
+        Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Editor", code: "editor"})
+
+      {:ok, _} =
+        Bilimbi.Base.Authz.replace_role_capabilities(scope, editor.id, ["admin.company.view"])
+
+      UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Kiat Ng"})
+      {:ok, _} = Bilimbi.Base.Authz.assign_role(scope, 73, :user, 91, editor.id)
+      grant_capabilities!(["admin.user.view", "admin.user.update", "admin.company.list"])
+
+      assignments = Bilimbi.Base.Authz.list_principal_role_assignments(scope, :user, 91).entries
+      editor_assignment = Enum.find(assignments, &(&1.role_id == editor.id))
+
+      %{scope: scope, editor: editor_assignment}
+    end
+
+    test "confirms removing a role", %{conn: conn, scope: scope, editor: editor} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/91")
+
+      view |> element("#remove-role-#{editor.id}") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "user-authz-confirm",
+        "The Editor role will be removed from your account."
+      )
+
+      assert has_element?(view, "dialog#user-authz-confirm[role='alertdialog']")
+      assert has_element?(view, "#user-authz-confirm-description", "your own access")
+
+      # Cancelling keeps the role.
+      view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#user-authz-confirm")
+      assert has_element?(view, "#assigned-roles-list", "Editor")
+
+      view |> element("#remove-role-#{editor.id}") |> render_click()
+
+      assert has_element?(
+               view,
+               "#user-authz-confirm-confirm[phx-disable-with='Removing…']",
+               "Remove"
+             )
+
+      view |> element("#user-authz-confirm-confirm") |> render_click()
+      refute has_element?(view, "#user-authz-confirm")
+      assert has_element?(view, "#flash-success", "The Editor role was removed.")
+      refute has_element?(view, "#assigned-roles-list", "Editor")
+
+      assignments = Bilimbi.Base.Authz.list_principal_role_assignments(scope, :user, 91).entries
+      refute Enum.any?(assignments, &(&1.id == editor.id))
+    end
+
+    test "confirms removing a direct grant", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/91")
+
+      view |> element("#toggle-permissions-btn") |> render_click()
+      view |> element("#remove-direct-cap-admin-company-list") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "user-authz-confirm",
+        "The direct grant of admin.company.list will be removed from your account."
+      )
+
+      assert has_element?(view, "#user-authz-confirm-description", "your own access")
+
+      view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
+      assert has_element?(view, "#cap-badge-admin-company-list")
+
+      view |> element("#remove-direct-cap-admin-company-list") |> render_click()
+      view |> element("#user-authz-confirm-confirm", "Remove") |> render_click()
+      refute has_element?(view, "#user-authz-confirm")
+
+      assert has_element?(
+               view,
+               "#flash-success",
+               "The direct grant of admin.company.list was removed."
+             )
+
+      refute has_element?(view, "#cap-badge-admin-company-list")
+    end
+
+    test "confirms denying a capability and lifting the deny rule", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/91")
+
+      view |> element("#toggle-permissions-btn") |> render_click()
+      view |> element("#deny-cap-admin-company-view") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "user-authz-confirm",
+        "admin.company.view will be denied for your account."
+      )
+
+      assert has_element?(view, "#user-authz-confirm-description", "your own access")
+
+      view |> element("#user-authz-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#denied-cap-badge-admin-company-view")
+
+      view |> element("#deny-cap-admin-company-view") |> render_click()
+      view |> element("#user-authz-confirm-confirm", "Deny") |> render_click()
+      assert has_element?(view, "#flash-success", "admin.company.view is denied for Kiat Ng.")
+      assert has_element?(view, "#denied-cap-badge-admin-company-view")
+
+      view |> element("#remove-denial-admin-company-view") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "user-authz-confirm",
+        "The deny rule for admin.company.view will be removed from your account."
+      )
+
+      view |> element("#user-authz-confirm-confirm", "Remove") |> render_click()
+      refute has_element?(view, "#user-authz-confirm")
+      refute has_element?(view, "#denied-cap-badge-admin-company-view")
+    end
   end
 
   test "prevents privilege escalation when assigning roles not held by the administrator", %{

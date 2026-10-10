@@ -10,9 +10,14 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
 
   Outcomes use the page flash. A LiveComponent's own `put_flash/3` does
   not reach `Layouts.app`, so a completed write or a refusal sends the
-  message to the page. Opening a confirmation clears that flash first,
-  with an untargeted `lv:clear-flash`, because the page behind the dialog
-  is inert.
+  message to the page. A change to another user commits on click: it can
+  be undone from the same card, by assigning the role or adding the grant
+  again, or by removing the deny rule. The one exception confirms first,
+  and that is the only time the card opens a dialog: any change to the
+  acting user's own account (`own_account?/1`), because the pickers offer
+  only what the acting user holds and so may not offer it back. Opening
+  that confirmation clears the flash first, with an untargeted
+  `lv:clear-flash`, because the page behind the dialog is inert.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -205,11 +210,12 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     end
   end
 
-  # Every authorization change on this card confirms through the shared
-  # dialog. The request holds the rule the dialog names -- a role assignment, a
-  # direct grant, a deny rule or a capability to deny -- and the confirm acts
-  # on that held rule rather than on a client-supplied id, so what was
-  # confirmed is what changes.
+  # A change to another user commits on click. The request resolves the rule
+  # from the page's own maps -- a role assignment, a direct grant, a deny rule
+  # or a capability to deny -- never from a client-supplied id alone, and
+  # applies it at once unless the account is the acting user's own; then the
+  # rule is held and the dialog names it, and the confirm acts on that held
+  # rule.
   def handle_event("request_remove_role", %{"assignment-id" => assignment_id_str}, socket) do
     cond do
       not can_manage?(socket) ->
@@ -219,7 +225,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         {:noreply, archived_refused(socket)}
 
       assignment = find_assignment(socket, assignment_id_str) ->
-        hold_authz(socket, {:remove_role, assignment})
+        apply_or_hold(socket, {:remove_role, assignment})
 
       true ->
         {:noreply, socket}
@@ -239,25 +245,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         {:noreply, socket}
 
       true ->
-        {:remove_role, assignment} = socket.assigns.pending_authz
-        socket = assign(socket, :pending_authz, nil)
-        scope = socket.assigns.current_scope.scope
-
-        case Authz.unassign_role(scope, assignment.role_id, assignment.id) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> page_flash(:success, "The #{assignment.role_name} role was removed.")
-             |> load_access()}
-
-          {:error, _} ->
-            {:noreply,
-             page_flash(
-               socket,
-               :error,
-               "The #{assignment.role_name} role was not removed. Reload the page and try again."
-             )}
-        end
+        apply_authz(socket, socket.assigns.pending_authz)
     end
   end
 
@@ -300,7 +288,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         {:noreply, archived_refused(socket)}
 
       cap_key in socket.assigns.effective_keys ->
-        hold_authz(socket, {:deny, cap_key})
+        apply_or_hold(socket, {:deny, cap_key})
 
       true ->
         {:noreply, socket}
@@ -316,44 +304,18 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         {:noreply, socket}
 
       true ->
-        {:deny, cap_key} = socket.assigns.pending_authz
-        socket = assign(socket, :pending_authz, nil)
-        scope = socket.assigns.current_scope.scope
-        user = socket.assigns.user
-
-        case Authz.put_principal_capability(
-               scope,
-               user.company_id,
-               :user,
-               user.id,
-               cap_key,
-               false
-             ) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> page_flash(:success, "#{cap_key} is denied for #{user.name}.")
-             |> load_access()}
-
-          {:error, _} ->
-            {:noreply,
-             page_flash(
-               socket,
-               :error,
-               "#{cap_key} was not denied. Reload the page and try again."
-             )}
-        end
+        apply_authz(socket, socket.assigns.pending_authz)
     end
   end
 
   # A grant id backs two controls -- a direct grant and a deny rule -- so the
-  # request resolves which one it is from the page's own maps before it opens
-  # a dialog, and the copy says what removing that rule does.
+  # request resolves which one it is from the page's own maps before it acts,
+  # and the outcome says what removing that rule did.
   def handle_event("request_remove_capability", %{"grant-id" => grant_id_str}, socket) do
     cond do
       not can_manage?(socket) -> capabilities_forbidden(socket)
       archived_company?(socket) -> {:noreply, archived_refused(socket)}
-      rule = find_capability_rule(socket, grant_id_str) -> hold_authz(socket, rule)
+      rule = find_capability_rule(socket, grant_id_str) -> apply_or_hold(socket, rule)
       true -> {:noreply, socket}
     end
   end
@@ -370,25 +332,82 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
         {:noreply, socket}
 
       true ->
-        {kind, cap_key, grant_id} = socket.assigns.pending_authz
-        socket = assign(socket, :pending_authz, nil)
-        scope = socket.assigns.current_scope.scope
+        apply_authz(socket, socket.assigns.pending_authz)
+    end
+  end
 
-        case Authz.remove_principal_capability(scope, grant_id) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> page_flash(:success, capability_removed_message(kind, cap_key))
-             |> load_access()}
+  # The write behind each rule, reached on click or from the dialog. It
+  # clears any held rule first, so a confirm with nothing held is a stale
+  # click and changes nothing.
+  defp apply_authz(socket, {:remove_role, assignment}) do
+    socket = assign(socket, :pending_authz, nil)
+    scope = socket.assigns.current_scope.scope
 
-          {:error, _} ->
-            {:noreply,
-             page_flash(
-               socket,
-               :error,
-               "The rule for #{cap_key} was not removed. Reload the page and try again."
-             )}
-        end
+    case Authz.unassign_role(scope, assignment.role_id, assignment.id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> page_flash(:success, "The #{assignment.role_name} role was removed.")
+         |> load_access()}
+
+      {:error, _} ->
+        {:noreply,
+         page_flash(
+           socket,
+           :error,
+           "The #{assignment.role_name} role was not removed. Reload the page and try again."
+         )}
+    end
+  end
+
+  defp apply_authz(socket, {:deny, cap_key}) do
+    socket = assign(socket, :pending_authz, nil)
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+
+    case Authz.put_principal_capability(
+           scope,
+           user.company_id,
+           :user,
+           user.id,
+           cap_key,
+           false
+         ) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> page_flash(:success, "#{cap_key} is denied for #{user.name}.")
+         |> load_access()}
+
+      {:error, _} ->
+        {:noreply,
+         page_flash(
+           socket,
+           :error,
+           "#{cap_key} was not denied. Reload the page and try again."
+         )}
+    end
+  end
+
+  defp apply_authz(socket, {kind, cap_key, grant_id})
+       when kind in [:remove_grant, :remove_denial] do
+    socket = assign(socket, :pending_authz, nil)
+    scope = socket.assigns.current_scope.scope
+
+    case Authz.remove_principal_capability(scope, grant_id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> page_flash(:success, capability_removed_message(kind, cap_key))
+         |> load_access()}
+
+      {:error, _} ->
+        {:noreply,
+         page_flash(
+           socket,
+           :error,
+           "The rule for #{cap_key} was not removed. Reload the page and try again."
+         )}
     end
   end
 
@@ -487,8 +506,16 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
 
   # --- Confirmation helpers ---
 
-  defp hold_authz(socket, rule) do
-    {:noreply, socket |> page_clear_flash() |> assign(:pending_authz, rule)}
+  defp apply_or_hold(socket, rule) do
+    if own_account?(socket) do
+      {:noreply, socket |> page_clear_flash() |> assign(:pending_authz, rule)}
+    else
+      apply_authz(socket, rule)
+    end
+  end
+
+  defp own_account?(socket) do
+    socket.assigns.user.id == socket.assigns.current_scope.user["user_id"]
   end
 
   defp capabilities_forbidden(socket) do
@@ -529,36 +556,22 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
   defp capability_removed_message(:remove_denial, cap_key),
     do: "The deny rule for #{cap_key} was removed."
 
-  # The dialog states what the held rule does to this person's access.
-  defp authz_consequence({:remove_role, assignment}, user),
-    do: "The #{assignment.role_name} role will be removed from #{user.name}."
+  # The dialog opens only for the acting user's own account, so it speaks to
+  # them: what changes, and that it is their own access.
+  defp authz_consequence({:remove_role, assignment}),
+    do: "The #{assignment.role_name} role will be removed from your account."
 
-  defp authz_consequence({:deny, cap_key}, user),
-    do: "#{cap_key} will be denied for #{user.name}."
+  defp authz_consequence({:deny, cap_key}),
+    do: "#{cap_key} will be denied for your account."
 
-  defp authz_consequence({:remove_grant, cap_key, _id}, user),
-    do: "The direct grant of #{cap_key} will be removed from #{user.name}."
+  defp authz_consequence({:remove_grant, cap_key, _id}),
+    do: "The direct grant of #{cap_key} will be removed from your account."
 
-  defp authz_consequence({:remove_denial, cap_key, _id}, _user),
-    do: "The deny rule for #{cap_key} will be removed."
+  defp authz_consequence({:remove_denial, cap_key, _id}),
+    do: "The deny rule for #{cap_key} will be removed from your account."
 
-  defp authz_detail({:remove_role, _assignment}, _user),
-    do:
-      "They lose every capability this role grants unless another role or direct grant " <>
-        "also provides it. The role can be assigned again."
-
-  defp authz_detail({:deny, _cap_key}, _user),
-    do:
-      "The deny rule overrides every role that grants it and takes effect at once. " <>
-        "It can be removed again from the denied list."
-
-  defp authz_detail({:remove_grant, _cap_key, _id}, _user),
-    do:
-      "They keep this capability only if an assigned role still grants it. " <>
-        "The grant can be added again."
-
-  defp authz_detail({:remove_denial, _cap_key, _id}, user),
-    do: "#{user.name} regains this capability from any role or direct grant that provides it."
+  defp authz_detail(_rule),
+    do: "This changes your own access, and it takes effect at once."
 
   defp authz_verb({:deny, _cap_key}), do: "Deny"
   defp authz_verb(_rule), do: "Remove"
@@ -758,38 +771,41 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
           </:description>
         </.section_heading>
 
+        <%!-- The assigned roles sit directly under the section description:
+                 the heading already says Roles, so the list carries no label of
+                 its own and takes the heading as its accessible name. --%>
         <div class="mb-4">
-          <.list id="assigned-roles-container">
-            <:item title="Roles" id="assigned-roles">
-              <%= if @assigned_roles == [] do %>
-                <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
-              <% else %>
-                <div class="flex flex-wrap gap-2" id="assigned-roles-list">
-                  <span
-                    :for={assignment <- @assigned_roles}
-                    id={"assigned-role-#{assignment.id}"}
-                    class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                  >
-                    <span>{assignment.role_name}</span>
-                    <.icon_button
-                      :if={@can_edit?}
-                      icon="close"
-                      label={"Remove the #{assignment.role_name} role"}
-                      context={:inline}
-                      kind={:danger}
-                      id={"remove-role-#{assignment.id}"}
-                      phx-click={
-                        JS.push("lv:clear-flash")
-                        |> JS.push("request_remove_role", target: @myself)
-                      }
-                      phx-value-assignment-id={assignment.id}
-                      class="-mr-1"
-                    />
-                  </span>
-                </div>
-              <% end %>
-            </:item>
-          </.list>
+          <%= if @assigned_roles == [] do %>
+            <p class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</p>
+          <% else %>
+            <ul
+              id="assigned-roles-list"
+              aria-labelledby="user-roles-heading"
+              class="flex flex-wrap gap-2"
+            >
+              <li
+                :for={assignment <- @assigned_roles}
+                id={"assigned-role-#{assignment.id}"}
+                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+              >
+                <span>{assignment.role_name}</span>
+                <.icon_button
+                  :if={@can_edit?}
+                  icon="close"
+                  label={"Remove the #{assignment.role_name} role"}
+                  context={:inline}
+                  kind={:danger}
+                  id={"remove-role-#{assignment.id}"}
+                  phx-click={
+                    JS.push("lv:clear-flash")
+                    |> JS.push("request_remove_role", target: @myself)
+                  }
+                  phx-value-assignment-id={assignment.id}
+                  class="-mr-1"
+                />
+              </li>
+            </ul>
+          <% end %>
         </div>
 
         <%!-- The Roles control, or the one sentence that says why it is absent.
@@ -1182,8 +1198,8 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
       <.confirm_dialog
         :if={@pending_authz}
         id="user-authz-confirm"
-        consequence={authz_consequence(@pending_authz, @user)}
-        detail={authz_detail(@pending_authz, @user)}
+        consequence={authz_consequence(@pending_authz)}
+        detail={authz_detail(@pending_authz)}
         confirm={authz_verb(@pending_authz)}
         working={authz_working(@pending_authz)}
         on_confirm={JS.push(authz_event(@pending_authz), target: @myself)}
