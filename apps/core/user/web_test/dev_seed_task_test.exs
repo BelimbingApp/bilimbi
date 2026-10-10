@@ -52,7 +52,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
     assert company.legal_name == "Bilimbi Development"
     assert {:ok, scope} = Tenancy.scope(company.tenant_id)
     assert {:ok, profile} = Company.get_company(scope, company.id)
-    assert profile.jurisdiction == "MY"
+    assert profile.jurisdiction == nil
     assert profile.metadata == %{"purpose" => "local_development"}
     assert {:ok, user} = User.authenticate("ai@agent.my", "bilimbi-dev")
 
@@ -92,7 +92,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
   end
 
   test "rejects arguments before starting the application" do
-    assert_raise Mix.Error, ~r/accepts no arguments/, fn ->
+    assert_raise Mix.Error, ~r/accepts no argument other than --at-startup/, fn ->
       Mix.Task.run("bilimbi.dev.seed", ["unexpected"])
     end
   end
