@@ -427,7 +427,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             </:col>
 
             <:col :let={type} label="Kind" sort="is_system" sort_id="employee-types-sort-kind">
-              <.badge kind={if type.is_system, do: :neutral, else: :success}>
+              <.badge kind={if type.is_system, do: :neutral, else: :success} dot={false}>
                 {if type.is_system, do: "system", else: "custom"}
               </.badge>
             </:col>
@@ -443,13 +443,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
             <:action :let={type}>
               <div :if={not type.is_system} class="flex items-center justify-end gap-3">
-                <.icon_button
-                  :if={allowed?(@current_scope, "admin.employee-type.update")}
-                  icon="edit"
-                  label={"Edit #{type.label}"}
-                  id={"employee-type-edit-#{type.id}"}
-                  navigate={~p"/employee-types/#{type.id}"}
-                />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}
                   icon="delete"

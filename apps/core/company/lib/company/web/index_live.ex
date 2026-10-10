@@ -483,11 +483,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               <% company = listed(@companies_page, id) %>
               <div class="flex items-center justify-end gap-3">
                 <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
-                <.icon_button
-                  icon="view"
-                  label={"Open #{company.name}"}
-                  navigate={~p"/companies/#{company.id}"}
-                />
               </div>
             </:action>
             <%!-- Two different absences, two different sentences: a search or

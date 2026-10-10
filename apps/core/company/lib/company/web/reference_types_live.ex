@@ -578,7 +578,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
               <span class="font-medium text-ink-strong">{type.name}</span>
             </:col>
             <:col :let={type} :if={@spec.category?} label="Category">
-              <.badge kind={:neutral}>
+              <.badge kind={:neutral} dot={false}>
                 {String.capitalize(type.category)}
               </.badge>
             </:col>
