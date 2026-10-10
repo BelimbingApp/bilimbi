@@ -49,11 +49,14 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
   end
 
   @spec publish(Scope.t(), String.t(), String.t(), [String.t()]) ::
-          {:ok, map()} | {:error, :forbidden | :label | :tree | :roles | Ecto.Changeset.t()}
+          {:ok, map()}
+          | {:error,
+             :forbidden | :company_archived | :label | :tree | :roles | Ecto.Changeset.t()}
   def publish(%Scope{} = scope, label, tree, roles)
       when is_binary(label) and is_binary(tree) and is_list(roles) do
     with :ok <- authorize(scope),
          {:ok, settings_scope} <- company_settings_scope(scope),
+         :ok <- writable(scope, settings_scope),
          {:ok, label} <- SavedLayouts.clean_label(label),
          {:ok, tree} <- SavedLayouts.clean_tree(tree),
          true <- Enum.all?(roles, &valid_role?/1) || {:error, :roles} do
@@ -80,10 +83,12 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
     end
   end
 
-  @spec delete(Scope.t(), String.t()) :: :ok | {:error, :forbidden | Ecto.Changeset.t()}
+  @spec delete(Scope.t(), String.t()) ::
+          :ok | {:error, :forbidden | :company_archived | Ecto.Changeset.t()}
   def delete(%Scope{} = scope, slug) when is_binary(slug) do
     with :ok <- authorize(scope),
-         {:ok, settings_scope} <- company_settings_scope(scope) do
+         {:ok, settings_scope} <- company_settings_scope(scope),
+         :ok <- writable(scope, settings_scope) do
       entries = Enum.reject(list(settings_scope), &(&1["slug"] == slug))
       with {:ok, _} <- Settings.put(@key, entries, settings_scope), do: :ok
     end
@@ -96,6 +101,16 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
     case Authz.can(scope, @publish) do
       %{allowed: true} -> :ok
       %{allowed: false} -> {:error, :forbidden}
+    end
+  end
+
+  # A shared layout is a company-scoped setting, and an archived company is
+  # read-only: the Authz company directory answers for every Base write.
+  defp writable(scope, %SettingsScope{type: :company, id: company_id}) do
+    case Authz.company_writable(scope, company_id) do
+      :ok -> :ok
+      {:error, :company_archived} -> {:error, :company_archived}
+      {:error, :company_not_found} -> {:error, :forbidden}
     end
   end
 

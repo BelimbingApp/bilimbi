@@ -191,12 +191,12 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
           {:error, :forbidden} ->
             delete_forbidden(socket)
 
-          {:error, :company_not_found} ->
+          {:error, reason} when reason in [:company_not_found, :company_archived] ->
             {:noreply,
              put_flash(
                socket,
                :error,
-               "#{entry.name} was not deleted: their company is archived. Restore the company first."
+               "#{entry.name} was not deleted: their company is archived, and archiving is final."
              )}
 
           {:error, :user_not_found} ->
@@ -223,7 +223,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     end
   end
 
-  defp delete_listed_user(_scope, %{company_archived: true}), do: {:error, :company_not_found}
+  defp delete_listed_user(_scope, %{company_archived: true}), do: {:error, :company_archived}
 
   defp delete_listed_user(scope, entry) do
     User.delete_user(scope, entry.company_id, entry.id)

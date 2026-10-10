@@ -58,6 +58,7 @@ defmodule Bilimbi.Core.Employee do
 
   @type lookup_error ::
           :company_not_found
+          | :company_archived
           | :employee_not_found
           | :not_provisioned
           | :invariant_violation
@@ -284,7 +285,7 @@ defmodule Bilimbi.Core.Employee do
   @spec assign_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def assign_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
          %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
       if subordinate.id == supervisor_id do
@@ -298,7 +299,7 @@ defmodule Bilimbi.Core.Employee do
         |> persist_update()
       end
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
     end
   end
@@ -307,7 +308,7 @@ defmodule Bilimbi.Core.Employee do
   @spec remove_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def remove_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
          %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
       if subordinate.supervisor_id == supervisor_id do
@@ -321,7 +322,7 @@ defmodule Bilimbi.Core.Employee do
         {:ok, Summary.from_schema(subordinate)}
       end
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
     end
   end
@@ -335,21 +336,23 @@ defmodule Bilimbi.Core.Employee do
   Company, then Employee, then User, with ascending IDs within each module.
 
   Missing, cross-tenant, and company-mismatched identities all fail as
-  `:not_found`. `:invariant_violation` is reserved for the protected platform
+  `:not_found`; an archived company is `:company_archived`, since the lock is
+  taken to write. `:invariant_violation` is reserved for the protected platform
   orchestrator, which is not available through this generic sibling-workflow
   seam.
   """
   @spec lock_affiliation(Scope.t(), term(), term()) ::
           {:ok, AffiliationProof.t()}
-          | {:error, :invariant_violation | :not_found | :transaction_required}
+          | {:error,
+             :invariant_violation | :not_found | :company_archived | :transaction_required}
   def lock_affiliation(%Scope{} = scope, company_id, employee_id) do
     AffiliationLock.lock(scope, company_id, employee_id)
   end
 
   @spec create_employee(Scope.t(), pos_integer(), map()) ::
-          {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
+          {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
       company_id
       |> Schema.creation_changeset(attributes)
       |> reject_reserved_orchestrator_number()
@@ -361,7 +364,7 @@ defmodule Bilimbi.Core.Employee do
   @spec update_employee(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def update_employee(%Scope{} = scope, company_id, employee_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       employee
       |> Schema.update_changeset(attributes)
@@ -370,7 +373,7 @@ defmodule Bilimbi.Core.Employee do
       |> validate_references(scope, company_id, employee_id)
       |> persist_update()
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
     end
   end
@@ -379,7 +382,7 @@ defmodule Bilimbi.Core.Employee do
           :ok | {:error, lookup_error() | :forbidden}
   def delete_employee(%Scope{} = scope, company_id, employee_id) do
     with :ok <- authorize(scope, "admin.employee.delete"),
-         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = employee <- employee_schema(company_id, employee_id) do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
@@ -391,7 +394,7 @@ defmodule Bilimbi.Core.Employee do
       end
     else
       {:error, :forbidden} = error -> error
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
     end
   end
@@ -519,9 +522,10 @@ defmodule Bilimbi.Core.Employee do
   end
 
   @spec create_employee_type(Scope.t(), pos_integer(), map()) ::
-          {:ok, TypeSummary.t()} | {:error, :company_not_found | Changeset.t()}
+          {:ok, TypeSummary.t()}
+          | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee_type(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          {:ok, type} <-
            company_id
            |> EmployeeType.custom_changeset(attributes)
@@ -533,10 +537,11 @@ defmodule Bilimbi.Core.Employee do
 
   @spec update_employee_type(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, TypeSummary.t()}
-          | {:error, :company_not_found | :type_not_found | :is_system | Changeset.t()}
+          | {:error,
+             :company_not_found | :company_archived | :type_not_found | :is_system | Changeset.t()}
   def update_employee_type(%Scope{} = scope, company_id, type_id, attributes)
       when is_integer(company_id) and is_integer(type_id) and is_map(attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          {:ok, type} <- fetch_company_employee_type(company_id, type_id) do
       type
       |> EmployeeType.update_changeset(attributes)
@@ -550,11 +555,17 @@ defmodule Bilimbi.Core.Employee do
 
   @spec delete_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
           :ok
-          | {:error, :company_not_found | :type_not_found | :is_system | :in_use | :forbidden}
+          | {:error,
+             :company_not_found
+             | :company_archived
+             | :type_not_found
+             | :is_system
+             | :in_use
+             | :forbidden}
   def delete_employee_type(%Scope{} = scope, company_id, type_id)
       when is_integer(company_id) and is_integer(type_id) do
     with :ok <- authorize(scope, "admin.employee-type.delete"),
-         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
+         {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
       Repo.transaction(fn ->
         case Repo.one(
                from(type in EmployeeType,
@@ -595,7 +606,7 @@ defmodule Bilimbi.Core.Employee do
       end
     else
       {:error, :forbidden} = error -> error
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
     end
   end
 
@@ -868,4 +879,5 @@ defmodule Bilimbi.Core.Employee do
 
   defp normalize_company({:ok, company}), do: {:ok, company}
   defp normalize_company({:error, :not_found}), do: {:error, :company_not_found}
+  defp normalize_company({:error, :company_archived}), do: {:error, :company_archived}
 end

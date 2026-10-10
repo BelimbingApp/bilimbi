@@ -977,6 +977,32 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#detail-email", "ops@bilimbi.test")
     end
 
+    test "an archived company reads with one notice, no editors, and refuses a forged commit",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      conn = log_in_as(conn)
+
+      {:ok, live_view, _html} = live(conn, ~p"/companies/73")
+      refute has_element?(live_view, "#company-archived")
+      assert has_element?(live_view, "#company-name[phx-hook='InlineEdit']")
+
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 73")
+
+      {:ok, view, _html} = live(conn, ~p"/companies/73")
+
+      assert has_element?(view, "#company-archived", "This company is archived and read-only.")
+      assert has_element?(view, "#detail-name", "Bilimbi Industries")
+      refute has_element?(view, "#company-name[phx-hook='InlineEdit']")
+
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged"})
+
+      # A forged commit reaches the domain, which refuses it; the page keeps
+      # the stored value and its notice.
+      assert has_element?(view, "#detail-name", "Bilimbi Industries")
+      assert has_element?(view, "#company-archived")
+      assert {:ok, %{name: "Bilimbi Industries"}} = Company.get_company(scope!(), 73)
+    end
+
     test "refuses in-place writes once the update capability is gone", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

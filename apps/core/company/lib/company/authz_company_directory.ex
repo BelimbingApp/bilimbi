@@ -49,4 +49,16 @@ defmodule Bilimbi.Core.Company.AuthzCompanyDirectory do
   end
 
   def company_in_scope?(%Scope{}, _company_id), do: false
+
+  # The same rule every Core write follows (`Company.require_writable_company/2`),
+  # so a role, an assignment or a grant in an archived company is refused the
+  # way a department or an employee in it is.
+  @impl true
+  def company_writable(%Scope{} = scope, company_id) do
+    case Company.require_writable_company(scope, company_id) do
+      {:ok, _id} -> :ok
+      {:error, :not_found} -> {:error, :company_not_found}
+      {:error, :company_archived} -> {:error, :company_archived}
+    end
+  end
 end

@@ -45,6 +45,7 @@ defmodule Bilimbi.Core.UserAdministration.Query do
         created_at: user.created_at,
         company_name: user.company_name,
         company_archived: user.company_archived,
+        company_deleted: user.company_deleted,
         role_ids: roles.role_ids,
         role_names: roles.role_names,
         role_codes: roles.role_codes,
@@ -70,6 +71,7 @@ defmodule Bilimbi.Core.UserAdministration.Query do
         id: company.id,
         tenant_id: company.tenant_id,
         name: company.name,
+        status: company.status,
         deleted_at: company.deleted_at
       }
     )
@@ -138,7 +140,8 @@ defmodule Bilimbi.Core.UserAdministration.Query do
         email: user.email,
         created_at: user.created_at,
         company_name: company.name,
-        company_archived: not is_nil(company.deleted_at)
+        company_archived: not is_nil(company.deleted_at) or company.status == "archived",
+        company_deleted: not is_nil(company.deleted_at)
       }
     )
     |> search(options.search)
@@ -177,7 +180,8 @@ defmodule Bilimbi.Core.UserAdministration.Query do
         email: user.email,
         created_at: user.created_at,
         company_name: user.company_name,
-        company_archived: user.company_archived
+        company_archived: user.company_archived,
+        company_deleted: user.company_deleted
       },
       limit: ^options.page_size,
       offset: ^offset
@@ -329,6 +333,7 @@ defmodule Bilimbi.Core.UserAdministration.Query do
       created_at: row.created_at,
       company_name: row.company_name,
       company_archived: row.company_archived,
+      company_deleted: row.company_deleted,
       roles: roles(row)
     }
   end

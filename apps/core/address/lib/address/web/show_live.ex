@@ -79,7 +79,9 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   # through to `CommitStatus.failure_message/0`.
   @failures %{
     address_not_found:
-      "This address no longer exists. Return to the list to find its replacement."
+      "This address no longer exists. Return to the list to find its replacement.",
+    company_archived:
+      "An archived company uses this address, so it is read-only and the change was not saved."
   }
 
   @impl true

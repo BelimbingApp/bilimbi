@@ -472,9 +472,33 @@ defmodule Bilimbi.Base.Authz do
     directory.companies_in_scope(scope)
   end
 
+  @doc """
+  Whether a company may be written, as the installed company directory answers.
+
+  `:ok` for a live company in scope; `{:error, :company_not_found}` for one
+  the scope cannot see; `{:error, :company_archived}` for an archived one,
+  which is read-only for good. Every Authz write into a company asks this
+  itself. A Base module that writes a record scoped to a company it does not
+  own the table of (a shared workspace layout) asks it before
+  the write, so an archived company is refused there too and not only where
+  Core knows the company. Reads never ask it.
+  """
+  @spec company_writable(Scope.t(), pos_integer()) ::
+          :ok | {:error, :company_not_found | :company_archived}
+  def company_writable(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    directory!(registry!()).company_writable(scope, company_id)
+  end
+
+  @doc """
+  Creates a custom role owned by a company in scope.
+
+  An archived company is read-only: `{:error, :company_archived}`, as for
+  every write below that lands in a company (`company_writable/2`).
+  """
   @spec create_role(Scope.t(), pos_integer(), map()) ::
           {:ok, Bilimbi.Base.Authz.RoleSummary.t()}
-          | {:error, :company_not_found | Ecto.Changeset.t()}
+          | {:error, :company_not_found | :company_archived | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes) do
     RoleService.create_role(scope, company_id, attributes, registry!())
   end
@@ -486,6 +510,7 @@ defmodule Bilimbi.Base.Authz do
              :role_not_found
              | :system_role
              | :company_not_found
+             | :company_archived
              | :role_has_principals
              | :invalid_company_id
              | Ecto.Changeset.t()}
@@ -495,20 +520,26 @@ defmodule Bilimbi.Base.Authz do
 
   @doc "Deletes a custom role and intentionally database-cascades its grants and assignments."
   @spec delete_role(Scope.t(), pos_integer()) ::
-          {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
+          {:ok, :deleted}
+          | {:error, :role_not_found | :system_role | :company_archived | Ecto.Changeset.t()}
   def delete_role(%Scope{} = scope, role_id) do
     RoleService.delete_role(scope, role_id, registry!())
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()]) ::
           {:ok, non_neg_integer()}
-          | {:error, :role_not_found | :system_role | {:unknown_capabilities, [String.t()]}}
+          | {:error,
+             :role_not_found
+             | :system_role
+             | :company_archived
+             | {:unknown_capabilities, [String.t()]}}
   def replace_role_capabilities(%Scope{} = scope, role_id, capabilities) do
     RoleService.replace_role_capabilities(scope, role_id, capabilities, registry!())
   end
 
   @spec assign_role(Scope.t(), pos_integer(), :user | :agent, pos_integer(), pos_integer()) ::
-          {:ok, :assigned | :existing} | {:error, :company_not_found | :role_not_found}
+          {:ok, :assigned | :existing}
+          | {:error, :company_not_found | :company_archived | :role_not_found}
   def assign_role(%Scope{} = scope, company_id, principal_type, principal_id, role_id) do
     RoleService.assign_role(
       scope,
@@ -522,7 +553,7 @@ defmodule Bilimbi.Base.Authz do
 
   @doc "Removes one scoped principal-role assignment by its durable assignment ID."
   @spec unassign_role(Scope.t(), pos_integer(), pos_integer()) ::
-          {:ok, :unassigned | :not_found} | {:error, :role_not_found}
+          {:ok, :unassigned | :not_found} | {:error, :role_not_found | :company_archived}
   def unassign_role(%Scope{} = scope, role_id, assignment_id) do
     RoleService.unassign_role(scope, role_id, assignment_id, registry!())
   end
@@ -555,7 +586,8 @@ defmodule Bilimbi.Base.Authz do
           boolean()
         ) ::
           {:ok, :stored}
-          | {:error, :company_not_found | {:unknown_capabilities, [String.t()]}}
+          | {:error,
+             :company_not_found | :company_archived | {:unknown_capabilities, [String.t()]}}
   def put_principal_capability(
         %Scope{} = scope,
         company_id,
@@ -579,7 +611,7 @@ defmodule Bilimbi.Base.Authz do
   @spec remove_principal_capability(
           Scope.t(),
           pos_integer()
-        ) :: {:ok, :removed | :not_found}
+        ) :: {:ok, :removed | :not_found} | {:error, :company_archived}
   def remove_principal_capability(%Scope{} = scope, grant_id) do
     RoleService.remove_principal_capability(scope, grant_id, registry!())
   end
@@ -638,6 +670,7 @@ defmodule Bilimbi.Base.Authz do
              | :undeclared_system_principal
              | :capability_not_declared
              | :company_not_found
+             | :company_archived
              | :audit_unavailable
              | {:unknown_capabilities, [String.t()]}}
   def grant_system_capability(%Scope{} = scope, company_id, principal, capability) do
@@ -656,7 +689,8 @@ defmodule Bilimbi.Base.Authz do
   `{:ok, :not_found}`.
   """
   @spec revoke_system_capability(Scope.t(), pos_integer(), String.t(), String.t()) ::
-          {:ok, :revoked | :not_found} | {:error, :forbidden | :audit_unavailable}
+          {:ok, :revoked | :not_found}
+          | {:error, :forbidden | :company_archived | :audit_unavailable}
   def revoke_system_capability(%Scope{} = scope, company_id, principal, capability) do
     with {:ok, granter} <- administrator(scope, "admin.authz.system-principal.revoke") do
       SystemPrincipalService.revoke(

@@ -26,14 +26,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   Every account this page mounts has a company — `get_tenant_user/2`
   returns no other — so every fact has a company for Core User to write it
-  through. When that company is archived (soft-deleted, so
+  through. When that company is archived (its status, or soft-deleted so
   `Company.list_companies/1` does not name it), the page reads it as an
   archived company rather than as no company at all, and the account is
   read-only: no write on it can land, because every Core User and Base Authz
-  write resolves the account's company and refuses an archived one, and
-  nobody can sign in as or impersonate the account for the same reason. So
-  the page offers no editor, picker, password form, employee action, delete
-  or Impersonate for it, and one warning under the header says why. No
+  write begins with `Company.require_writable_company/2` and refuses an
+  archived one. So the page offers no editor, picker, password form,
+  employee action or delete for it, and one warning under the header says
+  why. Impersonate is withheld only when the company is soft-deleted, since
+  the host cannot open that account's session; an archived status freezes
+  writes and leaves sign-in alone. No
   declared Company API returns an archived company's name, archiving is
   final (no restore, and no moving an account to another company), and the
   account's email stays unique platform-wide, so a replacement account
@@ -156,9 +158,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
 
     # `list_companies/1` names every live company of the workspace, so the
-    # account's company is missing from it only when archived.
+    # account's company is missing from it only when soft-deleted; a live
+    # company whose status is archived is read-only in the same way.
     company_name = Map.get(company_names, user.company_id)
-    company_archived? = is_nil(company_name)
+    company_deleted? = is_nil(company_name)
+
+    company_archived? =
+      company_deleted? or
+        Enum.any?(companies, &(&1.id == user.company_id and Company.archived?(&1)))
+
     can_edit? = can_manage? and not company_archived?
 
     # Employees
@@ -224,6 +232,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:user, user)
     |> assign(:page_title, user.name)
     |> assign(:company_archived?, company_archived?)
+    |> assign(:company_deleted?, company_deleted?)
     |> assign(:can_edit?, can_edit?)
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
@@ -780,7 +789,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 }
               />
               <.action_link
-                :if={can_impersonate?(@current_scope, @user, @company_archived?)}
+                :if={can_impersonate?(@current_scope, @user, @company_deleted?)}
                 id="user-impersonate"
                 icon="bilimbi-impersonate"
                 href={~p"/admin/impersonate/#{@user.id}"}
@@ -798,7 +807,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
              reader reaches a fact. It names the condition and what it
              prevents, and states that archiving is final. --%>
         <.alert :if={@company_archived?} id="user-archived-company" kind={:warning}>
-          {archived_account_notice(@user)}
+          {archived_account_notice(@user, @company_deleted?)}
         </.alert>
 
         <div class="mt-6 space-y-6">
@@ -1415,15 +1424,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # --- Private Helpers ---
 
   # The guard is the users list's: the capability, never the signed-in
-  # account, never while already impersonating, and never an archived-company
-  # account, whose session the host cannot open
+  # account, never while already impersonating, and never an account whose
+  # company is soft-deleted, whose session the host cannot open
   # (`BilimbiWeb.Impersonation.impersonate_user/3` resolves the tenant through
-  # the live company and refuses it).
-  defp can_impersonate?(current_scope, user, company_archived?) do
+  # the live company and refuses it). An archived status freezes writes, not
+  # sessions, so such an account can still be impersonated to read as it.
+  defp can_impersonate?(current_scope, user, company_deleted?) do
     allowed?(current_scope, "admin.user.impersonate") and
       user.id != current_scope.user["user_id"] and
       is_nil(current_scope.impersonator) and
-      not company_archived?
+      not company_deleted?
   end
 
   # One commit, one outcome on the fact that made it.
@@ -1490,10 +1500,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # names an archived company, archiving is never undone, and the account's
   # email stays taken platform-wide, so the notice neither names the company
   # nor offers a next step.
-  defp archived_account_notice(user) do
+  # Archiving freezes writes and leaves sign-in alone; a soft-deleted company
+  # also has no session to open, so only then does the notice say so.
+  defp archived_account_notice(user, company_deleted?) do
     "#{user.name}'s company is archived, and archiving is final, so this account is " <>
       "read-only: its details, roles, permissions, password and employee links can't " <>
-      "be changed, and nobody can sign in as or impersonate this user."
+      if(company_deleted?,
+        do: "be changed, and nobody can sign in as or impersonate this user.",
+        else: "be changed."
+      )
   end
 
   # The select offers no choosable blank; a blank that still arrives is refused
@@ -1668,8 +1683,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     scope = socket.assigns.current_scope.scope
 
     match?(
-      {:error, :not_found},
-      Company.require_live_company(scope, socket.assigns.user.company_id)
+      {:error, _reason},
+      Company.require_writable_company(scope, socket.assigns.user.company_id)
     )
   end
 
