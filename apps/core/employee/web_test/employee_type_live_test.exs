@@ -632,7 +632,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     # contribution to derive from -- the nav owns page names, nothing owns
     # action names. #292 fixed the titles and left this one behind, so it is
     # pinned rather than trusted (#296).
-    assert has_element?(view, "#employee-type-new", "New Type")
+    assert has_element?(view, "#employee-type-new", "New Employee Type")
   end
 
   # Pause the delete task after its initial company lookup has returned the
