@@ -71,8 +71,8 @@ action naming who restricted what for which roles, and the rows are audited
 like every write. Rows written before the roles meant "may still see" were
 cleared by the migration that flipped the reading; nothing converts them.
 
-For a reader, `Authz.restricted_fields/1` answers `%{table => %{field =>
-[role names]}}` from the roles assigned to the scope's actor in the company
+For a reader, `Authz.restricted_fields/1` answers `%{table => [field_id]}`
+from the roles assigned to the scope's actor in the company
 they signed in at: one query for the tenant's restrictions and, only when
 there are any, one for the actor's roles. Nothing is kept between calls, so
 a revoked role or a lifted restriction takes effect on the next check, on
