@@ -290,13 +290,13 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
 
       assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
       holder = reader(scope, 8)
-      assert Authz.restricted_fields(holder) == %{"records" => %{"tax_id" => ["Finance"]}}
+      assert Authz.restricted_fields(holder) == %{"records" => ["tax_id"]}
       assert Authz.restricted_fields(holder, "records") == ["tax_id"]
 
       assert %Record{tax_id: %Restricted{} = marker, email: "a@x.test"} =
                Authz.redact(holder, "records", record())
 
-      assert marker == %Restricted{table_id: "records", field_id: "tax_id", roles: ["Finance"]}
+      assert marker == %Restricted{table_id: "records", field_id: "tax_id"}
 
       assert [%Record{tax_id: %Restricted{}}, %Record{tax_id: %Restricted{}}] =
                Authz.redact(holder, "records", [record(), record()])
@@ -399,11 +399,10 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
 
   describe "the marker" do
     test "carries data only: it is not a string and cannot be interpolated" do
-      marker = %Restricted{table_id: "records", field_id: "tax_id", roles: ["A", "B"]}
+      marker = %Restricted{table_id: "records", field_id: "tax_id"}
 
       assert Restricted.restricted?(marker)
       refute Restricted.restricted?("TAX-1")
-      assert marker.roles == ["A", "B"]
       assert_raise Protocol.UndefinedError, fn -> to_string(marker) end
       assert_raise Protocol.UndefinedError, fn -> Phoenix.HTML.Safe.to_iodata(marker) end
     end

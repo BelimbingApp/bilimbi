@@ -37,7 +37,6 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   alias Bilimbi.Base.Authz.FieldRestrictionRole
   alias Bilimbi.Base.Authz.FieldRestrictionSummary
   alias Bilimbi.Base.Authz.Restricted
-  alias Bilimbi.Base.Authz.Role
   alias Bilimbi.Base.Authz.RoleService
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
@@ -280,8 +279,8 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   def remove(%Scope{}, _restriction_id, _operator, _registry), do: {:ok, :not_found}
 
   @doc """
-  The fields the scope's actor may not see, with the roles each is
-  restricted for: `%{table_id => %{field_id => [role_name]}}`.
+  The fields the scope's actor may not see: `%{table_id => [field_id]}`, each
+  list sorted.
 
   A field is withheld when the actor holds any of the roles its restriction
   names; the restriction wins over every other role they hold. One query for
@@ -291,7 +290,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   is restricted nowhere.
   """
   @spec restricted(Scope.t(), map() | (-> map())) ::
-          %{String.t() => %{String.t() => [String.t()]}}
+          %{String.t() => [String.t()]}
   def restricted(%Scope{} = scope, registry) do
     case restrictions_with_roles(scope) do
       [] ->
@@ -302,21 +301,10 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
         # common case, costs one query and needs no contribution snapshot.
         held = held_role_ids(scope, resolve(registry))
 
-        names =
-          restrictions
-          |> Enum.flat_map(fn r -> Enum.map(r.roles, & &1.role_id) end)
-          |> role_names()
-
         restrictions
         |> Enum.filter(fn r -> Enum.any?(r.roles, &MapSet.member?(held, &1.role_id)) end)
-        |> Enum.group_by(& &1.table_id)
-        |> Map.new(fn {table_id, rows} ->
-          {table_id,
-           Map.new(rows, fn r ->
-             {r.field_id,
-              r.roles |> Enum.map(&Map.get(names, &1.role_id)) |> Enum.reject(&is_nil/1)}
-           end)}
-        end)
+        |> Enum.group_by(& &1.table_id, & &1.field_id)
+        |> Map.new(fn {table_id, field_ids} -> {table_id, Enum.sort(field_ids)} end)
     end
   end
 
@@ -329,14 +317,14 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   @spec redact(Scope.t(), String.t(), record, map() | (-> map())) :: record
         when record: struct() | [struct()]
   def redact(%Scope{} = scope, table_id, records, registry) when is_binary(table_id) do
-    case Map.get(restricted(scope, registry), table_id, %{}) do
-      fields when fields == %{} ->
+    case Map.get(restricted(scope, registry), table_id, []) do
+      [] ->
         records
 
-      fields ->
+      field_ids ->
         markers =
-          Map.new(fields, fn {field_id, roles} ->
-            {field_id, %Restricted{table_id: table_id, field_id: field_id, roles: roles}}
+          Map.new(field_ids, fn field_id ->
+            {field_id, %Restricted{table_id: table_id, field_id: field_id}}
           end)
 
         case records do
@@ -409,14 +397,6 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
       %TenancyActor{type: :system} ->
         MapSet.new()
     end
-  end
-
-  defp role_names([]), do: %{}
-
-  defp role_names(role_ids) do
-    from(role in Role, where: role.id in ^Enum.uniq(role_ids), select: {role.id, role.name})
-    |> Repo.all()
-    |> Map.new()
   end
 
   defp restrictable(table_id, field_id) do

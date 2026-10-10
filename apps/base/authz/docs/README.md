@@ -79,7 +79,7 @@ a revoked role or a lifted restriction takes effect on the next check, on
 any node and inside an open LiveView, and no decision-log row is written.
 The owning module builds its read model through `Authz.redact/3`, which
 replaces each restricted field with a `Bilimbi.Base.Authz.Restricted`
-marker carrying the roles it is restricted for. The marker is explicit on
+marker. The marker is explicit on
 purpose: an absent field reads as "none", a blank one as "empty", and this
 one as "there is a value you may not see". It renders through
 `<.restricted>` (Base UI): the word "Restricted", a lock, and a tooltip

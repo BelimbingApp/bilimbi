@@ -9,10 +9,9 @@ defmodule Bilimbi.Base.Authz.Restricted do
   none", and a blank one as "this record's value is empty". Both teach the
   reader something false. This value says what is true: there is a value, and
   this account may not see it. `table_id` and `field_id` name the restriction
-  (`Bilimbi.Base.Authz.list_field_restrictions/1`), and `roles` the names of
-  the roles it is restricted for, which the reader holds one of. The names
-  are data for the owning module; the person is told only that they do not
-  have access, because naming a role they already hold helps nobody.
+  (`Bilimbi.Base.Authz.list_field_restrictions/1`). The person is told only
+  that they do not have access, because naming a role they already hold helps
+  nobody.
 
   A template renders it with `<.restricted>` from
   `Bilimbi.Base.UI.Components`, which is the one designed treatment: the
@@ -23,9 +22,9 @@ defmodule Bilimbi.Base.Authz.Restricted do
   """
 
   @enforce_keys [:table_id, :field_id]
-  defstruct [:table_id, :field_id, roles: []]
+  defstruct [:table_id, :field_id]
 
-  @type t :: %__MODULE__{table_id: String.t(), field_id: String.t(), roles: [String.t()]}
+  @type t :: %__MODULE__{table_id: String.t(), field_id: String.t()}
 
   @doc "Whether `value` is a restricted field rather than its value."
   @spec restricted?(term()) :: boolean()

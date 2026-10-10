@@ -356,7 +356,7 @@ defmodule Bilimbi.Base.Authz do
 
   @doc """
   The catalog fields the scope's actor may not see, per table:
-  `%{table_id => %{field_id => [role names it is restricted for]}}`.
+  `%{table_id => [field_id]}`, each list sorted.
 
   A field is withheld when the actor holds any role its restriction names;
   the restriction wins over the other roles they hold, and a grant-all role
@@ -368,13 +368,13 @@ defmodule Bilimbi.Base.Authz do
   the read model simply has this shape for this reader. A system scope,
   named or not, holds no roles, so nothing is restricted for it.
   """
-  @spec restricted_fields(Scope.t()) :: %{String.t() => %{String.t() => [String.t()]}}
+  @spec restricted_fields(Scope.t()) :: %{String.t() => [String.t()]}
   def restricted_fields(%Scope{} = scope), do: FieldRestrictions.restricted(scope, &registry!/0)
 
   @doc "The field ids of `table_id` the scope's actor may not see, sorted."
   @spec restricted_fields(Scope.t(), String.t()) :: [String.t()]
   def restricted_fields(%Scope{} = scope, table_id) when is_binary(table_id) do
-    scope |> restricted_fields() |> Map.get(table_id, %{}) |> Map.keys() |> Enum.sort()
+    scope |> restricted_fields() |> Map.get(table_id, [])
   end
 
   @doc """
@@ -425,7 +425,7 @@ defmodule Bilimbi.Base.Authz do
       %{}
     else
       for table <- field_restriction_catalog(),
-          fields = restricted |> Map.get(table.id, %{}) |> Map.keys() |> Enum.sort(),
+          fields = Map.get(restricted, table.id, []),
           fields != [],
           type <- table.record_types,
           type in types,

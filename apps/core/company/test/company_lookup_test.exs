@@ -140,14 +140,14 @@ defmodule Bilimbi.Core.CompanyLookupTest do
   end
 
   describe "a restricted field" do
-    test "is withheld from every summary of a holder and names the roles it is restricted for",
+    test "is withheld from every summary of a holder",
          %{reader: reader} do
       finance = restrict_email!(reader)
 
       assert {:ok, %Summary{email: %Restricted{} = marker, tax_id: "TAX-98765"}} =
                Company.get_company(reader, @company_id)
 
-      assert marker == %Restricted{table_id: "companies", field_id: "email", roles: ["Finance"]}
+      assert marker == %Restricted{table_id: "companies", field_id: "email"}
       assert Company.restricted_field_markers(reader) == %{email: marker}
 
       assert {:ok, [%Summary{email: %Restricted{}}, %Summary{email: %Restricted{}}]} =
@@ -241,7 +241,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
       assert {:ok, %{entries: [first, second]}} = Company.list_administration_page(reader, desc)
       assert [first.name, second.name] == ["Sibling", "Bilimbi Industries"]
 
-      assert %Restricted{field_id: "jurisdiction", roles: ["Finance"]} = first.jurisdiction
+      assert %Restricted{field_id: "jurisdiction"} = first.jurisdiction
       assert %Restricted{} = second.jurisdiction
       assert first.legal_name == nil
 

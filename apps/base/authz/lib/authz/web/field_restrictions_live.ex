@@ -190,9 +190,6 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
     end
   end
 
-  defp refusal(:no_fields), do: gettext("Choose the fields to restrict.")
-  defp refusal(:no_roles), do: gettext("Choose the roles to restrict.")
-
   defp refusal(:not_restrictable),
     do: gettext("Choose fields the catalog offers; one of these is no longer restrictable.")
 

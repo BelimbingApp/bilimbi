@@ -276,7 +276,7 @@ defmodule BilimbiWeb.AuthzFieldRestrictionsLiveTest do
     assert has_element?(
              view,
              "#field-restrictions-dialog-flash-error",
-             "Choose the roles to restrict."
+             "The restriction could not be saved."
            )
 
     # A field whose table was dropped is not a pick: a replayed form with the
@@ -294,7 +294,7 @@ defmodule BilimbiWeb.AuthzFieldRestrictionsLiveTest do
     assert has_element?(
              view,
              "#field-restrictions-dialog-flash-error",
-             "Choose the fields to restrict."
+             "The restriction could not be saved."
            )
 
     assert {:ok, []} = Authz.list_field_restrictions(operator)
