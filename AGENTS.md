@@ -334,9 +334,9 @@ module contributes nothing. A provider implements the ModuleRegistry behaviour
 and returns immutable plain terms under only the consumer keys
 `ContributionRegistry` validates: `:settings`, `:authz`, `:menu`,
 `:dashboard`, `:principal_directory`, `:schedule`, `:actor_verifier`,
-`:system_principals`, `:workflow`, and `:grid` (ADRs 0004, 0009, 0011, 0012,
-0016, 0017, 0018, 0019). `mix.exs` derives its local path dependencies from
-the descriptor; never list them by hand.
+`:system_principals`, `:workflow`, `:grid`, and `:agent_api` (ADRs 0004,
+0009, 0011, 0012, 0016, 0017, 0018, 0019, 0021). `mix.exs` derives its local
+path dependencies from the descriptor; never list them by hand.
 
 A non-nil `migrations` path requires `migration_dispositions` mapping every
 owned migration version exactly once to `:compatible_baseline` or
