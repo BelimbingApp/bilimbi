@@ -64,6 +64,23 @@ defmodule Bilimbi.Base.UI.IconRegistry do
       fill: "currentColor",
       paths: ["M3,11H11V3H3M3,21H11V13H3M13,21H21V13H13M13,3V11H21V3"]
     },
+    # The shell's menu toggle: hide the open menu, show the hidden one. Bootstrap
+    # Icons `text-indent-left` and `text-indent-right` (MIT License), path data
+    # unchanged.
+    "text-indent-left" => %{
+      view_box: "0 0 16 16",
+      fill: "currentColor",
+      paths: [
+        "M2 3.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5m.646 2.146a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1 0 .708l-2 2a.5.5 0 0 1-.708-.708L4.293 8 2.646 6.354a.5.5 0 0 1 0-.708M7 6.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5m0 3a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5m-5 3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5"
+      ]
+    },
+    "text-indent-right" => %{
+      view_box: "0 0 16 16",
+      fill: "currentColor",
+      paths: [
+        "M2 3.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5m10.646 2.146a.5.5 0 0 1 .708.708L11.707 8l1.647 1.646a.5.5 0 0 1-.708.708l-2-2a.5.5 0 0 1 0-.708zM2 6.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5m0 3a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5m0 3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5"
+      ]
+    },
     "hero-impersonate" => %{
       view_box: "0 0 24 24",
       fill: "none",
@@ -81,7 +98,6 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     light: "hero-sun",
     dark: "hero-moon",
     system: "hero-computer-desktop",
-    navigation: "hero-bars-3",
     chevron: "hero-chevron-down-mini",
     password: "hero-key",
     logout: "hero-arrow-right-on-rectangle",
@@ -125,7 +141,6 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "theme-dark" => "hero-moon",
     "theme-system" => "hero-computer-desktop",
     "clock" => "hero-clock",
-    "sidebar" => "hero-bars-3",
     "save" => "hero-check-circle",
     "confirm" => "hero-check",
     "back" => "hero-arrow-left",

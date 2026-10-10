@@ -553,9 +553,10 @@ Two shells exist and each stays minimal:
   wordmark, notification bell, current timezone selector and light/dark theme
   selector), a left menu sidebar, and a persistent status bar
   (application version). In development only, the status bar shows `dev` plus
-  the listen address. Wide screens keep the rail; the collapsed rail hides
-  labels, leaving the user initials. The bottom-left user circle remains the
-  account entry point in both states. Activating it opens a compact menu with
+  the listen address. Wide screens keep the menu open; the toggle hides the
+  whole menu and shows it again, with a text-indent glyph that points the
+  way it will move. The bottom-left user circle is the account entry point
+  while the menu is open. Activating it opens a compact menu with
   the signed-in name and identifier, current company and tenant, change
   password, and sign out. Offer scope switching only when the user has more
   than one permitted scope. Below `lg`, the menu is an off-canvas drawer. The
@@ -814,7 +815,7 @@ Users should always know what is happening and what happened. Show work in
 flight, give every action a visible and timely response, and keep outcomes
 honest and transparent. Never fail silently. An empty navigation is a
 permission-denied state: say that no destinations are available and name
-the recovery (an operator must assign a role), not a blank rail.
+the recovery (an operator must assign a role), not a blank menu.
 
 Flash messages stack at the top right, most severe first, so several stay
 readable at once. Info, warning and error stay until the person dismisses

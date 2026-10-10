@@ -23,7 +23,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       bolding or right spine lines.
     * Parent ascent: All parent branches containing the active item accent in
       `text-brand-strong`.
-    * Pinned items: Rendered in `bg-brand-surface` with `rounded-sm`.
+    * Pinned items: Plain links in a top-bar row, with a subtle hover and a
+      focus ring; below `lg` one pin button opens them as a dropdown.
     * Collation: Nav roots and submenus sort alphabetically ascending (`ASC`).
 
   No authenticated screen is context-free.
@@ -169,7 +170,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       data-pins={shell_pins(@current_scope)}
       data-served-routes={Jason.encode!(Bilimbi.Base.UI.RouteContract.navigable_paths())}
       data-sidebar-mode="desktop"
-      data-sidebar-rail="false"
+      data-sidebar-hidden="false"
       data-sidebar-open="false"
       class="flex h-screen flex-col overflow-hidden bg-canvas"
     >
@@ -181,26 +182,47 @@ defmodule Bilimbi.Base.UI.Layouts do
           type="button"
           id="app-sidebar-toggle"
           class="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
+          aria-label="Hide menu"
+          title="Hide menu"
           aria-controls="app-sidebar"
-          aria-expanded="false"
+          aria-expanded="true"
         >
-          <.icon name={Bilimbi.Base.UI.IconRegistry.shell(:navigation)} class="size-5" />
+          <%!-- app.css shows one glyph, keyed on aria-expanded; AppShell flips
+               it with the label and title. --%>
+          <.icon name="text-indent-left" class="app-toggle-hide size-5" />
+          <.icon name="text-indent-right" class="app-toggle-show size-5" />
         </button>
 
         <div id="app-topbar-main" class="flex min-w-0 flex-1 items-center justify-between gap-3">
-          <.link
-            navigate={~p"/dashboard"}
-            id="app-brand"
-            class="flex shrink-0 items-center gap-2 text-ink transition hover:opacity-90"
-            aria-label="Bilimbi dashboard"
+          <%!-- AppShell fills `#app-pinned-items` and reveals the nav when the
+               account has pins. From `lg` the items are a row; below it the
+               pin button opens them as a dropdown (app.css, app_shell.js). --%>
+          <nav
+            id="app-pinned"
+            aria-label="Pinned pages"
+            class="app-pinned relative flex min-w-0 flex-1 items-center"
+            hidden
           >
-            <.brand_mark size={24} />
-            <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
-          </.link>
+            <button
+              type="button"
+              id="app-pinned-button"
+              class="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong lg:hidden"
+              aria-label="Pinned pages"
+              title="Pinned pages"
+              aria-controls="app-pinned-items"
+              aria-expanded="false"
+            >
+              <.icon name="bilimbi-pin" class="size-4" />
+            </button>
+            <div
+              id="app-pinned-items"
+              class="app-pinned-items absolute top-full left-0 z-50 mt-1 hidden w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 rounded-md border border-line bg-surface p-1 shadow-lg data-[open=true]:flex lg:static lg:mt-0 lg:flex lg:w-auto lg:max-w-none lg:flex-row lg:items-center lg:gap-1 lg:overflow-x-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none"
+            >
+            </div>
+            <p id="app-pinned-announcement" class="sr-only" role="status" aria-live="polite"></p>
+          </nav>
 
-          <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <div class="ml-auto flex shrink-0 items-center justify-end gap-3">
             {render_slot(@topbar_actions)}
 
             <%!-- The notification bell is the shell's, so every authenticated
@@ -246,20 +268,11 @@ defmodule Bilimbi.Base.UI.Layouts do
 
         <aside
           id="app-sidebar"
-          class="app-sidebar app-nav-rail absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
+          class="app-sidebar app-nav-menu absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
           tabindex="-1"
           role="navigation"
           aria-label="Main navigation"
         >
-          <div id="app-pinned" class="app-pinned bg-brand-surface px-0.5 py-0.5 rounded-sm" hidden>
-            <p class="app-pinned-heading px-1 pt-0.5 pb-px text-[0.625rem] font-medium uppercase tracking-[0.14em] text-muted select-none">
-              Pinned
-            </p>
-            <div id="app-pinned-items"></div>
-            <p id="app-pinned-announcement" class="sr-only" role="status" aria-live="polite"></p>
-            <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/50" aria-hidden="true"></div>
-          </div>
-
           <.nav_menu
             id="app-nav"
             aria_label="Main navigation"
@@ -301,6 +314,14 @@ defmodule Bilimbi.Base.UI.Layouts do
         class="flex h-6 shrink-0 items-center justify-between border-t border-line bg-surface px-4 text-xs text-ink-subtle"
       >
         <div class="flex min-w-0 items-center gap-4 overflow-hidden">
+          <.link
+            navigate={~p"/dashboard"}
+            id="app-brand"
+            class="flex shrink-0 items-center transition hover:opacity-90"
+            aria-label="Bilimbi dashboard"
+          >
+            <.brand_mark size={16} />
+          </.link>
           <%!-- A page-level keyboard mode, such as the workspace's tiling mode,
           names itself here. The page's hook fills and reveals it; the shell
           renders it empty and hidden so the mode has one place on every
@@ -421,7 +442,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   The shell renders its menu through this, and so does the Design Library, so
   the library shows the menu the sidebar ships rather than a copy of its
-  wrapper. The element always carries `.app-nav-rail`, the class `app.css`
+  wrapper. The element always carries `.app-nav-menu`, the class `app.css`
   keys the rows' type scale, colours and carets to, so the menu reads the same
   inside `#app-sidebar` and anywhere else it is shown.
 
@@ -440,7 +461,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   def nav_menu(assigns) do
     ~H"""
-    <nav id={@id} aria-label={@aria_label} class={["app-nav-rail", @class]}>
+    <nav id={@id} aria-label={@aria_label} class={["app-nav-menu", @class]}>
       <.nav_branch
         :for={node <- @nodes}
         node={node}
@@ -463,7 +484,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   ancestors.
 
   Rows take their type scale, colours, icon suppression and caret direction
-  from the `.app-nav-rail` rules in `app.css`, which `nav_menu/1` carries.
+  from the `.app-nav-menu` rules in `app.css`, which `nav_menu/1` carries.
 
   `pinnable` is false outside the sidebar. `AppShell.resolvePinnedItem/1`
   resolves a pinned id only against `#app-sidebar`, so a pin control anywhere
@@ -674,7 +695,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       class={[
         "shrink-0 object-contain",
         @size == 36 && "size-9",
-        @size == 24 && "size-6"
+        @size == 16 && "size-4"
       ]}
       width={@size}
       height={@size}

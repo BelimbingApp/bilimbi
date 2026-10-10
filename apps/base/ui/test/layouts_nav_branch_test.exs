@@ -1,6 +1,6 @@
 defmodule Bilimbi.Base.UI.LayoutsNavBranchTest do
   @moduledoc """
-  Tests for `Layouts.nav_branch/1`, the sidebar rail the shell ships and the
+  Tests for `Layouts.nav_branch/1`, the sidebar menu the shell ships and the
   Design Library renders: leaf rows, branches, the current page, and the
   ancestor accent.
   """

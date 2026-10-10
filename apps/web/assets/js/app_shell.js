@@ -1,7 +1,7 @@
 import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
-// rail choice (localStorage), pin hydration from `data-pins` (and migration), the mobile
+// show/hide choice for the whole menu (localStorage), pin hydration from `data-pins` (and migration), the mobile
 // drawer, Escape/backdrop close, returning focus to the toggle, and pointing
 // each row's "Open in a tile" link at the workspace from wherever the
 // browser is. The top-bar display controls and account disclosure belong to
@@ -9,7 +9,6 @@ import ShellControls from "./shell_controls.js"
 // Navigation, capabilities, and status values stay server-rendered.
 const DESKTOP = "(min-width: 1024px)"
 const WORKSPACE = "/workspace"
-const RAIL_WIDTH = 56
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
 const DEFAULT_WIDTH = 240
@@ -35,11 +34,12 @@ const AppShell = {
     this.drag = this.el.querySelector("#app-sidebar-drag")
     this.pinned = this.el.querySelector("#app-pinned")
     this.pinnedItems = this.el.querySelector("#app-pinned-items")
+    this.pinnedButton = this.el.querySelector("#app-pinned-button")
     this.pinnedAnnouncement = this.el.querySelector("#app-pinned-announcement")
     this.impersonating = this.el.dataset.impersonating === "true"
     this.servedRoutes = this.readServedRoutes()
     this.mq = window.matchMedia(DESKTOP)
-    this.rail = window.localStorage.getItem("sidebarRail") === "1"
+    this.hidden = window.localStorage.getItem("sidebarHidden") === "1"
     this.width = this.readWidth()
     this.expandedBranches = this.readExpandedBranches()
     this.pinnedEntries = []
@@ -343,7 +343,7 @@ const AppShell = {
     event.preventDefault()
     this.dragging = true
     this.dragStartX = event.clientX
-    this.dragStartWidth = this.rail ? RAIL_WIDTH : this.width
+    this.dragStartWidth = this.width
     document.documentElement.style.cursor = "col-resize"
     document.documentElement.style.userSelect = "none"
     window.addEventListener("mousemove", this.onDragMove)
@@ -353,12 +353,7 @@ const AppShell = {
   moveDrag(event) {
     if (!this.dragging) return
     const next = this.dragStartWidth + (event.clientX - this.dragStartX)
-    if (next < 80) {
-      this.rail = true
-    } else {
-      this.rail = false
-      this.width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next))
-    }
+    this.width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next))
     this.apply()
   },
 
@@ -369,14 +364,13 @@ const AppShell = {
     document.documentElement.style.userSelect = ""
     window.removeEventListener("mousemove", this.onDragMove)
     window.removeEventListener("mouseup", this.onDragEnd)
-    window.localStorage.setItem("sidebarRail", this.rail ? "1" : "0")
-    if (!this.rail) window.localStorage.setItem("sidebarWidth", String(this.width))
+    window.localStorage.setItem("sidebarWidth", String(this.width))
   },
 
   toggleSidebar() {
     if (this.desktop()) {
-      this.rail = !this.rail
-      window.localStorage.setItem("sidebarRail", this.rail ? "1" : "0")
+      this.hidden = !this.hidden
+      window.localStorage.setItem("sidebarHidden", this.hidden ? "1" : "0")
     } else if (this.drawerOpen) {
       this.closeDrawer()
       return
@@ -403,6 +397,7 @@ const AppShell = {
   },
 
   onViewportChange() {
+    this.setPinnedMenu(false)
     if (this.desktop()) {
       this.drawerOpen = false
       this.lastFocus = null
@@ -414,6 +409,12 @@ const AppShell = {
 
   onGlobalKey(event) {
     if (event.key === "Escape") {
+      if (this.pinnedMenuOpen()) {
+        this.setPinnedMenu(false)
+        this.pinnedButton?.focus()
+        return
+      }
+
       if (this.controls?.panels().some(panel => !panel.hidden)) return
       this.closeDrawer()
       return
@@ -436,7 +437,39 @@ const AppShell = {
     }
   },
 
+  pinnedMenuOpen() {
+    return this.pinnedItems?.dataset.open === "true"
+  },
+
+  // Below `lg` the pinned items are a dropdown; from `lg` the same element is
+  // a row and this state is inert (app.css shows it either way).
+  setPinnedMenu(open) {
+    if (!this.pinnedItems || !this.pinnedButton) return
+
+    if (open) {
+      this.controls?.closeAll()
+      this.pinnedItems.dataset.open = "true"
+    } else {
+      delete this.pinnedItems.dataset.open
+    }
+
+    this.pinnedButton.setAttribute("aria-expanded", open ? "true" : "false")
+  },
+
   onSidebarClick(event) {
+    if (this.pinnedButton?.contains(event.target)) {
+      this.setPinnedMenu(!this.pinnedMenuOpen())
+      return
+    }
+
+    if (
+      this.pinnedMenuOpen() &&
+      (!this.pinned.contains(event.target) ||
+        event.target.closest(".app-pinned-link, .app-pinned-tile"))
+    ) {
+      this.setPinnedMenu(false)
+    }
+
     const unpin = event.target.closest("[data-nav-unpin]")
 
     if (unpin && this.root?.contains(unpin)) {
@@ -637,7 +670,7 @@ const AppShell = {
   startPinnedDrag(event) {
     const row = this.pinnedRow(event)
 
-    if (!row || this.rail || !event.dataTransfer) {
+    if (!row || !event.dataTransfer) {
       event.preventDefault()
       return
     }
@@ -735,21 +768,15 @@ const AppShell = {
 
     for (const {key, item, label: pinLabel, url} of items) {
       const row = document.createElement("div")
-      row.className = "app-pinned-row group flex min-w-0 items-center"
+      row.className =
+        "app-pinned-row group flex min-w-0 items-center rounded-sm lg:shrink-0"
       row.dataset.pinnedItem = key
-      row.draggable = !this.rail && !this.impersonating
-
-      const grip = document.createElement("span")
-      grip.className =
-        "app-pinned-grip mr-0.5 w-3 shrink-0 select-none text-center text-[0.625rem] text-muted opacity-0 transition-opacity group-hover:opacity-60"
-      grip.textContent = "⠁⠁"
-      grip.setAttribute("aria-hidden", "true")
-      grip.title = "Drag to reorder"
+      row.draggable = !this.impersonating
 
       const link = document.createElement("a")
       link.href = url
       link.className =
-        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-0 text-sm font-normal text-link transition hover:bg-surface-muted hover:text-ink"
+        "app-pinned-link flex min-w-0 flex-1 items-center rounded-sm px-1 py-0 text-sm font-normal text-link transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
       for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
         if (item?.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
@@ -766,7 +793,7 @@ const AppShell = {
       const label = document.createElement("span")
       label.className = [
         "app-nav-label app-pinned-label min-w-0 truncate",
-        item && "ml-3",
+        item && "ml-1.5",
       ]
         .filter(Boolean)
         .join(" ")
@@ -780,7 +807,7 @@ const AppShell = {
       unpin.title = `Unpin ${pinLabel}`
       unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
-        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-muted hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong lg:hidden lg:group-focus-within:grid lg:group-hover:grid"
 
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
@@ -802,7 +829,7 @@ const AppShell = {
       tileIcon.setAttribute("aria-hidden", "true")
       tile.append(tileIcon)
 
-      row.append(grip, link, tile, unpin)
+      row.append(link, tile, unpin)
       this.pinnedItems.append(row)
     }
 
@@ -824,6 +851,7 @@ const AppShell = {
     }
 
     this.pinned.hidden = items.length === 0
+    if (items.length === 0) this.setPinnedMenu(false)
   },
 
   focusable() {
@@ -839,14 +867,18 @@ const AppShell = {
 
   apply() {
     const desktop = this.desktop()
-    const open = desktop || this.drawerOpen
+    const open = desktop ? !this.hidden : this.drawerOpen
 
     this.root.dataset.sidebarMode = desktop ? "desktop" : "mobile"
-    this.root.dataset.sidebarRail = this.rail ? "true" : "false"
+    this.root.dataset.sidebarHidden = desktop && this.hidden ? "true" : "false"
     this.root.dataset.sidebarOpen = open ? "true" : "false"
 
     if (this.toggle) {
-      this.toggle.setAttribute("aria-expanded", (desktop ? !this.rail : open) ? "true" : "false")
+      const label = open ? "Hide menu" : "Show menu"
+
+      this.toggle.setAttribute("aria-expanded", open ? "true" : "false")
+      this.toggle.setAttribute("aria-label", label)
+      this.toggle.setAttribute("title", label)
     }
 
     const drawerOpen = !desktop && this.drawerOpen
@@ -874,7 +906,7 @@ const AppShell = {
     this.renderPinnedItems()
 
     if (this.sidebar && desktop) {
-      this.sidebar.style.width = `${this.rail ? RAIL_WIDTH : this.width}px`
+      this.sidebar.style.width = `${this.width}px`
     } else if (this.sidebar) {
       this.sidebar.style.width = ""
     }

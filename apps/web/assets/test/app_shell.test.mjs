@@ -1,4 +1,4 @@
-// app_shell.js: the authenticated shell's sidebar -- the desktop rail and its
+// app_shell.js: the authenticated shell's sidebar -- the desktop menu and its
 // width, the mobile drawer, navigation branches, pins and the "Open in a
 // tile" links. See the comment at the top of the hook.
 import {test, beforeEach, afterEach} from "node:test"
@@ -29,7 +29,7 @@ function setViewport(desktop) {
 // The shell as `Layouts.app` renders it, trimmed to what the hook touches.
 const SHELL = `
   <div id="app-shell" phx-hook="AppShell" data-theme-choice="light"
-       data-sidebar-mode="desktop" data-sidebar-rail="false" data-sidebar-open="false"
+       data-sidebar-mode="desktop" data-sidebar-hidden="false" data-sidebar-open="false"
        data-impersonating="false" data-served-routes='["/companies","/companies/:id","/users"]'>
     <header id="app-topbar">
       <button type="button" id="app-sidebar-toggle" aria-controls="app-sidebar" aria-expanded="false">Menu</button>
@@ -246,20 +246,20 @@ test("widening to desktop closes the drawer and releases the page", () => {
   assert.equal($("app-sidebar").getAttribute("role"), "navigation")
 })
 
-test("on desktop the toggle folds the sidebar to a rail and remembers it", () => {
+test("on desktop the toggle hides the whole menu and remembers it", () => {
   mount()
   assert.equal($("app-sidebar").style.width, "240px")
 
   click("app-sidebar-toggle")
 
-  assert.equal($("app-shell").dataset.sidebarRail, "true")
-  assert.equal($("app-sidebar").style.width, "56px")
+  assert.equal($("app-shell").dataset.sidebarHidden, "true")
   assert.equal($("app-sidebar-toggle").getAttribute("aria-expanded"), "false")
-  assert.equal(localStorage.getItem("sidebarRail"), "1")
+  assert.equal($("app-sidebar-toggle").getAttribute("aria-label"), "Show menu")
+  assert.equal(localStorage.getItem("sidebarHidden"), "1")
 
   shell.hook.destroyed()
   mount()
-  assert.equal($("app-sidebar").style.width, "56px")
+  assert.equal($("app-shell").dataset.sidebarHidden, "true")
 })
 
 test("dragging the edge resizes the sidebar within bounds and remembers the width", () => {
@@ -278,9 +278,8 @@ test("dragging the edge resizes the sidebar within bounds and remembers the widt
   assert.equal($("app-sidebar").style.width, "360px")
 
   drag(360, 20)
-  assert.equal($("app-shell").dataset.sidebarRail, "true")
-  assert.equal(localStorage.getItem("sidebarRail"), "1")
-  assert.equal(localStorage.getItem("sidebarWidth"), "360")
+  assert.equal($("app-sidebar").style.width, "180px")
+  assert.equal(localStorage.getItem("sidebarWidth"), "180")
 })
 
 test("a navigation branch opens, closes, and stays as it was left", () => {

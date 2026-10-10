@@ -45,7 +45,9 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
                "bilimbi-impersonate",
                "hero-impersonate",
                "rows-compact",
-               "rows-normal"
+               "rows-normal",
+               "text-indent-left",
+               "text-indent-right"
              ])
 
     assert Map.new(actions.icons, &{&1.name, &1.heroicon}) == IconRegistry.actions()
@@ -83,7 +85,6 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "theme-dark" => "hero-moon",
              "theme-system" => "hero-computer-desktop",
              "clock" => "hero-clock",
-             "sidebar" => "hero-bars-3",
              "save" => "hero-check-circle",
              "confirm" => "hero-check",
              "back" => "hero-arrow-left",

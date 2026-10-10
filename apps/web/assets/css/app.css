@@ -14,7 +14,7 @@
 @source "../../../../apps/domains";
 @source "../../../../apps/extensions";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
- * Heroicon utilities available for their rail-only rendering. */
+ * Heroicon utilities available for their icon rendering. */
 @source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,lock-closed,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
@@ -519,17 +519,17 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 }
 
 /* Menu typography & font colors matching Belimbing */
-.app-nav-rail {
+.app-nav-menu {
   font-family: var(--font-sans);
   font-weight: 350;
   letter-spacing: -0.01em;
   color: var(--color-link);
 }
 
-.app-nav-rail .app-nav-item,
-.app-nav-rail .app-nav-parent,
-.app-nav-rail .app-nav-container,
-.app-nav-rail .app-nav-parent-link,
+.app-nav-menu .app-nav-item,
+.app-nav-menu .app-nav-parent,
+.app-nav-menu .app-nav-container,
+.app-nav-menu .app-nav-parent-link,
 #app-pinned .app-pinned-link {
   font-weight: 350;
   font-size: 0.75rem;
@@ -537,138 +537,94 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   color: var(--color-link);
 }
 
-.app-nav-rail .app-nav-item:hover,
-.app-nav-rail .app-nav-parent:hover,
-.app-nav-rail .app-nav-container:hover,
-.app-nav-rail .app-nav-parent-link:hover,
+.app-nav-menu .app-nav-item:hover,
+.app-nav-menu .app-nav-parent:hover,
+.app-nav-menu .app-nav-container:hover,
+.app-nav-menu .app-nav-parent-link:hover,
 #app-pinned .app-pinned-link:hover {
   color: var(--color-ink);
 }
 
 /* Active menu item styling */
-.app-nav-rail .app-nav-item[aria-current="page"],
-.app-nav-rail .app-nav-parent-link[aria-current="page"] {
+.app-nav-menu .app-nav-item[aria-current="page"],
+.app-nav-menu .app-nav-parent-link[aria-current="page"] {
   font-weight: 350;
   color: var(--color-brand-strong);
   background-color: var(--color-surface);
 }
 
 /* Parent branch ascent when it contains the active menu item */
-.app-nav-rail .app-nav-parent.text-brand-strong,
-.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-container,
-.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-parent-link,
-.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-label,
-.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-caret,
-.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent,
-.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-container,
-.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-parent-link,
-.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-label,
-.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-caret {
+.app-nav-menu .app-nav-parent.text-brand-strong,
+.app-nav-menu .app-nav-parent.text-brand-strong .app-nav-container,
+.app-nav-menu .app-nav-parent.text-brand-strong .app-nav-parent-link,
+.app-nav-menu .app-nav-parent.text-brand-strong .app-nav-label,
+.app-nav-menu .app-nav-parent.text-brand-strong .app-nav-caret,
+.app-nav-menu .app-nav-branch:has([aria-current="page"]) > .app-nav-parent,
+.app-nav-menu .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-container,
+.app-nav-menu .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-parent-link,
+.app-nav-menu .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-label,
+.app-nav-menu .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-caret {
   color: var(--color-brand-strong);
 }
 
-.app-nav-rail .app-nav-icon {
+.app-nav-menu .app-nav-icon {
   display: none;
 }
 
-.app-nav-rail .app-nav-caret-open {
+.app-nav-menu .app-nav-caret-open {
   display: none;
 }
 
-.app-nav-rail .app-nav-caret-closed {
+.app-nav-menu .app-nav-caret-closed {
   display: inline;
 }
 
-.app-nav-rail [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-open {
+.app-nav-menu [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-open {
   display: inline;
 }
 
-.app-nav-rail [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-closed {
+.app-nav-menu [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-closed {
   display: none;
 }
 
-#app-sidebar .app-pinned-row[draggable="true"] {
+#app-pinned .app-pinned-row[draggable="true"] {
   cursor: grab;
 }
 
-#app-sidebar .app-pinned-row[draggable="true"]:active {
+#app-pinned .app-pinned-row[draggable="true"]:active {
   cursor: grabbing;
 }
 
-#app-sidebar .app-pinned-row[data-pinned-dragging="true"] {
+#app-pinned .app-pinned-row[data-pinned-dragging="true"] {
   opacity: 0.4;
 }
 
-#app-sidebar .app-pinned-row[data-pinned-drop-target="true"] {
-  border-top: 2px solid var(--color-brand-strong);
+#app-pinned .app-pinned-row[data-pinned-drop-target="true"] {
+  box-shadow: inset 0 2px 0 var(--color-brand-strong);
+}
+
+@media (min-width: 1024px) {
+  #app-pinned .app-pinned-row[data-pinned-drop-target="true"] {
+    box-shadow: inset 2px 0 0 var(--color-brand-strong);
+  }
 }
 
 /* Authenticated shell chrome. Geometry matches Belimbing: full-width top
- * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
+ * bar, persistent menu on wide screens, off-canvas drawer below `lg`.
  * The AppShell hook writes data attributes; the global reduced-motion
- * rule above collapses the drawer transition. Rail styles apply only at
- * `lg+` — the mobile drawer always shows labels, the same as Belimbing's
- * honorRail=false copy.
- * Rail is a state of the sidebar, so every rule below stays keyed to
- * `#app-sidebar`: `.app-nav-*` rows also render outside it (the Design
- * Library shows the real rail), and collapsing the sidebar must not strip
- * their labels and carets. */
+ * rule above collapses the drawer transition. On `lg+` the toggle hides
+ * the whole menu and its resize handle; below `lg` it opens the drawer.
+ * The toggle shows one of two glyphs, keyed on its `aria-expanded`. */
 @media (min-width: 1024px) {
-  #app-shell[data-sidebar-rail="true"] #app-sidebar {
-    width: 3.5rem;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-label,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-empty,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-user-expanded,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-indent,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-caret,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-toggle,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-pin,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-grip,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-unpin,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-heading,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-divider {
+  #app-shell[data-sidebar-hidden="true"] #app-sidebar,
+  #app-shell[data-sidebar-hidden="true"] #app-sidebar-drag {
     display: none;
   }
+}
 
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-item,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-container,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent-link,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-link {
-    justify-content: center;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-item,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent {
-    min-height: 1.5rem;
-    padding-inline: 0;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-container,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent-link,
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-link {
-    flex: none;
-    width: 100%;
-    padding-inline: 0;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-children {
-    margin-left: 0;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-icon {
-    display: block;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-row {
-    min-height: 1.5rem;
-  }
-
-  #app-shell[data-sidebar-rail="true"] #app-sidebar #app-user > button {
-    flex-direction: column;
-  }
+#app-sidebar-toggle[aria-expanded="true"] .app-toggle-show,
+#app-sidebar-toggle[aria-expanded="false"] .app-toggle-hide {
+  display: none;
 }
 
 @media (max-width: 1023px) {
