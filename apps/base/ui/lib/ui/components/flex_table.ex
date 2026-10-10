@@ -53,8 +53,8 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   workspace tile the table takes the room the tile has left, scrolls its
   rows under a heading row that sticks, and the notch and bar stay above it.
   Put the component straight into the card or the page, with `class` for
-  any padding, or `framed={false}` inside a `p-0` card: a wrapper of the caller's own between them hides the table
-  from those rules.
+  any padding, or `framed={false}` inside a `p-0` card: a wrapper of the
+  caller's own between them hides the table from those rules.
 
   Bars and bands: a `:band` cell carries `data-band` and `data-scale` and is
   painted by `app.css`; a `:bar` cell carries `data-bar` and the hook writes

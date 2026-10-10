@@ -101,8 +101,8 @@ height that looks like its neighbour (`Bilimbi.Base.UI.FlexTable` owns the
 steps). A compact row is as short as 18px, so a `<.badge>` in one gives up
 its vertical padding through the `data-badge` rule in
 `apps/web/assets/css/app.css` and a row action takes 16px; do not hand-shrink
-either in a page. Its chips, add box, zoom and reset live in table customization,
-the bar the notch on the table's top-left edge opens; do not put a toolbar
+either in a page. Its chips, add box, zoom and reset live in table
+customization, the bar the notch on the table's top-left edge opens; do not put a toolbar
 or an icon group back above the table or in its heading row. A zoom
 control carries `data-zoom-op` and no `phx-click`: LiveView drops a click
 on a control still waiting for its last reply, which is how the first
