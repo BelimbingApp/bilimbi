@@ -364,7 +364,7 @@ defmodule Bilimbi.Base.UI.Layouts do
         pinnable={@pinnable}
         impersonating={@impersonating}
         class={[
-          "app-nav-item relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal transition",
+          "app-nav-item relative flex min-w-0 flex-1 items-center rounded-none px-1 py-0 text-sm font-normal transition",
           @active && "bg-surface text-brand-strong",
           !@active && "text-link hover:bg-surface-muted hover:text-ink"
         ]}
@@ -514,7 +514,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       class="app-nav-branch"
     >
       <div class={[
-        "app-nav-parent group flex min-w-0 items-center px-1 py-px text-sm font-normal transition hover:bg-surface-muted",
+        "app-nav-parent group flex min-w-0 items-center px-1 py-0 text-sm font-normal transition hover:bg-surface-muted",
         (@active? or @has_active_child?) && "text-brand-strong",
         !(@active? or @has_active_child?) && "text-link hover:text-ink"
       ]}>
@@ -549,7 +549,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-expanded={to_string(@expanded?)}
           aria-label={"Toggle " <> @node.item.label}
           title={@node.item.label}
-          class="app-nav-toggle grid size-5 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <span
             class="app-nav-caret text-[11px] shrink-0 w-3 text-center select-none"
@@ -571,7 +571,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           pinnable={@pinnable}
           impersonating={@impersonating}
           class={[
-            "app-nav-parent-link relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px transition",
+            "app-nav-parent-link relative flex min-w-0 flex-1 items-center rounded-none px-1 py-0 transition",
             @active? && "bg-surface text-brand-strong font-normal",
             !@active? && "text-link hover:text-ink"
           ]}
@@ -580,7 +580,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
       <div
         id={"nav-children-" <> @dom_id}
-        class="app-nav-children ml-3"
+        class="app-nav-children ml-2.5"
         hidden={!@expanded?}
       >
         <.nav_branch

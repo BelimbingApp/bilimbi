@@ -439,8 +439,8 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: calc(var(--spacing) * 6);
-  height: calc(var(--spacing) * 6);
+  width: calc(var(--spacing) * 4);
+  height: calc(var(--spacing) * 4);
   border-radius: var(--radius-sm);
   color: var(--color-ink-muted);
   opacity: 0%;
@@ -532,8 +532,8 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 .app-nav-rail .app-nav-parent-link,
 #app-pinned .app-pinned-link {
   font-weight: 350;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+  font-size: 0.75rem;
+  line-height: 0.875rem;
   color: var(--color-link);
 }
 
@@ -642,7 +642,7 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 
   #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-item,
   #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent {
-    min-height: 2rem;
+    min-height: 1.5rem;
     padding-inline: 0;
   }
 
@@ -663,7 +663,7 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 
   #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-row {
-    min-height: 2rem;
+    min-height: 1.5rem;
   }
 
   #app-shell[data-sidebar-rail="true"] #app-sidebar #app-user > button {
