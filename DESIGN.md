@@ -202,9 +202,10 @@ Belimbing's link-slash glyph. `/employees/:id` and `/users/:id` follow the
 same anatomy: the employee's linked account is a row of its Employment
 Information list whose value is the `employee.accounts` embed, its
 subordinates are the shared table with assigning in the heading row and a
-demoted remove action on the row; the user's roles and each domain of its
-effective and denied permissions are rows of the same list, and its Employee
-Records and External Accesses sections open with the shared heading. The
+demoted remove action on the row; the user's roles are chips directly under
+their section heading, which names them, each domain of its effective and
+denied permissions is a row of the same list, and its Employee Records and
+External Accesses sections open with the shared heading. The
 database-query console renders its result set through the same table, one
 sort button per returned column. The company Departments and Relationships
 pages and `/authz/roles/:id` use the same anatomy; the company pages' add
@@ -456,15 +457,21 @@ focus, ignored Escape and painted its Delete solid red.
 Every destructive control confirms this way: the reference-type deletes, the
 address unlinks and deletes, the company relationship and department removals,
 the business activity chip, the employee and employee type deletes, the
-subordinate removal, the user deletes, the employee unlink, the role and
-capability rule changes on `/users/:id`, the saved database query deletes, the
-session terminate, the settings restore and the schedule pause and disable. No
-`data-confirm` attribute remains in the product. The schedule's enable confirms
-the same way, because it approves the definition under review to run
-unattended: the dialog names the task and states that it begins running on its
-schedule at that definition's fingerprint. Resume only lifts a pause and runs
-on click, matching Belimbing, where a confirmation is reserved for a choice
-that cannot be undone; discarding an unsaved database query is the same case.
+subordinate removal, the user deletes, the employee unlink, the saved database
+query deletes, the session terminate, the settings restore and the schedule
+pause and disable. No `data-confirm` attribute remains in the product. The
+schedule's enable confirms the same way, because it approves the definition
+under review to run unattended: the dialog names the task and states that it
+begins running on its schedule at that definition's fingerprint. Resume only
+lifts a pause and runs on click, matching Belimbing, where a confirmation is
+reserved for a choice that cannot be undone; discarding an unsaved database
+query is the same case. A change that the same card undoes commits on click,
+whatever it costs: a role or capability rule change on `/users/:id` is
+assigned, granted or lifted again from the picker or the denied list, so none
+of them asks — except the one the acting user could not undo, taking from
+their own account a role, grant or capability the pickers would no longer
+offer them (they offer only what the acting user holds), which confirms with a
+detail saying plainly that they cannot give it back.
 
 ## Subtle depth and motion
 

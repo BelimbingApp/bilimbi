@@ -172,10 +172,11 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "dd#user-view-created")
     assert has_element?(view, "dd#user-view-updated")
 
-    # Roles are a fact of the same shape, with the count in the heading row.
+    # The roles sit under the section heading, which already says Roles: the
+    # count is in the heading row and the list carries no label of its own.
     assert has_element?(view, "#user-roles-heading + span", "0")
-    assert has_element?(view, "#assigned-roles-container dt", "Roles")
-    assert has_element?(view, "dd#assigned-roles #no-roles-msg", "No roles assigned.")
+    refute has_element?(view, "#user-roles-card dt", "Roles")
+    assert has_element?(view, "#user-roles-card #no-roles-msg", "No roles assigned.")
 
     # The section's own action sits in its heading row.
     assert has_element?(view, "#user-employees-heading + span", "0")

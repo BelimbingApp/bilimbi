@@ -161,7 +161,6 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
       [assignment] = Authz.list_principal_role_assignments(scope, :user, 92).entries
 
       view |> element("#remove-role-#{assignment.id}") |> render_click()
-      view |> element("#user-authz-confirm-confirm") |> render_click()
 
       assert [_granted, revoked] = listener_rows("Bilimbi.Base.Authz.PrincipalRole")
       assert revoked.event == "deleted"
@@ -195,7 +194,6 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
       assert granted.new_values["is_allowed"] == true
 
       view |> element("#remove-direct-cap-admin-company-view") |> render_click()
-      view |> element("#user-authz-confirm-confirm") |> render_click()
 
       assert [^granted, removed] =
                listener_rows("Bilimbi.Base.Authz.PrincipalCapability") -- before
