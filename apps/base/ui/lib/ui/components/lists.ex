@@ -38,7 +38,11 @@ defmodule Bilimbi.Base.UI.Components.Lists do
       class="flex flex-col gap-2 border-t border-low-contrast-line px-2 py-2 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <p :if={@page.total_pages > 0} id={"#{@id}-summary"} class="text-xs tabular-nums text-ink-muted">
+        <p
+          :if={@page.total_pages > 0}
+          id={"#{@id}-summary"}
+          class="text-xs tabular-nums text-ink-muted"
+        >
           {page_summary(@page)}
         </p>
         <.form

@@ -344,7 +344,7 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
  * shrink, so the rules name the shapes a list page (`page/1`,
  * `data-page="list"`) has: the table in a card (`data-card`), or in a plain
  * wrapper. In either, the scroll box may sit one level further in, inside a
- * `data-table-frame`: that is `flex_table/1`, whose frame also holds the lip
+ * `data-table-frame`: that is `flex_table/1`, whose frame also holds the notch
  * and the customization bar above the table, and they keep their height
  * while the table takes the rest. Only the last such block on the page
  * takes the room; a smaller table above it keeps its height. A table nested

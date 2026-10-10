@@ -30,12 +30,12 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   caller's `<:col>` of the same id, so a list page keeps its own links and
   badges while gaining walked columns beside them.
 
-  Nothing stands above the table but a small lip on the top-left edge of
+  Nothing stands above the table but a small notch on the top-left edge of
   its frame, named "Customize table". It opens table customization, a bar
   inline above the table holding a chip per column (drag to reorder,
   remove, choose a lens), the add-a-column box, the zoom, the reset to the
   page's own columns and, while a change-since lens is worn, its date. The
-  lip is then the way to close it, as is Escape. The bar is closed until
+  notch is then the way to close it, as is Escape. The bar is closed until
   asked for and stays open while columns come and go.
 
   `zoom` is the height of a row and `mode` whether rows that tall are drawn
@@ -51,9 +51,9 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   The frame (`data-table-frame`) and its scroll box (`data-table-region`)
   are what the "list fill" rules in `app.css` look for, so inside a
   workspace tile the table takes the room the tile has left, scrolls its
-  rows under a heading row that sticks, and the lip and bar stay above it.
+  rows under a heading row that sticks, and the notch and bar stay above it.
   Put the component straight into the card or the page, with `class` for
-  any padding: a wrapper of the caller's own between them hides the table
+  any padding, or `framed={false}` inside a `p-0` card: a wrapper of the caller's own between them hides the table
   from those rules.
 
   Bars and bands: a `:band` cell carries `data-band` and `data-scale` and is
@@ -202,8 +202,8 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
           cost: trunc(@cost.estimate)
         )}
       </p>
-      <%!-- Table customization. The lip is the one thing above the table
-           until it is asked for: a notch on the frame's top-left edge that
+      <%!-- Table customization. The notch is the one thing above the table
+           until it is asked for: a tab on the frame's top-left edge that
            opens the bar and then closes it. It is a small tab in the
            surface colour with a hairline on its top and sides and none
            below, so that whatever it stands on is one piece with it: the
@@ -213,10 +213,10 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
            wears the same surface colour, boxed only when framed, so the
            notch and the settings it opens read as one shape. The card's
            headroom for it is the `data-unframed` rule in `app.css`; no
-           page carries the notch's height. `aria-expanded` on the lip is
+           page carries the notch's height. `aria-expanded` on the notch is
            the one record of open, as on `multi_select/1`, so a patch that
            redraws the chips leaves the bar as the person had it. It closes
-           on the lip or Escape, never because focus left: removing the chip
+           on the notch or Escape, never because focus left: removing the chip
            that held focus is focus leaving with nowhere to go. --%>
       <div
         id={"#{@id}-customizing"}
@@ -558,7 +558,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   end
 
   # The commands that open and close table customization. Each writes only
-  # the lip's `aria-expanded`; the bar's visibility is CSS derived from it,
+  # the notch's `aria-expanded`; the bar's visibility is CSS derived from it,
   # so a patch that redraws the chips leaves it open.
   defp assign_customization(%{id: id} = assigns) do
     close = JS.set_attribute({"aria-expanded", "false"}, to: "##{id}-customize")
