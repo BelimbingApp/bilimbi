@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
 
   def account_menu(assigns) do
     ~H"""
-    <div id={@id} class="relative border-t border-line p-1" data-account-menu>
+    <div id={@id} class="relative border-t border-line px-1 py-0.5" data-account-menu>
       <button
         id={@id <> "-toggle"}
         type="button"
@@ -23,12 +23,12 @@ defmodule Bilimbi.Base.UI.ShellComponents do
         aria-controls={@id <> "-panel"}
         aria-label="Account and scope"
         title="Account and scope"
-        class="flex w-full items-center gap-2 rounded-md p-0.5 text-left text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        class="flex w-full items-center gap-1.5 rounded-md p-0 text-left text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
       >
-        <span class="grid size-7 shrink-0 place-items-center rounded-full bg-action text-xs font-medium text-action-ink">
+        <span class="grid size-4 shrink-0 place-items-center rounded-full bg-action text-[0.5rem] leading-none font-medium text-action-ink">
           {initials(@current_scope.user["name"])}
         </span>
-        <span class="app-user-expanded min-w-0 truncate text-xs">{@current_scope.user["name"]}</span>
+        <span class="app-user-expanded min-w-0 truncate text-xs leading-3.5">{@current_scope.user["name"]}</span>
       </button>
       <section
         id={@id <> "-panel"}

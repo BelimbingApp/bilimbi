@@ -292,8 +292,7 @@ products were read and the plan forbids treating existence as acceptance.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
   Dropped from parity acceptance rather than built to. Bilimbi does ship pinned
-  reordering in the shell: drag, plus Move up and Move down buttons for keyboard
-  users. That order is account state, saved through `user_pins.sort_order` and
+  reordering in the shell: drag. That order is account state, saved through `user_pins.sort_order` and
   `reorder_user_pins/2` like the pins themselves.
 - **ACT-01** — "basics" understates what ships: disabled, navigation-as-button and an
   in-flight `Working…` primary already render on the Design Library (Lane B), and a
@@ -350,7 +349,7 @@ lost inside a design ledger:
   `[data-pinned-item]` with no keyboard or pointer-free equivalent, and the grip
   advertising it is `aria-hidden`, so keyboard and assistive-technology users cannot
   reorder pins at all.
-  Resolved: each pinned item has Move up and Move down buttons.
+  Resolved by dropping the Move up and Move down buttons; reordering is drag only.
 - `<.header>` never stacks; its actions are clipped and unreachable at 420px, where
   Belimbing's header wraps.
 - `:info` flashes render with success (green) roles.

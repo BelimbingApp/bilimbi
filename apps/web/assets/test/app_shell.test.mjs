@@ -514,25 +514,6 @@ test("dragging a pinned row reorders through the durable API", async () => {
   assert.deepEqual(serverPins.map(({id}) => id), [2, 1])
 })
 
-test("keyboard move controls reorder durably, announce, and restore focus", async () => {
-  serverPins = [
-    {id: 1, label: "Companies", url: "/companies"},
-    {id: 2, label: "Acme", url: "/companies/1"},
-  ]
-  mount()
-  await flush()
-
-  const moveDown = $("app-pinned-items").querySelector('[data-nav-move="down"]')
-  moveDown.focus()
-  moveDown.click()
-  await flush()
-
-  assert.deepEqual(serverPins.map(({id}) => id), [2, 1])
-  assert.deepEqual(pinnedLinks(), ["/companies/1", "/companies"])
-  assert.equal($("app-pinned-announcement").textContent, "Moved Companies down.")
-  assert.equal(document.activeElement.className.includes("app-pinned-link"), true)
-})
-
 test("a failed legacy migration keeps the pins already on the page", async () => {
   const root = render(SHELL, "app-shell")
   root.dataset.pins = JSON.stringify([{id: 1, label: "Companies", url: "/companies"}])
@@ -642,8 +623,6 @@ test("impersonated shells read pins but refuse pin writes and migration", async 
   await flush()
 
   click("nav-pin-companies")
-  const moveDown = $("app-pinned-items").querySelector('[data-nav-move="down"]')
-  moveDown?.click()
   await flush()
 
   assert.deepEqual(requests, [])

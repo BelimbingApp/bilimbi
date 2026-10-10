@@ -437,14 +437,6 @@ const AppShell = {
   },
 
   onSidebarClick(event) {
-    const move = event.target.closest("[data-nav-move]")
-
-    if (move && this.root?.contains(move)) {
-      event.preventDefault()
-      this.movePinnedItem(move.dataset.pinnedItem, move.dataset.navMove)
-      return
-    }
-
     const unpin = event.target.closest("[data-nav-unpin]")
 
     if (unpin && this.root?.contains(unpin)) {
@@ -629,27 +621,6 @@ const AppShell = {
     return this.pinnedItems?.contains(row) ? row : null
   },
 
-  async movePinnedItem(key, direction) {
-    if (this.impersonating) return
-    const index = this.pinnedEntries.findIndex((item) => this.pinnedItemKey(item) === key)
-    const targetIndex = direction === "up" ? index - 1 : index + 1
-    if (index < 0 || targetIndex < 0 || targetIndex >= this.pinnedEntries.length) return
-
-    const moved = [...this.pinnedEntries]
-    const [item] = moved.splice(index, 1)
-    moved.splice(targetIndex, 0, item)
-    try {
-      const updated = await this.reorderServerPins(moved)
-      if (updated) {
-        const label = item.label || "Pinned page"
-        this.setPinAnnouncement(`Moved ${label} ${direction}.`)
-        this.focusPinnedKey(key)
-      }
-    } catch (_error) {
-      this.setPinAnnouncement("Unable to reorder pinned pages.")
-    }
-  },
-
   focusPinnedKey(key) {
     for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
       if (row.dataset.pinnedItem === key) {
@@ -778,7 +749,7 @@ const AppShell = {
       const link = document.createElement("a")
       link.href = url
       link.className =
-        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal text-link transition hover:bg-surface-muted hover:text-ink"
+        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-0 text-sm font-normal text-link transition hover:bg-surface-muted hover:text-ink"
 
       for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
         if (item?.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
@@ -801,28 +772,6 @@ const AppShell = {
         .join(" ")
       label.textContent = pinLabel
       link.append(label)
-
-      const moveUp = document.createElement("button")
-      moveUp.type = "button"
-      moveUp.dataset.navMove = "up"
-      moveUp.dataset.pinnedItem = key
-      moveUp.disabled = this.impersonating || items[0] === items.find(({key: itemKey}) => itemKey === key)
-      moveUp.title = `Move ${pinLabel} up`
-      moveUp.setAttribute("aria-label", `Move ${pinLabel} up`)
-      moveUp.className =
-        "app-pinned-move grid size-6 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-muted hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong disabled:cursor-not-allowed disabled:opacity-30"
-      moveUp.textContent = "↑"
-
-      const moveDown = document.createElement("button")
-      moveDown.type = "button"
-      moveDown.dataset.navMove = "down"
-      moveDown.dataset.pinnedItem = key
-      moveDown.disabled =
-        this.impersonating || items[items.length - 1] === items.find(({key: itemKey}) => itemKey === key)
-      moveDown.title = `Move ${pinLabel} down`
-      moveDown.setAttribute("aria-label", `Move ${pinLabel} down`)
-      moveDown.className = moveUp.className
-      moveDown.textContent = "↓"
 
       const unpin = document.createElement("button")
       unpin.type = "button"
@@ -853,7 +802,7 @@ const AppShell = {
       tileIcon.setAttribute("aria-hidden", "true")
       tile.append(tileIcon)
 
-      row.append(grip, link, tile, moveUp, moveDown, unpin)
+      row.append(grip, link, tile, unpin)
       this.pinnedItems.append(row)
     }
 
