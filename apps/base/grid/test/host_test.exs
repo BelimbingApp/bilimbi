@@ -28,8 +28,8 @@ defmodule Bilimbi.Base.Grid.Web.HostTest do
     assert {:patch, %View{since: nil}} =
              Host.apply(%{"op" => "since", "since" => "never"}, view, [])
 
-    assert {:patch, %View{table: "users", columns: [], zoom: 36}} =
-             Host.apply(%{"op" => "reset"}, %{view | zoom: 24}, [])
+    assert {:patch, %View{table: "users", columns: [], zoom: 32}} =
+             Host.apply(%{"op" => "reset"}, %{view | zoom: 22}, [])
 
     assert Host.apply(%{"op" => "sort", "sort" => "name"}, view, []) == :noop
   end
@@ -38,22 +38,22 @@ defmodule Bilimbi.Base.Grid.Web.HostTest do
     view = %View{table: "users"}
     step = fn view, dir -> Host.apply(%{"op" => "zoom", "dir" => dir}, view, []) end
 
-    assert {:patch, %View{zoom: 40}} = step.(view, "in")
+    assert {:patch, %View{zoom: 36}} = step.(view, "in")
     # Out of normal rows the next height down is the tallest compact one.
-    assert {:patch, %View{zoom: 28}} = step.(view, "out")
-    assert {:patch, %View{zoom: 44}} = step.(%{view | zoom: 44}, "in")
-    assert {:patch, %View{zoom: 20}} = step.(%{view | zoom: 20}, "out")
+    assert {:patch, %View{zoom: 26}} = step.(view, "out")
+    assert {:patch, %View{zoom: 40}} = step.(%{view | zoom: 40}, "in")
+    assert {:patch, %View{zoom: 18}} = step.(%{view | zoom: 18}, "out")
   end
 
   test "a preset names the height it sets, so pressing it twice lands on the same rows" do
     view = %View{table: "users"}
     preset = fn view, name -> Host.apply(%{"op" => "zoom_preset", "preset" => name}, view, []) end
 
-    assert {:patch, %View{zoom: 24} = compact} = preset.(view, "compact")
+    assert {:patch, %View{zoom: 18} = compact} = preset.(view, "compact")
     assert {:patch, ^compact} = preset.(compact, "compact")
-    assert {:patch, %View{zoom: 36}} = preset.(compact, "normal")
+    assert {:patch, %View{zoom: 32}} = preset.(compact, "normal")
     # From any compact height, not only the preset's own.
-    assert {:patch, %View{zoom: 36}} = preset.(%{view | zoom: 20}, "normal")
+    assert {:patch, %View{zoom: 32}} = preset.(%{view | zoom: 22}, "normal")
     assert preset.(view, "huge") == :noop
   end
 end

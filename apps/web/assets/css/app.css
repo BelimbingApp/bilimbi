@@ -344,7 +344,7 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
  * shrink, so the rules name the shapes a list page (`page/1`,
  * `data-page="list"`) has: the table in a card (`data-card`), or in a plain
  * wrapper. In either, the scroll box may sit one level further in, inside a
- * `data-table-frame`: that is `flex_table/1`, whose frame also holds the lip
+ * `data-table-frame`: that is `flex_table/1`, whose frame also holds the notch
  * and the customization bar above the table, and they keep their height
  * while the table takes the rest. Only the last such block on the page
  * takes the room; a smaller table above it keeps its height. A table nested
@@ -413,6 +413,23 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
       }
     }
   }
+}
+
+/* The notch of an unframed `flex_table/1` rises its own height (`h-3.5`) out
+ * of the card it sits in, so that it stands on the page body rather than on
+ * a strip of the card. The card leaves it that height plus a gap above
+ * itself; the toolbar's `mb-2` collapses into this margin, so without it the
+ * notch touched the search box. The component marks its frame
+ * `data-unframed`; no page carries the notch's height. */
+[data-card]:has(> * > [data-table-frame][data-unframed]) {
+  margin-top: calc(--spacing(3.5) + --spacing(3));
+}
+
+/* A compact row of `flex_table/1` is as short as eighteen pixels, so a badge
+ * in one gives up its vertical padding: a twenty-pixel badge made every row
+ * that held one twenty-one. The badge is `badge/1`, marked `data-badge`. */
+.flex-table[data-mode="compact"] [data-badge] {
+  padding-block: 0;
 }
 
 /* The top right corner of a tile belongs to its floating controls

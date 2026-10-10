@@ -68,7 +68,7 @@ planner's cost estimate for that one whole-table statement.
 is presentation only and pushes one event with an `op`. It is one real
 table whose zoom is the height of a row: `Bilimbi.Base.UI.FlexTable` owns
 the heights offered, short ones drawn compact (tighter rows that never
-wrap) and tall ones normal. A lip on the table's top-left edge opens table
+wrap) and tall ones normal. A notch on the table's top-left edge opens table
 customization, the bar inline above the table that holds the column
 chips, their lenses, the add-a-column box, the zoom with its two named
 heights and the reset. `Bilimbi.Base.Grid.Lens` prepares a cell for every

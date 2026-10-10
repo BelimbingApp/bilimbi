@@ -9,7 +9,7 @@ defmodule Bilimbi.Base.Grid.PageViews do
 
       %{"page" => "users",
         "view" => %{"columns" => ["name", "company.name"], "lenses" => %{},
-                    "zoom" => 24, "since" => nil}}
+                    "zoom" => 18, "since" => nil}}
 
   A page is named by the catalog table its rows come from. A view that is
   the page's own, with nothing arranged, is not kept: its entry is removed,

@@ -28,7 +28,9 @@ defmodule Bilimbi.Base.UI.ShellComponents do
         <span class="grid size-4 shrink-0 place-items-center rounded-full bg-action text-[0.5rem] leading-none font-medium text-action-ink">
           {initials(@current_scope.user["name"])}
         </span>
-        <span class="app-user-expanded min-w-0 truncate text-xs leading-3.5">{@current_scope.user["name"]}</span>
+        <span class="app-user-expanded min-w-0 truncate text-xs leading-3.5">{@current_scope.user[
+          "name"
+        ]}</span>
       </button>
       <section
         id={@id <> "-panel"}

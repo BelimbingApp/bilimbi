@@ -7,20 +7,20 @@ defmodule Bilimbi.Base.Grid.ViewTest do
     params = %{
       "cols" => "name,company.name,employees:count",
       "lens" => "employees:count|bar",
-      "z" => "24",
+      "z" => "22",
       "since" => "2026-08-01"
     }
 
     view = View.from_params(params, "users")
     assert view.columns == ~w(name company.name employees:count)
     assert view.lenses == %{"employees:count" => "bar"}
-    assert view.zoom == 24
+    assert view.zoom == 22
     assert view.since == ~D[2026-08-01] and View.since(view) == ~D[2026-08-01]
 
     assert View.to_params(view) == %{
              cols: "name,company.name,employees:count",
              lens: "employees:count|bar",
-             z: 24,
+             z: 22,
              since: "2026-08-01"
            }
 
@@ -32,7 +32,7 @@ defmodule Bilimbi.Base.Grid.ViewTest do
   test "an address carries the view only when it names one of its keys" do
     assert View.carried?(%{"cols" => "name"})
     assert View.carried?(%{"lens" => "a|bar"})
-    assert View.carried?(%{"z" => "24"})
+    assert View.carried?(%{"z" => "22"})
     assert View.carried?(%{"since" => "2026-08-01"})
     # The page's own keys say nothing about the columns.
     refute View.carried?(%{"sort" => "name", "page" => "2", "search" => "ada"})
@@ -42,7 +42,7 @@ defmodule Bilimbi.Base.Grid.ViewTest do
   test "malformed values fall back rather than raise" do
     view = View.from_params(%{"z" => "huge", "cols" => "", "lens" => "nonsense"}, "users")
 
-    assert view.zoom == 36 and view.columns == [] and view.lenses == %{}
+    assert view.zoom == 32 and view.columns == [] and view.lenses == %{}
     assert View.from_params(%{"since" => "yesterday"}, "users").since == nil
     assert View.since(%View{}) == Date.add(Date.utc_today(), -30)
     assert View.put_since(%View{since: ~D[2026-01-01]}, "soon").since == nil
@@ -51,7 +51,7 @@ defmodule Bilimbi.Base.Grid.ViewTest do
   test "a stored map reads back as the same view, and a broken one as the default" do
     view =
       View.from_params(
-        %{"cols" => "name,users:count", "lens" => "users:count|band", "z" => "24"},
+        %{"cols" => "name,users:count", "lens" => "users:count|band", "z" => "22"},
         "companies"
       )
 
@@ -65,18 +65,18 @@ defmodule Bilimbi.Base.Grid.ViewTest do
   end
 
   test "the zoom takes only the offered row heights, the nearest to what was asked" do
-    # 30 and 33 are heights nothing is drawn at: a row is compact up to 28
-    # and normal from 36.
-    assert View.from_params(%{"z" => "30"}, "users").zoom == 28
-    assert View.from_params(%{"z" => "33"}, "users").zoom == 36
-    assert View.from_params(%{"z" => "2"}, "users").zoom == 20
-    assert View.from_params(%{"z" => "400"}, "users").zoom == 44
-    assert View.put_zoom(%View{}, 24).zoom == 24
+    # 28 and 30 are heights nothing is drawn at: a row is compact up to 26
+    # and normal from 32.
+    assert View.from_params(%{"z" => "28"}, "users").zoom == 26
+    assert View.from_params(%{"z" => "30"}, "users").zoom == 32
+    assert View.from_params(%{"z" => "2"}, "users").zoom == 18
+    assert View.from_params(%{"z" => "400"}, "users").zoom == 40
+    assert View.put_zoom(%View{}, 22).zoom == 22
   end
 
   test "reset is the page's own view of the same table" do
     view =
-      View.from_params(%{"cols" => "name,users:count", "z" => "24", "since" => "2026-08-01"}, "t")
+      View.from_params(%{"cols" => "name,users:count", "z" => "22", "since" => "2026-08-01"}, "t")
 
     assert View.reset(view) == %View{table: "t"}
     assert View.default?(View.reset(view))
