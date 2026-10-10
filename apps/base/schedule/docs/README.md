@@ -19,6 +19,12 @@ participates.
 
 ## Time and delivery
 
+The scheduler starts with its application, before the deployment installs the
+contribution snapshot its definitions come from, so its first poll waits for
+the registry's installation signal (`ContributionRegistry.subscribe_installed/0`)
+rather than polling at start. A registry that is unavailable after that point
+is still logged as a warning on every poll it spoils.
+
 The scheduler resolves the most recent local wall-clock occurrence at each
 poll. During ordinary operation both sides of a repeated DST time can run;
 nonexistent spring-forward times do not. After downtime only the latest missed

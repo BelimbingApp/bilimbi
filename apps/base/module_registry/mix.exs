@@ -14,7 +14,9 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
   end
 
   def application do
-    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__)
+    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__,
+      mod: {Bilimbi.Base.ModuleRegistry.Application, []}
+    )
   end
 
   defp deps do
