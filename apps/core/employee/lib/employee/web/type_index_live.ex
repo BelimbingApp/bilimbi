@@ -379,14 +379,12 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
           <:actions>
             <.back_link id="employee-types-back" navigate={~p"/employees"} title="Back to employees" />
-            <.button
+            <.create_button
               :if={allowed?(@current_scope, "admin.employee-type.create")}
               id="employee-type-new"
+              noun="Type"
               navigate={~p"/employee-types/new"}
-              variant="primary"
-            >
-              New Type
-            </.button>
+            />
           </:actions>
         </.header>
 

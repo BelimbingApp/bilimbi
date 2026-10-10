@@ -13,14 +13,12 @@
         />
       </:title_actions>
       <:actions>
-        <.button
+        <.create_button
           :if={allowed?(@current_scope, "admin.user.create")}
           id="user-new"
+          noun="User"
           navigate={~p"/users/new"}
-          variant="primary"
-        >
-          <.icon name="create" /> Create User
-        </.button>
+        />
       </:actions>
     </.header>
 

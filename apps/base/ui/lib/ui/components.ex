@@ -345,6 +345,26 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders the primary create button of a page header: the plus icon and the
+  record noun, no verb ("+ Company", "+ User"). The accessible name is
+  "New <noun>", so the visible text stays inside it. Use it for every
+  list-page header create action instead of a hand-written
+  `<.button variant="primary">` with its own verb and icon. It accepts the
+  attributes `button/1` does (`navigate`, `phx-click`, `type`, `id`, `class`).
+  """
+  attr(:noun, :string, required: true, doc: "the record type, such as \"Company\"")
+  attr(:rest, :global, include: ~w(href navigate patch type))
+  attr(:class, :any, default: nil)
+
+  def create_button(assigns) do
+    ~H"""
+    <.button variant="primary" class={@class} {@rest}>
+      <.icon name="create" class="size-4" /><span class="sr-only">New </span>{@noun}
+    </.button>
+    """
+  end
+
+  @doc """
   Renders a compact status badge with a state dot, for entity statuses such
   as `"active"` or `"archived"`. Neutral by default; pass `kind` for a
   status color.
