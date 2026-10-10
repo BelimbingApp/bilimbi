@@ -43,7 +43,7 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     assigns =
       assigns
       |> assign_new(:columns, fn -> @columns end)
-      |> assign_new(:zoom, fn -> 36 end)
+      |> assign_new(:zoom, fn -> 32 end)
       |> assign_new(:cost, fn -> nil end)
       |> assign_new(:since, fn -> nil end)
       |> assign_new(:expanded, fn -> %{} end)
@@ -171,12 +171,12 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
   test "the zoom steps only through heights that change the table, and names two of them" do
     normal = render_component(&grid/1, %{})
 
-    assert tag(normal, "costed-grid") =~ ~s(data-zoom="36")
+    assert tag(normal, "costed-grid") =~ ~s(data-zoom="32")
     assert tag(normal, "costed-grid") =~ ~s(data-mode="normal")
-    assert normal =~ ~r/id="costed-grid-zoom-level"[^>]*>\s*36 px\s*</
+    assert normal =~ ~r/id="costed-grid-zoom-level"[^>]*>\s*32 px\s*</
     assert tag(normal, "costed-grid-zoom-normal") =~ ~s(aria-pressed="true")
     assert tag(normal, "costed-grid-zoom-compact") =~ ~s(aria-pressed="false")
-    assert "h-9" in classes(tag(normal, "costed-grid-cell-1-code"))
+    assert "h-8" in classes(tag(normal, "costed-grid-cell-1-code"))
 
     # Each press is pushed by the hook from these, never dropped by LiveView's
     # guard on a click still awaiting its reply.
@@ -188,13 +188,13 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
     refute tag(normal, "costed-grid-zoom-compact") =~ "phx-click"
 
     # The ends of the range are disabled steps, not steps that do nothing.
-    shortest = render_component(&grid/1, %{zoom: 20})
+    shortest = render_component(&grid/1, %{zoom: 18})
     assert tag(shortest, "costed-grid-zoom-out") =~ ~r/\sdisabled[\s>]/
     refute tag(shortest, "costed-grid-zoom-in") =~ ~r/\sdisabled[\s>]/
     assert tag(shortest, "costed-grid-zoom-compact") =~ ~s(aria-pressed="true")
-    assert "h-5" in classes(tag(shortest, "costed-grid-cell-1-code"))
+    assert "h-4.5" in classes(tag(shortest, "costed-grid-cell-1-code"))
 
-    tallest = render_component(&grid/1, %{zoom: 44})
+    tallest = render_component(&grid/1, %{zoom: 40})
     assert tag(tallest, "costed-grid-zoom-in") =~ ~r/\sdisabled[\s>]/
     refute tag(tallest, "costed-grid-zoom-out") =~ ~r/\sdisabled[\s>]/
   end
@@ -211,12 +211,13 @@ defmodule Bilimbi.Base.UI.ComponentsFlexTableTest do
              [:compact, :compact, :compact, :normal, :normal, :normal]
 
     # A height nothing is drawn at is the nearest one that is.
-    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(31) == 28
-    assert Bilimbi.Base.UI.FlexTable.normalize_zoom("33") == 36
-    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(nil) == 36
-    assert Bilimbi.Base.UI.FlexTable.step_zoom(28, :in) == 36
-    assert Bilimbi.Base.UI.FlexTable.step_zoom(44, :in) == 44
-    assert Bilimbi.Base.UI.FlexTable.step_zoom(20, :out) == 20
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(30) == 32
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom("27") == 26
+    assert Bilimbi.Base.UI.FlexTable.normalize_zoom(nil) == 32
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(26, :in) == 32
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(40, :in) == 40
+    assert Bilimbi.Base.UI.FlexTable.step_zoom(18, :out) == 18
+    assert Bilimbi.Base.UI.FlexTable.zoom_presets() == [compact: 18, normal: 32]
   end
 
   test "compact is the same table with tighter rows that stay on one line" do

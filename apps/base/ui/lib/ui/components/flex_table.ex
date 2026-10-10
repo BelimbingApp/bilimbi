@@ -133,6 +133,13 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
 
   attr(:caption, :string, default: nil, doc: "sr-only caption naming the table")
 
+  attr(:framed, :boolean,
+    default: true,
+    doc:
+      "when false, the frame draws no line of its own, so a card with " <>
+        "`inner_class=\"p-0\"` is the one frame around the table, as `table/1` takes it"
+  )
+
   attr(:class, :any,
     default: nil,
     doc: "classes for the frame, such as the padding a card with `inner_class=\"p-0\"` leaves out"
@@ -181,6 +188,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       data-mode={@mode}
       data-zoom={@zoom}
       data-table-frame
+      data-unframed={!@framed}
       class={["flex-table", @class]}
     >
       <p
@@ -195,8 +203,17 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
         )}
       </p>
       <%!-- Table customization. The lip is the one thing above the table
-           until it is asked for: a tab on the frame's top-left edge that
-           opens the bar and then closes it. `aria-expanded` on the lip is
+           until it is asked for: a notch on the frame's top-left edge that
+           opens the bar and then closes it. It is a small tab in the
+           surface colour with a hairline on its top and sides and none
+           below, so that whatever it stands on is one piece with it: the
+           card, unframed, where it rises out of the card (`-mt-3.5`) to
+           stand on the page body and its fill covers the card's top line;
+           the viewport's top line when framed (`-mb-px`). The open bar
+           wears the same surface colour, boxed only when framed, so the
+           notch and the settings it opens read as one shape. The card's
+           headroom for it is the `data-unframed` rule in `app.css`; no
+           page carries the notch's height. `aria-expanded` on the lip is
            the one record of open, as on `multi_select/1`, so a patch that
            redraws the chips leaves the bar as the person had it. It closes
            on the lip or Escape, never because focus left: removing the chip
@@ -216,16 +233,23 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
           aria-label={gettext("Customize table")}
           title={gettext("Customize table")}
           phx-click={@toggle}
-          class="peer group -mb-px flex h-5 w-10 items-center justify-center rounded-t-md border border-b-0 border-line bg-surface-sunken text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 aria-expanded:bg-surface aria-expanded:text-ink"
+          class={[
+            "peer group flex h-3.5 w-7 items-center justify-center rounded-t-md border border-b-0 border-line bg-surface",
+            if(@framed, do: "-mb-px", else: "-ml-px -mt-3.5"),
+            "text-ink-muted transition hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 aria-expanded:text-ink"
+          ]}
         >
-          <.icon name="customize" class="size-3.5 group-aria-expanded:hidden" />
-          <.icon name="close" class="hidden size-3.5 group-aria-expanded:block" />
+          <.icon name="customize" class="size-3 group-aria-expanded:hidden" />
+          <.icon name="customizing" class="hidden size-3 group-aria-expanded:block" />
         </button>
         <div
           id={"#{@id}-customization"}
           role="group"
           aria-label={gettext("Table customization")}
-          class="hidden flex-wrap items-center gap-x-3 gap-y-2 border border-b-0 border-line bg-surface p-2 peer-aria-expanded:flex"
+          class={[
+            "hidden flex-wrap items-center gap-x-3 gap-y-2 bg-surface p-2 peer-aria-expanded:flex",
+            @framed && "border border-b-0 border-line"
+          ]}
         >
           <ul
             id={"#{@id}-chips"}
@@ -406,7 +430,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
         id={"#{@id}-viewport"}
         data-viewport
         data-table-region
-        class="relative overflow-auto border border-line bg-surface"
+        class={["relative overflow-auto bg-surface", @framed && "border border-line"]}
         tabindex="0"
       >
         <table class={["w-full text-left", if(@compact?, do: "text-xs", else: "text-sm")]}>
@@ -471,14 +495,15 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
                   target={@target}
                 />
                 <%!-- A compact row is shorter than a table icon button, so
-                     the row's own controls take the inline size there. --%>
+                     the row's own controls take a size that fits: sixteen
+                     pixels in an eighteen-pixel row. --%>
                 <td
                   :if={@action != []}
                   class={[
                     "w-0 font-semibold",
                     @row_class,
                     if(@compact?,
-                      do: "px-1.5 py-0 [&_a]:size-5 [&_button]:size-5",
+                      do: "px-1.5 py-0 [&_a]:size-4 [&_button]:size-4",
                       else: "px-2 py-0.5"
                     )
                   ]}
@@ -632,7 +657,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   end
 
   # A compact row is one line however long its text is.
-  defp cell_density(true), do: "whitespace-nowrap px-1.5 py-0 leading-5"
+  defp cell_density(true), do: "whitespace-nowrap px-1.5 py-0 leading-4.5"
   defp cell_density(false), do: "px-2 py-0.5"
 
   defp flex_table_cell_id(%{table_id: table_id, row: row, column: column}) do

@@ -27,7 +27,7 @@ defmodule Bilimbi.Base.Grid.View do
   defstruct table: nil,
             columns: [],
             lenses: %{},
-            zoom: 36,
+            zoom: FlexTable.default_zoom(),
             since: nil
 
   @type t :: %__MODULE__{

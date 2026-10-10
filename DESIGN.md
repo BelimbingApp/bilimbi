@@ -114,7 +114,11 @@ facts").
 
 - **Geometry:** Fields use `rounded-md`, compact `py-1.5` vertical padding,
   and the smallest width that still fits their content. This applies equally
-  to forms, filters, and inline work.
+  to forms, filters, and inline work. A button wears the same geometry:
+  `rounded-md`, one field tall (`py-1.5 text-sm` plus a border on every
+  variant, transparent on the filled ones), `font-medium`; `button/1` owns
+  it, so a primary action beside a field or a secondary button lines up
+  with it and never outweighs its page header.
 - **Focus:** Keyboard focus uses `brand-strong` for the border and ring. Focus
   is orientation, so it stays consistent across control types and themes.
 - **Choice:** Use the simplest control that fits the value: text for genuinely
@@ -706,17 +710,22 @@ word as the heading, so a wide table still scans. The page keeps its own
 search, filters, sort and pagination; the flexible table is the list
 itself, not a page beside it.
 
-Nothing stands above the table but a small lip on the top-left edge of
-its frame, a tab named "Customize table". It is part of the frame, so it
-never sits over the page title, the search row or a heading. It opens
-**table customization**, a bar inline above the table that holds a chip
-per column, dragged to reorder and removed with its ✕, each with its lens;
-the add-a-column box, which suggests paths (`Company › Parent company ›
-Name`) as the person types; the zoom; and the comparison date while a
-change-since lens is worn. The lip then closes the bar, as does Escape,
-which returns focus to the lip. The bar is closed until asked for and stays
-open while columns are added and removed. Arranging columns is done once
-and then left alone, so it does not take a row of the page.
+Nothing stands above the table but a small notch on the top-left edge of
+its frame, named "Customize table": a low tab in the surface colour with a
+hairline on its top and sides and none below, carrying a double chevron
+that points up while closed and down while open. In a list's `p-0` card it
+rises out of the card's top edge, so it stands on the page body and the
+card is its body; it never sits over the page title, the search row or a
+heading. It opens **table customization**, a bar inline above the table in
+the same surface colour and with no box of its own, so the notch and the
+bar read as one shape. The bar holds a chip per column, dragged to reorder
+and removed with its ✕, each with its lens; the add-a-column box, which
+suggests paths (`Company › Parent company › Name`) as the person types;
+the zoom; and the comparison date while a change-since lens is worn. The
+notch then closes the bar, as does Escape, which returns focus to the
+notch. The bar is closed until asked for and stays open while columns are
+added and removed. Arranging columns is done once and then left alone, so
+it does not take a row of the page.
 
 The same column is read through a lens: the value, a bar scaled to the
 column's range across the whole table, a colour band, and, for a count or

@@ -98,14 +98,22 @@ bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
 refuses inline style; the `FlexTable` hook writes the bar width). It is
 one real table at every zoom: do not add a canvas, and do not offer a row
 height that looks like its neighbour (`Bilimbi.Base.UI.FlexTable` owns the
-steps). Its chips, add box, zoom and reset live in table customization,
+steps). A compact row is as short as 18px, so a `<.badge>` in one gives up
+its vertical padding through the `data-badge` rule in
+`apps/web/assets/css/app.css` and a row action takes 16px; do not hand-shrink
+either in a page. Its chips, add box, zoom and reset live in table customization,
 the bar the lip on the table's top-left edge opens; do not put a toolbar
 or an icon group back above the table or in its heading row. A zoom
 control carries `data-zoom-op` and no `phx-click`: LiveView drops a click
 on a control still waiting for its last reply, which is how the first
 density toggle came to look stuck, so the hook pushes each press. A page
 that draws a second line or an avatar in a `<:col>` leaves it out when the
-mode is `:compact`. See the component comment in
+mode is `:compact`. In a `p-0` card the flexible table is `framed={false}`,
+as `table/1` is `framed={false}` there, so the card is the one frame;
+`class="p-2"` drew a second frame 8px inside the card's. The notch then
+rises out of the card, and the card's headroom for it is the `data-unframed`
+rule in `apps/web/assets/css/app.css`: do not add a margin or padding for
+it at a call site. See the component comment in
 `lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries

@@ -355,7 +355,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   def badge(assigns) do
     ~H"""
-    <span class={[
+    <span data-badge class={[
       "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
       @kind == :neutral && "bg-surface-muted text-ink-muted",
       @kind == :success && "bg-success-surface text-success-ink",
@@ -474,6 +474,15 @@ defmodule Bilimbi.Base.UI.Components do
       <.button navigate={~p"/"}>Home</.button>
       <.button type="submit" busy={@saving}>Saving…</.button>
 
+  ## Geometry
+
+  A button is a control, so it wears the ledger geometry every other control
+  wears: `rounded-md`, one input tall (`py-1.5 text-sm` plus a border), and a
+  medium weight. Every variant carries the border, transparent on the filled
+  ones, so a primary and a secondary button side by side are the same height
+  and line up with the fields beside them; the old `rounded-xl px-4 py-2
+  font-semibold` was a 36px block that outweighed its page header.
+
   ## In-flight state
 
   A control that has been activated and is waiting for its outcome is
@@ -516,12 +525,12 @@ defmodule Bilimbi.Base.UI.Components do
     # stylesheet order, not by this list's order (#619's invisible button).
     variants = %{
       "primary" =>
-        "bg-action text-action-ink hover:bg-action-hover shadow-sm focus-visible:ring-brand-strong/30",
+        "border-transparent bg-action text-action-ink hover:bg-action-hover shadow-xs focus-visible:ring-brand-strong/30",
       "danger" =>
-        "text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
+        "border-transparent text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
           "focus-visible:ring-brand-strong/30",
       nil =>
-        "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-sm " <>
+        "border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-xs " <>
           "focus-visible:ring-brand-strong/30"
     }
 
@@ -531,7 +540,7 @@ defmodule Bilimbi.Base.UI.Components do
     assigns =
       assigns
       |> assign(:class, [
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
+        "inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium",
         "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         if(assigns.busy,
