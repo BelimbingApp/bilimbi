@@ -70,27 +70,79 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   # prefix; once the installed definition is proved again the mark is cleared.
   def reconcile(scope, run_id) do
     with_run(scope, run_id, :reconcile, fn run, items, dependencies, _definition ->
-      time = now()
-
-      run =
-        if run.status not in @terminal_run and is_binary(run.last_error) and
-             String.starts_with?(run.last_error, @definition_unavailable) do
-          run = update!(run, %{last_error: nil, updated_at: time})
-
-          :ok =
-            append_event(scope, run, nil, "process.definition_restored", %{
-              "definition_key" => run.definition_key,
-              "definition_version" => run.definition_version
-            })
-
-          run
-        else
-          run
-        end
-
-      {:ok, run} = settle(scope, run, items, dependencies, time)
-      {:ok, run_fact(run)}
+      reconcile_locked(scope, run, items, dependencies)
     end)
+  end
+
+  # Belimbing's every-minute `blb:workflow:reconcile`: every running run of
+  # every live tenant is locked and settled on its saved graph. This is Base's
+  # own lease and timer hygiene, so it runs under each tenant's system scope
+  # and asks no owner for `:reconcile` authority; it executes no owner code
+  # beyond the subject lock. A run whose definition, subject or tenant is not
+  # proved is skipped and left as it is.
+  def sweep(opts) do
+    opts = Keyword.validate!(opts, limit: 500)
+    limit = opts[:limit]
+
+    unless is_integer(limit) and limit in 1..5000,
+      do: raise(ArgumentError, "sweep limit must be 1..5000")
+
+    summary =
+      Tenancy.list_tenants()
+      |> Enum.reduce(%{reconciled: 0, skipped: 0}, fn tenant, acc ->
+        scope = Scope.for_tenant(tenant)
+
+        from(r in Tenancy.scope_query(RunSchema, scope),
+          where: r.status == "running" and r.scope_type == "tenant",
+          order_by: [asc: r.id],
+          limit: ^limit,
+          select: r.id
+        )
+        |> Repo.all()
+        |> Enum.reduce(acc, fn run_id, acc ->
+          case maintain(scope, run_id) do
+            {:ok, _run} -> Map.update!(acc, :reconciled, &(&1 + 1))
+            {:error, _reason} -> Map.update!(acc, :skipped, &(&1 + 1))
+          end
+        end)
+      end)
+
+    {:ok, summary}
+  end
+
+  defp maintain(scope, run_id) do
+    Attribution.transact(scope, fn ->
+      case proven_run(scope, run_id, true, fn _ref, _subject, _definition, _run -> :ok end) do
+        {:ok, run, _ref, _subject, _definition, items, dependencies} ->
+          reconcile_locked(scope, run, items, dependencies)
+
+        {:error, _} = error ->
+          error
+      end
+    end)
+  end
+
+  defp reconcile_locked(scope, run, items, dependencies) do
+    time = now()
+
+    run =
+      if run.status not in @terminal_run and is_binary(run.last_error) and
+           String.starts_with?(run.last_error, @definition_unavailable) do
+        run = update!(run, %{last_error: nil, updated_at: time})
+
+        :ok =
+          append_event(scope, run, nil, "process.definition_restored", %{
+            "definition_key" => run.definition_key,
+            "definition_version" => run.definition_version
+          })
+
+        run
+      else
+        run
+      end
+
+    {:ok, run} = settle(scope, run, items, dependencies, time)
+    {:ok, run_fact(run)}
   end
 
   def complete(scope, run_id, item_ref, request) do
@@ -693,22 +745,36 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     lock? = operation != :read
 
     write(scope, fn ->
-      with {:ok, candidate} <- scoped_run(scope, run_id, false),
-           {:ok, ref} <-
-             Definitions.subject(%{type: candidate.subject_type, id: candidate.subject_id}),
-           {:ok, subject} <- load(scope, ref, if(lock?, do: :lock, else: :read)),
-           {:ok, run} <- if(lock?, do: scoped_run(scope, run_id, true), else: {:ok, candidate}),
-           true <-
-             run.subject_type == candidate.subject_type and run.subject_id == candidate.subject_id,
-           {:ok, definition} <- supported(run, ref, lock?),
-           :ok <- authorize(scope, ref, subject, definition, run, operation),
-           {:ok, items, dependencies} <- graph(scope, run, definition, lock?) do
-        fun.(run, items, dependencies, definition)
-      else
-        false -> {:error, :run_identity_changed}
-        {:error, _} = error -> error
+      authorizer = &authorize(scope, &1, &2, &3, &4, operation)
+
+      case proven_run(scope, run_id, lock?, authorizer) do
+        {:ok, run, _ref, _subject, definition, items, dependencies} ->
+          fun.(run, items, dependencies, definition)
+
+        {:error, _} = error ->
+          error
       end
     end)
+  end
+
+  # Subject -> run -> graph, in lock order, with the owner's authorization
+  # asked after the definition is proved and before the graph is loaded.
+  defp proven_run(scope, run_id, lock?, authorizer) do
+    with {:ok, candidate} <- scoped_run(scope, run_id, false),
+         {:ok, ref} <-
+           Definitions.subject(%{type: candidate.subject_type, id: candidate.subject_id}),
+         {:ok, subject} <- load(scope, ref, if(lock?, do: :lock, else: :read)),
+         {:ok, run} <- if(lock?, do: scoped_run(scope, run_id, true), else: {:ok, candidate}),
+         true <-
+           run.subject_type == candidate.subject_type and run.subject_id == candidate.subject_id,
+         {:ok, definition} <- supported(run, ref, lock?),
+         :ok <- authorizer.(ref, subject, definition, run),
+         {:ok, items, dependencies} <- graph(scope, run, definition, lock?) do
+      {:ok, run, ref, subject, definition, items, dependencies}
+    else
+      false -> {:error, :run_identity_changed}
+      {:error, _} = error -> error
+    end
   end
 
   defp scoped_run(scope, id, lock?) do
@@ -1261,14 +1327,14 @@ defmodule Bilimbi.Base.Workflow.Coordination do
     }
 
     event = %EventSchema{} |> Ecto.Changeset.change(attrs) |> Repo.insert!()
-    actor = Scope.actor(scope)
+    actor = Attribution.audit_actor(Scope.actor(scope))
 
     {:ok, _} =
       Audit.record_action(scope, %{
         event: "workflow." <> type,
         occurred_at: now(),
-        actor_type: Atom.to_string(actor.type),
-        actor_id: actor.user_id || 0,
+        actor_type: actor.actor_type,
+        actor_id: actor.actor_id,
         company_id: actor.company_id,
         impersonator_id: actor.impersonator_id,
         system_principal: actor.system_principal,

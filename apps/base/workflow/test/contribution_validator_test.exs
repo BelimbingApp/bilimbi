@@ -49,6 +49,35 @@ defmodule Bilimbi.Base.Workflow.ContributionValidatorTest do
     end
   end
 
+  test "transition listeners need an owned listener module, known subjects and unique keys" do
+    entry = TestFixtures.entry()
+    snapshot = ContributionRegistry.build!([entry.descriptor])
+
+    assert %{owner: "domain/example", subjects: ["example.record"]} =
+             snapshot.consumers.workflow.transition_listeners["example.notify"]
+
+    [listener] = entry.payload.transition_listeners
+
+    for {bad, message} <- [
+          {%{listener | subjects: ["other.record"]}, ~r/unknown subject/},
+          {%{listener | subjects: []}, ~r/needs subjects/},
+          {%{listener | adapter: TestContributions}, ~r/must implement/},
+          {Map.put(listener, :flows, []), ~r/unknown fields/}
+        ] do
+      assert_raise ArgumentError, message, fn ->
+        ContributionValidator.validate_contributions!([
+          put_in(entry.payload.transition_listeners, [bad])
+        ])
+      end
+    end
+
+    assert_raise ArgumentError, ~r/duplicate transition_listeners key/, fn ->
+      ContributionValidator.validate_contributions!([
+        put_in(entry.payload.transition_listeners, [listener, listener])
+      ])
+    end
+  end
+
   test "human actions need an owned subject, a handler behaviour and unique keys" do
     entry = TestFixtures.entry()
     [approve | _] = entry.payload.human_actions
