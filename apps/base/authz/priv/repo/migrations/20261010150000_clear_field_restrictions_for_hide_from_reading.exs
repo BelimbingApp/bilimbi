@@ -21,11 +21,17 @@ defmodule Bilimbi.Base.Authz.Migrations.ClearFieldRestrictionsForHideFromReading
   use Ecto.Migration
 
   def up do
-    execute("DELETE FROM base_authz_field_restriction_roles")
-    execute("DELETE FROM base_authz_field_restrictions")
+    schema = quote_identifier(prefix() || "public")
+
+    execute("DELETE FROM #{schema}.base_authz_field_restriction_roles")
+    execute("DELETE FROM #{schema}.base_authz_field_restrictions")
   end
 
-  def down do
-    :ok
+  # Rows written under the old reading are gone for good; the audit log
+  # names them.
+  def down, do: :ok
+
+  defp quote_identifier(identifier) do
+    ~s("#{String.replace(identifier, "\"", "\"\"")}")
   end
 end
