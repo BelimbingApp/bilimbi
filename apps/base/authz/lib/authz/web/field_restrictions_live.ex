@@ -18,8 +18,12 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
   three multiple and each shown as chips that can be removed in place. It
   reads the choice back in one sentence before it is saved. Several fields
   restricted together commit as one transaction and one row each. A row's
-  roles are changed in a second, smaller dialog, and removing a restriction
-  confirms through the shared dialog. Every write re-asks Authz for
+  roles are changed in a second, smaller dialog, which also offers to
+  remove the restriction; removing, from the row or from that dialog,
+  confirms through the shared dialog. Saving with no role left is not
+  offered: the dialog says to remove the restriction instead, so a
+  restriction never silently becomes one for nobody. Every write re-asks
+  Authz for
   `admin.authz.field.manage`, the capability the route is gated on, so a
   grant revoked while the page is open is refused.
   """
@@ -107,8 +111,13 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
     end
   end
 
+  # Asked from the list or from the edit dialog; the edit dialog closes so
+  # the confirmation is the one dialog open.
   def handle_event("request_remove", %{"id" => id}, socket) do
-    {:noreply, assign(socket, :pending_removal, find_restriction(socket, id))}
+    {:noreply,
+     socket
+     |> close_dialog()
+     |> assign(:pending_removal, find_restriction(socket, id))}
   end
 
   def handle_event("cancel_remove", _params, socket) do

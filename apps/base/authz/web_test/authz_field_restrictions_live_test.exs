@@ -209,6 +209,14 @@ defmodule BilimbiWeb.AuthzFieldRestrictionsLiveTest do
       "field_keys" => ["companies.email"]
     })
 
+    # The remove button reports the option under `option`, never `value`: a
+    # browser fills a pushed `value` from the button's own empty value, which
+    # is how the first chips could not be removed by a real click.
+    assert has_element?(
+             view,
+             "#field-restrictions-fields-chip-companies\\.email-remove[phx-value-option='companies.email']:not([phx-value-value])"
+           )
+
     view |> element("#field-restrictions-fields-chip-companies\\.email-remove") |> render_click()
     refute has_element?(view, "#field-restrictions-fields-chip-companies\\.email")
     assert has_element?(view, "#field-restrictions-save[disabled]")
@@ -223,6 +231,61 @@ defmodule BilimbiWeb.AuthzFieldRestrictionsLiveTest do
 
     view |> element("#field-restrictions-roles-chip-#{finance.id}-remove") |> render_click()
     refute has_element?(view, "#field-restrictions-roles-chip-#{finance.id}")
+    assert {:ok, []} = Authz.list_field_restrictions(operator)
+  end
+
+  test "the edit dialog removes the restriction instead of saving one for nobody", %{
+    conn: conn,
+    operator: operator
+  } do
+    finance = role!(operator, "Finance", "finance")
+    grant_capabilities!(@manage)
+
+    {:ok, [restriction]} =
+      Authz.put_field_restrictions(operator, [{"companies", "email"}], [finance.id])
+
+    {:ok, view, _html} = open(conn)
+    view |> element("#field-restriction-#{restriction.id}-edit") |> render_click()
+
+    assert has_element?(
+             view,
+             "#field-restrictions-outcome",
+             "Finance will read Companies › Email as Restricted"
+           )
+
+    # Dropping the last role leaves nothing to save: the dialog says what to
+    # do instead, and the button stays disabled.
+    view |> element("#field-restrictions-roles-chip-#{finance.id}-remove") |> render_click()
+    refute has_element?(view, "#field-restrictions-roles-chip-#{finance.id}")
+
+    assert has_element?(
+             view,
+             "#field-restrictions-outcome",
+             "No role is left. Use Remove restriction"
+           )
+
+    assert has_element?(view, "#field-restrictions-save[disabled]")
+
+    render_submit(view, "save", %{"restriction" => %{"role_ids" => []}})
+    assert {:ok, [%{role_ids: [finance_id]}]} = Authz.list_field_restrictions(operator)
+    assert finance_id == finance.id
+
+    # The demoted action hands over to the shared confirmation.
+    view |> element("#field-restrictions-remove", "Remove restriction") |> render_click()
+    refute has_element?(view, "#field-restrictions-dialog")
+
+    assert has_element?(
+             view,
+             "#field-restrictions-remove-confirm",
+             "Companies › Email will be visible to every role again"
+           )
+
+    view
+    |> element("#field-restrictions-remove-confirm button", "Remove restriction")
+    |> render_click()
+
+    assert has_element?(view, "#flash-success", "Companies › Email is no longer restricted.")
+    assert has_element?(view, "#field-restrictions-empty")
     assert {:ok, []} = Authz.list_field_restrictions(operator)
   end
 

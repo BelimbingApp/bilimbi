@@ -162,7 +162,8 @@
           on_cancel={JS.push("close_dialog")}
         >
           <:description>
-            The field stays restricted; only the roles it is restricted for change.
+            Change the roles the field is restricted for, or remove the restriction so every
+            role sees the value again.
           </:description>
           <.form
             for={@form}
@@ -183,26 +184,41 @@
             />
 
             <p
-              :if={outcome_sentence([subject(restriction)], @chosen_roles)}
               id="field-restrictions-outcome"
               class="rounded-md bg-surface-sunken px-3 py-2 text-sm text-ink"
             >
-              {outcome_sentence([subject(restriction)], @chosen_roles)}
+              {outcome_sentence([subject(restriction)], @chosen_roles) ||
+                gettext(
+                  "No role is left. Use Remove restriction to let every role see the value."
+                )}
             </p>
 
-            <div class="flex justify-end gap-2">
-              <.button id="field-restrictions-cancel" type="button" phx-click="close_dialog">
-                Cancel
-              </.button>
+            <%!-- Removing is the demoted action of this dialog: a calm danger
+                 text control on the left, the shared confirmation after it. --%>
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <.button
-                id="field-restrictions-save"
-                type="submit"
-                variant="primary"
-                disabled={@chosen_roles == []}
-                phx-disable-with="Saving…"
+                id="field-restrictions-remove"
+                type="button"
+                variant="danger"
+                phx-click="request_remove"
+                phx-value-id={restriction.id}
               >
-                Save roles
+                Remove restriction
               </.button>
+              <div class="flex gap-2">
+                <.button id="field-restrictions-cancel" type="button" phx-click="close_dialog">
+                  Cancel
+                </.button>
+                <.button
+                  id="field-restrictions-save"
+                  type="submit"
+                  variant="primary"
+                  disabled={@chosen_roles == []}
+                  phx-disable-with="Saving…"
+                >
+                  Save roles
+                </.button>
+              </div>
             </div>
           </.form>
         </.modal>
