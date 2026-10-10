@@ -52,8 +52,8 @@ multiple; the fields picked together commit as one transaction and one
 restriction each (`Authz.put_field_restrictions/3`). The roles chosen are
 the ones that keep seeing the field, never the ones it is hidden from: that
 reading fails closed for a role created later and lets the marker name the
-roles to ask for. The vocabulary is `Bilimbi.Base.Grid`'s catalog of tables and
-fields; Base Authz reads that snapshot as data and depends on no Grid
+roles to ask for. The vocabulary is `Bilimbi.Base.Grid`'s catalog of tables
+and fields; Base Authz reads that snapshot as data and depends on no Grid
 module. The picker never offers a field every reader needs: a table's key,
 label and time fields, hidden fields, fields a link joins on, and fields the
 owning module marked `protected: true` (`Bilimbi.Base.Grid.Field`).
@@ -61,9 +61,10 @@ owning module marked `protected: true` (`Bilimbi.Base.Grid.Field`).
 A restriction is tenant-scoped runtime data in the Bilimbi-only
 `base_authz_field_restrictions` and `base_authz_field_restriction_roles`
 tables (`Authz.put_field_restriction/4`, `put_field_restrictions/3`,
-`remove_field_restriction/2`, `list_field_restrictions/1`). Each write commits with a retained
-`authz.field_restriction.set` or `.removed` audit action naming who
-restricted what to which roles, and the rows are audited like every write.
+`remove_field_restriction/2`, `list_field_restrictions/1`). Each write commits
+with a retained `authz.field_restriction.set` or `.removed` audit action
+naming who restricted what to which roles, and the rows are audited like every
+write.
 
 For a reader, `Authz.restricted_fields/1` answers `%{table => %{field =>
 [role names]}}` from the roles assigned to the scope's actor in the company
