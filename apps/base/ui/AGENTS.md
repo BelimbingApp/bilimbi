@@ -120,9 +120,11 @@ it at a call site. See the component comment in
 
 A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip: the section uses `<.card>`, `<.section_heading>` and `<.empty_state>`, and the entry rows stay local, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
 
-## Maintaining this file
-
-Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.
+## Badges, rows and buttons
 
 A badge that names a type, role, category or kind is `<.badge dot={false}>`; the dot belongs to a status badge only (`badge/1`). A list row whose name is a `<.record_link>` carries no view eye or edit pencil that leads to the same page; keep only actions that do something else, such as delete. A destructive icon button is `<.icon_button kind={:danger}>`, which is grey at rest and red on hover and focus; do not colour it red with a class.
 A list page's header create action is `<.create_button noun="Company">` ("+ Company", no verb); do not hand-write a primary `<.button>` with its own verb and plus icon (`create_button/1`).
+
+## Maintaining this file
+
+Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.

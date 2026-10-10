@@ -382,7 +382,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             <.create_button
               :if={allowed?(@current_scope, "admin.employee-type.create")}
               id="employee-type-new"
-              noun="Type"
+              noun="Employee Type"
               navigate={~p"/employee-types/new"}
             />
           </:actions>
