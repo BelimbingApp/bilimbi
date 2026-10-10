@@ -59,7 +59,8 @@ A production release has no Mix; `scripts/setup-native.sh adopt` and
 `scripts/setup-docker.sh adopt` run the same sequence as
 `BilimbiWeb.Release.verify()`, `adopt()`, `remap_dry_run()` and `remap()`
 before `migrate()` (see [Deployment](./deploy/README.md)), and `migrate()`
-refuses a database that has not been adopted.
+refuses a database that has not been adopted, as `mix bilimbi.migrate` and
+the development server's start-up migrate do.
 
 Adoption refuses schema drift and records the verified baselines in
 `bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.

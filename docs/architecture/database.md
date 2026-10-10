@@ -188,13 +188,22 @@ The normal operational commands are:
 
 | Command | Purpose |
 | --- | --- |
-| `mix bilimbi.migrate` | Run every pending installed migration through the shared Repo after disposition and ledger validation. |
+| `mix bilimbi.migrate` | Run every pending installed migration through the shared Repo after disposition and ledger validation. Refuses an unadopted Belimbing database. |
 | `mix bilimbi.migrations` | Display installed Bilimbi migration status. |
 | `mix bilimbi.rollback` | Roll back installed migrations using all discovered migration paths and the shared ledger. |
 | `mix bilimbi.schema.verify` | Read-only verification of owned structure, contributions, and live-data invariants. |
 | `mix bilimbi.schema.adopt` | Re-verify an existing Belimbing schema and record only compatible-baseline versions without executing their DDL. |
 | `mix bilimbi.cutover.remap` | Remap adopted Belimbing stored values Bilimbi reads differently, and report the residue. Run once at cutover, after adoption. |
 | `mix bilimbi.seeds.run` | Run installed production seed providers through the separate production-seed ledger. |
+
+In development `mix bilimbi.server` runs `mix bilimbi.migrate` before it
+starts Phoenix and `mix bilimbi.dev.seed --at-startup` (the production seeds
+through their ledger, then the development identity) once it is up
+(`--no-migrate` skips both), and a running development server
+refuses a request with a pending-migrations page, naming the versions and the
+command, when installed migrations are missing from the ledger
+(`BilimbiWeb.CheckPendingMigrations`). Production migrates only through the
+release command.
 
 Run migrations through these Bilimbi tasks rather than a single module path.
 The installed graph is validated before migration paths are exposed;
@@ -230,7 +239,8 @@ runs the same work without Mix through
 `bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and
 `bin/bilimbi eval "BilimbiWeb.Release.seed()"`. It also offers `verify()`,
 `adopt()`, `remap_dry_run()` and `remap()` for an existing Belimbing database,
-and `migrate()` refuses one that is not yet adopted.
+and `migrate()`, like `mix bilimbi.migrate`, refuses one that is not yet
+adopted.
 
 ## Compatibility lifecycle
 
