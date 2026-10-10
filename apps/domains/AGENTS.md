@@ -8,7 +8,7 @@ Each immediate child is one independently sourced Domain repository and installa
 
 Use stable logical IDs and declared dependencies. A Domain may depend on Base, Core, and a Domain whose public contract a real business invariant requires. It must not depend on an Extension or reach into another module's private schema or queries. Keep customer-specific integration in an Extension unless a confirmed shared workflow belongs in the Domain.
 
-Domain code uses only meta-terms, such as material, material type, resource, resource type, property, operation, and role. Specific industry, material, product, equipment, or line names are configuration data: never code identifiers, schema constants, or fixed inclusion lists. Anything a company might name differently must be configurable.
+Domain code uses only meta-terms, such as material, material type, resource, resource type, property, operation, and role. Specific industry, material, product, equipment, or line names are configuration data: never code identifiers, schema constants, or fixed inclusion lists. Anything a company might name differently must be configurable. A Domain's agent operation keys, titles, summaries and guides (`agent_api` contribution, ADR 0021) use meta-terms too; a company's own wording for them belongs in `keywords` the module reads from its configuration.
 
 ## Repository names
 
