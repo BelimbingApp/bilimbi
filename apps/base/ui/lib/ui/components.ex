@@ -355,14 +355,17 @@ defmodule Bilimbi.Base.UI.Components do
 
   def badge(assigns) do
     ~H"""
-    <span data-badge class={[
-      "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-      @kind == :neutral && "bg-surface-muted text-ink-muted",
-      @kind == :success && "bg-success-surface text-success-ink",
-      @kind == :warning && "bg-warning-surface text-warning-ink",
-      @kind == :danger && "bg-danger-surface text-danger-ink",
-      @class
-    ]}>
+    <span
+      data-badge
+      class={[
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+        @kind == :neutral && "bg-surface-muted text-ink-muted",
+        @kind == :success && "bg-success-surface text-success-ink",
+        @kind == :warning && "bg-warning-surface text-warning-ink",
+        @kind == :danger && "bg-danger-surface text-danger-ink",
+        @class
+      ]}
+    >
       <span class="size-1.5 rounded-full bg-current opacity-70"></span>
       {render_slot(@inner_block)}
     </span>
