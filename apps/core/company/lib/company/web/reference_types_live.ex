@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.Params
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.LegalEntityType
@@ -18,6 +19,8 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
   @create_capability "admin.company.create"
   @update_capability "admin.company.update"
   @delete_capability "admin.company.delete"
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -45,16 +48,16 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
        |> assign(:active_nav, spec.active_nav)
        |> assign(:reference_path, path)
        |> assign(:spec, spec)
+       |> assign(:columns, ListColumns.mount(spec.dom.table, reference_columns(spec)))
        |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
        |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
        |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
-       |> assign(:types_count, length(types))
        |> assign(:selected_category, "all")
        |> assign(:modal_action, nil)
        |> assign(:editing_type, nil)
        |> assign(:pending_delete, nil)
        |> assign_form(nil)
-       |> stream(:types, types, reset: true)}
+       |> load_types(types)}
     end
   end
 
@@ -66,10 +69,16 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
       {:noreply,
        socket
        |> assign(:selected_category, category)
-       |> assign(:types_count, length(types))
-       |> stream(:types, types, reset: true)}
+       |> load_types(types)}
     else
       {:noreply, socket}
+    end
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
     end
   end
 
@@ -253,9 +262,8 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
          |> put_flash(:success, spec.created)
          |> assign(:modal_action, nil)
          |> assign(:editing_type, nil)
-         |> assign(:types_count, length(types))
          |> assign_form(nil)
-         |> stream(:types, types, reset: true)}
+         |> load_types(types)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -271,13 +279,15 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
 
     case update(spec, scope, type, params) do
       {:ok, updated_type} ->
+        {:ok, types} = list_types(spec, socket.assigns.selected_category)
+
         {:noreply,
          socket
          |> put_flash(:success, spec.updated)
          |> assign(:modal_action, nil)
          |> assign(:editing_type, nil)
          |> assign_form(nil)
-         |> stream_insert(:types, updated_type)}
+         |> load_types(replace_type(types, updated_type))}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -299,10 +309,12 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
     with {:ok, type_id} <- Params.positive_id(id),
          {:ok, updated_type} <-
            toggle(spec, socket.assigns.current_scope.scope, type_id) do
+      {:ok, types} = list_types(spec, socket.assigns.selected_category)
+
       {:noreply,
        socket
        |> put_flash(:success, "Status updated successfully.")
-       |> stream_insert(:types, updated_type)}
+       |> load_types(replace_type(types, updated_type))}
     else
       {:error, :forbidden} ->
         write_forbidden(socket)
@@ -341,8 +353,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
         {:noreply,
          socket
          |> put_flash(:success, spec.deleted)
-         |> assign(:types_count, length(types))
-         |> stream(:types, types, reset: true)}
+         |> load_types(types)}
 
       {:error, :in_use} ->
         {:noreply, put_flash(socket, :error, spec.in_use.(type))}
@@ -382,6 +393,26 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
     do: Company.list_department_types(category: category)
 
   defp list_types(%{kind: :legal_entity_type}, _category), do: Company.list_legal_entity_types()
+
+  defp reference_columns(spec) do
+    base = [%{id: "code", label: "Code"}, %{id: "name", label: "Name"}]
+    category = if spec.category?, do: [%{id: "category", label: "Category"}], else: []
+
+    base ++
+      category ++
+      [%{id: "description", label: "Description"}, %{id: "is_active", label: "Status"}]
+  end
+
+  defp load_types(socket, types) do
+    socket
+    |> assign(:types_count, length(types))
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, types, & &1.id))
+    |> stream(:types, types, reset: true)
+  end
+
+  defp replace_type(types, updated_type) do
+    Enum.map(types, fn type -> if type.id == updated_type.id, do: updated_type, else: type end)
+  end
 
   defp get_type(%{kind: :department_type}, id), do: Company.get_department_type(id)
   defp get_type(%{kind: :legal_entity_type}, id), do: Company.get_legal_entity_type(id)
@@ -563,34 +594,38 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
         </div>
 
         <.card id={@spec.dom.card} inner_class="p-0">
-          <.table
+          <.flex_table
             id={@spec.dom.table}
-            rows={@streams.types}
-            row_id={fn {id, _} -> id end}
-            row_item={fn {_, type} -> type end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            event="grid"
             caption={@spec.caption}
             framed={false}
           >
-            <:col :let={type} label="Code">
+            <:col :let={%{record: type}} id="code">
               <code class="text-xs font-medium">{type.code}</code>
             </:col>
-            <:col :let={type} label="Name">
+            <:col :let={%{record: type}} id="name">
               <span class="font-medium text-ink-strong">{type.name}</span>
             </:col>
-            <:col :let={type} :if={@spec.category?} label="Category">
+            <:col :let={%{record: type}} :if={@spec.category?} id="category">
               <.badge kind={:neutral}>
                 {String.capitalize(type.category)}
               </.badge>
             </:col>
-            <:col :let={type} label="Description">
+            <:col :let={%{record: type}} id="description">
               <span class="text-xs text-ink-subtle">{type.description || "—"}</span>
             </:col>
-            <:col :let={type} label="Status">
+            <:col :let={%{record: type}} id="is_active">
               <.badge kind={if type.is_active, do: :success, else: :neutral}>
                 {if type.is_active, do: "active", else: "inactive"}
               </.badge>
             </:col>
-            <:action :let={type}>
+            <:action :let={%{record: type}}>
               <div class="flex items-center gap-2">
                 <button
                   :if={@can_update?}
@@ -624,7 +659,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
             <:empty :if={@types_count == 0}>
               {@spec.empty}
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <.modal

@@ -115,6 +115,8 @@ rises out of the card, and the card's headroom for it is the `data-unframed`
 rule in `apps/web/assets/css/app.css`: do not add a margin or padding for
 it at a call site. See the component comment in
 `lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
+For a list without a Grid catalog, use `Bilimbi.Base.UI.ListColumns` to feed
+the same notch and built-in column controls; do not make a page-local picker.
 
 ## Summaries
 

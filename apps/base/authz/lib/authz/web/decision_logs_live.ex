@@ -22,6 +22,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -49,10 +50,55 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
           page_size_param: "per_page",
           filters: [result: {:one_of, ~w(allowed denied), ""}]
         )
+  @builtins [
+    %{
+      id: "occurred_at",
+      label: "When",
+      type: :datetime,
+      sort: "occurred_at",
+      sort_id: "logs-sort-occurred_at"
+    },
+    %{
+      id: "actor_type",
+      label: "Actor",
+      type: :string,
+      sort: "actor_type",
+      sort_id: "logs-sort-actor_type"
+    },
+    %{
+      id: "capability",
+      label: "Capability",
+      type: :string,
+      sort: "capability",
+      sort_id: "logs-sort-capability"
+    },
+    %{
+      id: "allowed",
+      label: "Result",
+      type: :string,
+      sort: "allowed",
+      sort_id: "logs-sort-allowed"
+    },
+    %{id: "reason", label: "Reason", type: :string, sort: "reason", sort_id: "logs-sort-reason"},
+    %{
+      id: "resource",
+      label: "Resource",
+      type: :string,
+      sort: "resource",
+      sort_id: "logs-sort-resource"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Decision Logs", reach_caution?: reach_caution?(socket))}
+    {:ok,
+     assign(socket,
+       page_title: "Decision Logs",
+       reach_caution?: reach_caution?(socket),
+       columns: ListColumns.mount("decision-logs", @builtins)
+     )}
   end
 
   @impl true
@@ -69,8 +115,8 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   end
 
   @impl true
-  # `<.table>` pushes the column as `phx-value-sort`, so the param is "sort"
-  # rather than the "column" this screen used while it hand-rolled its headers.
+  # The flexible table routes its sort operation through this event so the
+  # page keeps its existing URL sort state.
   def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
 
@@ -81,6 +127,14 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -115,6 +169,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
       |> assign(:filters_form, ListState.filters_form(state))
       |> stream(:logs, page.entries, reset: true)
     end

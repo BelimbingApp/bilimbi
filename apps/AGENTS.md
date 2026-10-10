@@ -4,7 +4,9 @@ Read this before editing a LiveView, a template, or a test. The component that c
 
 ## Flexible columns on a list
 
-A list page that lets people add, remove and reorder columns or change
+List pages use `<.flex_table>` with the notch, not `<.table>`.
+
+A catalog-backed list page that lets people add, remove and reorder columns or change
 the row height renders `<.flex_table>` through
 `Bilimbi.Base.Grid.Web.PageColumns`: declare the page's own columns as
 built-ins, merge `PageColumns.params/1` into every path the page patches
@@ -18,6 +20,8 @@ on `flex_table/1` own the contract. There is no standalone grid page: a
 table is explored on the list that already owns its rows. A module puts its
 tables in the catalog through a `:grid` contribution and a
 `Bilimbi.Base.Grid.Source`; see `apps/base/grid/docs/README.md`.
+A list without a Grid catalog uses `Bilimbi.Base.UI.ListColumns` for its
+built-in columns and row height.
 
 ## List filters and pagination
 

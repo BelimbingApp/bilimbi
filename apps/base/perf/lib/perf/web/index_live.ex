@@ -4,17 +4,42 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Perf
+  alias Bilimbi.Base.UI.ListColumns
 
   @page_sizes [25, 50, 100, 300]
+  @regression_columns [
+    %{id: "identity", label: "Route / worker", type: :string},
+    %{id: "baseline", label: "Baseline avg", type: :float, align: :right},
+    %{id: "current", label: "Current p95", type: :float, align: :right},
+    %{id: "change", label: "Change", type: :float, align: :right}
+  ]
+  @sample_columns [
+    %{id: "observed_at", label: "Observed", type: :datetime},
+    %{id: "kind", label: "Kind", type: :string},
+    %{id: "identity", label: "Route / worker", type: :string},
+    %{id: "outcome", label: "Outcome", type: :string},
+    %{id: "duration", label: "Duration", type: :integer, align: :right},
+    %{id: "database", label: "DB", type: :integer, align: :right}
+  ]
+
+  @write_guard_opt_out ~w(regressions_grid samples_grid)
 
   @impl true
   def mount(_params, _session, socket) do
+    regressions = recent_regressions()
+
     {:ok,
      socket
      |> assign(:page_title, "Performance")
      |> assign(:page_sizes, @page_sizes)
      |> assign(:diagnostics, Perf.diagnostics())
-     |> assign(:regressions, recent_regressions())
+     |> assign(:regressions, regressions)
+     |> assign(
+       :regression_columns,
+       ListColumns.mount("performance-regression-table", @regression_columns)
+       |> ListColumns.load(regressions, & &1.identity)
+     )
+     |> assign(:sample_columns, ListColumns.mount("performance-sample-table", @sample_columns))
      |> assign(:filters, default_filters())
      |> assign(:filters_form, filters_form(default_filters()))
      |> assign(:samples_page, empty_page())
@@ -38,6 +63,8 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
             {:noreply, push_patch(socket, to: filter_path(%{filters | page: 1}))}
 
           true ->
+            regressions = recent_regressions()
+
             {:noreply,
              socket
              |> assign(:filters, filters)
@@ -45,7 +72,15 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
              |> assign(:samples_page, samples_page(page, total_pages))
              |> assign(:total, page.total)
              |> assign(:diagnostics, Perf.diagnostics())
-             |> assign(:regressions, recent_regressions())
+             |> assign(:regressions, regressions)
+             |> assign(
+               :regression_columns,
+               ListColumns.load(socket.assigns.regression_columns, regressions, & &1.identity)
+             )
+             |> assign(
+               :sample_columns,
+               ListColumns.load(socket.assigns.sample_columns, page.entries, & &1.id)
+             )
              |> stream(:samples, page.entries, reset: true)}
         end
 
@@ -56,6 +91,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
          |> assign(:filters_form, filters_form(filters))
          |> assign(:samples_page, empty_page())
          |> assign(:total, 0)
+         |> assign(:sample_columns, ListColumns.load(socket.assigns.sample_columns, [], & &1.id))
          |> put_flash(:error, "Performance history is unavailable.")
          |> stream(:samples, [], reset: true)}
     end
@@ -70,6 +106,20 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
   def handle_event("page", %{"page" => page}, socket) do
     filters = socket.assigns.filters
     {:noreply, push_patch(socket, to: filter_path(%{filters | page: positive_integer(page, 1)}))}
+  end
+
+  def handle_event("regressions_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.regression_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :regression_columns, columns)}
+      _other -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("samples_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.sample_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :sample_columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   defp default_filters, do: %{kind: "", outcome: "", identity: "", page: 1, page_size: 25}

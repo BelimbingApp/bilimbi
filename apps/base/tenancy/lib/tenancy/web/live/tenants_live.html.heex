@@ -26,35 +26,40 @@
     </.header>
 
     <.card id="tenants-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="tenants"
-        rows={@streams.tenants}
-        row_id={fn {id, _} -> id end}
-        row_item={fn {_, tenant} -> tenant end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"tenants-#{&1}"}
+        caption="Tenants"
         sort_by={@sort_by}
         sort_dir={@sort_dir}
-        framed={false}
       >
-        <:col :let={tenant} label="ID" sort="id" sort_id="tenants-sort-id">
+        <:col :let={%{record: tenant}} id="id">
           <span class="tabular-nums text-ink-muted">{tenant.id}</span>
         </:col>
-        <:col :let={tenant} label="Name" sort="name" sort_id="tenants-sort-name">
+        <:col :let={%{record: tenant}} id="name">
           <span class="font-medium text-ink-strong">{tenant.name}</span>
           <.badge :if={tenant.is_platform_operator} class="ml-2">Platform operator</.badge>
         </:col>
-        <:col :let={tenant} label="Parent">
+        <:col :let={%{record: tenant}} id="parent">
           <span class="text-ink-muted">{tenant.parent_name || "—"}</span>
         </:col>
-        <:col :let={tenant} label="Sub-tenants">
+        <:col :let={%{record: tenant}} id="sub_tenants">
           <span class="tabular-nums text-ink-muted">{tenant.children_count}</span>
         </:col>
-        <:col :let={tenant} label="Status" sort="status" sort_id="tenants-sort-status">
+        <:col :let={%{record: tenant}} id="status">
           <.badge kind={status_kind(tenant.status)}>{status_label(tenant.status)}</.badge>
         </:col>
         <:empty :if={@tenants_count == 0}>
           No tenants found.
         </:empty>
-      </.table>
+      </.flex_table>
     </.card>
   </.page>
 

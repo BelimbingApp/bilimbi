@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -31,6 +32,21 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
           page_size_param: "page_size",
           invalid_page_size: :default
         )
+  @builtins [
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "roles-sort-name"},
+    %{id: "code", label: "Code", type: :string, sort: "code", sort_id: "roles-sort-code"},
+    %{
+      id: "is_system",
+      label: "Scope",
+      type: :string,
+      sort: "is_system",
+      sort_id: "roles-sort-is_system"
+    },
+    %{id: "capabilities", label: "Capabilities", type: :integer, align: :right},
+    %{id: "principals", label: "Principals", type: :integer, align: :right}
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -38,7 +54,8 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
      assign(socket,
        page_title: "Roles",
        can_create?: allowed?(socket.assigns.current_scope, "admin.authz.role.create"),
-       reach_caution?: reach_caution?(socket)
+       reach_caution?: reach_caution?(socket),
+       columns: ListColumns.mount("roles", @builtins)
      )}
   end
 
@@ -52,9 +69,8 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
     {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
-  # The shared `<.table>` pushes the column as `phx-value-sort`, so the param is
-  # "sort" rather than the "column" this screen used while it hand-rolled its
-  # own header buttons.
+  # The flexible table routes its sort operation through this event so this
+  # page keeps the same URL sort state as its former table headings.
   @impl true
   def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
@@ -66,6 +82,14 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -99,6 +123,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
       |> assign(:filters_form, ListState.filters_form(state))
       |> stream(:roles, page.entries, reset: true)
     end

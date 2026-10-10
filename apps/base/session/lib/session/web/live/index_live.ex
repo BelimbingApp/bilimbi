@@ -29,6 +29,7 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Page
+  alias Bilimbi.Base.UI.ListColumns
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
@@ -40,6 +41,39 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
     "last_activity" => :last_activity
   }
   @manage_cap "admin.system.session.manage"
+  @builtins [
+    %{
+      id: "user_id",
+      label: "User",
+      type: :string,
+      sort: "user_id",
+      sort_id: "sessions-sort-user_id"
+    },
+    %{
+      id: "ip_address",
+      label: "IP Address",
+      type: :string,
+      sort: "ip_address",
+      sort_id: "sessions-sort-ip_address"
+    },
+    %{
+      id: "user_agent",
+      label: "User Agent",
+      type: :string,
+      sort: "user_agent",
+      sort_id: "sessions-sort-user_agent"
+    },
+    %{
+      id: "last_activity",
+      label: "Last Activity",
+      type: :datetime,
+      sort: "last_activity",
+      sort_id: "sessions-sort-last_activity"
+    },
+    %{id: "status", label: "Status", type: :string}
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   defmodule State do
     @moduledoc false
@@ -61,6 +95,7 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, %State{})
      |> assign(:sessions_page, empty_page())
+     |> assign(:columns, ListColumns.mount("sessions", @builtins))
      |> assign(:user_names, %{})
      |> assign(:pending_terminate, nil)
      |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
@@ -92,6 +127,14 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     {:noreply,
      push_patch(socket, to: sessions_path(next_sort(socket.assigns.index_state, sort_by)))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -195,6 +238,7 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
         socket
         |> assign(:index_state, state)
         |> assign(:sessions_page, page)
+        |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
         |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
         |> assign(:user_names, user_names(socket, page.entries))
         |> stream(:sessions, page.entries, reset: true)

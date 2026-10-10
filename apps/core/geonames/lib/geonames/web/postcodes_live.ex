@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.Web.CamelList
@@ -11,6 +12,23 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   import Bilimbi.Core.Geonames.Web.Components
 
   @page_sizes [25, 50, 100, 300]
+  @builtins [
+    %{
+      id: "country_name",
+      label: "Country",
+      sort: "country_name",
+      sort_id: "postcodes-sort-country"
+    },
+    %{id: "postcode", label: "Postcode", sort: "postcode", sort_id: "postcodes-sort-postcode"},
+    %{id: "place_name", label: "Place Name", sort: "place_name", sort_id: "postcodes-sort-place"},
+    %{
+      id: "admin1_code",
+      label: "Admin1 Code",
+      sort: "admin1_code",
+      sort_id: "postcodes-sort-admin1"
+    },
+    %{id: "updated_at", label: "Updated", sort: "updated_at", sort_id: "postcodes-sort-updated"}
+  ]
   @list ListState.spec!(
           sortable: %{
             country_name: :asc,
@@ -38,11 +56,13 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
              invalid_page_size: :default
            )
   @update_capability "admin.geonames.update"
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(:columns, ListColumns.mount("postcodes-table", @builtins))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
      |> assign(:modal_action, nil)
      |> assign(:editing_postcode_id, nil)
@@ -66,6 +86,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     state = ListState.next_sort(socket.assigns.index_state, sort_by)
     {:noreply, push_patch(socket, to: postcodes_path(state, socket.assigns.summary_state))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
   end
 
   def handle_event("sort-summary", %{"sort" => sort_by}, socket) do
@@ -248,34 +276,39 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
         </.filter_toolbar>
 
         <.card id="postcodes-card" inner_class="p-0">
-          <.table
+          <.flex_table
             id="postcodes-table"
-            rows={@streams.postcodes}
-            row_id={fn {id, _postcode} -> id end}
-            row_item={fn {_id, postcode} -> postcode end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"postcode-#{&1}"}
+            event="grid"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
             caption="Geonames postcodes"
           >
-            <:col :let={postcode} label="Country" sort="country_name" sort_id="postcodes-sort-country">
+            <:col :let={%{record: postcode}} id="country_name">
               <div class="whitespace-nowrap text-ink-muted">
                 <span class="font-mono text-xs">{postcode.country_iso}</span>
                 <span class="ml-1">{postcode.country_name || postcode.country_iso}</span>
               </div>
             </:col>
-            <:col :let={postcode} label="Postcode" sort="postcode" sort_id="postcodes-sort-postcode">
+            <:col :let={%{record: postcode}} id="postcode">
               <div class="flex items-center gap-1.5 whitespace-nowrap">
                 <span class="font-medium tabular-nums text-ink">{postcode.postcode}</span>
                 <span
-                  :if={postcode.provenance == :operator}
+                  :if={@columns.mode == :normal and postcode.provenance == :operator}
                   class="rounded-md border border-line bg-brand-surface px-1 py-0.5 text-[0.6875rem] text-ink-muted"
                 >
                   Local
                 </span>
               </div>
             </:col>
-            <:col :let={postcode} label="Place Name" sort="place_name" sort_id="postcodes-sort-place">
+            <:col :let={%{record: postcode}} id="place_name">
               <.inline_edit
                 :if={@can_update?}
                 id={"postcode-#{postcode.id}-place-name"}
@@ -290,14 +323,12 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
               </span>
             </:col>
             <:col
-              :let={postcode}
-              label="Admin1 Code"
-              sort="admin1_code"
-              sort_id="postcodes-sort-admin1"
+              :let={%{record: postcode}}
+              id="admin1_code"
             >
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{postcode.admin1_code || "—"}</span>
             </:col>
-            <:col :let={postcode} label="Updated" sort="updated_at" sort_id="postcodes-sort-updated">
+            <:col :let={%{record: postcode}} id="updated_at">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
                 <.datetime
                   id={"postcode-#{postcode.id}-updated"}
@@ -306,7 +337,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                 />
               </span>
             </:col>
-            <:action :let={postcode} :if={@can_update?}>
+            <:action :let={%{record: postcode}} :if={@can_update?}>
               <.icon_button
                 icon="edit"
                 label={"Edit #{postcode.postcode}"}
@@ -318,7 +349,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             <:empty :if={@postcodes_page.entries == []}>
               No postcodes found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="postcodes-pagination"
@@ -450,6 +481,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> assign(:summary_state, summary)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, postcodes_page.entries, & &1.id))
     |> stream(:postcodes, postcodes_page.entries, reset: true)
   end
 
@@ -508,9 +540,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   defp save_postcode_place(socket, reference, place_name) do
     with [id, revision] <- String.split(to_string(reference), "|", parts: 2),
          {:ok, postcode} <- Geonames.update_postcode(id, revision, %{place_name: place_name}) do
+      page = socket.assigns.postcodes_page
+      entries = Enum.map(page.entries, &if(&1.id == postcode.id, do: postcode, else: &1))
+
       {:noreply,
        socket
        |> assign(:postcode_rows, Map.put(socket.assigns.postcode_rows, postcode.id, postcode))
+       |> assign(:postcodes_page, %{page | entries: entries})
+       |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
        |> stream_insert(:postcodes, postcode)
        |> put_flash(:success, "Postcode #{postcode.postcode} updated.")}
     else

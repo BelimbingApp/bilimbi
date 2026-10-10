@@ -17,17 +17,51 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
 
   use Bilimbi.Base.UI, :live_component
 
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Employee
 
   @page_sizes [25, 50, 100, 300]
+
+  @builtins [
+    %{
+      id: "full_name",
+      label: "Name",
+      sort: "full_name",
+      sort_id: "company-employees-sort-full-name"
+    },
+    %{
+      id: "employee_number",
+      label: "No.",
+      sort: "employee_number",
+      sort_id: "company-employees-sort-employee-number"
+    },
+    %{
+      id: "employee_type",
+      label: "Type",
+      sort: "employee_type",
+      sort_id: "company-employees-sort-employee-type"
+    },
+    %{id: "status", label: "Status", sort: "status", sort_id: "company-employees-sort-status"}
+  ]
+
+  @write_guard_opt_out ~w(employees_grid)
 
   @impl true
   def update(assigns, socket) do
     {:ok,
      socket
      |> assign(assigns)
+     |> assign_new(:columns, fn -> ListColumns.mount("company-employees", @builtins) end)
      |> reload()}
+  end
+
+  @impl true
+  def handle_event("employees_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
+    end
   end
 
   # Deliberately strict, matching the address panel (#409): the company page
@@ -46,6 +80,7 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
     |> assign(:employees, employees)
     |> assign(:employees_count, length(employees))
     |> assign(:employees_page, employees_page)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, employees_page.entries, & &1.id))
     |> assign(:page_sizes, page_sizes)
     |> assign(:filters_form, ListState.filters_form(table_state, as: :employees_filters))
   end
@@ -54,76 +89,82 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <.card class="mt-6">
-        <div class="flex items-center gap-2 mb-4">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-            Employees
-          </h3>
-          <.badge>{@employees_count}</.badge>
-        </div>
-        <.form
-          for={@filters_form}
-          id="company-employees-filters"
-          phx-change="employees_filters"
-          class="mb-2"
-        >
-          <div class="relative">
-            <.icon
-              name="search"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="company-employees-search"
-              type="search"
-              phx-debounce="300"
-              maxlength="255"
-              label="Search employees"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by name, employee number, email, designation..."
-              class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
-            />
+      <.card class="mt-6" inner_class="p-0">
+        <div class="p-4 pb-2">
+          <div class="mb-4 flex items-center gap-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Employees
+            </h3>
+            <.badge>{@employees_count}</.badge>
           </div>
-        </.form>
-        <.table
+          <.form
+            for={@filters_form}
+            id="company-employees-filters"
+            phx-change="employees_filters"
+            class="mb-2"
+          >
+            <div class="relative">
+              <.icon
+                name="search"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
+              <.input
+                field={@filters_form[:search]}
+                id="company-employees-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search employees"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search by name, employee number, email, designation..."
+                class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
+              />
+            </div>
+          </.form>
+        </div>
+        <.flex_table
           id="company-employees-table"
-          rows={@employees_page.entries}
-          row_id={fn employee -> "company-employee-#{employee.id}" end}
-          row_item={fn employee -> employee end}
+          columns={@columns.column_views}
+          rows={@columns.rows}
+          mode={@columns.mode}
+          zoom={@columns.zoom}
+          suggestions={@columns.suggestions}
+          add_query={@columns.add_query}
+          row_id={&"company-employee-#{&1}"}
+          event="employees_grid"
+          target={@myself}
           sort_by={@table_state.sort_by}
           sort_dir={@table_state.sort_dir}
           sort_event="employees_sort"
           caption="Employees"
+          framed={false}
         >
           <:col
-            :let={employee}
-            label="Name"
-            sort="full_name"
-            sort_id="company-employees-sort-full-name"
+            :let={%{record: employee}}
+            id="full_name"
           >
             <span class="font-medium">{employee.full_name}</span>
-            <span :if={employee.designation} class="block text-xs text-ink-subtle">
+            <span
+              :if={@columns.mode == :normal and not is_nil(employee.designation)}
+              class="block text-xs text-ink-subtle"
+            >
               {employee.designation}
             </span>
           </:col>
           <:col
-            :let={employee}
-            label="No."
-            sort="employee_number"
-            sort_id="company-employees-sort-employee-number"
+            :let={%{record: employee}}
+            id="employee_number"
           >
             <code class="text-xs font-medium">{employee.employee_number}</code>
           </:col>
           <:col
-            :let={employee}
-            label="Type"
-            sort="employee_type"
-            sort_id="company-employees-sort-employee-type"
+            :let={%{record: employee}}
+            id="employee_type"
           >
             {employee.employee_type_label || employee.employee_type}
           </:col>
-          <:col :let={employee} label="Status" sort="status" sort_id="company-employees-sort-status">
+          <:col :let={%{record: employee}} id="status">
             <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
               {employee.status}
             </.badge>
@@ -131,7 +172,7 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
           <:empty :if={@employees_page.total_entries == 0}>
             No employees found for this company.
           </:empty>
-        </.table>
+        </.flex_table>
         <.pagination
           id="company-employees-pagination"
           page={@employees_page}

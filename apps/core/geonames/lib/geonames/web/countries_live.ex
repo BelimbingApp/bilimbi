@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.Web.CamelList
@@ -11,6 +12,28 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   import Bilimbi.Core.Geonames.Web.Components
 
   @page_sizes [25, 50, 100, 300]
+  @builtins [
+    %{id: "iso", label: "ISO", sort: "iso", sort_id: "countries-sort-iso"},
+    %{id: "country", label: "Country", sort: "country", sort_id: "countries-sort-country"},
+    %{id: "capital", label: "Capital", sort: "capital", sort_id: "countries-sort-capital"},
+    %{id: "phone", label: "Phone", sort: "phone", sort_id: "countries-sort-phone"},
+    %{
+      id: "currency_code",
+      label: "Currency",
+      sort: "currency_code",
+      sort_id: "countries-sort-currency"
+    },
+    %{
+      id: "population",
+      label: "Population",
+      sort: "population",
+      sort_id: "countries-sort-population",
+      align: :right
+    },
+    %{id: "updated_at", label: "Updated", sort: "updated_at", sort_id: "countries-sort-updated"}
+  ]
+
+  @write_guard_opt_out ~w(grid)
   @list ListState.spec!(
           sortable: %{
             iso: :asc,
@@ -32,6 +55,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(:columns, ListColumns.mount("countries-table", @builtins))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
      |> assign(:updating_countries?, false)
      |> stream_configure(:countries, dom_id: &"country-#{&1.id}")}
@@ -71,6 +95,14 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
+
   def handle_event("page", %{"page" => page}, socket) do
     state =
       socket.assigns.index_state
@@ -106,9 +138,17 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   defp save_country_name(socket, id, name) do
     case Geonames.update_country_name(socket.assigns.current_scope.scope, id, name) do
       {:ok, updated_country} ->
+        page = socket.assigns.countries_page
+
+        entries =
+          Enum.map(page.entries, &if(&1.id == updated_country.id, do: updated_country, else: &1))
+
+        page = %{page | entries: entries}
+
         {:noreply,
          socket
-         |> stream_insert(:countries, updated_country)
+         |> assign(:countries_page, page)
+         |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
          |> put_flash(:success, "Country #{updated_country.iso} name updated.")}
 
       {:error, :forbidden} ->
@@ -196,20 +236,25 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         </.filter_toolbar>
 
         <.card id="countries-card" inner_class="p-0">
-          <.table
+          <.flex_table
             id="countries-table"
-            rows={@streams.countries}
-            row_id={fn {id, _country} -> id end}
-            row_item={fn {_id, country} -> country end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"country-#{&1}"}
+            event="grid"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
             caption="Countries"
           >
-            <:col :let={country} label="ISO" sort="iso" sort_id="countries-sort-iso">
+            <:col :let={%{record: country}} id="iso">
               <span class="whitespace-nowrap font-medium tabular-nums text-ink">{country.iso}</span>
             </:col>
-            <:col :let={country} label="Country" sort="country" sort_id="countries-sort-country">
+            <:col :let={%{record: country}} id="country">
               <.inline_edit
                 :if={@can_update?}
                 id={"country-#{country.id}-name"}
@@ -221,32 +266,27 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
               />
               <span :if={not @can_update?} class="font-medium text-ink">{country.country}</span>
             </:col>
-            <:col :let={country} label="Capital" sort="capital" sort_id="countries-sort-capital">
+            <:col :let={%{record: country}} id="capital">
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.capital || "—"}</span>
             </:col>
-            <:col :let={country} label="Phone" sort="phone" sort_id="countries-sort-phone">
+            <:col :let={%{record: country}} id="phone">
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.phone || "—"}</span>
             </:col>
             <:col
-              :let={country}
-              label="Currency"
-              sort="currency_code"
-              sort_id="countries-sort-currency"
+              :let={%{record: country}}
+              id="currency_code"
             >
               <span class="whitespace-nowrap text-ink-muted">{country.currency_code || "—"}</span>
             </:col>
             <:col
-              :let={country}
-              label="Population"
-              sort="population"
-              sort_id="countries-sort-population"
-              align={:right}
+              :let={%{record: country}}
+              id="population"
             >
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{format_integer(
                 country.population
               )}</span>
             </:col>
-            <:col :let={country} label="Updated" sort="updated_at" sort_id="countries-sort-updated">
+            <:col :let={%{record: country}} id="updated_at">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
                 <.datetime
                   id={"country-#{country.id}-updated"}
@@ -258,7 +298,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             <:empty :if={@countries_page.entries == []}>
               No countries found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="countries-pagination"
@@ -288,6 +328,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     |> assign(:countries_page, countries_page)
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, countries_page.entries, & &1.id))
     |> stream(:countries, countries_page.entries, reset: true)
   end
 

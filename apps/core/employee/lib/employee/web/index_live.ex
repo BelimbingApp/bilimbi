@@ -8,6 +8,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz.LiveAuthorization
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
   alias Bilimbi.Core.Company
@@ -15,6 +16,21 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   alias Bilimbi.Core.Employee.AdministrationPage
 
   @delete_capability "admin.employee.delete"
+
+  @builtins [
+    %{id: "full_name", label: "Name", sort: "full_name", sort_id: "employees-sort-name"},
+    %{id: "number", label: "No."},
+    %{id: "department", label: "Department"},
+    %{
+      id: "employee_type_label",
+      label: "Type",
+      sort: "employee_type_label",
+      sort_id: "employees-sort-type"
+    },
+    %{id: "status", label: "Status", sort: "status", sort_id: "employees-sort-status"}
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
@@ -52,6 +68,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, parse_list(%{}))
      |> assign(:employees_page, empty_page())
+     |> assign(:columns, ListColumns.mount("employees", @builtins))
      |> assign(:department_map, %{})
      |> assign(:pending_delete, nil)
      |> assign(:filters_form, ListState.filters_form(parse_list(%{})))}
@@ -86,6 +103,25 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   def handle_event("page", %{"page" => page}, socket) do
     state = ListState.put_page(socket.assigns.index_state, page)
     {:noreply, push_patch(socket, to: employees_path(state))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} ->
+        {:noreply, assign(socket, :columns, columns)}
+
+      {:sort, sort_by} ->
+        state = ListState.next_sort(socket.assigns.index_state, sort_by)
+
+        if state == socket.assigns.index_state do
+          {:noreply, socket}
+        else
+          {:noreply, push_patch(socket, to: employees_path(state))}
+        end
+
+      :noop ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -202,7 +238,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           |> assign(:department_map, department_map(scope, company_id))
           |> assign(:company_id, company_id)
           |> assign(:filters_form, ListState.filters_form(state))
-          |> stream(:employees, page.entries, reset: true)
+          |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
         end
 
       {:error, _reason} ->
@@ -210,7 +246,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         |> put_flash(:error, "Failed to load employees.")
         |> assign(:index_state, state)
         |> assign(:employees_page, empty_page())
-        |> stream(:employees, [], reset: true)
+        |> assign(:columns, ListColumns.load(socket.assigns.columns, [], & &1.id))
     end
   end
 
@@ -412,16 +448,22 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         <.card id="employees-card" inner_class="p-0">
           <h2 id="employees-table-title" class="sr-only">Employees</h2>
 
-          <.table
+          <.flex_table
             id="employees"
-            rows={@streams.employees}
-            row_id={fn {id, _employee} -> id end}
-            row_item={fn {_id, employee} -> employee end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"employee-#{&1}"}
+            caption="Employees"
+            event="grid"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
           >
-            <:col :let={employee} label="Name" sort="full_name" sort_id="employees-sort-name">
+            <:col :let={%{record: employee}} id="full_name">
               <.record_link
                 workspace={@workspace}
                 kind="core/employee"
@@ -432,39 +474,40 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
                 {employee.full_name}
               </.record_link>
 
-              <span :if={employee.designation} class="block text-xs text-ink-subtle">
+              <span
+                :if={@columns.mode == :normal and not is_nil(employee.designation)}
+                class="block text-xs text-ink-subtle"
+              >
                 {employee.designation}
               </span>
             </:col>
 
-            <:col :let={employee} label="No.">
+            <:col :let={%{record: employee}} id="number">
               <code class="text-xs font-medium tabular-nums">{employee.employee_number}</code>
             </:col>
 
-            <:col :let={employee} label="Department">
+            <:col :let={%{record: employee}} id="department">
               <span class={[is_nil(employee.department_id) && "text-ink-faint"]}>
                 {Map.get(@department_map, employee.department_id, "—")}
               </span>
             </:col>
 
             <:col
-              :let={employee}
-              label="Type"
-              sort="employee_type_label"
-              sort_id="employees-sort-type"
+              :let={%{record: employee}}
+              id="employee_type_label"
             >
               <.badge kind={:neutral}>
                 {employee.employee_type_label || employee.employee_type}
               </.badge>
             </:col>
 
-            <:col :let={employee} label="Status" sort="status" sort_id="employees-sort-status">
+            <:col :let={%{record: employee}} id="status">
               <.badge kind={status_badge_kind(employee.status)}>
                 {employee.status}
               </.badge>
             </:col>
 
-            <:action :let={employee}>
+            <:action :let={%{record: employee}}>
               <div class="flex items-center justify-end gap-3">
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.update")}
@@ -488,7 +531,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             <:empty :if={@employees_page.entries == []}>
               No employees found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="employees-pagination"

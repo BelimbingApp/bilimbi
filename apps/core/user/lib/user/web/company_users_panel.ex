@@ -21,10 +21,30 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
 
   use Bilimbi.Base.UI, :live_component
 
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.User
 
   @page_sizes [25, 50, 100, 300]
+  @builtins [
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "company-users-sort-name"},
+    %{
+      id: "email",
+      label: "Email",
+      type: :string,
+      sort: "email",
+      sort_id: "company-users-sort-email"
+    },
+    %{
+      id: "email_verified",
+      label: "Email verified",
+      type: :string,
+      sort: "email_verified",
+      sort_id: "company-users-sort-email-verified"
+    }
+  ]
+
+  @write_guard_opt_out ~w(users_grid)
 
   @impl true
   def update(assigns, socket) do
@@ -32,6 +52,14 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
      socket
      |> assign(assigns)
      |> reload()}
+  end
+
+  @impl true
+  def handle_event("users_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   # Deliberately strict, matching the employees/address panels (#409): the
@@ -45,11 +73,13 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
     page_sizes = socket.assigns[:page_sizes] || @page_sizes
     {:ok, users} = User.list_company_users(scope, company_id)
     users_page = users |> filter_and_sort(table_state) |> ListState.paginate(table_state)
+    columns = socket.assigns[:columns] || ListColumns.mount("company-users-table", @builtins)
 
     socket
     |> assign(:users, users)
     |> assign(:users_count, length(users))
     |> assign(:users_page, users_page)
+    |> assign(:columns, ListColumns.load(columns, users_page.entries, & &1.id))
     |> assign(:page_sizes, page_sizes)
     |> assign(:filters_form, ListState.filters_form(table_state, as: :users_filters))
   end
@@ -58,60 +88,63 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <.card class="mt-6">
-        <div class="flex items-center gap-2 mb-4">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-            Users
-          </h3>
-          <.badge>{@users_count}</.badge>
-        </div>
-        <.form
-          for={@filters_form}
-          id="company-users-filters"
-          phx-change="users_filters"
-          class="mb-2"
-        >
-          <div class="relative">
-            <.icon
-              name="search"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="company-users-search"
-              type="search"
-              phx-debounce="300"
-              maxlength="255"
-              label="Search users"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by name or email..."
-              class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
-            />
+      <.card id="company-users-card" class="mt-6" inner_class="p-0">
+        <div class="space-y-3 px-4 pb-5 pt-4">
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Users
+            </h3>
+            <.badge>{@users_count}</.badge>
           </div>
-        </.form>
-        <.table
+          <.form
+            for={@filters_form}
+            id="company-users-filters"
+            phx-change="users_filters"
+          >
+            <div class="relative">
+              <.icon
+                name="search"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
+              <.input
+                field={@filters_form[:search]}
+                id="company-users-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search users"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search by name or email..."
+                class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
+              />
+            </div>
+          </.form>
+        </div>
+        <.flex_table
           id="company-users-table"
-          rows={@users_page.entries}
-          row_id={fn user -> "company-user-#{user.id}" end}
-          row_item={fn user -> user end}
+          framed={false}
+          columns={@columns.column_views}
+          rows={@columns.rows}
+          mode={@columns.mode}
+          zoom={@columns.zoom}
+          suggestions={@columns.suggestions}
+          add_query={@columns.add_query}
+          row_id={&"company-user-#{&1}"}
           sort_by={@table_state.sort_by}
           sort_dir={@table_state.sort_dir}
+          event="users_grid"
+          target={@myself}
           sort_event="users_sort"
           caption="Users"
         >
-          <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
+          <:col :let={%{record: user}} id="name">
             <span class="font-medium">{user.name}</span>
           </:col>
-          <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
+          <:col :let={%{record: user}} id="email">
             {user.email}
           </:col>
-          <:col
-            :let={user}
-            label="Email verified"
-            sort="email_verified"
-            sort_id="company-users-sort-email-verified"
-          >
+          <:col :let={%{record: user}} id="email_verified">
             <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
               {if user.email_verified_at, do: "verified", else: "unverified"}
             </.badge>
@@ -119,7 +152,7 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
           <:empty :if={@users_page.total_entries == 0}>
             No users found for this company.
           </:empty>
-        </.table>
+        </.flex_table>
         <.pagination
           id="company-users-pagination"
           page={@users_page}

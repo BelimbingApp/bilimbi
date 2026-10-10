@@ -4,11 +4,26 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.Web.CamelList
 
   @page_sizes [25, 50, 100, 300]
+  @builtins [
+    %{
+      id: "country_name",
+      label: "Country",
+      sort: "country_name",
+      sort_id: "admin1-sort-country"
+    },
+    %{id: "code", label: "Code", sort: "code", sort_id: "admin1-sort-code"},
+    %{id: "name", label: "Name", sort: "name", sort_id: "admin1-sort-name"},
+    %{id: "alt_name", label: "Alt Name", sort: "alt_name", sort_id: "admin1-sort-alt-name"},
+    %{id: "updated_at", label: "Updated", sort: "updated_at", sort_id: "admin1-sort-updated"}
+  ]
+
+  @write_guard_opt_out ~w(grid)
   @list ListState.spec!(
           sortable: %{
             country_name: :asc,
@@ -29,6 +44,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(:columns, ListColumns.mount("admin1-table", @builtins))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
      |> stream_configure(:admin1, dom_id: &"admin1-#{&1.id}")}
   end
@@ -47,6 +63,14 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     state = ListState.next_sort(socket.assigns.index_state, sort_by)
     {:noreply, push_patch(socket, to: admin1_path(state))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
   end
 
   def handle_event("page", %{"page" => page}, socket) do
@@ -76,9 +100,15 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   defp save_admin1_name(socket, id, name) do
     case Geonames.update_admin1_name(socket.assigns.current_scope.scope, id, name) do
       {:ok, updated_admin1} ->
+        page = socket.assigns.admin1_page
+
+        entries =
+          Enum.map(page.entries, &if(&1.id == updated_admin1.id, do: updated_admin1, else: &1))
+
         {:noreply,
          socket
-         |> stream_insert(:admin1, updated_admin1)
+         |> assign(:admin1_page, %{page | entries: entries})
+         |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
          |> put_flash(:success, "Admin1 division #{updated_admin1.code} updated.")}
 
       {:error, :forbidden} ->
@@ -132,26 +162,31 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
         </.filter_toolbar>
 
         <.card id="admin1-card" inner_class="p-0">
-          <.table
+          <.flex_table
             id="admin1-table"
-            rows={@streams.admin1}
-            row_id={fn {id, _admin1} -> id end}
-            row_item={fn {_id, admin1} -> admin1 end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"admin1-#{&1}"}
+            event="grid"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
             caption="Admin1 divisions"
           >
-            <:col :let={admin1} label="Country" sort="country_name" sort_id="admin1-sort-country">
+            <:col :let={%{record: admin1}} id="country_name">
               <div class="whitespace-nowrap text-ink-muted">
                 <span class="font-mono text-xs">{admin1.country_iso}</span>
                 <span class="ml-1">{admin1.country_name || admin1.country_iso}</span>
               </div>
             </:col>
-            <:col :let={admin1} label="Code" sort="code" sort_id="admin1-sort-code">
+            <:col :let={%{record: admin1}} id="code">
               <span class="whitespace-nowrap font-mono text-ink">{admin1.code}</span>
             </:col>
-            <:col :let={admin1} label="Name" sort="name" sort_id="admin1-sort-name">
+            <:col :let={%{record: admin1}} id="name">
               <.inline_edit
                 :if={@can_update?}
                 id={"admin1-#{admin1.id}-name"}
@@ -163,10 +198,10 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
               />
               <span :if={not @can_update?} class="text-ink">{admin1.name}</span>
             </:col>
-            <:col :let={admin1} label="Alt Name" sort="alt_name" sort_id="admin1-sort-alt-name">
+            <:col :let={%{record: admin1}} id="alt_name">
               <span class="whitespace-nowrap text-ink-muted">{admin1.alt_name || "—"}</span>
             </:col>
-            <:col :let={admin1} label="Updated" sort="updated_at" sort_id="admin1-sort-updated">
+            <:col :let={%{record: admin1}} id="updated_at">
               <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
                 <.datetime
                   id={"admin1-#{admin1.id}-updated"}
@@ -178,7 +213,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             <:empty :if={@admin1_page.entries == []}>
               No Admin1 divisions found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="admin1-pagination"
@@ -210,6 +245,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     |> assign(:filter_countries, Geonames.admin1_filter_countries())
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, admin1_page.entries, & &1.id))
     |> stream(:admin1, admin1_page.entries, reset: true)
   end
 

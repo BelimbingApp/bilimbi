@@ -25,9 +25,17 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Params
 
   @capability "admin.authz.field.manage"
+  @builtins [
+    %{id: "table", label: "Table"},
+    %{id: "field", label: "Field"},
+    %{id: "visible_to", label: "Visible to"},
+    %{id: "since", label: "Since"}
+  ]
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -35,6 +43,7 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
 
     {:ok,
      socket
+     |> assign(:columns, ListColumns.mount("field-restrictions", @builtins))
      |> assign(:page_title, "Field Access")
      |> assign(:catalog, Authz.field_restriction_catalog())
      |> assign(:roles, Authz.list_roles(scope))
@@ -42,6 +51,14 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
      |> assign(:pending_removal, nil)
      |> assign_form(%{"table_id" => "", "field_id" => "", "role_ids" => []})
      |> load()}
+  end
+
+  @impl true
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -169,8 +186,15 @@ defmodule Bilimbi.Base.Authz.Web.FieldAccessLive do
 
   defp load(socket) do
     case Authz.list_field_restrictions(socket.assigns.current_scope.scope) do
-      {:ok, restrictions} -> assign(socket, :restrictions, restrictions)
-      {:error, :forbidden} -> assign(socket, :restrictions, [])
+      {:ok, restrictions} ->
+        socket
+        |> assign(:restrictions, restrictions)
+        |> assign(:columns, ListColumns.load(socket.assigns.columns, restrictions, & &1.id))
+
+      {:error, :forbidden} ->
+        socket
+        |> assign(:restrictions, [])
+        |> assign(:columns, ListColumns.load(socket.assigns.columns, [], & &1.id))
     end
   end
 
