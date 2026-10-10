@@ -5,6 +5,24 @@ defmodule Mix.Tasks.Bilimbi.Server do
   A stale graph is repaired before Phoenix starts. Other compilation and
   application-start errors are left unchanged so this task does not hide
   unrelated failures.
+
+  In development the database is brought up to date first: the task runs
+  `mix bilimbi.migrate`, the one Bilimbi migration path, before `phx.server`,
+  so a module migration that arrived with a pull is applied before the first
+  request. A refusal (an unadopted Belimbing database, an invalid ledger, a
+  failing migration) stops the task with that message and Phoenix does not
+  start. Once Phoenix is up the task runs `mix bilimbi.dev.seed --at-startup`
+  in the same VM: reference data is seeded through the production-seed
+  ledger, a database with no development identity gets one, and a database
+  whose identities carry no bootstrap receipt is reported in one line and
+  left alone. The seed runs after `phx.server` because that task is what
+  starts the application; a seed failure still stops the server with its
+  message. Pass `--no-migrate` to skip both steps, for example to see the
+  pending-migrations page (`BilimbiWeb.CheckPendingMigrations`) on purpose.
+  Any other environment never migrates or seeds here: production uses its
+  release commands.
+
+  Remaining arguments go to `phx.server`.
   """
 
   use Mix.Task
@@ -12,6 +30,8 @@ defmodule Mix.Tasks.Bilimbi.Server do
   alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @shortdoc "Starts Phoenix with workspace-graph recovery"
+
+  @no_migrate "--no-migrate"
 
   @impl Mix.Task
   def run(args) do
@@ -35,7 +55,29 @@ defmodule Mix.Tasks.Bilimbi.Server do
         end
     end
 
-    Mix.Task.run("phx.server", args)
+    start(args, Mix.env())
+  end
+
+  @doc """
+  Migrates when `env` is `:dev` and `args` does not carry `--no-migrate`,
+  starts Phoenix with the remaining arguments, then seeds the development
+  database under the same condition. `run/1` calls this after the graph is
+  known to be fresh; it is public so the start sequence can be exercised
+  without compiling or repairing the workspace.
+  """
+  @spec start([String.t()], atom()) :: term()
+  def start(args, env) do
+    {skip, server_args} = Enum.split_with(args, &(&1 == @no_migrate))
+    prepare? = env == :dev and skip == []
+
+    if prepare? do
+      Mix.shell().info("Migrating the development database before starting Phoenix.")
+      Mix.Task.run("bilimbi.migrate")
+    end
+
+    Mix.Task.run("phx.server", server_args)
+
+    if prepare?, do: Mix.Task.run("bilimbi.dev.seed", ["--at-startup"])
   end
 
   @doc false

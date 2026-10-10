@@ -38,7 +38,16 @@ defmodule BilimbiWeb.Endpoint do
     socket "/phoenix/live_reload/socket", Phoenix.LiveReloader.Socket
     plug Phoenix.LiveReloader
     plug Phoenix.CodeReloader
-    plug Phoenix.Ecto.CheckRepoStatus, otp_app: :bilimbi_base_database
+    # The database-exists check only. Bilimbi migrations are per module and
+    # recorded in Bilimbi's ledger; the plug below checks those. Pointing
+    # CheckRepoStatus at the module paths would bring back its "Run
+    # migrations" button, which bypasses that ledger
+    # (BilimbiWeb.CheckPendingMigrations).
+    plug Phoenix.Ecto.CheckRepoStatus,
+      otp_app: :bilimbi_base_database,
+      migration_paths: &BilimbiWeb.CheckPendingMigrations.no_central_migrations/1
+
+    plug BilimbiWeb.CheckPendingMigrations
   end
 
   plug Phoenix.LiveDashboard.RequestLogger,

@@ -36,9 +36,11 @@ To add Factory, from the Bilimbi root:
 ```bash
 git clone https://github.com/BelimbingApp/b-dom-factory.git apps/domains/factory
 mix deps.get
-mix bilimbi.migrate
 mix bilimbi.server
 ```
+
+`mix bilimbi.server` migrates the development database before it starts, so
+the Domain's migrations need no separate step.
 
 The rules for building an add-on are in
 [the composition model](./docs/architecture/0010_composition-model.md) and
@@ -69,12 +71,12 @@ verify it runs.
    the server you have. Use the same value in every later shell.
 5. Setup: run `mix setup`. It fetches dependencies, creates the database,
    runs every installed migration, and builds the web assets.
-6. Development identity: run `mix bilimbi.dev.seed`. It seeds system roles,
-   creates the platform tenant/company and explicitly bootstraps the initial
-   administrator `ai@agent.my` / `bilimbi-dev`. Repeats preserve revoked roles.
-7. Run: start `mix bilimbi.server` in the background and wait until it logs
-   that the endpoint is running on port 4000.
-8. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
+6. Run: start `mix bilimbi.server` in the background and wait until it logs
+   that the endpoint is running on port 4000. On the way up it migrates the
+   database, seeds system roles, creates the platform tenant/company and
+   bootstraps the initial administrator `ai@agent.my` / `bilimbi-dev`; later
+   starts leave an existing login and its revoked roles alone.
+7. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
    must print 200. Then open http://localhost:4000 in a browser, sign in with
    the login from step 6, and confirm the workspace loads. Report the result
    and how to stop the server.
@@ -105,15 +107,15 @@ For people installing by hand. Requirements are in the next section.
    export DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/bilimbi_dev
    ```
 
-4. Create the database, run migrations, build assets, and seed a login:
+4. Create the database and build the assets:
 
    ```bash
    mix setup
-   mix bilimbi.dev.seed
    ```
 
 5. Start the server and open [http://localhost:4000](http://localhost:4000).
-   Sign in with `ai@agent.my` and `bilimbi-dev`.
+   The first start migrates the database and seeds the development login;
+   sign in with `ai@agent.my` and `bilimbi-dev`.
 
    ```bash
    mix bilimbi.server

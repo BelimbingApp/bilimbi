@@ -1,5 +1,12 @@
 defmodule Mix.Tasks.Bilimbi.Migrate do
-  @moduledoc "Runs every installed module migration through Bilimbi's shared Repo and ledger."
+  @moduledoc """
+  Runs every installed module migration through Bilimbi's shared Repo and ledger.
+
+  An existing Belimbing database that Bilimbi has not adopted is refused with
+  the adoption sequence, as the release migrate command refuses it; migrating
+  it would run baseline DDL against tables that already exist. In development
+  `mix bilimbi.server` runs this task before it starts Phoenix.
+  """
 
   use Mix.Task
 
@@ -30,7 +37,14 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
         if parsed[:quiet], do: Keyword.put(opts, :log, false), else: opts
       end)
 
+    ensure_adopted!(repo, Keyword.take(opts, [:prefix]))
     Bilimbi.Core.Compatibility.migrate(repo, opts)
+  end
+
+  defp ensure_adopted!(repo, opts) do
+    Bilimbi.Core.Compatibility.ensure_adopted!(repo, opts)
+  rescue
+    error in ArgumentError -> Mix.raise(Exception.message(error))
   end
 
   defp with_repo!(repo, operation) do

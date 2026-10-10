@@ -291,6 +291,30 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
   end
 
+  test "pending migrations follow the ledger from missing through baseline to complete", %{
+    schema: schema
+  } do
+    entries = Compatibility.migration_entries()
+    all_versions = Enum.map(entries, &elem(&1, 0))
+
+    pending_versions = fn ->
+      Enum.map(Compatibility.pending_migrations(MigrationTestRepo, prefix: schema), & &1.version)
+    end
+
+    # No ledger yet: everything installed is pending, each with its owner.
+    pending = Compatibility.pending_migrations(MigrationTestRepo, prefix: schema)
+    assert Enum.map(pending, & &1.version) == all_versions
+    assert Enum.all?(pending, &(&1.owner_id =~ ~r{^(base|core|domain|extension)/}))
+
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+
+    assert pending_versions.() ==
+             for({version, _module, :bilimbi_only} <- entries, do: version)
+
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    assert pending_versions.() == []
+  end
+
   test "migration is refused on an unadopted Belimbing database until it is adopted", %{
     schema: schema
   } do

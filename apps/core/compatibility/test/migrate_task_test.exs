@@ -73,6 +73,22 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
     assert synthetic_version in recorded_versions(MigrationTestRepo, schema)
   end
 
+  test "operational task refuses an unadopted Belimbing database with the adoption sequence",
+       %{schema: schema} do
+    SQL.query!(
+      MigrationTestRepo,
+      "CREATE TABLE #{qualified(schema, "migrations")} " <>
+        "(id serial PRIMARY KEY, migration varchar NOT NULL, batch integer NOT NULL)",
+      []
+    )
+
+    assert_raise Mix.Error, ~r/not adopted.*verify, adopt, remap/s, fn ->
+      Mix.Tasks.Bilimbi.Migrate.run(["--prefix", schema, "--quiet"], MigrationTestRepo)
+    end
+
+    assert relation(MigrationTestRepo, schema, "bilimbi_schema_migrations") == nil
+  end
+
   test "operational task rejects unsupported and positional arguments" do
     assert_raise OptionParser.ParseError, ~r/Unknown option/, fn ->
       Mix.Tasks.Bilimbi.Migrate.run(["--step", "1"], MigrationTestRepo)

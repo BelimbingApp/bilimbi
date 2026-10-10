@@ -25,17 +25,29 @@ mix bilimbi.server
 Open [http://localhost:4000](http://localhost:4000).
 
 `mix setup` fetches dependencies, creates the database, runs every installed
-migration through `mix bilimbi.migrate`, and builds the web assets. The
+migration through `mix bilimbi.migrate`, and builds the web assets.
+`mix bilimbi.server` runs that same migrate before it starts Phoenix, so a
+module migration that arrives with a pull needs no separate command, and
+once Phoenix is up it runs the development seed described below, so a fresh
+clone needs nothing but `mix bilimbi.server`. A server that was already
+running when a migration arrived shows a pending-migrations page naming what
+to run until the database is migrated or the server is restarted;
+`mix bilimbi.server --no-migrate` starts without migrating or seeding. The
 baseline creates no tenant or company rows; platform-operator and
 primary-company provisioning are explicit setup steps and numeric IDs carry no
 runtime meaning.
 
-`mix bilimbi.dev.seed` seeds installed reference data, provisions the development
-platform tenant/company, and bootstraps `ai@agent.my` / `bilimbi-dev` with
-`core_admin` through the [shared bootstrap contract](deploy/README.md#bootstrap-contract-and-recovery).
-It runs only in `dev`. Matching repeats preserve passwords and revoked roles.
-Existing identities without a bootstrap receipt are refused rather than
-promoted; use existing administration or a separate fresh development database.
+The development seed, which `mix bilimbi.server` runs at every start-up and
+`mix bilimbi.dev.seed` runs on its own, seeds installed reference data through
+the production-seed ledger (what `mix bilimbi.seeds.run` does in production),
+provisions the development platform tenant/company, and bootstraps
+`ai@agent.my` / `bilimbi-dev` with `core_admin` through the
+[shared bootstrap contract](deploy/README.md#bootstrap-contract-and-recovery).
+It runs only in `dev`. Matching repeats preserve passwords and revoked roles
+and add nothing to the server log. Existing identities without a bootstrap
+receipt are never promoted: the server reports that in one line and starts,
+with reference data seeded, and the plain command fails. Sign in with an
+existing administrator or use a separate fresh development database.
 
 ## Provisioning identity
 
@@ -74,6 +86,9 @@ mix help bilimbi.tenant.provision
 mix help bilimbi.server
 mix precommit
 ```
+
+`mix bilimbi.migrate` migrates without starting a server, which setup, tests
+and an existing Belimbing database's adoption sequence use.
 
 Run database tasks from the umbrella root. A single module's project cannot
 see the whole composition graph, so `ModuleRegistry.complete_modules!/0`

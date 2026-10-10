@@ -108,6 +108,41 @@ defmodule Bilimbi.Core.Compatibility do
   end
 
   @doc """
+  The installed migrations the ledger does not record, as
+  `%{version: integer, owner_id: "base/authz"}` in version order.
+
+  This is the pending check `migrate/2` would act on, read cheaply enough to
+  run on every development request: the ledger's versions against each
+  installed module's migration files, with no file loaded or checksummed. A
+  missing ledger leaves every installed migration pending, on a fresh
+  database as on an unadopted Belimbing one; `unadopted_belimbing?/2` tells
+  the two apart.
+  """
+  @spec pending_migrations(Ecto.Repo.t(), keyword()) ::
+          [%{version: integer(), owner_id: String.t()}]
+  def pending_migrations(repo \\ Repo, opts \\ []) do
+    schema = Keyword.get(opts, :prefix, "public")
+    _ = SchemaVerifier.quote_identifier!(schema)
+
+    recorded =
+      case ledger_versions(repo, schema) do
+        :missing -> MapSet.new()
+        versions -> MapSet.new(versions)
+      end
+
+    ModuleRegistry.migration_modules!()
+    |> Enum.flat_map(fn descriptor ->
+      descriptor.otp_app
+      |> Application.app_dir(descriptor.migrations)
+      |> Path.join("*.exs")
+      |> Path.wildcard()
+      |> Enum.map(&%{version: migration_version!(&1), owner_id: descriptor.id})
+    end)
+    |> Enum.reject(&MapSet.member?(recorded, &1.version))
+    |> Enum.sort_by(& &1.version)
+  end
+
+  @doc """
   Whether the schema holds a Belimbing database that Bilimbi has not adopted:
   Laravel's `migrations` table exists but the Bilimbi ledger is missing or
   empty. Migrating such a database would run baseline DDL against tables that

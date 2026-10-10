@@ -166,7 +166,8 @@ contribution changes, explicitly run `mix bilimbi.authz.reconcile` (or
 definitions without restoring revoked account assignments.
 
 Local development uses the same reference-seed and administrator bootstrap
-through `mix bilimbi.dev.seed`, then runs module sample seeds. Migrate first.
+through `mix bilimbi.dev.seed`, then runs module sample seeds;
+`mix bilimbi.server` migrates and runs it at every development start-up.
 Older development identities without a receipt are deliberately not promoted;
 use existing administration/recovery or a separate fresh development database.
 Never run the development seed or its published password in production.

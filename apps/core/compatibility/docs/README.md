@@ -32,7 +32,8 @@ Platform migrated ships earlier-dated versions that are all pending, and an
 absent owner (below) keeps its baseline pending behind recorded Platform
 baselines; a later compatible baseline may likewise be adopted while an
 earlier Bilimbi-only migration remains pending. `mix bilimbi.migrate`
-validates the ledger through this module before running anything, and the
+refuses an unadopted Belimbing database (`ensure_adopted!/2`), validates the
+ledger through this module before running anything, and the
 pending migrations then run after every recorded one, in version order among
 themselves. `Ecto.Migrator.run/4` never refuses an older pending version
 itself, so this validation is the ordering guard. A gap inside one owner's
