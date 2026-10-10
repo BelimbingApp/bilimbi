@@ -115,6 +115,11 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   # keep a name per state because those controls are the meaning, not one
   # glyph: `retain` is the outline bookmark Belimbing offers on a row that is
   # not yet kept, `retained` the solid one on a row that is.
+  # `customize` and `customizing` are the two states of the notch on
+  # `flex_table/1`: closed, the double chevron points up, the way the notch
+  # lifts to open the bar; open, it points back down. The notch is fourteen
+  # pixels tall, so both draw the 16-grid micro glyphs, which stay legible at
+  # twelve pixels where the outline set thins to nothing.
   @actions %{
     "create" => "hero-plus",
     "edit" => "hero-pencil",
@@ -173,7 +178,8 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "inspect" => "hero-document-magnifying-glass",
     "zoom-in" => "hero-plus",
     "zoom-out" => "hero-minus",
-    "customize" => "hero-adjustments-horizontal",
+    "customize" => "hero-chevron-double-up-micro",
+    "customizing" => "hero-chevron-double-down-micro",
     "dashboard" => "hero-squares-2x2",
     "status" => "hero-signal"
   }

@@ -193,14 +193,14 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
   test "Compact and Normal are two row heights of the same list", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
-    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='32']")
     assert has_element?(view, "#users-zoom-normal[aria-pressed='true']")
 
     press(view, "#users-zoom-compact")
-    assert query(view)["z"] == "24"
+    assert query(view)["z"] == "18"
 
     # Compact is the same table: the rows, their links and the sort stay.
-    assert has_element?(view, "#users[data-mode='compact'][data-zoom='24']")
+    assert has_element?(view, "#users[data-mode='compact'][data-zoom='18']")
     assert has_element?(view, "#users-zoom-compact[aria-pressed='true']")
     assert has_element?(view, "#user-91 #user-91-show", "Ada Lovelace")
     assert has_element?(view, "#users-sort-name")
@@ -208,26 +208,26 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
 
     press(view, "#users-zoom-normal")
     refute Map.has_key?(query(view), "z")
-    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='32']")
   end
 
   test "the zoom steps one height at a time and stops at the ends of its range", %{conn: conn} do
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users?z=40")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users?z=36")
 
     press(view, "#users-zoom-in")
-    assert query(view)["z"] == "44"
-    assert has_element?(view, "#users-zoom-level", "44 px")
+    assert query(view)["z"] == "40"
+    assert has_element?(view, "#users-zoom-level", "40 px")
     assert has_element?(view, "#users-zoom-in[disabled]")
 
-    # Down from the tallest: 40, 36, then the tallest compact height.
-    for expected <- ["40", nil, "28"] do
+    # Down from the tallest: 36, 32, then the tallest compact height.
+    for expected <- ["36", nil, "26"] do
       press(view, "#users-zoom-out")
       assert query(view)["z"] == expected
     end
 
     assert has_element?(view, "#users[data-mode='compact']")
 
-    {:ok, shortest, _html} = conn |> log_in_as() |> live(~p"/users?z=20")
+    {:ok, shortest, _html} = conn |> log_in_as() |> live(~p"/users?z=18")
     assert has_element?(shortest, "#users-zoom-out[disabled]")
     refute has_element?(shortest, "#users-zoom-in[disabled]")
   end
@@ -248,7 +248,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     # this is the press that used to snap back to compact.
     press(view, "#users-zoom-normal")
     refute Map.has_key?(query(view), "z")
-    assert has_element?(view, "#users[data-mode='normal'][data-zoom='36']")
+    assert has_element?(view, "#users[data-mode='normal'][data-zoom='32']")
     assert has_element?(view, "#users-zoom-normal[aria-pressed='true']")
 
     # And it stays through the page's own controls, with nothing kept now.
@@ -287,7 +287,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
     # The page's own controls carry the arrangement into the address.
     later |> element("#users-sort-name") |> render_click()
     carried = query(later)
-    assert carried["cols"] =~ "company.parent.name" and carried["z"] == "24"
+    assert carried["cols"] =~ "company.parent.name" and carried["z"] == "18"
 
     # A shared link says what to show, and opening it changes nothing kept.
     {:ok, linked, _html} = live(conn, ~p"/users?cols=name")

@@ -112,6 +112,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   def handle_params(params, _uri, socket) do
     state = ListState.parse(list_params(params), @list)
     columns = PageColumns.from_params(socket.assigns.columns, params)
+
     {:noreply, socket |> assign(:columns, columns) |> load_page(state)}
   end
 
@@ -408,7 +409,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
 
           <.flex_table
-            class="p-2"
+            framed={false}
             id="companies"
             columns={@columns.column_views}
             rows={@columns.rows}

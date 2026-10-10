@@ -21,7 +21,11 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       )
 
     assert html =~ ~s(id="default-btn")
-    assert html =~ "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken"
+    assert html =~ "border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken"
+    # Ledger geometry: a control radius, one input tall, medium weight, and the
+    # border every variant carries so two variants side by side are one height.
+    assert html =~ "rounded-md border px-3 py-1.5 text-sm font-medium"
+    refute html =~ "rounded-xl"
     assert html =~ "Save"
   end
 
@@ -37,7 +41,8 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       )
 
     assert html =~ ~s(id="primary-btn")
-    assert html =~ "bg-action text-action-ink hover:bg-action-hover"
+    assert html =~ "border-transparent bg-action text-action-ink hover:bg-action-hover"
+    assert html =~ "rounded-md border px-3 py-1.5 text-sm font-medium"
     refute html =~ "bg-brand"
   end
 
@@ -235,7 +240,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
         %{}
       )
 
-    assert html =~ "bg-action text-action-ink hover:bg-action-hover"
+    assert html =~ "border-transparent bg-action text-action-ink hover:bg-action-hover"
     assert html =~ "w-full custom-class"
   end
 
