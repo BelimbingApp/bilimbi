@@ -215,6 +215,47 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
                Authz.list_field_restrictions(operator)
     end
 
+    test "several fields restrict together to the same roles, one row and one action each, or not at all",
+         %{operator: operator, scope: scope, finance: finance} do
+      bystander = reader(scope, 8)
+
+      assert {:error, :forbidden} =
+               Authz.put_field_restrictions(bystander, [{"records", "tax_id"}], [finance.id])
+
+      assert {:error, :no_fields} = Authz.put_field_restrictions(operator, [], [finance.id])
+
+      # One bad pick writes nothing: the batch is all or nothing.
+      assert {:error, :not_restrictable} =
+               Authz.put_field_restrictions(
+                 operator,
+                 [{"records", "tax_id"}, {"records", "code"}],
+                 [finance.id]
+               )
+
+      assert {:error, {:unknown_roles, [999_999]}} =
+               Authz.put_field_restrictions(operator, [{"records", "tax_id"}], [999_999])
+
+      assert {:ok, []} = Authz.list_field_restrictions(operator)
+
+      assert {:ok, [tax_id, email]} =
+               Authz.put_field_restrictions(
+                 operator,
+                 [{"records", "tax_id"}, {"records", "email"}, {"records", "tax_id"}],
+                 [finance.id]
+               )
+
+      assert %FieldRestrictionSummary{field_id: "tax_id", role_names: ["Finance"]} = tax_id
+      assert %FieldRestrictionSummary{field_id: "email", role_names: ["Finance"]} = email
+
+      assert {:ok, [%{field_id: "email"}, %{field_id: "tax_id"}]} =
+               Authz.list_field_restrictions(operator)
+
+      {:ok, actions} = Audit.list_actions(operator)
+      summaries = Enum.map(actions, & &1.payload["summary"])
+      assert "Restricted records.tax_id to Finance" in summaries
+      assert "Restricted records.email to Finance" in summaries
+    end
+
     test "another tenant neither sees nor removes it", %{operator: operator, finance: finance} do
       assert {:ok, restriction} =
                Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])

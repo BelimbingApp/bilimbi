@@ -190,6 +190,44 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   end
 
   @doc """
+  Restricts several catalog fields to the same `role_ids` at once, as one
+  transaction: either every field is restricted or none is.
+
+  `fields` are `{table_id, field_id}` pairs; duplicates are ignored and an
+  empty list is `:no_fields`. Every field must be restrictable and every role
+  in scope, checked before anything is written, so a mistaken pick does not
+  leave half the batch behind. Each field keeps its own restriction row and
+  its own retained `authz.field_restriction.set` audit action, exactly as if
+  restricted alone (`put/6`): the batch is the operator's convenience, not a
+  new kind of record.
+  """
+  @spec put_many(Scope.t(), [{String.t(), String.t()}], [pos_integer()], operator(), map()) ::
+          {:ok, [FieldRestrictionSummary.t()]}
+          | {:error,
+             :no_fields
+             | :not_restrictable
+             | {:unknown_roles, [pos_integer()]}
+             | :audit_unavailable}
+  def put_many(%Scope{} = scope, fields, role_ids, operator, registry)
+      when is_list(fields) and is_list(role_ids) do
+    fields = Enum.uniq(fields)
+    role_ids = role_ids |> Enum.uniq() |> Enum.sort()
+
+    with :ok <- some_fields(fields),
+         :ok <- all_restrictable(fields),
+         :ok <- roles_in_scope(scope, role_ids, registry) do
+      transaction(fn ->
+        Enum.map(fields, fn {table_id, field_id} ->
+          case put(scope, table_id, field_id, role_ids, operator, registry) do
+            {:ok, restriction} -> restriction
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        end)
+      end)
+    end
+  end
+
+  @doc """
   Removes one restriction of the scope's tenant by its durable id. A
   retained `authz.field_restriction.removed` action naming the operator
   commits with it. A restriction that does not exist, or belongs to another
@@ -368,6 +406,25 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
 
   defp restrictable(table_id, field_id) do
     if restrictable?(table_id, field_id), do: :ok, else: {:error, :not_restrictable}
+  end
+
+  defp some_fields([]), do: {:error, :no_fields}
+  defp some_fields(_fields), do: :ok
+
+  defp all_restrictable(fields) do
+    catalog = catalog()
+
+    restrictable? = fn
+      {table_id, field_id} when is_binary(table_id) and is_binary(field_id) ->
+        Enum.any?(catalog, fn table ->
+          table.id == table_id and Enum.any?(table.fields, &(&1.id == field_id))
+        end)
+
+      _other ->
+        false
+    end
+
+    if Enum.all?(fields, restrictable?), do: :ok, else: {:error, :not_restrictable}
   end
 
   defp roles_in_scope(_scope, [], _registry), do: :ok

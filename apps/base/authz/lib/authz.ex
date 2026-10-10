@@ -313,6 +313,30 @@ defmodule Bilimbi.Base.Authz do
   end
 
   @doc """
+  Restricts several catalog fields in the scope's tenant to the same
+  `role_ids` in one transaction, each as `put_field_restriction/4` would:
+  one restriction row and one retained `authz.field_restriction.set` audit
+  action per field, and nothing written when any field is not restrictable
+  (`:not_restrictable`), any role is out of scope (`{:unknown_roles, ids}`)
+  or `fields` is empty (`:no_fields`). The caller must be a signed-in user
+  holding `admin.authz.field.manage`.
+  """
+  @spec put_field_restrictions(Scope.t(), [{String.t(), String.t()}], [pos_integer()]) ::
+          {:ok, [FieldRestrictionSummary.t()]}
+          | {:error,
+             :forbidden
+             | :no_fields
+             | :not_restrictable
+             | {:unknown_roles, [term()]}
+             | :audit_unavailable}
+  def put_field_restrictions(%Scope{} = scope, fields, role_ids)
+      when is_list(fields) and is_list(role_ids) do
+    with {:ok, operator} <- administrator(scope, "admin.authz.field.manage") do
+      FieldRestrictions.put_many(scope, fields, role_ids, operator, registry!())
+    end
+  end
+
+  @doc """
   Removes one field access restriction of the scope's tenant by its id.
 
   The caller must be a signed-in user holding `admin.authz.field.manage`; the
