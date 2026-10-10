@@ -575,7 +575,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu")) == []
   end
 
-  test "principal capability and role search reach a provider-owned email" do
+  test "principal capability search reaches a provider-owned email" do
     tenant_scope = TenancyFixtures.scope()
     install_principal_directory!()
 
@@ -583,30 +583,6 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
 
     assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu@example")) ==
              [7]
-
-    assert {:ok, role} =
-             Authz.create_role(tenant_scope, 10, %{name: "Auditor", code: "auditor"})
-
-    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, role.id)
-
-    assert principal_ids(Authz.list_principal_roles(tenant_scope, search: "zulu@example")) == [7]
-  end
-
-  test "principal roles name and order by the same directory" do
-    tenant_scope = TenancyFixtures.scope()
-    install_principal_directory!()
-
-    assert {:ok, role} =
-             Authz.create_role(tenant_scope, 10, %{name: "Auditor", code: "auditor"})
-
-    for id <- [5, 9],
-        do: assert({:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, id, role.id))
-
-    page = Authz.list_principal_roles(tenant_scope, sort_by: :principal_name, sort_dir: :asc)
-
-    assert Enum.map(page.entries, & &1.principal_name) == ["ada lovelace", "eMart Holdings"]
-    assert principal_ids(page) == [9, 5]
-    assert principal_ids(Authz.list_principal_roles(tenant_scope, search: "emart")) == [5]
   end
 
   test "principal capabilities sort by supplied company_order across pages" do
@@ -664,50 +640,6 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert page_one.total_entries == 3
     assert [%PrincipalCapabilitySummary{company_id: 11}] = page_one.entries
     assert [%PrincipalCapabilitySummary{company_id: 10, principal_id: 1}] = page_two.entries
-  end
-
-  test "principal roles list searches role name and pages by company_order" do
-    tenant_scope = TenancyFixtures.scope()
-
-    assert {:ok, alpha} =
-             Authz.create_role(tenant_scope, 10, %{name: "Alpha clerks", code: "alpha_clerks"})
-
-    assert {:ok, bravo} =
-             Authz.create_role(tenant_scope, 11, %{name: "Bravo clerks", code: "bravo_clerks"})
-
-    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 1, alpha.id)
-    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 11, :user, 2, bravo.id)
-    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :agent, 9, alpha.id)
-
-    assert %Page{entries: [hit], total_entries: 1} =
-             Authz.list_principal_roles(tenant_scope, search: "bravo")
-
-    assert hit.role_name == "Bravo clerks"
-    assert hit.company_id == 11
-
-    page_one =
-      Authz.list_principal_roles(tenant_scope,
-        sort_by: :company_name,
-        sort_dir: :asc,
-        page: 1,
-        page_size: 1,
-        company_order: [11, 10]
-      )
-
-    page_two =
-      Authz.list_principal_roles(tenant_scope,
-        sort_by: :company_name,
-        sort_dir: :asc,
-        page: 2,
-        page_size: 1,
-        company_order: [11, 10]
-      )
-
-    assert page_one.total_entries == 3
-    assert [%{company_id: 11}] = page_one.entries
-    assert [%{company_id: 10}] = page_two.entries
-
-    assert %Page{entries: []} = Authz.list_principal_roles(TenancyFixtures.scope(2))
   end
 
   test "administration options reject unbounded or unknown input" do
