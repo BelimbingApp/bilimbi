@@ -46,7 +46,7 @@ defmodule Bilimbi.Base.Grid.Catalog do
       |> Map.new(fn {id, table} ->
         {id,
          table
-         |> without_restricted(restricted |> Map.get(id, %{}) |> Map.keys())
+         |> without_restricted(Map.get(restricted, id, []))
          |> resolve_columns!(scope)}
       end)
 
