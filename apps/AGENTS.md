@@ -33,7 +33,7 @@ Flash `:success` only for a completed write. `:info` informs and confirms nothin
 
 ## Confirmations
 
-A control confirms only when the acting user cannot undo it from the same page; one the page reverses on its own (assign again, add again, lift the rule) commits on click and reports through the flash, however much it costs. The list in `DESIGN.md` "Confirmation dialogs" is the inventory; keep it true when adding or removing a dialog. `irreversible_on_self?/2` in `apps/core/user/lib/user/web/user_access_panel.ex` is the shape for a control that is undoable for everyone except the acting user.
+A control confirms only when the acting user cannot undo it from the same page; one the page reverses on its own (assign again, add again, lift the rule) commits on click and reports through the flash, however much it costs. The list in `DESIGN.md` "Confirmation dialogs" is the inventory; keep it true when adding or removing a dialog. `own_account?/1` in `apps/core/user/lib/user/web/user_access_panel.ex` is the shape for a control that is undoable for everyone except the acting user: it confirms on the acting user's own account only.
 
 ## Withheld controls and fields
 

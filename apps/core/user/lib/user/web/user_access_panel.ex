@@ -10,15 +10,14 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
 
   Outcomes use the page flash. A LiveComponent's own `put_flash/3` does
   not reach `Layouts.app`, so a completed write or a refusal sends the
-  message to the page. A change on this card commits on click: every one
-  of them can be undone from the same card, by assigning the role or
-  adding the grant again, or by removing the deny rule. The one exception
-  confirms first, and that is the only time the card opens a dialog: the
-  acting user taking from their own account a role, grant or capability
-  they could not give back afterwards, because the pickers offer only what
-  the acting user holds (`irreversible_on_self?/2`). Opening that
-  confirmation clears the flash first, with an untargeted `lv:clear-flash`,
-  because the page behind the dialog is inert.
+  message to the page. A change to another user commits on click: it can
+  be undone from the same card, by assigning the role or adding the grant
+  again, or by removing the deny rule. The one exception confirms first,
+  and that is the only time the card opens a dialog: any change to the
+  acting user's own account (`own_account?/1`), because the pickers offer
+  only what the acting user holds and so may not offer it back. Opening
+  that confirmation clears the flash first, with an untargeted
+  `lv:clear-flash`, because the page behind the dialog is inert.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -211,12 +210,12 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     end
   end
 
-  # A change the acting user can undo commits on click. The request resolves
-  # the rule from the page's own maps -- a role assignment, a direct grant, a
-  # deny rule or a capability to deny -- never from a client-supplied id
-  # alone, and applies it at once unless `irreversible_on_self?/2` says the
-  # acting user could not give it back; then the rule is held and the dialog
-  # names it, and the confirm acts on that held rule.
+  # A change to another user commits on click. The request resolves the rule
+  # from the page's own maps -- a role assignment, a direct grant, a deny rule
+  # or a capability to deny -- never from a client-supplied id alone, and
+  # applies it at once unless the account is the acting user's own; then the
+  # rule is held and the dialog names it, and the confirm acts on that held
+  # rule.
   def handle_event("request_remove_role", %{"assignment-id" => assignment_id_str}, socket) do
     cond do
       not can_manage?(socket) ->
@@ -508,81 +507,15 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
   # --- Confirmation helpers ---
 
   defp apply_or_hold(socket, rule) do
-    if irreversible_on_self?(socket, rule) do
+    if own_account?(socket) do
       {:noreply, socket |> page_clear_flash() |> assign(:pending_authz, rule)}
     else
       apply_authz(socket, rule)
     end
   end
 
-  # The only change this card cannot undo: the acting user taking from their
-  # own account something they could not give back. The pickers offer a role
-  # only when the acting user holds every capability it grants, a capability
-  # only when they hold it, and both only while they hold
-  # `admin.user.update`. So the question is what the acting user still holds
-  # once the rule is gone -- their effective set narrowed to what the other
-  # assigned roles and remaining direct grants provide -- and whether that
-  # set still admits the rule. A deny rule's removal only restores access,
-  # and a deny on anyone else, or on oneself of any other capability, is
-  # lifted from the denied list, so neither asks.
-  defp irreversible_on_self?(socket, rule) do
-    own_account?(socket) and not reversible_after?(socket, rule)
-  end
-
   defp own_account?(socket) do
     socket.assigns.user.id == socket.assigns.current_scope.user["user_id"]
-  end
-
-  defp reversible_after?(_socket, {:remove_denial, _cap_key, _id}), do: true
-
-  defp reversible_after?(_socket, {:deny, cap_key}), do: cap_key != @manage_capability
-
-  defp reversible_after?(socket, {:remove_role, assignment}) do
-    scope = socket.assigns.current_scope.scope
-    {grant_all?, allowed} = held_without(socket, {:role, assignment.role_id})
-
-    case Map.fetch(Authz.role_grants(scope, [assignment.role_id]), assignment.role_id) do
-      {:ok, grant} ->
-        manages_after?(grant_all?, allowed) and
-          role_grantable?(grant, grant.capabilities, grant_all?, allowed)
-
-      :error ->
-        false
-    end
-  end
-
-  defp reversible_after?(socket, {:remove_grant, cap_key, _id}) do
-    {grant_all?, allowed} = held_without(socket, {:grant, cap_key})
-    manages_after?(grant_all?, allowed) and (grant_all? or MapSet.member?(allowed, cap_key))
-  end
-
-  defp manages_after?(grant_all?, %MapSet{} = allowed),
-    do: grant_all? or MapSet.member?(allowed, @manage_capability)
-
-  # What the acting user, who is the account on this page, still holds once
-  # one source is gone. The sources are the other assigned roles and the
-  # remaining direct grants; a deny rule already keeps a capability out of
-  # the effective set, so intersecting with that set keeps it out here.
-  defp held_without(socket, removed) do
-    scope = socket.assigns.current_scope.scope
-    {_acting_grant_all?, acting_allowed} = acting_permissions(socket.assigns.current_scope)
-
-    role_ids =
-      for %{role_id: role_id} <- socket.assigns.assigned_roles,
-          removed != {:role, role_id},
-          do: role_id
-
-    grants = Authz.role_grants(scope, role_ids) |> Map.values()
-
-    if Enum.any?(grants, & &1.grant_all) do
-      {true, MapSet.new(acting_allowed)}
-    else
-      direct =
-        for {cap, _id} <- socket.assigns.direct_grant_ids, removed != {:grant, cap}, do: cap
-
-      sources = grants |> Enum.flat_map(& &1.capabilities) |> Enum.concat(direct) |> MapSet.new()
-      {false, acting_allowed |> MapSet.new() |> MapSet.intersection(sources)}
-    end
   end
 
   defp capabilities_forbidden(socket) do
@@ -624,7 +557,7 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     do: "The deny rule for #{cap_key} was removed."
 
   # The dialog opens only for the acting user's own account, so it speaks to
-  # them: what goes, and that they cannot give it back from here.
+  # them: what changes, and that it is their own access.
   defp authz_consequence({:remove_role, assignment}),
     do: "The #{assignment.role_name} role will be removed from your account."
 
@@ -634,22 +567,11 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
   defp authz_consequence({:remove_grant, cap_key, _id}),
     do: "The direct grant of #{cap_key} will be removed from your account."
 
-  defp authz_detail({:remove_role, _assignment}),
-    do:
-      "You lose every capability this role grants unless another role or direct grant " <>
-        "also provides it, and you will not be able to assign it to yourself again: " <>
-        "this page only offers roles whose capabilities you hold."
+  defp authz_consequence({:remove_denial, cap_key, _id}),
+    do: "The deny rule for #{cap_key} will be removed from your account."
 
-  defp authz_detail({:deny, _cap_key}),
-    do:
-      "The deny rule takes effect at once and takes away your permission to manage " <>
-        "roles and capabilities, so you will not be able to remove it yourself."
-
-  defp authz_detail({:remove_grant, _cap_key, _id}),
-    do:
-      "You keep this capability only if an assigned role still grants it, and you will " <>
-        "not be able to grant it to yourself again: this page only offers capabilities " <>
-        "you hold."
+  defp authz_detail(_rule),
+    do: "This changes your own access, and it takes effect at once."
 
   defp authz_verb({:deny, _cap_key}), do: "Deny"
   defp authz_verb(_rule), do: "Remove"

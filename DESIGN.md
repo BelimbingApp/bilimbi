@@ -466,12 +466,12 @@ begins running on its schedule at that definition's fingerprint. Resume only
 lifts a pause and runs on click, matching Belimbing, where a confirmation is
 reserved for a choice that cannot be undone; discarding an unsaved database
 query is the same case. A change that the same card undoes commits on click,
-whatever it costs: a role or capability rule change on `/users/:id` is
-assigned, granted or lifted again from the picker or the denied list, so none
-of them asks — except the one the acting user could not undo, taking from
-their own account a role, grant or capability the pickers would no longer
-offer them (they offer only what the acting user holds), which confirms with a
-detail saying plainly that they cannot give it back.
+whatever it costs: a role or capability rule change on another user's
+`/users/:id` is assigned, granted or lifted again from the picker or the
+denied list, so none of them asks. The acting user's own account is the one
+exception, because the pickers offer only what the acting user holds and may
+not offer back what they take away: every change there confirms, with a
+detail saying plainly that it is their own access.
 
 ## Subtle depth and motion
 
