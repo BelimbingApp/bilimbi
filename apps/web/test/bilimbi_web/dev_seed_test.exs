@@ -1,4 +1,4 @@
-defmodule BilimbiWeb.DevSeedTest do
+defmodule BilimbiWeb.StartupDevSeedTest do
   # The seed body `mix bilimbi.dev.seed` and `mix bilimbi.server` share needs
   # the whole installed graph (production seed providers and module sample
   # seeds are discovered from it), which only the host's closure has. The
