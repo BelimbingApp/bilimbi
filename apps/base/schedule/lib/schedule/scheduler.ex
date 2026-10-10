@@ -5,6 +5,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   import Ecto.Query
   require Logger
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule.Administration
@@ -28,17 +29,38 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
     GenServer.start_link(__MODULE__, options, name: name)
   end
 
+  # This application starts before the deployment application installs the
+  # contribution snapshot that `poll/1` reads, so the first poll waits for the
+  # registry's installation signal instead of running at start and warning.
+  # The subscription comes first so an installation between it and the check
+  # is not missed. The warning in `poll/1` stays for a registry that fails
+  # after that point.
   @impl true
   def init(_options) do
-    send(self(), :poll)
-    {:ok, %{}}
+    :ok = ContributionRegistry.subscribe_installed()
+    {:ok, start_polling_when_installed(%{polling?: false})}
   end
 
   @impl true
+  def handle_info({ContributionRegistry, :installed}, state) do
+    {:noreply, start_polling_when_installed(state)}
+  end
+
   def handle_info(:poll, state) do
     poll()
     Process.send_after(self(), :poll, poll_interval())
     {:noreply, state}
+  end
+
+  defp start_polling_when_installed(%{polling?: true} = state), do: state
+
+  defp start_polling_when_installed(state) do
+    if ContributionRegistry.installed?() do
+      send(self(), :poll)
+      %{state | polling?: true}
+    else
+      state
+    end
   end
 
   @doc false

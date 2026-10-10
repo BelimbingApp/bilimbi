@@ -39,6 +39,16 @@ that every package was compiled from the same graph and that the generated
 positions are complete and dependency-safe before exposing module and
 migration contributions.
 
+The deployment application (the Web host, or a release command) installs the
+one contribution snapshot after every module application has started, so a
+module process exists before the snapshot does. A process that reads the
+snapshot on its own clock subscribes with
+`ContributionRegistry.subscribe_installed/0`, then checks `installed?/0`, and
+starts reading on whichever answers first; the registry announces each
+installation to subscribers. `Bilimbi.Base.Schedule.Scheduler` is the example.
+Guessing at start-up, then warning when the snapshot is missing, is the defect
+this replaces.
+
 In the test environment, all discovered local path dependencies explicitly use
 `:test`, including mounted containers and their module dependencies. They share
 `_build/test` with package-local test runs, so compiling a host or a dependent

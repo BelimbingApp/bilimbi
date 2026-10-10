@@ -5,6 +5,13 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   Providers are discovered exclusively from Mix-approved installed descriptor
   metadata. Each provider executes once per build, and every consumer validates
   its complete provenance-carrying entry list before the snapshot is installed.
+
+  The deployment application installs the snapshot once its dependencies have
+  started, so a module application starts before the snapshot exists. A process
+  that reads the snapshot on its own clock, such as a poller, must not guess
+  when that is: it calls `subscribe_installed/0` and then `installed?/0`, and
+  starts reading on whichever says yes first. Reading before that point is a
+  start-up ordering defect, not an outage to warn about.
   """
 
   alias Bilimbi.Base.ModuleRegistry
@@ -12,6 +19,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   alias Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @snapshot_key {__MODULE__, :snapshot}
+  @subscribers __MODULE__.Subscribers
   @consumer_validators %{
     settings: Bilimbi.Base.Settings.ContributionValidator,
     authz: Bilimbi.Base.Authz.ContributionValidator,
@@ -34,14 +42,27 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   @spec install!() :: snapshot()
   def install! do
     case :persistent_term.get(@snapshot_key, :missing) do
-      :missing ->
-        snapshot = build!()
-        :persistent_term.put(@snapshot_key, snapshot)
-        snapshot
-
-      snapshot ->
-        snapshot
+      :missing -> publish!(build!())
+      snapshot -> snapshot
     end
+  end
+
+  @doc "Whether this VM has the deployment's contribution snapshot installed."
+  @spec installed?() :: boolean()
+  def installed?, do: :persistent_term.get(@snapshot_key, :missing) != :missing
+
+  @doc """
+  Delivers `{#{inspect(__MODULE__)}, :installed}` to the calling process when
+  a snapshot is installed in this VM.
+
+  Subscribe before calling `installed?/0`, so an installation between the two
+  is not missed; a snapshot that is already installed sends nothing. The
+  subscription lasts for the life of the calling process.
+  """
+  @spec subscribe_installed() :: :ok
+  def subscribe_installed do
+    {:ok, _owner} = Registry.register(@subscribers, :installed, nil)
+    :ok
   end
 
   @spec build!([map()]) :: snapshot()
@@ -88,8 +109,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     unless plain_term?(snapshot),
       do: raise(ArgumentError, "test snapshot must contain plain terms")
 
-    :persistent_term.put(@snapshot_key, snapshot)
-    snapshot
+    publish!(snapshot)
   end
 
   @doc false
@@ -113,6 +133,24 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   @doc false
   def clear_for_test! do
     :persistent_term.erase(@snapshot_key)
+    :ok
+  end
+
+  defp publish!(snapshot) do
+    :persistent_term.put(@snapshot_key, snapshot)
+    notify_installed()
+    snapshot
+  end
+
+  # A release `eval` installs the snapshot into a VM that never started this
+  # application, so nothing can be subscribed there.
+  defp notify_installed do
+    if Process.whereis(@subscribers) do
+      Registry.dispatch(@subscribers, :installed, fn entries ->
+        for {pid, _value} <- entries, do: send(pid, {__MODULE__, :installed})
+      end)
+    end
+
     :ok
   end
 
