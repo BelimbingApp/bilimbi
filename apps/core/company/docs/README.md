@@ -125,7 +125,7 @@ values through the table's `record_types` (`auditable_types/0`). `code` and
 `status` are protected, and the key `id` and the label `name` are protected
 implicitly. `restricted_field_markers/1` returns the restricted summary keys with their
 `Restricted` markers for the create and setup forms, which show them as
-`<.restricted_field>` rows naming the roles that see each. The
+`<.restricted_field>` rows, which name no role. The
 seam itself is Base Authz's (`apps/base/authz/docs/README.md`
 "Field-level authorization").
 
