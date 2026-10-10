@@ -85,7 +85,7 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
   # A chip's remove button names the input and the value; the form is the
   # same one the pickers post, so dropping the value is a validate without
   # the browser's help.
-  def handle_event("deselect", %{"name" => name, "value" => value}, socket) do
+  def handle_event("deselect", %{"name" => name, "option" => value}, socket) do
     params = socket.assigns.form.params
 
     case picker(name) do

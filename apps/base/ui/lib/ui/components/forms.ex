@@ -813,9 +813,11 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   selected option is a chip with a remove button above the trigger, which
   then reads `placeholder` as the verb to add more ("Add roles"). A chip's
   remove button runs `on_remove` with `phx-value-name` (the input name) and
-  `phx-value-value` (the option's value), so the owning LiveView drops the
+  `phx-value-option` (the option's value), so the owning LiveView drops the
   value from its form and re-renders; the component holds no state of its
-  own. The selected options stay checked in the list, so adding and removing
+  own. The key is `option`, not `value`: the LiveView client fills a
+  pushed event's `value` from the clicked button's own value property, which
+  is empty, so a `phx-value-value` reaches the server as "". The selected options stay checked in the list, so adding and removing
   read as one set either way. This is the chip-and-add shape of the Roles
   control on the user page.
 
@@ -864,7 +866,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
   attr(:on_remove, JS,
     default: nil,
-    doc: "the command a chip's remove button runs, given `phx-value-name` and `phx-value-value`"
+    doc: "the command a chip's remove button runs, given `phx-value-name` and `phx-value-option`"
   )
 
   attr(:rest, :global, doc: "arbitrary HTML attributes for the button")
@@ -1026,7 +1028,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
             aria-label={gettext("Remove %{option}", option: opt_label)}
             phx-click={@on_remove}
             phx-value-name={@input_name}
-            phx-value-value={opt_value}
+            phx-value-option={opt_value}
             class="-mr-1 grid size-5 place-items-center rounded-full text-ink-muted transition hover:bg-surface-sunken hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30"
           >
             <.icon name="close" class="size-3.5" />

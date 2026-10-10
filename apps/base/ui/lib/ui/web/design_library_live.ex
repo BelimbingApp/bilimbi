@@ -252,7 +252,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   # form drops that value, which is all the multi-select asks of its caller.
   def handle_event(
         "sample_chip_remove",
-        %{"name" => "sample[" <> rest, "value" => value},
+        %{"name" => "sample[" <> rest, "option" => value},
         socket
       ) do
     key = String.trim_trailing(rest, "][]")
