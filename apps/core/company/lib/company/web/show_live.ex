@@ -43,8 +43,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     the decision, so one dialog both collects it and, for the irreversible
     archive, confirms it with the same consequence-first shape.
 
-  A fact an operator restricted to roles the viewer lacks (Administration >
-  Authorization > Field Access) reads `<.restricted>` with no editor, the
+  A fact an operator restricted for a role the viewer holds (Administration >
+  Authorization > Field Restrictions) reads `<.restricted>` with no editor, the
   jurisdiction and website facts included, and `Company.update_company/3`
   refuses a forged write to it whatever value it carries.
 
@@ -1117,7 +1117,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <.restricted
                 :if={Restricted.restricted?(@company.jurisdiction)}
                 id="company-jurisdiction-restricted"
-                roles={@company.jurisdiction.roles}
               />
               <.choice_fact
                 :if={not Restricted.restricted?(@company.jurisdiction)}
@@ -1360,7 +1359,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <.restricted
                 :if={Restricted.restricted?(child.jurisdiction)}
                 id={"child-#{child.id}-jurisdiction-restricted"}
-                roles={child.jurisdiction.roles}
               />
               <span
                 :if={not Restricted.restricted?(child.jurisdiction)}
@@ -1665,14 +1663,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     assigns = assign(assigns, :restricted?, Restricted.restricted?(assigns.value))
 
     ~H"""
-    <%!-- A fact an operator restricted to roles the viewer lacks
+    <%!-- A fact an operator restricted for a role the viewer holds
          (`Bilimbi.Core.Company.Summary.for_scope/2`) is the marker and nothing
          else, whether or not the viewer may update: an editor cannot show what
          it would replace, and `update_company/3` refuses the change anyway. --%>
     <.restricted
       :if={@restricted?}
       id={"#{@dom_id}-restricted"}
-      roles={@value.roles}
       class={@class}
     />
     <.commit_status :if={@restricted?} id={"#{@dom_id}-status"} status={@field_status[@name]} />

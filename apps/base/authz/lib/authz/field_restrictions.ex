@@ -1,13 +1,14 @@
 defmodule Bilimbi.Base.Authz.FieldRestrictions do
   @moduledoc """
-  Field access restrictions an operator sets at runtime, per tenant.
+  Field restrictions an operator sets at runtime, per tenant.
 
-  A restriction names one field of one catalog table, in the vocabulary
-  `Bilimbi.Base.Grid` installs (`companies` / `email`), and the roles that
-  still see it. Everyone else in the tenant reads the field as
-  `Bilimbi.Base.Authz.Restricted`: on the record page, in grid columns, in
-  the audit views, and on create and update, where any submitted value is
-  refused whatever it is.
+  Every field is visible by default. A restriction names one field of one
+  catalog table, in the vocabulary `Bilimbi.Base.Grid` installs
+  (`companies` / `email`), and the roles it is restricted for. A reader who
+  holds any of those roles reads the field as `Bilimbi.Base.Authz.Restricted`:
+  on the record page, in grid columns, in the audit views, and on create and
+  update, where any submitted value is refused whatever it is. Everyone else
+  sees the value.
 
   The catalog of what may be restricted is read from the installed `:grid`
   contribution snapshot as plain data, so Base Authz keeps no dependency on
@@ -18,9 +19,12 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   The decision for a reader is made from the roles assigned to the scope's
   actor in the company they signed in at, read afresh on every ask, so a role
   revoked or a restriction removed takes effect on the next check, on any
-  node and inside an open LiveView. A named system principal and an
-  anonymous system scope hold no roles, so every restricted field is
-  withheld from them.
+  node and inside an open LiveView. The restriction wins: a reader holding a
+  restricted role and an unrestricted one is restricted. A grant-all role
+  earns no exemption; listing it restricts its holders like any other. A
+  named system principal and an anonymous system scope hold no roles, so
+  nothing is restricted for them: a field is visible unless a role the
+  reader holds is named.
   """
 
   import Ecto.Query
@@ -123,22 +127,29 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   end
 
   @doc """
-  Restricts `field_id` of `table_id` to `role_ids` in the scope's tenant,
+  Restricts `field_id` of `table_id` for `role_ids` in the scope's tenant,
   creating the restriction or replacing the roles of the existing one.
 
-  The field must be restrictable (`catalog/0`), and every role must be one
-  the scope may see: a system role, or a custom role of a live company in the
-  tenant. The write and a retained `authz.field_restriction.set` audit action
-  naming the operator commit together.
+  The field must be restrictable (`catalog/0`), at least one role must be
+  named (`:no_roles`: a restriction for nobody restricts nothing), and every
+  role must be one the scope may see: a system role, or a custom role of a
+  live company in the tenant. The write and a retained
+  `authz.field_restriction.set` audit action naming the operator commit
+  together.
   """
   @spec put(Scope.t(), String.t(), String.t(), [pos_integer()], operator(), map()) ::
           {:ok, FieldRestrictionSummary.t()}
-          | {:error, :not_restrictable | {:unknown_roles, [pos_integer()]} | :audit_unavailable}
+          | {:error,
+             :not_restrictable
+             | :no_roles
+             | {:unknown_roles, [pos_integer()]}
+             | :audit_unavailable}
   def put(%Scope{} = scope, table_id, field_id, role_ids, operator, registry)
       when is_binary(table_id) and is_binary(field_id) and is_list(role_ids) do
     role_ids = role_ids |> Enum.uniq() |> Enum.sort()
 
     with :ok <- restrictable(table_id, field_id),
+         :ok <- some_roles(role_ids),
          :ok <- roles_in_scope(scope, role_ids, registry) do
       tenant_id = Scope.tenant_id(scope)
 
@@ -166,19 +177,17 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
           from(rr in FieldRestrictionRole, where: rr.restriction_id == ^restriction.id)
         )
 
-        if role_ids != [] do
-          Repo.insert_all(
-            FieldRestrictionRole,
-            Enum.map(role_ids, fn role_id ->
-              %{
-                restriction_id: restriction.id,
-                role_id: role_id,
-                created_at: now,
-                updated_at: now
-              }
-            end)
-          )
-        end
+        Repo.insert_all(
+          FieldRestrictionRole,
+          Enum.map(role_ids, fn role_id ->
+            %{
+              restriction_id: restriction.id,
+              role_id: role_id,
+              created_at: now,
+              updated_at: now
+            }
+          end)
+        )
 
         record!(scope, "authz.field_restriction.set", restriction, role_ids, operator, registry)
 
@@ -190,13 +199,14 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   end
 
   @doc """
-  Restricts several catalog fields to the same `role_ids` at once, as one
+  Restricts several catalog fields for the same `role_ids` at once, as one
   transaction: either every field is restricted or none is.
 
   `fields` are `{table_id, field_id}` pairs; duplicates are ignored and an
-  empty list is `:no_fields`. Every field must be restrictable and every role
-  in scope, checked before anything is written, so a mistaken pick does not
-  leave half the batch behind. Each field keeps its own restriction row and
+  empty list is `:no_fields`, as an empty role list is `:no_roles`. Every
+  field must be restrictable and every role in scope, checked before
+  anything is written, so a mistaken pick does not leave half the batch
+  behind. Each field keeps its own restriction row and
   its own retained `authz.field_restriction.set` audit action, exactly as if
   restricted alone (`put/6`): the batch is the operator's convenience, not a
   new kind of record.
@@ -205,6 +215,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
           {:ok, [FieldRestrictionSummary.t()]}
           | {:error,
              :no_fields
+             | :no_roles
              | :not_restrictable
              | {:unknown_roles, [pos_integer()]}
              | :audit_unavailable}
@@ -215,6 +226,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
 
     with :ok <- some_fields(fields),
          :ok <- all_restrictable(fields),
+         :ok <- some_roles(role_ids),
          :ok <- roles_in_scope(scope, role_ids, registry) do
       transaction(fn ->
         Enum.map(fields, fn {table_id, field_id} ->
@@ -268,12 +280,15 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   def remove(%Scope{}, _restriction_id, _operator, _registry), do: {:ok, :not_found}
 
   @doc """
-  The fields the scope's actor may not see, as `%{table_id => [field_id]}`,
-  with the roles that see each: `%{table_id => %{field_id => [role_name]}}`.
+  The fields the scope's actor may not see, with the roles each is
+  restricted for: `%{table_id => %{field_id => [role_name]}}`.
 
-  One query for the tenant's restrictions; when there are any, one more for
-  the roles the actor holds in the company they signed in at. A table with
-  nothing restricted for this actor is absent.
+  A field is withheld when the actor holds any of the roles its restriction
+  names; the restriction wins over every other role they hold. One query for
+  the tenant's restrictions; when there are any, one more for the roles the
+  actor holds in the company they signed in at. A table with nothing
+  restricted for this actor is absent, and a system scope, holding no role,
+  is restricted nowhere.
   """
   @spec restricted(Scope.t(), map() | (-> map())) ::
           %{String.t() => %{String.t() => [String.t()]}}
@@ -293,7 +308,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
           |> role_names()
 
         restrictions
-        |> Enum.reject(fn r -> Enum.any?(r.roles, &MapSet.member?(held, &1.role_id)) end)
+        |> Enum.filter(fn r -> Enum.any?(r.roles, &MapSet.member?(held, &1.role_id)) end)
         |> Enum.group_by(& &1.table_id)
         |> Map.new(fn {table_id, rows} ->
           {table_id,
@@ -380,7 +395,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   end
 
   # The roles the actor holds in the company they signed in at. A system
-  # scope, named or not, holds none.
+  # scope, named or not, holds none, so nothing is restricted for it.
   defp held_role_ids(%Scope{} = scope, registry) do
     case Scope.actor(scope) do
       %TenancyActor{type: :user, user_id: user_id, company_id: company_id} ->
@@ -411,6 +426,9 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
   defp some_fields([]), do: {:error, :no_fields}
   defp some_fields(_fields), do: :ok
 
+  defp some_roles([]), do: {:error, :no_roles}
+  defp some_roles(_role_ids), do: :ok
+
   defp all_restrictable(fields) do
     catalog = catalog()
 
@@ -426,8 +444,6 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
 
     if Enum.all?(fields, restrictable?), do: :ok, else: {:error, :not_restrictable}
   end
-
-  defp roles_in_scope(_scope, [], _registry), do: :ok
 
   defp roles_in_scope(scope, role_ids, registry) do
     malformed = Enum.reject(role_ids, &(is_integer(&1) and &1 > 0))
@@ -459,10 +475,9 @@ defmodule Bilimbi.Base.Authz.FieldRestrictions do
     subject = "#{restriction.table_id}.#{restriction.field_id}"
 
     summary =
-      case {event, roles} do
-        {"authz.field_restriction.removed", _} -> "#{verb} #{subject}"
-        {_, []} -> "#{verb} #{subject} to no role"
-        {_, roles} -> "#{verb} #{subject} to #{Enum.join(roles, ", ")}"
+      case event do
+        "authz.field_restriction.removed" -> "#{verb} #{subject}"
+        _set -> "#{verb} #{subject} for #{Enum.join(roles, ", ")}"
       end
 
     attributes = %{

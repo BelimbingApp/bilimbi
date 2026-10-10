@@ -1205,6 +1205,24 @@
                   selection_label=":count role selected|:count roles selected"
                 />
                 <div class="border-t border-line pt-3">
+                  <p class="mb-2 text-xs text-ink-muted">
+                    With chips: each choice is shown and removed in place, and the trigger keeps its verb
+                  </p>
+                  <.multi_select
+                    field={@sample_form[:chip_roles]}
+                    id="design-library-multi-select-chips"
+                    aria-label="Roles with chips"
+                    placeholder="Add roles"
+                    chips
+                    on_remove={JS.push("sample_chip_remove")}
+                    options={[
+                      {"Administrator", "admin"},
+                      {"Operator", "operator"},
+                      {"Reviewer", "reviewer"}
+                    ]}
+                  />
+                </div>
+                <div class="border-t border-line pt-3">
                   <p class="mb-2 text-xs text-ink-muted">Optional, on its own</p>
                   <.multi_select
                     field={@sample_form[:plain_roles]}
@@ -1401,6 +1419,20 @@
                     label="Interests"
                     selection_label=":count interest selected|:count interests selected"
                     options={[{"Platform", "platform"}, {"Billing", "billing"}]}
+                  />
+                  <.input
+                    field={@sample_form[:example_teams_chips]}
+                    id="example_teams_chips"
+                    type="multi_select"
+                    label="Teams, as chips"
+                    placeholder="Add teams"
+                    chips
+                    on_remove={JS.push("sample_chip_remove")}
+                    options={[
+                      {"Platform", "platform"},
+                      {"Billing", "billing"},
+                      {"Support", "support"}
+                    ]}
                   />
                   <.input
                     name="quick_search"
@@ -2173,14 +2205,12 @@
               >
                 <p class="text-xs text-ink-muted">
                   A field the viewer may not see, beside an empty one: restricted is not blank.
-                  The lock's tooltip says what to do, and names the roles to ask for when the
-                  page knows them.
+                  The lock's tooltip says plainly that the viewer has no access; it names no
+                  role, because the field is restricted for a role the viewer holds.
                 </p>
                 <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
                   <span class="text-ink-muted">Bank account</span>
-                  <.restricted id="design-library-restricted" roles={["Payroll"]} />
-                  <span class="text-ink-muted">Salary</span>
-                  <.restricted id="design-library-restricted-plain" />
+                  <.restricted id="design-library-restricted" />
                   <span class="text-ink-muted">Bonus</span>
                   <.restricted
                     id="design-library-restricted-reason"
@@ -2198,11 +2228,7 @@
                   The same field in a create or edit form: a read-only row that keeps its
                   label, never an omitted input, and submits nothing.
                 </p>
-                <.restricted_field
-                  id="design-library-restricted-field"
-                  label="Bank account"
-                  roles={["Payroll"]}
-                />
+                <.restricted_field id="design-library-restricted-field" label="Bank account" />
                 <.restricted_field
                   id="design-library-restricted-field-reason"
                   label="Bonus"

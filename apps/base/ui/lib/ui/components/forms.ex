@@ -28,24 +28,18 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   edit form the same field is `<.restricted_field>`, a read-only row, never
   an omitted input.
 
-  The tooltip tells the person what to do: "You don't have access to this.
-  Ask your administrator." Pass `roles`, the names of the roles that see the
-  field (`roles` of the `Bilimbi.Base.Authz.Restricted` marker), and the
-  sentence names them: "... for the Finance role." or "... for one of the
-  roles Audit, Finance." `reason` replaces the whole sentence when a page has
-  a better one.
+  The tooltip says plainly what is true: "You don't have access to this
+  field." A field is restricted for roles the person holds
+  (`Bilimbi.Base.Authz.Restricted`), so naming roles here would name their
+  own; there is nothing to ask for. `reason` replaces the sentence when a
+  page has a better one.
 
   ## Examples
 
-      <.restricted id="detail-email-restricted" roles={@company.email.roles} />
+      <.restricted id="detail-email-restricted" />
       <.restricted id="salary-restricted" reason="Salaries are shown to payroll only." />
   """
   attr(:id, :string, required: true)
-
-  attr(:roles, :list,
-    default: [],
-    doc: "the names of the roles that see the field, as the marker carries them"
-  )
 
   attr(:reason, :string,
     default: nil,
@@ -55,7 +49,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   attr(:class, :any, default: nil)
 
   def restricted(assigns) do
-    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason(assigns.roles))
+    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason())
 
     ~H"""
     <span
@@ -71,23 +65,9 @@ defmodule Bilimbi.Base.UI.Components.Forms do
     """
   end
 
-  @doc """
-  The sentence a restricted field explains itself with: what happened and
-  what to do, naming the roles that see the field when there are any.
-  """
-  @spec restricted_reason([String.t()]) :: String.t()
-  def restricted_reason([]),
-    do: gettext("You don't have access to this. Ask your administrator.")
-
-  def restricted_reason([_ | _] = roles) do
-    ngettext(
-      "You don't have access to this. Ask your administrator for the %{role} role.",
-      "You don't have access to this. Ask your administrator for one of the roles %{roles}.",
-      length(roles),
-      role: hd(roles),
-      roles: Enum.join(roles, ", ")
-    )
-  end
+  @doc "The one sentence a restricted field explains itself with."
+  @spec restricted_reason() :: String.t()
+  def restricted_reason, do: gettext("You don't have access to this field.")
 
   @doc """
   A form row for a field the person may not see.
@@ -103,15 +83,10 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
   ## Examples
 
-      <.restricted_field id="company-email" label="Email" roles={["Tenant Owner"]} />
+      <.restricted_field id="company-email" label="Email" />
   """
   attr(:id, :string, required: true)
   attr(:label, :string, required: true)
-
-  attr(:roles, :list,
-    default: [],
-    doc: "the names of the roles that see the field, as the marker carries them"
-  )
 
   attr(:reason, :string,
     default: nil,
@@ -121,12 +96,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   attr(:wrapper_class, :any, default: nil)
 
   def restricted_field(assigns) do
-    assigns =
-      assign(
-        assigns,
-        :tooltip,
-        assigns.reason || restricted_reason(assigns.roles)
-      )
+    assigns = assign(assigns, :tooltip, assigns.reason || restricted_reason())
 
     ~H"""
     <div id={@id} class={@wrapper_class || "mb-4"} data-restricted-field>
@@ -140,7 +110,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
         title={@tooltip}
         class="flex min-h-10 w-full items-center rounded-lg border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted"
       >
-        <.restricted id={"#{@id}-restricted"} roles={@roles} reason={@reason} />
+        <.restricted id={"#{@id}-restricted"} reason={@reason} />
       </div>
     </div>
     """
@@ -300,6 +270,16 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   attr(:selection_label, :string,
     default: nil,
     doc: "the singular|plural summary template for a `multi_select` input"
+  )
+
+  attr(:chips, :boolean,
+    default: false,
+    doc: "for a `multi_select` input: show each selected option as a removable chip"
+  )
+
+  attr(:on_remove, JS,
+    default: nil,
+    doc: "for a `multi_select` input with `chips`: the command a chip's remove button runs"
   )
 
   attr(:class, :any, default: nil, doc: "the input class to use over defaults")
@@ -829,6 +809,16 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   trigger only when focus was already inside the field, and otherwise stays
   where the user put it.
 
+  With `chips` the control shows what is chosen instead of counting it: each
+  selected option is a chip with a remove button above the trigger, which
+  then reads `placeholder` as the verb to add more ("Add roles"). A chip's
+  remove button runs `on_remove` with `phx-value-name` (the input name) and
+  `phx-value-value` (the option's value), so the owning LiveView drops the
+  value from its form and re-renders; the component holds no state of its
+  own. The selected options stay checked in the list, so adding and removing
+  read as one set either way. This is the chip-and-add shape of the Roles
+  control on the user page.
+
   ## Examples
 
       <.multi_select
@@ -866,6 +856,17 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
   attr(:hint, :string, default: nil)
   attr(:required, :boolean, default: false)
+
+  attr(:chips, :boolean,
+    default: false,
+    doc: "show each selected option as a chip with a remove button; needs `on_remove`"
+  )
+
+  attr(:on_remove, JS,
+    default: nil,
+    doc: "the command a chip's remove button runs, given `phx-value-name` and `phx-value-value`"
+  )
+
   attr(:rest, :global, doc: "arbitrary HTML attributes for the button")
 
   def multi_select(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
@@ -923,12 +924,15 @@ defmodule Bilimbi.Base.UI.Components.Forms do
 
     selected_count = Enum.count(normalized_options, fn {_, val} -> val in selected_values end)
 
+    # In chip mode the chips carry the selection, so the trigger keeps its
+    # verb; a count beside the chips would say the same thing twice.
     summary_label =
-      format_selection_summary(
-        selected_count,
-        assigns.placeholder,
-        assigns.selection_label
-      )
+      if assigns.chips,
+        do: assigns.placeholder,
+        else:
+          format_selection_summary(selected_count, assigns.placeholder, assigns.selection_label)
+
+    selected_options = Enum.filter(normalized_options, fn {_, val} -> val in selected_values end)
 
     # `aria-expanded` follows the list because the same command moves both.
     # Click-away sits on the wrapper: LiveView dispatches click-away before
@@ -977,6 +981,7 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       |> assign(:selected_values, selected_values)
       |> assign(:normalized_options, normalized_options)
       |> assign(:selected_count, selected_count)
+      |> assign(:selected_options, selected_options)
       |> assign(:summary_label, summary_label)
       |> assign(:dismiss, dismiss)
       |> assign(:toggle, toggle)
@@ -1000,6 +1005,34 @@ defmodule Bilimbi.Base.UI.Components.Forms do
       >
         {@label}<span :if={@required} aria-hidden="true">*</span>
       </label>
+
+      <div
+        :if={@chips and @selected_options != []}
+        id={"#{@id}-chips"}
+        class="mb-2 flex flex-wrap gap-2"
+        role="list"
+        aria-labelledby={@label && "#{@id}-label"}
+      >
+        <span
+          :for={{opt_label, opt_value} <- @selected_options}
+          id={"#{@id}-chip-#{opt_value}"}
+          role="listitem"
+          class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-ink"
+        >
+          <span>{opt_label}</span>
+          <button
+            type="button"
+            id={"#{@id}-chip-#{opt_value}-remove"}
+            aria-label={gettext("Remove %{option}", option: opt_label)}
+            phx-click={@on_remove}
+            phx-value-name={@input_name}
+            phx-value-value={opt_value}
+            class="-mr-1 grid size-5 place-items-center rounded-full text-ink-muted transition hover:bg-surface-sunken hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30"
+          >
+            <.icon name="close" class="size-3.5" />
+          </button>
+        </span>
+      </div>
 
       <button
         id={@id}

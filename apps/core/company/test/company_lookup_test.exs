@@ -60,11 +60,19 @@ defmodule Bilimbi.Core.CompanyLookupTest do
   # holds yet, as the operator page would.
   defp restrict_email!(reader), do: restrict!(reader, "email")
 
+  # Restricts `field` for a Finance role the reader holds: a field is visible
+  # until a role the reader holds is named.
   defp restrict!(reader, field) do
     grant!("admin.authz.field.manage")
     {:ok, finance} = Authz.create_role(reader, @company_id, %{name: "Finance", code: "finance"})
     {:ok, _} = Authz.put_field_restriction(reader, "companies", field, [finance.id])
+    {:ok, :assigned} = Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
     finance
+  end
+
+  defp drop_role!(reader, role) do
+    %{entries: [assignment]} = Authz.list_principal_role_assignments(reader, :user, @user_id)
+    {:ok, :unassigned} = Authz.unassign_role(reader, role.id, assignment.id)
   end
 
   test "the identity lookup is one query with no authorization evaluation", %{reader: reader} do
@@ -132,7 +140,8 @@ defmodule Bilimbi.Core.CompanyLookupTest do
   end
 
   describe "a restricted field" do
-    test "is withheld from every summary and names the roles that see it", %{reader: reader} do
+    test "is withheld from every summary of a holder and names the roles it is restricted for",
+         %{reader: reader} do
       finance = restrict_email!(reader)
 
       assert {:ok, %Summary{email: %Restricted{} = marker, tax_id: "TAX-98765"}} =
@@ -150,9 +159,8 @@ defmodule Bilimbi.Core.CompanyLookupTest do
       assert {:ok, %{company: %Summary{email: %Restricted{}}}} =
                Company.dashboard_summary(reader, @company_id)
 
-      # A holder of the role reads the value, on the very next call.
-      assert {:ok, :assigned} =
-               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+      # Without the role the value is back, on the very next call.
+      drop_role!(reader, finance)
 
       assert {:ok, %Summary{email: "hq@bilimbi.test"}} = Company.get_company(reader, @company_id)
       assert Company.restricted_field_markers(reader) == %{}
@@ -183,9 +191,10 @@ defmodule Bilimbi.Core.CompanyLookupTest do
       assert {:ok, %Summary{name: "New Co", email: %Restricted{}}} =
                Company.create_company(reader, %{name: "New Co"})
 
+      # A system scope holds no role, so nothing is restricted for it.
       {:ok, system_scope} = Tenancy.scope(41)
 
-      assert {:ok, %Summary{name: "Renamed", email: %Restricted{}}} =
+      assert {:ok, %Summary{name: "Renamed", email: "hq@bilimbi.test"}} =
                Company.get_company(system_scope, @company_id)
     end
 
@@ -210,8 +219,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
       assert {:ok, %{entries: [%{id: @company_id}]}} =
                Company.list_administration_page(reader, search: "Bilimbi Ind")
 
-      assert {:ok, :assigned} =
-               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+      drop_role!(reader, finance)
 
       assert {:ok, %{entries: [%{id: @company_id}]}} =
                Company.list_administration_page(reader, search: "hq@bilimbi")
@@ -239,8 +247,7 @@ defmodule Bilimbi.Core.CompanyLookupTest do
 
       assert {:ok, %{entries: []}} = Company.list_administration_page(reader, search: "AU")
 
-      assert {:ok, :assigned} =
-               Authz.assign_role(reader, @company_id, :user, @user_id, finance.id)
+      drop_role!(reader, finance)
 
       assert {:ok, %{entries: [%{jurisdiction: "MY"}, %{jurisdiction: "AU"}]}} =
                Company.list_administration_page(reader, desc)

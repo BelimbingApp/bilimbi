@@ -117,11 +117,11 @@ defmodule Bilimbi.Base.Authz.Contributions do
           order: 50
         },
         %{
-          id: "admin.authz.field-access",
-          label: "Field Access",
+          id: "admin.authz.field-restrictions",
+          label: "Field Restrictions",
           icon: "lock-closed",
           parent: "admin.authz",
-          route: "/authz/field-access",
+          route: "/authz/field-restrictions",
           capability: "admin.authz.field.manage",
           order: 60
         }

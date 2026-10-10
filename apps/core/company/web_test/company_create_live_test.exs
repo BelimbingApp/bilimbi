@@ -293,7 +293,7 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
   end
 
   describe "a restricted field" do
-    test "names the roles that see it in the tooltip, as the record page does", %{conn: conn} do
+    test "says plainly that the person has no access, as the record page does", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.create"])
       {:ok, scope} = Tenancy.scope(41)
       grant_capabilities!("admin.authz.field.manage", user_id: 92)
@@ -305,16 +305,20 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
       {:ok, _} =
         Authz.put_field_restriction(operator, "companies", "tax_id", [finance.id, audit.id])
 
+      # The viewer holds Finance, so both fields are restricted for them; a
+      # field restricted for a role they do not hold stays an ordinary input.
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
       assert has_element?(
                view,
-               "#company-email-restricted-value[title=\"You don't have access to this. Ask your administrator for the Finance role.\"]"
+               "#company-email-restricted-value[title=\"You don't have access to this field.\"]"
              )
 
       assert has_element?(
                view,
-               "#company-tax-id-restricted-value[title^=\"You don't have access to this. Ask your administrator for one of the roles \"]"
+               "#company-tax-id-restricted-value[title=\"You don't have access to this field.\"]"
              )
 
       assert has_element?(view, "input[name='company[legal_name]']")
@@ -327,7 +331,9 @@ defmodule BilimbiWeb.CompanyCreateLiveTest do
       {:ok, scope} = Tenancy.scope(41)
       grant_capabilities!("admin.authz.field.manage", user_id: 92)
       operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
-      {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [])
+      {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
+      {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [finance.id])
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 

@@ -1704,7 +1704,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
   describe "field access" do
     # An operator (user 92, holding admin.authz.field.manage) restricts the
-    # company email to a Finance role. The signed-in user 91 holds no role.
+    # company email for a Finance role, which the signed-in user 91 holds.
     setup do
       {:ok, scope} = Tenancy.scope(41)
       {:ok, _} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
@@ -1712,10 +1712,11 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
       {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
       {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [finance.id])
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
       %{operator: operator, finance: finance}
     end
 
-    test "a viewer without the role sees the fact as Restricted, never the value", %{conn: conn} do
+    test "a holder of the role sees the fact as Restricted, never the value", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies/73")
@@ -1724,7 +1725,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
       assert has_element?(
                view,
-               "#detail-email #company-email-restricted[data-restricted][title=\"You don't have access to this. Ask your administrator for the Finance role.\"]",
+               "#detail-email #company-email-restricted[data-restricted][title=\"You don't have access to this field.\"]",
                "Restricted"
              )
 
@@ -1749,17 +1750,19 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
       refute render(view) =~ "hq@bilimbi.test"
 
+      # The stored value is unchanged; a system scope holds no role and reads it.
       {:ok, scope} = Tenancy.scope(41)
-      assert {:ok, %{email: %Bilimbi.Base.Authz.Restricted{}}} = Company.get_company(scope, 73)
+      assert {:ok, %{email: "hq@bilimbi.test"}} = Company.get_company(scope, 73)
     end
 
-    test "a holder of the role sees and edits the value", %{
+    test "a viewer without the role sees and edits the value", %{
       conn: conn,
       operator: operator,
       finance: finance
     } do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
-      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+      %{entries: [assignment]} = Authz.list_principal_role_assignments(operator, :user, 91)
+      {:ok, :unassigned} = Authz.unassign_role(operator, finance.id, assignment.id)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 

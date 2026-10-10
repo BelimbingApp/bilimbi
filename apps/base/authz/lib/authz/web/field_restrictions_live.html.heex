@@ -1,30 +1,34 @@
-<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.authz.field-access">
-  <.page id="field-access-index">
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.authz.field-restrictions"
+>
+  <.page id="field-restrictions-index">
     <.header>
-      Field Access
+      Field Restrictions
       <:title_actions>
         <.icon_button
           icon="bilimbi-pin"
-          label="Pin Field Access to sidebar"
+          label="Pin Field Restrictions to sidebar"
           context={:inline}
-          id="field-access-pin"
-          data-nav-pin="nav-admin-authz-field-access"
+          id="field-restrictions-pin"
+          data-nav-pin="nav-admin-authz-field-restrictions"
           aria-pressed="false"
         />
       </:title_actions>
       <:subtitle>
-        Which fields the roles of this tenant may see. A restricted field reads as Restricted
-        for every other role, on the record, in list columns and in the audit log, and cannot be
-        changed by them.
+        Every field is visible unless it is restricted here. A restricted field reads as
+        Restricted for the roles named, on the record, in list columns and in the audit log,
+        and cannot be changed by them.
       </:subtitle>
       <:actions>
-        <.button id="field-access-new" variant="primary" phx-click="new">
+        <.button id="field-restrictions-new" variant="primary" phx-click="new">
           Restrict fields
         </.button>
       </:actions>
     </.header>
 
-    <.card id="field-access-card" inner_class="p-0">
+    <.card id="field-restrictions-card" inner_class="p-0">
       <.table id="field-restrictions" rows={@restrictions} framed={false}>
         <:col :let={restriction} label="Table">
           <span class="whitespace-nowrap text-ink">{restriction.table_label}</span>
@@ -32,8 +36,7 @@
         <:col :let={restriction} label="Field">
           <span class="whitespace-nowrap text-ink">{restriction.field_label}</span>
         </:col>
-        <:col :let={restriction} label="Still visible to">
-          <span :if={restriction.role_names == []} class="text-ink-muted">No role</span>
+        <:col :let={restriction} label="Restricted for">
           <span :for={name <- restriction.role_names} class="mr-1 inline-flex">
             <.badge>{name}</.badge>
           </span>
@@ -50,7 +53,7 @@
           <.icon_button
             id={"field-restriction-#{restriction.id}-edit"}
             icon="edit"
-            label={"Change who sees #{restriction.table_label} › #{restriction.field_label}"}
+            label={"Change the roles #{restriction.table_label} › #{restriction.field_label} is restricted for"}
             context={:inline}
             phx-click="edit"
             phx-value-id={restriction.id}
@@ -68,78 +71,80 @@
         <:empty
           :if={@restrictions == []}
           title="No field is restricted in this tenant"
-          reason="Every role sees every field. Use Restrict fields to hide some from the roles that do not need them."
+          reason="Every role sees every field. Use Restrict fields to hide some from the roles that should not see them."
         />
       </.table>
     </.card>
 
-    <%!-- Roles first, then tables, then fields: the operator states who keeps
-         access before naming what. The sentence under the pickers reads the
-         three choices back before anything is saved. --%>
+    <%!-- Roles first, then tables, then fields: the operator names who is
+         restricted before naming from what. Each picker shows its choices as
+         chips, and the sentence under them reads the whole choice back. --%>
     <.modal
       :if={@dialog == :add}
-      id="field-access-dialog"
+      id="field-restrictions-dialog"
       title="Restrict fields"
       flash={@flash}
       on_cancel={JS.push("close_dialog")}
     >
       <:description>
-        Choose the roles that keep seeing the fields, then the fields. Fields every reader
-        needs, such as a record's name or code, are not offered.
+        Fields every reader needs, such as a record's name or code, are not offered.
       </:description>
       <.form
         for={@form}
-        id="field-access-form"
+        id="field-restrictions-form"
         phx-change="validate"
         phx-submit="save"
         class="mt-4 space-y-4"
       >
         <.input
           field={@form[:role_ids]}
-          id="field-access-roles"
+          id="field-restrictions-roles"
           type="multi_select"
-          label="Roles that may still see the fields"
-          placeholder="No role: hidden from everyone"
-          selection_label=":count role selected|:count roles selected"
+          label="Choose the roles to restrict field access"
+          placeholder="Add roles"
+          chips
+          on_remove={JS.push("deselect")}
           options={role_options(@roles)}
-          hint="Every other role reads Restricted."
         />
         <.input
           field={@form[:table_ids]}
-          id="field-access-tables"
+          id="field-restrictions-tables"
           type="multi_select"
           label="Tables"
-          placeholder="Choose tables"
-          selection_label=":count table selected|:count tables selected"
+          placeholder="Add tables"
+          chips
+          on_remove={JS.push("deselect")}
           options={table_options(@catalog)}
         />
         <.input
           field={@form[:field_keys]}
-          id="field-access-fields"
+          id="field-restrictions-fields"
           type="multi_select"
           label="Fields"
-          placeholder={if @field_options == [], do: "Choose a table first", else: "Choose fields"}
-          selection_label=":count field selected|:count fields selected"
+          placeholder={if @field_options == [], do: "Choose a table first", else: "Add fields"}
+          chips
+          on_remove={JS.push("deselect")}
           options={@field_options}
           disabled={@field_options == []}
         />
 
         <p
-          id="field-access-outcome"
+          :if={outcome_sentence(@chosen_fields, @chosen_roles)}
+          id="field-restrictions-outcome"
           class="rounded-md bg-surface-sunken px-3 py-2 text-sm text-ink"
         >
           {outcome_sentence(@chosen_fields, @chosen_roles)}
         </p>
 
         <div class="flex justify-end gap-2">
-          <.button id="field-access-cancel" type="button" phx-click="close_dialog">
+          <.button id="field-restrictions-cancel" type="button" phx-click="close_dialog">
             Cancel
           </.button>
           <.button
-            id="field-access-save"
+            id="field-restrictions-save"
             type="submit"
             variant="primary"
-            disabled={@chosen_fields == []}
+            disabled={not ready?(@chosen_fields, @chosen_roles)}
             phx-disable-with="Restricting…"
           >
             {submit_label(@chosen_fields)}
@@ -151,47 +156,49 @@
     <%= case @dialog do %>
       <% {:edit, restriction} -> %>
         <.modal
-          id="field-access-dialog"
-          title={"Who may see #{subject(restriction)}"}
+          id="field-restrictions-dialog"
+          title={"Restrict #{subject(restriction)}"}
           flash={@flash}
           on_cancel={JS.push("close_dialog")}
         >
           <:description>
-            The field stays restricted; only the roles that see it change.
+            The field stays restricted; only the roles it is restricted for change.
           </:description>
           <.form
             for={@form}
-            id="field-access-form"
+            id="field-restrictions-form"
             phx-change="validate"
             phx-submit="save"
             class="mt-4 space-y-4"
           >
             <.input
               field={@form[:role_ids]}
-              id="field-access-roles"
+              id="field-restrictions-roles"
               type="multi_select"
-              label="Roles that may still see the field"
-              placeholder="No role: hidden from everyone"
-              selection_label=":count role selected|:count roles selected"
+              label="Choose the roles to restrict field access"
+              placeholder="Add roles"
+              chips
+              on_remove={JS.push("deselect")}
               options={role_options(@roles)}
-              hint="Every other role reads Restricted."
             />
 
             <p
-              id="field-access-outcome"
+              :if={outcome_sentence([subject(restriction)], @chosen_roles)}
+              id="field-restrictions-outcome"
               class="rounded-md bg-surface-sunken px-3 py-2 text-sm text-ink"
             >
               {outcome_sentence([subject(restriction)], @chosen_roles)}
             </p>
 
             <div class="flex justify-end gap-2">
-              <.button id="field-access-cancel" type="button" phx-click="close_dialog">
+              <.button id="field-restrictions-cancel" type="button" phx-click="close_dialog">
                 Cancel
               </.button>
               <.button
-                id="field-access-save"
+                id="field-restrictions-save"
                 type="submit"
                 variant="primary"
+                disabled={@chosen_roles == []}
                 phx-disable-with="Saving…"
               >
                 Save roles
@@ -204,7 +211,7 @@
 
     <.confirm_dialog
       :if={@pending_removal}
-      id="field-access-remove-confirm"
+      id="field-restrictions-remove-confirm"
       consequence={"#{subject(@pending_removal)} will be visible to every role again."}
       detail="Anyone who may open the record, its list or its audit log will see the value at once."
       confirm="Remove restriction"

@@ -306,9 +306,9 @@ page:
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
 - **A fact the viewer may not see** reads `<.restricted>`: the word
-  "Restricted", the registry's lock, and a tooltip that says what to do
-  ("You don't have access to this. Ask your administrator.", naming the
-  roles that see the field when the page knows them), with no editor
+  "Restricted", the registry's lock, and a tooltip that says what is true
+  ("You don't have access to this field."; the field is restricted for a
+  role the viewer holds, so no role is named), with no editor
   whatever the update capability says. It is never blank and never "—",
   which mean "empty"; the owning module withholds the value before the page
   sees it, as the operator restricted it (`Bilimbi.Base.Authz.redact/3`). A create or edit form shows the same
