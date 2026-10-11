@@ -192,9 +192,9 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     # Three rows, not two: granting the route capability to the actor lists
     # itself, so Ada holds two of them. Zoe is last by name and first by id,
     # which is the whole point of the assertion.
-    assert has_element?(view, "#principal-capabilities > tr:nth-child(1)", "Ada Lovelace")
-    assert has_element?(view, "#principal-capabilities > tr:nth-child(2)", "Ada Lovelace")
-    assert has_element?(view, "#principal-capabilities > tr:nth-child(3)", "Zoe Quinn")
+    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(1)", "Ada Lovelace")
+    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(2)", "Ada Lovelace")
+    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(3)", "Zoe Quinn")
 
     view |> element("#grants-sort-principal_name") |> render_click()
     assert %{"sort_by" => "principal_name"} = patched_params(view)
@@ -333,8 +333,8 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     {:ok, view, _html} =
       conn |> log_in_as() |> live(~p"/authz/principal-capabilities?sort_by=company_name")
 
-    assert has_element?(view, "#principal-capabilities > tr:nth-child(1)", "Aurora Works")
-    assert has_element?(view, "#principal-capabilities > tr:nth-child(2)", "Bilimbi Industries")
+    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(1)", "Aurora Works")
+    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(2)", "Bilimbi Industries")
 
     view |> element("#grants-sort-company_name") |> render_click()
     assert %{"sort_by" => "company_name", "sort_dir" => "desc"} = patched_params(view)

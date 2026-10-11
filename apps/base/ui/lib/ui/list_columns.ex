@@ -122,10 +122,11 @@ defmodule Bilimbi.Base.UI.ListColumns do
   end
 
   def handle(%__MODULE__{} = state, %{"op" => "zoom_preset", "preset" => preset}) do
-    case preset do
-      "compact" -> {:update, put_zoom(state, 18)}
-      "normal" -> {:update, put_zoom(state, 32)}
-      _other -> :noop
+    case Enum.find(FlexTable.zoom_presets(), fn {name, _zoom} ->
+           Atom.to_string(name) == preset
+         end) do
+      {_name, zoom} -> {:update, put_zoom(state, zoom)}
+      nil -> :noop
     end
   end
 
