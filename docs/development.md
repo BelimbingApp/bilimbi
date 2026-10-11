@@ -94,10 +94,21 @@ Run database tasks from the umbrella root. A single module's project cannot
 see the whole composition graph, so `ModuleRegistry.complete_modules!/0`
 refuses to migrate from inside a module, Domain, or Extension.
 
-`mix bilimbi.server` checks the compiled module metadata before starting
-Phoenix. If it finds stale or missing workspace-graph metadata, it rebuilds
-the dependencies once and retries; other startup errors are reported without
-automatic recovery.
+`mix bilimbi.server` checks the compiled module metadata before compiling or
+starting Phoenix. The root alias loads the recovery task from source so Mix
+does not compile dependencies just to find it. If the task finds stale or
+missing workspace-graph metadata, it cleans the dependency builds, compiles
+once, and verifies the resulting graph. This includes a pulled module that
+introduces a dependency on a new app; unrelated compilation and startup
+errors still stop startup with their original diagnostics.
+
+After pulling new modules or dependency changes while the development server
+is running, stop it and run `mix bilimbi.server` again. Phoenix’s code reloader
+uses the dependency graph from startup; reloading a page does not refresh it.
+
+Plain `mix compile`, `mix test`, and `mix phx.server` do not run this
+preflight. If a changed workspace graph breaks one of those entry points,
+run `mix clean --deps` before retrying it.
 
 `mix precommit` is the required final check for a change. It compiles the
 umbrella with warnings as errors, strictly compiles each discovered module and

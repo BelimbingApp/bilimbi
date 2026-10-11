@@ -84,6 +84,22 @@ defmodule Bilimbi.Umbrella.MixProject do
   end
 
   defp prepare_bilimbi_server(_args) do
+    # Resolving a task from a dependency can compile that dependency closure
+    # before the task runs. Load recovery from source so its graph preflight
+    # also protects the first compile after a pull.
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+
+    try do
+      # This source definition intentionally replaces a task loaded from BEAM.
+      Code.put_compiler_option(:ignore_module_conflict, true)
+
+      Code.require_file(
+        Path.expand("apps/base/module_registry/lib/mix/tasks/bilimbi.server.ex", __DIR__)
+      )
+    after
+      Code.put_compiler_option(:ignore_module_conflict, previous)
+    end
+
     Mix.shell().info("Checking and fetching locked dependencies before starting Bilimbi.")
     Mix.Task.run("deps.get")
   end
