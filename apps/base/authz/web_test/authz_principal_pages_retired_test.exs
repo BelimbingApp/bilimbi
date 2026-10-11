@@ -4,7 +4,7 @@ defmodule BilimbiWeb.AuthzPrincipalPagesRetiredTest do
 
   Every role assignment and direct grant is made on the person, in the access
   section of `/users/:id`, and who holds a role is read on that role's page.
-  Authorization keeps Capabilities, Roles, Decision Logs and Field Access.
+  Authorization keeps Capabilities, Roles, Decision Logs and Field Restrictions.
   """
 
   use BilimbiWeb.ConnCase, async: false
@@ -38,7 +38,7 @@ defmodule BilimbiWeb.AuthzPrincipalPagesRetiredTest do
     assert has_element?(view, "#nav-admin-authz-capability")
     assert has_element?(view, "#nav-admin-authz-role[aria-current='page']")
     assert has_element?(view, "#nav-admin-authz-decision-log")
-    assert has_element?(view, "#nav-admin-authz-field-access")
+    assert has_element?(view, "#nav-admin-authz-field-restrictions")
     refute has_element?(view, "#nav-admin-authz-principal-role")
     refute has_element?(view, "#nav-admin-authz-principal-capability")
     refute has_element?(view, "#app-shell a[href='/authz/principal-roles']")
