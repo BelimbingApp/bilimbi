@@ -1,7 +1,7 @@
 # ADR 0021: External agents act for a person through granted connections and self-registered API operations
 
 **Document Type:** Architecture Decision Record
-**Status:** Proposed
+**Status:** Accepted
 **Agents:** claude-code/opus-5.5
 **Scope:** How an AI agent running outside Bilimbi is connected to a person,
 what it may do, how it finds and calls operations any installed module
@@ -18,10 +18,9 @@ registers, and how its work is recorded
 People want agents they already use, such as coding agents and chat apps, to
 look things up and fill in records in Bilimbi. The owner decided that Bilimbi
 itself stays free of AI, that agents come in through an API that runs the
-same operations and checks as the screens, that a connection belongs to a
-person and never exceeds that person's permissions, that it is read-only by
-default with risky writes drafted for a person's approval, and that audit
-names the agent, the person, the channel and the run.
+same operations and checks as the screens, that an agent can do what its
+person can do and nothing more, that the person sees and agrees to every
+change before it is written, and that every call is logged.
 
 Four facts shaped the decision.
 
@@ -42,14 +41,14 @@ Four facts shaped the decision.
 ## Decision
 
 1. **A connection is an OAuth grant owned by one person.** Bilimbi is its
-   own authorization server. A connection binds a person, the company they
-   approved it in, and that company's tenant. It carries a level, `read`,
-   `draft` or `write`, an optional area ceiling of capability keys, an
-   end date, and the agent ID shown at approval. Core Agent Access
-   (`core/agent_access`) owns connections and their tokens.
+   own authorization server. Any signed-in person may connect an agent to
+   their own account. A connection binds the person, the company they
+   approved it in, and that company's tenant, with an end date and the
+   agent ID shown at approval. Core Agent Access (`core/agent_access`)
+   owns connections and their tokens.
    - The primary way to connect is the device authorization grant (RFC 8628):
      the agent shows a code, and the person approves in Bilimbi on a page
-     that names the stated agent ID, the level and the areas.
+     that names the stated agent ID.
    - Authorization code with PKCE `S256` serves clients that can open a
      browser on a loopback address (RFC 8252) and operator-registered front
      ends.
@@ -64,42 +63,45 @@ Four facts shaped the decision.
    `BilimbiWeb.AgentAuth` proves the token, the connection, the company,
    the tenant and the person, with the browser edge's proof, then calls
    `Authentication.sign_in/4` with an `:agent` facet. The person is the
-   actor (`type: :user`). The sealed facet names the connection, the agent
-   ID stated on that request, the level and the ceiling. Domain code reads
-   it only through `Scope.actor/1`. `delegate/1` refuses a facet scope.
+   actor (`type: :user`). The sealed facet names the connection and the
+   agent ID stated on that request. Domain code reads it only through
+   `Scope.actor/1`. `delegate/1` refuses a facet scope.
 
-3. **Authz bounds every agent facet.** For a facet scope, `Authz.can/4`
-   decides for the person against live grants first, then denies:
-   - a capability outside the ceiling (`:denied_agent_ceiling`);
-   - a non-read verb unless the level is `write` (`:denied_agent_level`);
-     the read verbs are `view`, `list` and `search`, and an unknown verb is
-     a write;
+3. **An agent can do what its person can do, and no more.** For a facet
+   scope, `Authz.can/4` decides for the person against live grants, then
+   denies:
    - every platform capability (`:denied_agent_platform`);
    - every access-control capability: role, grant, field-restriction and
      system-principal administration, impersonation, settings management,
-     and agent-connection management.
+     and agent-connection management;
+   - every write, while the company has switched agent writes off
+     (`:denied_agent_writes_off`). A read verb is `view`, `list` or
+     `search`; any other verb, an unknown one included, is a write.
 
-   `scope_actor/1` carries the facet. `agent_reach/1` lists what a facet
-   may propose. Workflow human actions refuse a facet, so an agent never
-   approves anything.
+   `scope_actor/1` carries the facet. Workflow human actions refuse a
+   facet, so an agent never approves anything.
 
-4. **Audit names the person and the agent.** A facet's rows keep
-   `actor_type "user"` and the person's `actor_id`. Four Bilimbi-only
-   columns on `base_audit_mutations` and `base_audit_actions` record
-   `agent_grant_id`, `declared_agent`, `channel` and `agent_run`, declared
-   as an optional group in the Base Audit schema contract as
-   `impersonator_id` and `system_principal` were. They appear only on
-   `"user"` rows. The dispatcher records one audit action per API call,
-   reads included. The `"agent"` actor type keeps its Belimbing meaning.
+4. **One API request log, and the existing audit.** Every incoming API
+   call, reads included, is one row in a general API request log owned by
+   the platform, not by agents: the operation, the outcome, the person,
+   the connection, the stated agent ID, the run and the trace id are
+   ordinary fields. Outgoing calls can use the same log later. It does not
+   store request or result bodies by default, because they can carry
+   secrets and pay. A write's changes are recorded by the existing
+   mutation audit as the person's rows (`actor_type "user"`), joined to
+   the request by its trace id. The Bilimbi command-line client calls the
+   API, so its calls are logged too; work done without the API, such as a
+   server-side task, is covered by the audit alone. The `"agent"` actor
+   type keeps its Belimbing meaning.
 
 5. **Modules register operations; Base exposes them.** `:agent_api` is a
    peer consumer validated by `Bilimbi.Base.AgentApi.ContributionValidator`.
    - An entry declares a key, a title, a summary, keywords, `kind`
      (`:read` or `:write`), the capability the matching screen asks for,
-     the write `approval` (`:level` or `:required`), an input schema, and a
-     handler that implements `Bilimbi.Base.AgentApi.Operation`, belongs to
-     the declaring OTP application, and calls its own facade with the scope
-     it receives.
+     an input schema, and a handler that implements
+     `Bilimbi.Base.AgentApi.Operation`, belongs to the declaring OTP
+     application, and calls its own facade with the scope it receives. A
+     write's handler also implements `preview/3`.
    - Modules may also contribute short guides.
    - A module that is not installed contributes nothing.
    - No module adds API routes. The host serves `/api/v1` and `/oauth`.
@@ -109,31 +111,39 @@ Four facts shaped the decision.
    - validate the input's shape;
    - ask `Authz.can(scope, capability)`, the same key the screen's route or
      event asks;
-   - decide whether a write runs or becomes a draft;
+   - for a write, check the plan token (Decision 8);
    - call the handler, so the facade's changesets, field restrictions and
      internal checks apply unchanged.
 
-   A connection can only narrow what the person may do.
-
 7. **Discovery is one search.** `search/3` ranks the operations and guides
-   within the facet's reach by the words given, deterministically and
+   within the person's reach by the words given, deterministically and
    without a model. `describe/2` returns one operation's schemas and
    guides. The Bilimbi skill teaches search, then describe, then call, and
    lists no operations.
 
-8. **Risky writes are drafts approved by a person through Workflow.** A
-   write runs at once only for a `write`-level connection and an operation
-   with `approval: :level`. Otherwise it becomes a write request, a
-   Workflow subject owned by Base Agent API. Its approve human action
-   requires `base.agent-draft.approve`. It re-checks the operation's
-   capability for the approver, refuses a record changed since the draft,
-   and runs the operation with the approver's scope, all in the gate's
-   transaction.
+8. **Writes go preview, go, write, report.**
+   - The agent asks for a preview: a dry run that returns the change plan
+     (each record and field, before and after) and a plan token bound to
+     that plan, the person and the input.
+   - The agent shows the person a summary of the plan and waits for their
+     go.
+   - On the go, the agent calls the write with the plan token. Bilimbi
+     refuses it if the input or the records' current values no longer
+     match the plan.
+   - The agent then reports what was written, with links into Bilimbi so
+     the person can check each change.
 
-9. **The client is a skill, not a protocol server.** Bilimbi serves one
-   generic skill with a small helper that signs in, keeps tokens out of the
-   conversation, and sends the agent ID (`harness/model-ver-effort`) and a
-   run id with every call.
+   Domain workflows still apply: a change that needs approval when made on
+   a screen enters the same approval workflow when an agent makes it. There
+   is no separate permission for agent changes.
+
+9. **The client is a skill and a command-line client, not a protocol
+   server.** Bilimbi ships one generic skill and one native command-line
+   client with `login`, `search`, `describe`, `call` and `logout`. The
+   client signs in with the device grant, keeps the token in the operating
+   system's credential store and out of the conversation, and sends the
+   agent ID (`harness/model-ver-effort`) and a run id with every call.
+   - Both are packaged as thin plugins for each agent harness, Codex first.
    - The skill is an asset of Base Agent API, in this repository, versioned
      and tested with the API it teaches.
    - Each running Bilimbi serves its own copy, as a zip carrying that
@@ -143,47 +153,39 @@ Four facts shaped the decision.
    - A separate public skills repository may only mirror the served copy.
    - An MCP server is not part of this decision.
 
-## Open decisions: defaults pending the owner
+## The owner's decisions
 
-The owner has not yet decided these six questions. Each is written here with
-its recommended default, and the default is what gets built until the owner
-answers. Each one is marked as a default and none is settled.
+- **D1 and D2. Who may connect, and how writes are agreed.** Anyone may
+  connect an agent, and it can do what the person can do (Decision 3).
+  Writes follow preview, go, write, report (Decision 8), and a company can
+  switch agent writes off.
+- **D3. An agent ID that differs from the approved one.** Record it, flag
+  it on the connected-agents page as "also seen as …", and never refuse a
+  request because of it. The token grants access; the stated ID proves
+  nothing.
+- **D4. The client.** One native Bilimbi command-line client plus the
+  skill, packaged as thin plugins per agent harness, with the Codex plugin
+  first (Decision 9).
+- **D5. Logging.** One general API request log for every call, reads
+  included, and the existing mutation audit for changes (Decision 4).
+- **D6. One central AI provider for a company.** Deferred. People connect
+  their own AI accounts for now. Connections stay per person and do not
+  assume one provider, so a central option can be added later.
 
-- **D1. Who may approve an agent's draft.** *Default, pending the owner:*
-  a new capability, `base.agent-draft.approve`, granted by default to the
-  Tenant Owner and Core Administrator roles. The approver must also hold
-  the capability the change itself needs, checked when they approve. A
-  person may approve a draft their own agent prepared, because approval
-  guards against agent mistakes and injected instructions, not against the
-  person. An agent never approves anything.
-- **D2. Who may connect an agent, and how far a connection may go.**
-  *Default, pending the owner:*
-  - every signed-in person may connect an agent to their own account;
-  - a new connection starts at `read`;
-  - the person may choose `draft` when approving the connection;
-  - `write` stays unavailable until an operator raises the tenant's limit
-    (setting `agent_access.max_level`, default `draft`);
-  - an operator can switch agent access off for a tenant.
-- **D3. An agent ID that differs from the approved one.** *Default,
-  pending the owner:* record it, flag it on the connected-agents page as
-  "also seen as …", and never refuse a request because of it. The
-  connection's token grants access; the stated ID proves nothing.
-- **D4. A helper script in the Bilimbi skill.** *Default, pending the
-  owner:* ship a small standard-library-only Python 3 helper that signs
-  in, keeps the token out of the conversation, and adds the agent and run
-  headers, with plain HTTP calls documented as a fallback. The repository
-  gains one Python file and one CI step that runs its tests.
-- **D5. Auditing agent reads.** *Default, pending the owner:* yes. The
-  dispatcher writes one audit action per API call, reads included, naming
-  the person, the connection, the agent ID and the run (Decision 4).
-- **D6. Default advice for adopters who want one central AI provider.**
-  *Default, pending the owner:* company-managed AI seats from one provider,
-  with single sign-on, plus the shared Bilimbi skill. Each person still
-  connects with their own grant. A company-hosted chat front end is the
-  option for a company that must use its own key or keep prompts on its
-  own network. A provider's cloud chat app reaches only a Bilimbi with a
-  public address; a Bilimbi on a private network needs an agent that runs
-  on the person's own computer.
+## Build order
+
+Each step is its own change.
+
+1. Self-registration, search, describe, and read calls in process.
+2. The sealed agent facet and its Authz bounds.
+3. Connections: Core Agent Access, the device grant and the consent page.
+4. The HTTP API and the general API request log.
+5. The command-line client, the skill, the Codex plugin, and a "Connect
+   an AI assistant" page.
+6. Preview, plan token and write for the first write operations.
+7. The connected-agents page, the agent-writes switch and settings.
+8. Reviewing one agent run from the request log and the audit.
+9. Authorization code with PKCE, registered front ends, and OpenAPI.
 
 ## Consequences
 
@@ -194,8 +196,8 @@ answers. Each one is marked as a default and none is settled.
 - Operations inherit facades' validation and restrictions, but a facade that
   lacks its own capability check is protected by the dispatcher, not by
   itself. Moving those checks into facades remains worthwhile.
-- The agent ID is self-reported. It labels audit and never grants access.
-- Agent reads add one audit action each.
+- The agent ID is self-reported. It labels the log and never grants access.
+- Every API call, reads included, adds one request-log row.
 - Queued jobs cannot yet carry an agent facet, so no exposed operation
   enqueues one until that is designed.
 - OAuth is implemented in-house, as a narrow subset: no implicit, password,
@@ -204,6 +206,9 @@ answers. Each one is marked as a default and none is settled.
   text.
 - Domain and Extension operations use meta-terms in keys, titles and
   guides; company wording belongs in configurable keywords.
+- The first step's validator still accepts an `approval` field on write
+  operations, from an earlier draft of this record. The write step
+  replaces it with the plan token.
 
 ## Alternatives considered
 
@@ -214,7 +219,14 @@ answers. Each one is marked as a default and none is settled.
   through the clipboard and chat transcripts, and the agent could not set
   itself up.
 - **MCP as the first client surface.** Tool lists cost context in every
-  session, and skills plus a helper cover coding agents. MCP can wrap the
-  same API later.
+  session, and a skill plus a command-line client cover coding agents. MCP
+  can wrap the same API later.
 - **A per-module API.** Every Domain would write controllers, and an agent
   would need module-specific instructions that drift.
+- **Drafts approved under a separate permission.** An agent's write would
+  wait as a draft for someone holding an "approve agent drafts"
+  capability. The person who asked for the change is the one who should
+  agree to it, and domain workflows already route changes that need
+  someone else's approval.
+- **An audit log only for agents.** A separate agent log would duplicate
+  the request facts every API caller needs and split one trail in two.

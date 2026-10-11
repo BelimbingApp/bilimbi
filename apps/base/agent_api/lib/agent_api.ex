@@ -16,7 +16,7 @@ defmodule Bilimbi.Base.AgentApi do
   found and not called.
 
   Only read operations run. A write answers `{:error, :writes_not_enabled}`
-  until connections carry a level and drafts exist to approve.
+  until writes go through a preview and the person's go (ADR 0021).
   """
 
   alias Bilimbi.Base.AgentApi.Definition
