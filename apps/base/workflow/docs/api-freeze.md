@@ -11,6 +11,8 @@ must not import its schemas, queries, or coordination internals.
 - Durable work: `start_run/4`, `get_run/2`, `complete_work/4`,
   `supersede_run/3`, and bounded `pending_work/2`.
 - Human actions: `available_actions/2` and `execute_action/3`.
+- Maintenance: `reconcile_running_runs/1` and `deliver_transition_events/1`,
+  installation-wide and run by the contributed maintenance schedule.
 
 Tenant-owned calls take a validated `Bilimbi.Base.Tenancy.Scope` and a stable
 subject reference `%{type: key, id: id}`. Return values are plain maps, never
@@ -20,12 +22,14 @@ transaction contracts.
 ## Extension seam
 
 Owners contribute immutable plain data under `:workflow`: subjects, flows,
-guards, actions, versioned process definitions, and human actions. Adapters
+guards, actions, versioned process definitions, human actions, and transition
+listeners. Adapters
 must be compiled modules owned by the contributing descriptor and implement
 the matching Workflow behaviour. A subject adapter proves and scopes owner
 records; process adapters authorize durable coordination; human handlers make
-database changes inside the Workflow transaction. External effects require a
-durable delivery adapter and are outside this API freeze.
+database changes inside the Workflow transaction. External effects belong in
+a `TransitionListener`, delivered at least once after commit from the durable
+outbox; its event map is part of this freeze.
 
 ## Compatibility commitments
 

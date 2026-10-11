@@ -77,6 +77,8 @@ scoped worklist rechecks owner policy and exposes no sibling-private relations.
   durable runs, including pause/resume and the worker lease API (claim,
   heartbeat, leaseholder completion, failure with retry, waive, block and
   claimed block); pending legacy outbox rows remain retained without delivery.
+  [ADR 0022](./0022-workflow-transition-event-delivery.md) (Proposed) adds
+  that delivery and the every-minute maintenance pass.
 - The human request table is the third compatible baseline. Its rows, digests,
   aliases and results are adopted intact; a row whose completion and result
   disagree fails verification. Owner UI echoes the subject and work version

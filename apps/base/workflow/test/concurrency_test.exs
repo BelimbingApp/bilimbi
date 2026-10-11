@@ -15,11 +15,22 @@ defmodule Bilimbi.Base.Workflow.ConcurrencyTest do
       SQL.query!(Repo, ~s(CREATE SCHEMA "#{schema}"), [])
     end)
 
+    started_at = NaiveDateTime.utc_now()
+
     on_exit(fn ->
       ContributionRegistry.clear_for_test!()
 
       Ecto.Adapters.SQL.Sandbox.unboxed_run(Repo, fn ->
         SQL.query!(Repo, ~s(DROP SCHEMA "#{schema}" CASCADE), [])
+
+        # The committed transition enqueued its delivery job outside the
+        # sandbox, and Oban names its own schema, so the job outlives the
+        # disposable one; left behind, it would be drained by a later test.
+        SQL.query!(
+          Repo,
+          "DELETE FROM oban_jobs WHERE worker = $1 AND inserted_at >= $2",
+          [inspect(Bilimbi.Base.Workflow.DeliveryWorker.ObanAdapter), started_at]
+        )
       end)
     end)
 
@@ -121,6 +132,10 @@ defmodule Bilimbi.Base.Workflow.ConcurrencyTest do
                  "SELECT count(*) FROM base_audit_actions WHERE event = 'workflow.transition.completed'",
                  []
                ).rows
+
+      # Only the committed transition left an event to deliver.
+      assert [[1]] =
+               Repo.query!("SELECT count(*) FROM base_workflow_transition_outbox", []).rows
     after
       Repo.put_dynamic_repo(previous)
     end

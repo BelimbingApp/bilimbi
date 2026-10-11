@@ -8,6 +8,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 Use `Workflow.available_actions/2` and `Workflow.execute_action/3`; do not hand-roll actor, capability, version, work, or idempotency checks. The exact transaction and adoption contract is in `apps/base/workflow/docs/README.md` under “Human actions”.
 
+## Effects after a transition
+
+An effect outside the database (a notification, a call to another service) is a contributed `transition_listeners` entry, delivered at least once from the durable outbox after commit; do not run it from a guard, an action, or the code that called `Workflow.transition/4`, where a rollback or a crash loses or duplicates it. The contract is `Bilimbi.Base.Workflow.TransitionListener` and `docs/README.md` "Transition events".
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
