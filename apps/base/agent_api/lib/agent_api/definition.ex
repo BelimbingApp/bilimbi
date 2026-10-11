@@ -5,7 +5,8 @@ defmodule Bilimbi.Base.AgentApi.Definition do
   `owner` is the stable id of the module that declared it. `capability` is
   the key the matching screen's route or event asks for, and the dispatcher
   asks it again on every call. `approval` is `nil` for a read and `:level`
-  or `:required` for a write. `input` is an
+  or `:required` for a write; it decides nothing and the write step
+  replaces it with the plan token (ADR 0021). `input` is an
   `Bilimbi.Base.AgentApi.InputSchema` object; `output` describes the result
   for an agent and is not enforced.
   """
