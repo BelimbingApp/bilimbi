@@ -9,11 +9,44 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.User
 
   @sortable ~w(name description created_at updated_at)
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
+  @builtins [
+    %{
+      id: "name",
+      label: "Name",
+      type: :string,
+      sort: "name",
+      sort_id: "database-queries-table-sort-name"
+    },
+    %{
+      id: "description",
+      label: "Description",
+      type: :string,
+      sort: "description",
+      sort_id: "database-queries-table-sort-description"
+    },
+    %{
+      id: "created_at",
+      label: "Created",
+      type: :datetime,
+      sort: "created_at",
+      sort_id: "database-queries-table-sort-created_at"
+    },
+    %{
+      id: "updated_at",
+      label: "Updated",
+      type: :datetime,
+      sort: "updated_at",
+      sort_id: "database-queries-table-sort-updated_at"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -27,6 +60,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
      |> assign(:pending_delete, nil)
      |> assign(:state, state)
      |> assign(:queries, [])
+     |> assign(:columns, ListColumns.mount("database-queries-table", @builtins))
      |> assign(:queries_page, empty_page())
      |> assign(:filters_form, filters_form(state))
      |> assign_list_fields(state)}
@@ -67,6 +101,14 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -220,11 +262,13 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
     state = %{state | page: page}
     offset = (page - 1) * state.page_size
+    entries = Enum.slice(all_queries, offset, state.page_size)
 
     socket
     |> assign(:state, state)
     |> assign_list_fields(state)
-    |> assign(:queries, Enum.slice(all_queries, offset, state.page_size))
+    |> assign(:queries, entries)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
     |> assign(:total_count, total_count)
     |> assign(:queries_page, %{
       page: page,

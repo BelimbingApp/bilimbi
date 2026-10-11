@@ -14,11 +14,23 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Menu
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Nav
 
   @page_sizes [25, 50, 100, 300]
   @default_page_size 25
+  @builtins [
+    %{id: "id", label: "ID"},
+    %{id: "label", label: "Label"},
+    %{id: "parent", label: "Parent"},
+    %{id: "kind", label: "Kind"},
+    %{id: "capability", label: "Capability"},
+    %{id: "route", label: "Route"},
+    %{id: "served", label: "Served"},
+    %{id: "source", label: "Source"},
+    %{id: "allowed", label: "Allowed"}
+  ]
 
   # No sort. Empty search and source stay off the URL. `source=all` is the
   # same as no source. `perPage` is accepted inbound because the page-size
@@ -45,7 +57,7 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
      |> assign(:filters_form, ListState.filters_form(state))
      |> assign(:items_page, empty_page())
      |> assign(:total_entries, 0)
-     |> stream(:items, [])}
+     |> assign(:columns, ListColumns.mount("menu-inspector", @builtins))}
   end
 
   @impl true
@@ -73,6 +85,14 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
     {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
+  end
+
+  @impl true
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   defp push_state(socket, state) do
@@ -107,7 +127,7 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
       total_entries: total_entries,
       total_pages: pages
     })
-    |> stream(:items, entries, reset: true)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
   end
 
   defp empty_page do

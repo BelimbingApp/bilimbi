@@ -45,9 +45,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   facts" sets out: a `<.card>` region opened by `<.section_heading>`, its
   facts the shared `<.list>` (the linked account is one of those rows, its
   value the `employee.accounts` embed) and its subordinates the shared
-  `<.table>`, unframed inside the card, sorted by this page, with assigning
-  as the heading's own action and removal as a demoted icon action on the
-  row. Nothing here hand-writes a heading, a `<dl>` or a `<table>`.
+  `<.flex_table>` with its notch, unframed inside the card, sorted by this
+  page, with assigning as the heading's own action and removal as a demoted
+  icon action on the row. Nothing here hand-writes a heading, a `<dl>` or a
+  `<table>`.
 
   Deleting the platform orchestrator (`SYS-001` / `agent`) is refused by the
   domain as `:invariant_violation`; this screen reports that honestly rather
@@ -60,6 +61,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.DiscoveredPanels
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Workspace
   alias Phoenix.LiveView.JS
 
@@ -72,7 +74,14 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # `toggle_add_subordinate`, `edit_field`, and `cancel_edit_field` only flip
   # visibility assigns; the persisting events are `add_subordinate` and the
   # `save_*` family, which are capability-guarded (#420).
-  @write_guard_opt_out ~w(toggle_add_subordinate edit_field cancel_edit_field)
+  @write_guard_opt_out ~w(toggle_add_subordinate edit_field cancel_edit_field grid)
+
+  @subordinate_builtins [
+    %{id: "full_name", label: "Name", sort: "full_name"},
+    %{id: "designation", label: "Designation", sort: "designation"},
+    %{id: "status", label: "Status", sort: "status"},
+    %{id: "department", label: "Department", sort: "department"}
+  ]
 
   # The facts an inline text edit may write, keyed by the form name the hook
   # pushes. A name outside this map is ignored; user input never becomes an atom.
@@ -146,6 +155,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:selected_subordinate_id, "")
     |> assign(:subordinates_sort_by, "full_name")
     |> assign(:subordinates_sort_dir, "asc")
+    |> assign(:columns, ListColumns.mount("subordinates-table", @subordinate_builtins))
     |> assign(:pending_subordinate, nil)
     |> assign(:pending_delete?, false)
   end
@@ -220,7 +230,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:employee_types, employee_types)
     |> assign(:subordinates, subordinates)
     |> assign(:available_subordinates, available_subordinates)
-    |> assign(:sorted_subordinates, sorted_subordinates)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, sorted_subordinates, & &1.id))
   end
 
   defp not_found(socket) do
@@ -475,7 +485,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
      socket
      |> assign(:subordinates_sort_by, sort_col)
      |> assign(:subordinates_sort_dir, new_dir)
-     |> assign(:sorted_subordinates, sorted)}
+     |> assign(:columns, ListColumns.load(socket.assigns.columns, sorted, & &1.id))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort_subordinates", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
   end
 
   # --- Event Handlers: Danger Zone ---
@@ -1146,77 +1164,83 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                action on the row. --%>
           <.card
             id="subordinates-card"
-            inner_class="p-5 sm:p-6"
+            inner_class="p-0"
             role="region"
             aria-labelledby="employee-subordinates-heading"
           >
-            <.section_heading
-              id="employee-subordinates-heading"
-              title="Subordinates"
-              count={length(@subordinates)}
-            >
-              <:actions :if={@can_manage?}>
-                <%= if @adding_subordinate do %>
-                  <form
-                    phx-submit="add_subordinate"
-                    id="add-subordinate-form"
-                    class="flex flex-wrap items-center gap-2"
-                  >
-                    <select
-                      id="employee-subordinate-select"
-                      name="subordinate_id"
-                      aria-label="Employee to assign"
-                      class="min-w-48 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+            <div class="px-5 pb-4 pt-5 sm:px-6">
+              <.section_heading
+                id="employee-subordinates-heading"
+                title="Subordinates"
+                count={length(@subordinates)}
+              >
+                <:actions :if={@can_manage?}>
+                  <%= if @adding_subordinate do %>
+                    <form
+                      phx-submit="add_subordinate"
+                      id="add-subordinate-form"
+                      class="flex flex-wrap items-center gap-2"
                     >
-                      <option value="">Select employee...</option>
+                      <select
+                        id="employee-subordinate-select"
+                        name="subordinate_id"
+                        aria-label="Employee to assign"
+                        class="min-w-48 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option value="">Select employee...</option>
 
-                      <%= for avail <- @available_subordinates do %>
-                        <option value={avail.id}>{avail.full_name}</option>
-                      <% end %>
-                    </select>
+                        <%= for avail <- @available_subordinates do %>
+                          <option value={avail.id}>{avail.full_name}</option>
+                        <% end %>
+                      </select>
 
+                      <.button
+                        id="btn-assign-subordinate"
+                        type="submit"
+                        variant="primary"
+                        class="text-xs px-2.5 py-1"
+                      >
+                        Assign
+                      </.button>
+
+                      <.button
+                        id="btn-cancel-add-subordinate"
+                        type="button"
+                        phx-click="toggle_add_subordinate"
+                        class="text-xs px-2.5 py-1"
+                      >
+                        Cancel
+                      </.button>
+                    </form>
+                  <% else %>
                     <.button
-                      id="btn-assign-subordinate"
-                      type="submit"
+                      id="btn-toggle-add-subordinate"
+                      phx-click="toggle_add_subordinate"
                       variant="primary"
                       class="text-xs px-2.5 py-1"
                     >
-                      Assign
+                      <.icon name="create" class="size-3.5" /> <span>Add</span>
                     </.button>
+                  <% end %>
+                </:actions>
+              </.section_heading>
+            </div>
 
-                    <.button
-                      id="btn-cancel-add-subordinate"
-                      type="button"
-                      phx-click="toggle_add_subordinate"
-                      class="text-xs px-2.5 py-1"
-                    >
-                      Cancel
-                    </.button>
-                  </form>
-                <% else %>
-                  <.button
-                    id="btn-toggle-add-subordinate"
-                    phx-click="toggle_add_subordinate"
-                    variant="primary"
-                    class="text-xs px-2.5 py-1"
-                  >
-                    <.icon name="create" class="size-3.5" /> <span>Add</span>
-                  </.button>
-                <% end %>
-              </:actions>
-            </.section_heading>
-
-            <.table
+            <.flex_table
               id="subordinates-table"
-              rows={@sorted_subordinates}
-              row_id={fn sub -> "subordinate-row-#{sub.id}" end}
+              columns={@columns.column_views}
+              rows={@columns.rows}
+              mode={@columns.mode}
+              zoom={@columns.zoom}
+              suggestions={@columns.suggestions}
+              add_query={@columns.add_query}
+              row_id={&"subordinate-row-#{&1}"}
               sort_by={@subordinates_sort_by}
               sort_dir={@subordinates_sort_dir}
-              sort_event="sort_subordinates"
-              caption="Subordinates"
               framed={false}
+              caption="Subordinates"
             >
-              <:col :let={sub} label="Name" sort="full_name">
+              <:col :let={%{record: sub}} id="full_name">
                 <.link
                   id={"subordinate-link-#{sub.id}"}
                   navigate={~p"/employees/#{sub.id}"}
@@ -1225,20 +1249,20 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   {sub.full_name}
                 </.link>
               </:col>
-              <:col :let={sub} label="Designation" sort="designation">
+              <:col :let={%{record: sub}} id="designation">
                 <span class="text-ink-subtle">{display_or_dash(sub.designation)}</span>
               </:col>
-              <:col :let={sub} label="Status" sort="status">
+              <:col :let={%{record: sub}} id="status">
                 <.badge kind={status_badge_kind(sub.status)}>
                   {String.capitalize(sub.status)}
                 </.badge>
               </:col>
-              <:col :let={sub} label="Department" sort="department">
+              <:col :let={%{record: sub}} id="department">
                 <span class="text-ink-subtle">
                   {Map.get(@department_map, sub.department_id, "—")}
                 </span>
               </:col>
-              <:action :let={sub}>
+              <:action :let={%{record: sub}}>
                 <.icon_button
                   :if={@can_manage?}
                   icon="close"
@@ -1250,11 +1274,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                 />
               </:action>
               <:empty
-                :if={@sorted_subordinates == []}
+                :if={@columns.rows == []}
                 title="No subordinates"
                 reason="Employees who report to this employee appear here."
               />
-            </.table>
+            </.flex_table>
           </.card>
           <.discovered_panel
             key="employee.addresses"

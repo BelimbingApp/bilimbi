@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -29,10 +30,47 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
           page_size_param: "page_size",
           filters: [event: {:one_of, ~w(created updated deleted), ""}]
         )
+  @builtins [
+    %{
+      id: "occurred_at",
+      label: "Occurred",
+      type: :datetime,
+      sort: "occurred_at",
+      sort_id: "mutations-sort-occurred_at"
+    },
+    %{
+      id: "actor_type",
+      label: "Actor",
+      type: :string,
+      sort: "actor_type",
+      sort_id: "mutations-sort-actor_type"
+    },
+    %{id: "event", label: "Event", type: :string, sort: "event", sort_id: "mutations-sort-event"},
+    %{
+      id: "auditable_type",
+      label: "Subject",
+      type: :string,
+      sort: "auditable_type",
+      sort_id: "mutations-sort-auditable_type"
+    },
+    %{id: "details", label: "Details", type: :string},
+    %{
+      id: "trace_id",
+      label: "Trace",
+      type: :string,
+      sort: "trace_id",
+      sort_id: "mutations-sort-trace_id"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Data Mutations")}
+    {:ok,
+     socket
+     |> assign(page_title: "Data Mutations")
+     |> assign(:columns, ListColumns.mount("mutations-table", @builtins))}
   end
 
   @impl true
@@ -59,6 +97,14 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -88,8 +134,8 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
       |> assign(:filters_form, ListState.filters_form(state))
-      |> stream(:mutations, page.entries, reset: true)
     end
   end
 

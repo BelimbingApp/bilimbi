@@ -7,10 +7,19 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.PrincipalDirectory
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Department
 
   @update_capability "admin.company.update"
+  @builtins [
+    %{id: "code", label: "Code"},
+    %{id: "name", label: "Department Name"},
+    %{id: "category", label: "Category"},
+    %{id: "head", label: "Head"},
+    %{id: "status", label: "Status"}
+  ]
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -29,7 +38,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              |> assign(:active_nav, "admin.company")
              |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
-             |> assign(:departments_count, length(departments))
+             |> assign(:columns, ListColumns.mount("company-departments", @builtins))
              |> assign(:department_head_names, department_head_names)
              |> assign(:modal_action, nil)
              |> assign(:pending_delete, nil)
@@ -37,7 +46,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              |> assign(:head_options, [])
              |> assign_form(nil)
              |> assign_head_form(nil)
-             |> stream(:departments, departments)}
+             |> assign_departments(departments)}
 
           {:error, :not_found} ->
             {:ok,
@@ -51,6 +60,14 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          socket
          |> put_flash(:error, "Invalid company ID.")
          |> push_navigate(to: ~p"/companies")}
+    end
+  end
+
+  @impl true
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
     end
   end
 
@@ -132,9 +149,8 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          socket
          |> put_flash(:success, "Department added successfully.")
          |> assign(:modal_action, nil)
-         |> assign(:departments_count, length(departments))
          |> assign_form(nil)
-         |> stream(:departments, departments, reset: true)}
+         |> assign_departments(departments)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -158,7 +174,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             {:noreply,
              socket
              |> put_flash(:success, "Department status updated to #{status}.")
-             |> stream_insert(:departments, updated_dept)}
+             |> replace_department(updated_dept)}
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not update status.")}
@@ -202,8 +218,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
         {:noreply,
          socket
          |> put_flash(:success, "Department removed.")
-         |> assign(:departments_count, length(departments))
-         |> stream(:departments, departments, reset: true)}
+         |> assign_departments(departments)}
 
       {:error, :not_found} ->
         {:ok, departments} = Company.list_departments(scope, company_id)
@@ -211,8 +226,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
         {:noreply,
          socket
          |> put_flash(:error, "That department had already been removed.")
-         |> assign(:departments_count, length(departments))
-         |> stream(:departments, departments, reset: true)}
+         |> assign_departments(departments)}
 
       {:error, _reason} ->
         {:noreply,
@@ -317,7 +331,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          |> assign(:modal_action, nil)
          |> assign(:head_options, [])
          |> assign_head_form(nil)
-         |> stream_insert(:departments, department)}
+         |> replace_department(department)}
 
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Department not found.")}
@@ -334,6 +348,22 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
        :error,
        "You do not have permission to change company administration data."
      )}
+  end
+
+  defp assign_departments(socket, departments) do
+    socket
+    |> assign(:departments, departments)
+    |> assign(:departments_count, length(departments))
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, departments, & &1.id))
+  end
+
+  defp replace_department(socket, updated) do
+    departments =
+      Enum.map(socket.assigns.departments, fn department ->
+        if department.id == updated.id, do: updated, else: department
+      end)
+
+    assign_departments(socket, departments)
   end
 
   defp can_update?(socket) do
@@ -434,51 +464,58 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
         <.card
           id="company-departments-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-departments-heading"
         >
-          <.section_heading
-            id="company-departments-heading"
-            title="Departments"
-            count={@departments_count}
-          >
-            <:actions>
-              <.button
-                :if={@can_update?}
-                id="add-dept-btn"
-                phx-click="new"
-                variant="primary"
-                class="text-xs"
-              >
-                Add Department
-              </.button>
-            </:actions>
-          </.section_heading>
+          <div class="p-5 pb-2 sm:p-6 sm:pb-2">
+            <.section_heading
+              id="company-departments-heading"
+              title="Departments"
+              count={@departments_count}
+            >
+              <:actions>
+                <.button
+                  :if={@can_update?}
+                  id="add-dept-btn"
+                  phx-click="new"
+                  variant="primary"
+                  class="text-xs"
+                >
+                  Add Department
+                </.button>
+              </:actions>
+            </.section_heading>
+          </div>
 
-          <.table
+          <.flex_table
             id="company-departments"
-            rows={@streams.departments}
-            row_id={fn {id, _} -> id end}
-            row_item={fn {_, dept} -> dept end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"company-department-#{&1}"}
+            event="grid"
             caption="Company Departments"
             framed={false}
           >
-            <:col :let={dept} label="Code">
+            <:col :let={%{record: dept}} id="code">
               <code class="text-xs font-medium">{dept.type.code}</code>
             </:col>
-            <:col :let={dept} label="Department Name">
+            <:col :let={%{record: dept}} id="name">
               <span class="font-medium text-ink-strong">{dept.type.name}</span>
             </:col>
-            <:col :let={dept} label="Category">
+            <:col :let={%{record: dept}} id="category">
               <.badge kind={:neutral} dot={false}>
                 {String.capitalize(dept.type.category)}
               </.badge>
             </:col>
-            <:col :let={dept} label="Head">
+            <:col :let={%{record: dept}} id="head">
               {head_name(dept, @department_head_names)}
             </:col>
-            <:col :let={dept} label="Status">
+            <:col :let={%{record: dept}} id="status">
               <.badge kind={
                 case dept.status do
                   "active" -> :success
@@ -489,7 +526,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 {dept.status}
               </.badge>
             </:col>
-            <:action :let={dept}>
+            <:action :let={%{record: dept}}>
               <div class="flex items-center gap-2">
                 <.icon_button
                   :if={@can_update?}
@@ -540,7 +577,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             <:empty :if={@departments_count == 0}>
               No departments configured for this company yet.
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <.modal

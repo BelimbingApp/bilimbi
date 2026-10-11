@@ -45,23 +45,28 @@
     </p>
 
     <.card id="decision-logs-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="decision-logs"
-        rows={@streams.logs}
-        row_id={fn {dom_id, _log} -> dom_id end}
-        row_item={fn {_dom_id, log} -> log end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"logs-#{&1}"}
+        caption="Authorization decisions"
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
-        framed={false}
       >
-        <:col :let={log} label="When" sort="occurred_at" sort_id="logs-sort-occurred_at">
+        <:col :let={%{record: log}} id="occurred_at">
           <span class="whitespace-nowrap tabular-nums text-ink-muted"><.datetime
             id={"log-occurred-#{log.id}"}
             value={log.occurred_at}
           /></span>
         </:col>
 
-        <:col :let={log} label="Actor" sort="actor_type" sort_id="logs-sort-actor_type">
+        <:col :let={%{record: log}} id="actor_type">
           <span class="whitespace-nowrap text-ink-muted">
             <.badge>{actor_label(log)}</.badge>
             <span :if={log.system_principal} class="ml-1">{log.system_principal}</span>
@@ -72,21 +77,21 @@
           </span>
         </:col>
 
-        <:col :let={log} label="Capability" sort="capability" sort_id="logs-sort-capability">
+        <:col :let={%{record: log}} id="capability">
           <span class="font-mono text-xs text-ink">{log.capability}</span>
         </:col>
 
-        <:col :let={log} label="Result" sort="allowed" sort_id="logs-sort-allowed">
+        <:col :let={%{record: log}} id="allowed">
           <.badge kind={if log.allowed, do: :success, else: :danger}>
             {if log.allowed, do: "Allowed", else: "Denied"}
           </.badge>
         </:col>
 
-        <:col :let={log} label="Reason" sort="reason" sort_id="logs-sort-reason">
+        <:col :let={%{record: log}} id="reason">
           <span class="font-mono text-xs text-ink-muted">{log.reason || "—"}</span>
         </:col>
 
-        <:col :let={log} label="Resource" sort="resource" sort_id="logs-sort-resource">
+        <:col :let={%{record: log}} id="resource">
           <span class="text-ink-muted">{resource_label(log)}</span>
         </:col>
 
@@ -95,7 +100,7 @@
             do: "No authorization decisions have been recorded in this tenant.",
             else: "No decisions match these filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="logs-pagination"

@@ -65,21 +65,27 @@
     </p>
 
     <div class="mt-4">
-      <.table
+      <.flex_table
         id="actions-table"
-        rows={@streams.actions}
-        row_id={fn {dom_id, _a} -> dom_id end}
-        row_item={fn {_dom_id, a} -> a end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"actions-#{&1}"}
+        caption="Audit actions"
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
       >
-        <:col :let={action} label="Occurred" sort="occurred_at" sort_id="actions-sort-occurred_at">
+        <:col :let={%{record: action}} id="occurred_at">
           <span class="whitespace-nowrap tabular-nums text-xs text-ink-muted">
             <.datetime id={"action-occurred-#{action.id}"} value={action.occurred_at} />
           </span>
         </:col>
 
-        <:col :let={action} label="Actor" sort="actor_type" sort_id="actions-sort-actor_type">
+        <:col :let={%{record: action}} id="actor_type">
           <div class="whitespace-nowrap text-sm font-medium text-ink">
             {actor_label(action)}
           </div>
@@ -88,7 +94,7 @@
           </div>
         </:col>
 
-        <:col :let={action} label="Action" sort="event" sort_id="actions-sort-event">
+        <:col :let={%{record: action}} id="event">
           <% pres = action_presentation(action) %>
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="text-sm font-medium text-ink">{pres.summary}</span>
@@ -98,28 +104,28 @@
           <div class="mt-0.5 font-mono text-xs text-ink-muted">{action.event}</div>
         </:col>
 
-        <:col :let={action} label="Context">
+        <:col :let={%{record: action}} id="context">
           <% pres = action_presentation(action) %>
           <div class="max-w-xs truncate text-xs text-ink-muted" title={pres.context}>
             {pres.context}
           </div>
         </:col>
 
-        <:col :let={action} label="Result">
+        <:col :let={%{record: action}} id="result">
           <% pres = action_presentation(action) %>
           <.badge kind={pres.variant}>
             {pres.result}
           </.badge>
         </:col>
 
-        <:col :let={action} label="Trace" sort="trace_id" sort_id="actions-sort-trace_id">
+        <:col :let={%{record: action}} id="trace_id">
           <span :if={action.trace_id} class="font-mono text-xs text-ink-muted">
             {action.trace_id}
           </span>
           <span :if={!action.trace_id} class="text-ink-muted">—</span>
         </:col>
 
-        <:col :let={action} label="Retain" align={:right}>
+        <:col :let={%{record: action}} id="retain">
           <button
             :if={@can_manage}
             type="button"
@@ -157,7 +163,7 @@
                 "No action logs match the current filters. Try Show Diagnostics if you are looking for Livewire or stream traffic.",
               else: "No action logs match the current filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="actions-pagination"

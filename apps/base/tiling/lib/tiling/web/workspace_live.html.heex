@@ -282,12 +282,18 @@
       </p>
 
       <div class="mt-4">
-        <.table
+        <.flex_table
           id="workspace-saved-layouts"
-          rows={@saved}
-          row_id={&("workspace-layout-" <> &1["slug"])}
+          columns={@saved_columns.column_views}
+          rows={@saved_columns.rows}
+          mode={@saved_columns.mode}
+          zoom={@saved_columns.zoom}
+          suggestions={@saved_columns.suggestions}
+          add_query={@saved_columns.add_query}
+          row_id={&"workspace-layout-#{&1}"}
+          event="saved_grid"
         >
-          <:col :let={entry} label={gettext("Name")}>
+          <:col :let={%{record: entry}} id="label">
             <.inline_edit
               id={"workspace-layout-name-" <> entry["slug"]}
               id_value={entry["slug"]}
@@ -297,7 +303,7 @@
               label={gettext("Rename layout")}
             />
           </:col>
-          <:col :let={entry} label={gettext("Opens with the workspace")}>
+          <:col :let={%{record: entry}} id="default">
             <span
               :if={entry["slug"] == @default_slug}
               id={"workspace-layout-default-" <> entry["slug"]}
@@ -305,7 +311,7 @@
               {gettext("Default")}
             </span>
           </:col>
-          <:col :let={entry} label={gettext("Tiling layout")}>
+          <:col :let={%{record: entry}} id="layout_mode">
             <button
               type="button"
               id={"workspace-layout-mode-" <> entry["slug"]}
@@ -322,7 +328,7 @@
               {if entry["layout"] == "master", do: gettext("Master"), else: gettext("Dwindle")}
             </button>
           </:col>
-          <:action :let={entry}>
+          <:action :let={%{record: entry}}>
             <div class="flex items-center justify-end gap-1">
               <.icon_button
                 id={"workspace-layout-open-" <> entry["slug"]}
@@ -364,23 +370,29 @@
               )
             }
           />
-        </.table>
+        </.flex_table>
       </div>
 
       <div id="workspace-shared-layouts" class="mt-4">
         <.section_heading title={gettext("Shared with you")} />
-        <.table
+        <.flex_table
           id="workspace-shared-table"
-          rows={@shared}
-          row_id={&("workspace-shared-" <> &1["slug"])}
+          columns={@shared_columns.column_views}
+          rows={@shared_columns.rows}
+          mode={@shared_columns.mode}
+          zoom={@shared_columns.zoom}
+          suggestions={@shared_columns.suggestions}
+          add_query={@shared_columns.add_query}
+          row_id={&"workspace-shared-#{&1}"}
+          event="shared_grid"
         >
-          <:col :let={entry} label={gettext("Name")}>{entry["label"]}</:col>
-          <:col :let={entry} label={gettext("Audience")}>
+          <:col :let={%{record: entry}} id="label">{entry["label"]}</:col>
+          <:col :let={%{record: entry}} id="audience">
             {if entry["roles"] == [],
               do: gettext("Company"),
               else: Enum.join(entry["roles"], ", ")}
           </:col>
-          <:action :let={entry}>
+          <:action :let={%{record: entry}}>
             <.link
               id={"workspace-shared-open-" <> entry["slug"]}
               navigate={~p"/workspace/shared/#{entry["slug"]}"}
@@ -397,7 +409,7 @@
             title={gettext("No shared workspaces")}
             reason={gettext("Workspaces shared with your company or roles appear here.")}
           />
-        </.table>
+        </.flex_table>
         <.link
           :if={@company_scope && allowed?(@current_scope, "ui.workspace.publish")}
           id="workspace-manage-shared"

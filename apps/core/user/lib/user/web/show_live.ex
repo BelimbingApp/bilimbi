@@ -71,14 +71,33 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # event behind them (password change, employee link) carries its own
   # capability check (#420). Role and capability toggles live on
   # `UserAccessPanel`.
-  @write_guard_opt_out ~w(toggle_change_password toggle_link_employee)
+  @write_guard_opt_out ~w(toggle_change_password toggle_link_employee
+                          employees_grid external_accesses_grid)
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.CommitStatus
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Workspace
   alias Bilimbi.Core.User.Web.UserAccessPanel
 
   @manage_capability "admin.user.update"
+
+  @employee_builtins [
+    %{id: "employee_number", label: "Employee No.", sort: "employee_number"},
+    %{id: "company", label: "Company", sort: "company"},
+    %{id: "department", label: "Department", sort: "department"},
+    %{id: "designation", label: "Designation", sort: "designation"},
+    %{id: "status", label: "Status", sort: "status"},
+    %{id: "employment_start", label: "Employment Start", sort: "employment_start"}
+  ]
+
+  @external_access_builtins [
+    %{id: "company", label: "Granting Company", sort: "company"},
+    %{id: "permissions", label: "Permissions", sort: "permissions"},
+    %{id: "access_status", label: "Status", sort: "access_status"},
+    %{id: "granted_at", label: "Granted At", sort: "granted_at"},
+    %{id: "expires_at", label: "Expires At", sort: "expires_at"}
+  ]
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -143,6 +162,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:employees_sort_dir, "asc")
     |> assign(:external_accesses_sort_by, "company")
     |> assign(:external_accesses_sort_dir, "asc")
+    |> assign(:employee_columns, ListColumns.mount("user-employees-table", @employee_builtins))
+    |> assign(
+      :access_columns,
+      ListColumns.mount("user-external-accesses-table", @external_access_builtins)
+    )
     |> assign(:pending_unlink, nil)
     |> assign(:pending_delete?, false)
   end
@@ -220,6 +244,23 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       end)
       |> Map.new()
 
+    sorted_employees =
+      sort_employees(
+        linked_employees,
+        socket.assigns.employees_sort_by,
+        socket.assigns.employees_sort_dir,
+        company_names,
+        department_names
+      )
+
+    sorted_external_accesses =
+      sort_external_accesses(
+        external_accesses,
+        socket.assigns.external_accesses_sort_by,
+        socket.assigns.external_accesses_sort_dir,
+        company_names
+      )
+
     socket
     |> assign(:user, user)
     |> assign(:page_title, user.name)
@@ -231,25 +272,14 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:department_names, department_names)
     |> assign(:employees, linked_employees)
     |> assign(
-      :sorted_employees,
-      sort_employees(
-        linked_employees,
-        socket.assigns[:employees_sort_by] || "employee_number",
-        socket.assigns[:employees_sort_dir] || "asc",
-        company_names,
-        department_names
-      )
+      :employee_columns,
+      ListColumns.load(socket.assigns.employee_columns, sorted_employees, & &1.id)
     )
     |> assign(:unlinkable_employees, unlinkable_employees)
     |> assign(:external_accesses, external_accesses)
     |> assign(
-      :sorted_external_accesses,
-      sort_external_accesses(
-        external_accesses,
-        socket.assigns[:external_accesses_sort_by] || "company",
-        socket.assigns[:external_accesses_sort_dir] || "asc",
-        company_names
-      )
+      :access_columns,
+      ListColumns.load(socket.assigns.access_columns, sorted_external_accesses, & &1.id)
     )
   end
 
@@ -442,7 +472,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
      socket
      |> assign(:employees_sort_by, sort_col)
      |> assign(:employees_sort_dir, new_dir)
-     |> assign(:sorted_employees, sorted)}
+     |> assign(
+       :employee_columns,
+       ListColumns.load(socket.assigns.employee_columns, sorted, & &1.id)
+     )}
+  end
+
+  def handle_event("employees_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.employee_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :employee_columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   def handle_event("sort_external_accesses", params, socket) do
@@ -469,7 +509,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
      socket
      |> assign(:external_accesses_sort_by, sort_col)
      |> assign(:external_accesses_sort_dir, new_dir)
-     |> assign(:sorted_external_accesses, sorted)}
+     |> assign(
+       :access_columns,
+       ListColumns.load(socket.assigns.access_columns, sorted, & &1.id)
+     )}
+  end
+
+  def handle_event("external_accesses_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.access_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :access_columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   # --- Event Handlers: Deletion ---
@@ -995,41 +1045,49 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           <%!-- Section 4: Employee Records --%>
           <.card
             id="user-employees-card"
-            inner_class="p-5 sm:p-6"
+            inner_class="p-0"
             role="region"
             aria-labelledby="user-employees-heading"
           >
-            <.section_heading
-              id="user-employees-heading"
-              title="Employee Records"
-              count={length(@employees)}
-            >
-              <:description>
-                Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
-              </:description>
-              <:actions :if={@can_edit?}>
-                <.button
-                  type="button"
-                  id="open-add-employee-modal-btn"
-                  phx-click="open_add_employee_modal"
-                  variant="primary"
-                  class="text-xs"
-                >
-                  <.icon name="create" class="size-3.5" />
-                  <span>Add Employee</span>
-                </.button>
-              </:actions>
-            </.section_heading>
+            <div class="px-5 pb-4 pt-5 sm:px-6">
+              <.section_heading
+                id="user-employees-heading"
+                title="Employee Records"
+                count={length(@employees)}
+              >
+                <:description>
+                  Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
+                </:description>
+                <:actions :if={@can_edit?}>
+                  <.button
+                    type="button"
+                    id="open-add-employee-modal-btn"
+                    phx-click="open_add_employee_modal"
+                    variant="primary"
+                    class="text-xs"
+                  >
+                    <.icon name="create" class="size-3.5" />
+                    <span>Add Employee</span>
+                  </.button>
+                </:actions>
+              </.section_heading>
+            </div>
 
-            <.table
+            <.flex_table
               id="user-employees-table"
-              rows={@sorted_employees}
+              columns={@employee_columns.column_views}
+              rows={@employee_columns.rows}
+              mode={@employee_columns.mode}
+              zoom={@employee_columns.zoom}
+              suggestions={@employee_columns.suggestions}
+              add_query={@employee_columns.add_query}
+              event="employees_grid"
               sort_by={@employees_sort_by}
               sort_dir={@employees_sort_dir}
               sort_event="sort_employees"
               framed={false}
             >
-              <:col :let={emp} label="Employee No." sort="employee_number">
+              <:col :let={%{record: emp}} id="employee_number">
                 <.link
                   navigate={~p"/employees/#{emp.id}"}
                   class="text-action hover:underline font-medium"
@@ -1037,7 +1095,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   {emp.employee_number || "—"}
                 </.link>
               </:col>
-              <:col :let={emp} label="Company" sort="company">
+              <:col :let={%{record: emp}} id="company">
                 <%= if Map.get(@company_names, emp.company_id) do %>
                   <.link
                     navigate={~p"/companies/#{emp.company_id}"}
@@ -1049,18 +1107,18 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span class="text-ink-faint">—</span>
                 <% end %>
               </:col>
-              <:col :let={emp} label="Department" sort="department">
+              <:col :let={%{record: emp}} id="department">
                 <span class="text-ink-muted">{Map.get(@department_names, emp.department_id) || "—"}</span>
               </:col>
-              <:col :let={emp} label="Designation" sort="designation">
+              <:col :let={%{record: emp}} id="designation">
                 <span class="text-ink-muted">{emp.designation || "—"}</span>
               </:col>
-              <:col :let={emp} label="Status" sort="status">
+              <:col :let={%{record: emp}} id="status">
                 <.badge kind={employee_status_kind(emp.status)}>
                   {String.capitalize(emp.status || "active")}
                 </.badge>
               </:col>
-              <:col :let={emp} label="Employment Start" sort="employment_start">
+              <:col :let={%{record: emp}} id="employment_start">
                 <span class="text-ink-muted tabular-nums">
                   <.datetime
                     :if={emp.employment_start}
@@ -1070,7 +1128,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span :if={is_nil(emp.employment_start)} class="text-ink-faint">—</span>
                 </span>
               </:col>
-              <:action :let={emp}>
+              <:action :let={%{record: emp}}>
                 <.icon_button
                   :if={@can_edit?}
                   icon="unlink"
@@ -1081,16 +1139,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   phx-value-employee-id={emp.id}
                 />
               </:action>
-              <:empty :if={@employees == []}>
+              <:empty :if={@employee_columns.rows == []}>
                 No employee records.
               </:empty>
-            </.table>
+            </.flex_table>
 
             <!-- Link Existing Employee Form -->
             <div
               :if={@can_edit? and @unlinkable_employees != []}
               id="link-employee-section"
-              class="mt-4 pt-4 border-t border-line"
+              class="mx-5 mb-5 mt-4 border-t border-line pt-4 sm:mx-6 sm:mb-6"
             >
               <div :if={not @show_link_employee}>
                 <.button
@@ -1145,29 +1203,37 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           <%!-- Section 5: External Accesses --%>
           <.card
             id="user-external-accesses-card"
-            inner_class="p-5 sm:p-6"
+            inner_class="p-0"
             role="region"
             aria-labelledby="user-external-accesses-heading"
           >
-            <.section_heading
-              id="user-external-accesses-heading"
-              title="External Accesses"
-              count={length(@external_accesses)}
-            >
-              <:description>
-                Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
-              </:description>
-            </.section_heading>
+            <div class="px-5 pb-4 pt-5 sm:px-6">
+              <.section_heading
+                id="user-external-accesses-heading"
+                title="External Accesses"
+                count={length(@external_accesses)}
+              >
+                <:description>
+                  Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
+                </:description>
+              </.section_heading>
+            </div>
 
-            <.table
+            <.flex_table
               id="user-external-accesses-table"
-              rows={@sorted_external_accesses}
+              columns={@access_columns.column_views}
+              rows={@access_columns.rows}
+              mode={@access_columns.mode}
+              zoom={@access_columns.zoom}
+              suggestions={@access_columns.suggestions}
+              add_query={@access_columns.add_query}
+              event="external_accesses_grid"
               sort_by={@external_accesses_sort_by}
               sort_dir={@external_accesses_sort_dir}
               sort_event="sort_external_accesses"
               framed={false}
             >
-              <:col :let={access} label="Granting Company" sort="company">
+              <:col :let={%{record: access}} id="company">
                 <%= if Map.get(@company_names, access.company_id) do %>
                   <.link
                     navigate={~p"/companies/#{access.company_id}"}
@@ -1179,7 +1245,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span class="text-ink-faint">—</span>
                 <% end %>
               </:col>
-              <:col :let={access} label="Permissions" sort="permissions">
+              <:col :let={%{record: access}} id="permissions">
                 <%= if is_list(access.permissions) and access.permissions != [] do %>
                   <div class="flex flex-wrap gap-1">
                     <span
@@ -1193,12 +1259,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span class="text-ink-faint">—</span>
                 <% end %>
               </:col>
-              <:col :let={access} label="Status" sort="access_status">
+              <:col :let={%{record: access}} id="access_status">
                 <.badge kind={external_access_status_kind(access)}>
                   {external_access_status_label(access)}
                 </.badge>
               </:col>
-              <:col :let={access} label="Granted At" sort="granted_at">
+              <:col :let={%{record: access}} id="granted_at">
                 <span class="text-ink-muted tabular-nums">
                   <.datetime
                     :if={access.access_granted_at}
@@ -1208,7 +1274,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span :if={is_nil(access.access_granted_at)} class="text-ink-faint">—</span>
                 </span>
               </:col>
-              <:col :let={access} label="Expires At" sort="expires_at">
+              <:col :let={%{record: access}} id="expires_at">
                 <span class="text-ink-muted tabular-nums">
                   <.datetime
                     :if={access.access_expires_at}
@@ -1218,10 +1284,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span :if={is_nil(access.access_expires_at)} class="text-ink-faint">—</span>
                 </span>
               </:col>
-              <:empty :if={@external_accesses == []}>
+              <:empty :if={@access_columns.rows == []}>
                 No external accesses.
               </:empty>
-            </.table>
+            </.flex_table>
           </.card>
 
           <%!-- Card 6: Danger Zone (Delete Account). Deleting an archived-company

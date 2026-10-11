@@ -6,10 +6,19 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Relationship
 
   @update_capability "admin.company.update"
+  @builtins [
+    %{id: "other_company", label: "Related Company"},
+    %{id: "direction", label: "Direction"},
+    %{id: "type", label: "Type"},
+    %{id: "effective_period", label: "Effective Period"},
+    %{id: "status", label: "Status"}
+  ]
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -27,14 +36,14 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              |> assign(:active_nav, "admin.company")
              |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
-             |> assign(:relationships_count, length(relationships))
+             |> assign(:columns, ListColumns.mount("company-relationships", @builtins))
              |> assign(:modal_action, nil)
              |> assign(:editing_rel, nil)
              |> assign(:pending_delete, nil)
              |> assign(:available_companies, [])
              |> assign(:available_types, [])
              |> assign_form(nil)
-             |> stream(:relationships, relationships)}
+             |> assign_relationships(relationships)}
 
           {:error, :not_found} ->
             {:ok,
@@ -48,6 +57,14 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
          socket
          |> put_flash(:error, "Invalid company ID.")
          |> push_navigate(to: ~p"/companies")}
+    end
+  end
+
+  @impl true
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
     end
   end
 
@@ -199,9 +216,8 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              socket
              |> put_flash(:success, "Relationship established successfully.")
              |> assign(:modal_action, nil)
-             |> assign(:relationships_count, length(relationships))
              |> assign_form(nil)
-             |> stream(:relationships, relationships, reset: true)}
+             |> assign_relationships(relationships)}
 
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply, assign_form(socket, changeset)}
@@ -226,7 +242,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              |> assign(:modal_action, nil)
              |> assign(:editing_rel, nil)
              |> assign_form(nil)
-             |> stream(:relationships, relationships, reset: true)}
+             |> assign_relationships(relationships)}
 
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply, assign_form(socket, changeset)}
@@ -269,8 +285,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         {:noreply,
          socket
          |> put_flash(:success, "Relationship removed.")
-         |> assign(:relationships_count, length(relationships))
-         |> stream(:relationships, relationships, reset: true)}
+         |> assign_relationships(relationships)}
 
       {:error, :forbidden} ->
         write_forbidden(socket)
@@ -281,8 +296,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         {:noreply,
          socket
          |> put_flash(:error, "That relationship had already been removed.")
-         |> assign(:relationships_count, length(relationships))
-         |> stream(:relationships, relationships, reset: true)}
+         |> assign_relationships(relationships)}
 
       {:error, _reason} ->
         {:noreply,
@@ -310,6 +324,13 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
       :error,
       "You do not have permission to change company administration data."
     )
+  end
+
+  defp assign_relationships(socket, relationships) do
+    socket
+    |> assign(:relationships, relationships)
+    |> assign(:relationships_count, length(relationships))
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, relationships, & &1.id))
   end
 
   defp assign_form(socket, nil), do: assign(socket, :form, nil)
@@ -357,61 +378,70 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         <.card
           id="company-relationships-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-relationships-heading"
         >
-          <.section_heading
-            id="company-relationships-heading"
-            title="Relationships"
-            count={@relationships_count}
-          >
-            <:actions>
-              <.button
-                :if={@can_update?}
-                id="add-rel-btn"
-                phx-click="new"
-                variant="primary"
-                class="text-xs"
-              >
-                Add Relationship
-              </.button>
-            </:actions>
-          </.section_heading>
+          <div class="p-5 pb-2 sm:p-6 sm:pb-2">
+            <.section_heading
+              id="company-relationships-heading"
+              title="Relationships"
+              count={@relationships_count}
+            >
+              <:actions>
+                <.button
+                  :if={@can_update?}
+                  id="add-rel-btn"
+                  phx-click="new"
+                  variant="primary"
+                  class="text-xs"
+                >
+                  Add Relationship
+                </.button>
+              </:actions>
+            </.section_heading>
+          </div>
 
-          <.table
+          <.flex_table
             id="company-relationships"
-            rows={@streams.relationships}
-            row_id={fn {id, _} -> id end}
-            row_item={fn {_, item} -> item end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"company-relationship-#{&1}"}
+            event="grid"
             caption="Company Relationships"
             framed={false}
           >
-            <:col :let={item} label="Related Company">
+            <:col :let={%{record: item}} id="other_company">
               <span class="font-medium text-ink-strong">{item.other_company.name}</span>
-              <code class="block text-xs text-ink-subtle">{item.other_company.code}</code>
+              <code :if={@columns.mode == :normal} class="block text-xs text-ink-subtle">
+                {item.other_company.code}
+              </code>
             </:col>
-            <:col :let={item} label="Direction">
+            <:col :let={%{record: item}} id="direction">
               <.badge kind={if item.direction == :outgoing, do: :info, else: :neutral}>
                 {if item.direction == :outgoing, do: "Outgoing", else: "Incoming"}
               </.badge>
             </:col>
-            <:col :let={item} label="Type">
+            <:col :let={%{record: item}} id="type">
               <span class="font-medium">{item.type.name}</span>
             </:col>
-            <:col :let={item} label="Effective Period">
+            <:col :let={%{record: item}} id="effective_period">
               <span class="text-xs text-ink-subtle">
                 {item.effective_from || "Always"}
                 {" → "}
                 {item.effective_to || "Present"}
               </span>
             </:col>
-            <:col :let={item} label="Status">
+            <:col :let={%{record: item}} id="status">
               <.badge kind={if item.is_active, do: :success, else: :neutral}>
                 {if item.is_active, do: "active", else: "inactive"}
               </.badge>
             </:col>
-            <:action :let={item}>
+            <:action :let={%{record: item}}>
               <div class="flex items-center gap-2">
                 <.icon_button
                   :if={@can_update?}
@@ -435,7 +465,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             <:empty :if={@relationships_count == 0}>
               No company relationships configured yet.
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <.modal

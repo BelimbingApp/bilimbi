@@ -602,7 +602,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
                "#company-addresses-panel th[aria-sort='ascending'] button#addresses-table-sort-label"
              )
 
-      assert has_element?(view, "tbody#addresses-table tr#address-row-#{hq.id}")
+      assert has_element?(view, "#addresses-table-rows tr#address-row-#{hq.id}")
 
       # The label opens the address's own page, carrying the company for the way back.
       assert has_element?(

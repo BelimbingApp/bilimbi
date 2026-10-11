@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.User
 
   @page_sizes [25, 50, 100, 300]
@@ -21,7 +22,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   # where read-only is enforced, and the route requires
   # `admin.system.database-table.list` — a read capability, correctly matched to
   # a read. There is no weaker capability for this handler to refuse.
-  @write_guard_opt_out ~w(run_query)
+  @write_guard_opt_out ~w(run_query results_grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -40,6 +41,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
      |> assign(:param_values, %{})
      |> assign(:error, nil)
      |> assign(:results, nil)
+     |> assign(:result_columns, ListColumns.mount("query-results-table", []))
      |> assign(:page_sizes, @page_sizes)
      |> assign(:result_page, 1)
      |> assign(:result_per_page, @default_page_size)
@@ -218,7 +220,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     end
   end
 
-  # The shared `<.table>` names the column in `phx-value-sort`.
+  # The shared sort heading names the column in `phx-value-sort`.
   @impl true
   def handle_event("sort_results", %{"sort" => column}, socket) do
     sort_dir =
@@ -233,6 +235,14 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
      |> assign(:result_sort_by, column)
      |> assign(:result_sort_dir, sort_dir)
      |> show_result_page(1)}
+  end
+
+  @impl true
+  def handle_event("results_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.result_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :result_columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -462,11 +472,32 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
     case Database.execute_readonly(sql, params, opts) do
       {:ok, results} ->
-        socket |> assign(:results, results) |> assign(:error, nil)
+        socket
+        |> assign(:results, results)
+        |> assign(:result_columns, load_result_columns(socket.assigns.result_columns, results))
+        |> assign(:error, nil)
 
       {:error, reason} ->
         socket |> assign(:results, nil) |> assign(:error, format_db_error(reason))
     end
+  end
+
+  # The columns come from the result set. The arrangement a person made is
+  # kept while the same columns come back, and starts afresh when they change.
+  defp load_result_columns(state, results) do
+    columns = Enum.uniq(results.columns)
+
+    state =
+      if Enum.map(state.builtins, & &1.id) == columns do
+        state
+      else
+        ListColumns.mount(
+          state.id,
+          Enum.map(columns, &%{id: &1, label: &1, sort: &1})
+        )
+      end
+
+    ListColumns.load(state, Enum.with_index(results.rows), fn {_row, index} -> index end)
   end
 
   defp format_db_error(%{message: msg}), do: msg

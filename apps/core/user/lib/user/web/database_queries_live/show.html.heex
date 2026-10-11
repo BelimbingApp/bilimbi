@@ -172,30 +172,37 @@
       <%= if @results do %>
         <.card
           id="query-results-card"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="query-results-heading"
         >
-          <.section_heading id="query-results-heading" title="Results">
-            <:description>
-              <span id="query-results-summary">
-                {@results.columns |> length()} columns · {@results.total_count} total rows
-              </span>
-            </:description>
-          </.section_heading>
+          <div class="px-5 pb-4 pt-5 sm:px-6">
+            <.section_heading id="query-results-heading" title="Results">
+              <:description>
+                <span id="query-results-summary">
+                  {@results.columns |> length()} columns · {@results.total_count} total rows
+                </span>
+              </:description>
+            </.section_heading>
+          </div>
 
-          <.table
+          <.flex_table
             id="query-results-table"
-            rows={Enum.with_index(@results.rows)}
-            row_id={fn {_row, index} -> "result-row-#{index}" end}
-            row_item={fn {row, _index} -> row end}
+            columns={@result_columns.column_views}
+            rows={@result_columns.rows}
+            mode={@result_columns.mode}
+            zoom={@result_columns.zoom}
+            suggestions={@result_columns.suggestions}
+            add_query={@result_columns.add_query}
+            event="results_grid"
+            row_id={&"result-row-#{&1}"}
             sort_by={@result_sort_by}
             sort_dir={@result_sort_dir}
             sort_event="sort_results"
             caption="Query results"
             framed={false}
           >
-            <:col :let={row} :for={col <- @results.columns} label={col} sort={col}>
+            <:col :let={%{record: {row, _index}}} :for={col <- @results.columns} id={col}>
               <% val = Map.get(row, col) %>
               <span class="block max-w-sm truncate whitespace-nowrap font-mono text-xs">
                 <%= if is_nil(val) do %>
@@ -210,7 +217,7 @@
               title="No rows returned"
               reason="The query ran and matched nothing."
             />
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="query-results-pagination"

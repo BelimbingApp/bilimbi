@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -35,13 +36,43 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
           ]
         )
   @manage_cap "admin.audit.log.manage"
+  @builtins [
+    %{
+      id: "occurred_at",
+      label: "Occurred",
+      type: :datetime,
+      sort: "occurred_at",
+      sort_id: "actions-sort-occurred_at"
+    },
+    %{
+      id: "actor_type",
+      label: "Actor",
+      type: :string,
+      sort: "actor_type",
+      sort_id: "actions-sort-actor_type"
+    },
+    %{id: "event", label: "Action", type: :string, sort: "event", sort_id: "actions-sort-event"},
+    %{id: "context", label: "Context", type: :string},
+    %{id: "result", label: "Result", type: :string},
+    %{
+      id: "trace_id",
+      label: "Trace",
+      type: :string,
+      sort: "trace_id",
+      sort_id: "actions-sort-trace_id"
+    },
+    %{id: "retain", label: "Retain", type: :string, align: :right}
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
      |> assign(page_title: "Audit Actions")
-     |> assign(can_manage: allowed?(socket.assigns.current_scope, @manage_cap))}
+     |> assign(can_manage: allowed?(socket.assigns.current_scope, @manage_cap))
+     |> assign(:columns, ListColumns.mount("actions-table", @builtins))}
   end
 
   @impl true
@@ -68,6 +99,14 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -121,9 +160,9 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
       |> assign(:filters_form, ListState.filters_form(state))
       |> assign(:can_manage, allowed?(socket.assigns.current_scope, @manage_cap))
-      |> stream(:actions, page.entries, reset: true)
     end
   end
 

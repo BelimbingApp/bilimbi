@@ -20,20 +20,31 @@
     </.header>
 
     <.card id="field-access-card" inner_class="p-0">
-      <.table id="field-restrictions" rows={@restrictions} framed={false}>
-        <:col :let={restriction} label="Table">
+      <.flex_table
+        id="field-restrictions"
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"field-restriction-#{&1}"}
+        event="grid"
+        framed={false}
+      >
+        <:col :let={%{record: restriction}} id="table">
           <span class="whitespace-nowrap text-ink">{restriction.table_label}</span>
         </:col>
-        <:col :let={restriction} label="Field">
+        <:col :let={%{record: restriction}} id="field">
           <span class="whitespace-nowrap text-ink">{restriction.field_label}</span>
         </:col>
-        <:col :let={restriction} label="Visible to">
+        <:col :let={%{record: restriction}} id="visible_to">
           <span :if={restriction.role_names == []} class="text-ink-muted">No role</span>
           <span :for={name <- restriction.role_names} class="mr-1 inline-flex">
             <.badge>{name}</.badge>
           </span>
         </:col>
-        <:col :let={restriction} label="Since">
+        <:col :let={%{record: restriction}} id="since">
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
             <.datetime
               id={"field-restriction-#{restriction.id}-since"}
@@ -41,7 +52,7 @@
             />
           </span>
         </:col>
-        <:action :let={restriction}>
+        <:action :let={%{record: restriction}}>
           <.icon_button
             id={"field-restriction-#{restriction.id}-edit"}
             icon="edit"
@@ -65,7 +76,7 @@
           title="No field is restricted in this tenant"
           reason="Every role sees every field. Restrict one below."
         />
-      </.table>
+      </.flex_table>
     </.card>
 
     <.card id="field-access-form-card" class="mt-6">

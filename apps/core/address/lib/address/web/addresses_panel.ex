@@ -30,8 +30,8 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   outgrows the full listing.
 
   The panel is one `<.card>` opened by the shared `<.section_heading>`, and
-  the attached addresses are the shared `<.table>`, unframed inside it, with
-  the sort buttons addressed to this component. As on Belimbing's
+  the attached addresses use `<.flex_table>` with its notch and sort buttons
+  addressed to this component. As on Belimbing's
   company-addresses partial the kinds are a choice fact whose read state is
   the trigger, the primary flag toggles on click, priority commits on Enter or
   blur through `<.inline_edit>`, and unlinking is a demoted icon action that
@@ -44,6 +44,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.FormErrors
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
@@ -55,8 +56,17 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
   # state; the persistence event is `save_address_kinds`, which re-authorizes.
   # There is no weaker capability for this handler to refuse (#575 precedent).
-  @write_guard_opt_out ~w(toggle_edit_kind)
+  @write_guard_opt_out ~w(addresses_grid toggle_edit_kind)
   @valid_address_kinds ~w(headquarters billing shipping branch other)
+  @builtins [
+    %{id: "label", label: "Label", type: :string, sort: "label"},
+    %{id: "line1", label: "Address", type: :string, sort: "line1"},
+    %{id: "kind", label: "Kind", type: :string, sort: "kind"},
+    %{id: "is_primary", label: "Primary", type: :boolean, sort: "is_primary"},
+    %{id: "priority", label: "Priority", type: :integer, sort: "priority", align: :right},
+    %{id: "valid_from", label: "Valid From", type: :date, sort: "valid_from"},
+    %{id: "valid_to", label: "Valid To", type: :date, sort: "valid_to"}
+  ]
 
   # The create-and-attach form's fields, cast as a schemaless changeset — the
   # company page's inline create flow moved here whole (#595). Geonames resolves
@@ -87,6 +97,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
      |> assign(:selected_edit_kinds, [])
      |> assign(:addresses_sort_by, "label")
      |> assign(:addresses_sort_dir, "asc")
+     |> assign(:columns, ListColumns.mount("addresses-table", @builtins))
      |> assign(:address_kinds, @valid_address_kinds)
      # Create-and-attach flow (ported from the company page's inline section).
      |> assign(:show_create_modal, false)
@@ -382,7 +393,14 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
      socket
      |> assign(:addresses_sort_by, sort_col)
      |> assign(:addresses_sort_dir, new_dir)
-     |> assign(:sorted_addresses, sorted)}
+     |> assign(:columns, ListColumns.load(socket.assigns.columns, sorted, & &1.id))}
+  end
+
+  def handle_event("addresses_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   # --- Create-and-attach: a new address made and linked in one step ---
@@ -552,10 +570,12 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
         socket.assigns.addresses_sort_dir
       )
 
+    columns = socket.assigns[:columns] || ListColumns.mount("addresses-table", @builtins)
+
     socket
     |> assign(:attached_addresses, attached)
     |> assign(:available_addresses, available)
-    |> assign(:sorted_addresses, sorted)
+    |> assign(:columns, ListColumns.load(columns, sorted, & &1.id))
   end
 
   defp can_manage?(socket) do
@@ -613,54 +633,63 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
       </.panel_notice>
       <.card
         id="addresses-card"
-        inner_class="p-5 sm:p-6"
+        inner_class="p-0"
         role="region"
         aria-labelledby={"#{@owner.prefix}-addresses-heading"}
       >
-        <.section_heading
-          id={"#{@owner.prefix}-addresses-heading"}
-          title="Addresses"
-          count={length(@attached_addresses)}
-        >
-          <:actions :if={@can_manage?}>
-            <.button
-              id="btn-open-attach-address"
-              phx-click={
-                JS.push("lv:clear-flash")
-                |> JS.push("open_attach_modal", target: @myself)
-              }
-              {attach_button_variant(@owner)}
-              class="text-xs px-2.5 py-1"
-            >
-              <.icon name="create" class="size-3.5" /> <span>Attach Address</span>
-            </.button>
-            <.button
-              :if={@owner.create?}
-              id="btn-open-create-address"
-              phx-click={
-                JS.push("lv:clear-flash")
-                |> JS.push("open_create_modal", target: @myself)
-              }
-              variant="primary"
-              class="text-xs px-2.5 py-1"
-            >
-              <.icon name="create" class="size-3.5" /> <span>Create &amp; Attach</span>
-            </.button>
-          </:actions>
-        </.section_heading>
+        <div class="px-5 pb-4 pt-5 sm:px-6">
+          <.section_heading
+            id={"#{@owner.prefix}-addresses-heading"}
+            title="Addresses"
+            count={length(@attached_addresses)}
+          >
+            <:actions :if={@can_manage?}>
+              <.button
+                id="btn-open-attach-address"
+                phx-click={
+                  JS.push("lv:clear-flash")
+                  |> JS.push("open_attach_modal", target: @myself)
+                }
+                {attach_button_variant(@owner)}
+                class="text-xs px-2.5 py-1"
+              >
+                <.icon name="create" class="size-3.5" /> <span>Attach Address</span>
+              </.button>
+              <.button
+                :if={@owner.create?}
+                id="btn-open-create-address"
+                phx-click={
+                  JS.push("lv:clear-flash")
+                  |> JS.push("open_create_modal", target: @myself)
+                }
+                variant="primary"
+                class="text-xs px-2.5 py-1"
+              >
+                <.icon name="create" class="size-3.5" /> <span>Create &amp; Attach</span>
+              </.button>
+            </:actions>
+          </.section_heading>
+        </div>
 
-        <.table
+        <.flex_table
           id="addresses-table"
-          rows={@sorted_addresses}
-          row_id={&"address-row-#{&1.id}"}
+          framed={false}
+          columns={@columns.column_views}
+          rows={@columns.rows}
+          mode={@columns.mode}
+          zoom={@columns.zoom}
+          suggestions={@columns.suggestions}
+          add_query={@columns.add_query}
+          event="addresses_grid"
+          target={@myself}
+          row_id={&"address-row-#{&1}"}
           sort_by={@addresses_sort_by}
           sort_dir={@addresses_sort_dir}
           sort_event="sort_addresses"
           sort_target={@myself}
-          framed={false}
           caption={@owner.caption}
         >
-          <:col :let={addr} label="Label" sort="label">
+          <:col :let={%{record: addr}} id="label">
             <%!-- The label opens the address's own read-first page. A company
                  link carries the company so that page can offer the way back. --%>
             <.link
@@ -672,11 +701,11 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
             </.link>
           </:col>
 
-          <:col :let={addr} label="Address" sort="line1">
+          <:col :let={%{record: addr}} id="line1">
             <span class="text-ink-subtle">{format_address_summary(addr)}</span>
           </:col>
 
-          <:col :let={addr} label="Kind" sort="kind">
+          <:col :let={%{record: addr}} id="kind">
             <%= if @editing_kinds_address_id == addr.id do %>
               <div class="space-y-1">
                 <%= for k <- @address_kinds do %>
@@ -742,7 +771,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
             <% end %>
           </:col>
 
-          <:col :let={addr} label="Primary" sort="is_primary">
+          <:col :let={%{record: addr}} id="is_primary">
             <button
               :if={@can_manage?}
               id={"toggle-primary-#{addr.id}"}
@@ -763,7 +792,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
             </span>
           </:col>
 
-          <:col :let={addr} label="Priority" sort="priority">
+          <:col :let={%{record: addr}} id="priority">
             <%!-- Priority commits on Enter or blur through the shared in-place
                editor, as Belimbing's priority cell does; the outcome reports
                through the panel notice. The hook addresses its event to its
@@ -783,15 +812,15 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
             <span :if={not @can_manage?} class="tabular-nums">{addr.priority || 0}</span>
           </:col>
 
-          <:col :let={addr} label="Valid From" sort="valid_from">
+          <:col :let={%{record: addr}} id="valid_from">
             <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_from)}</span>
           </:col>
 
-          <:col :let={addr} label="Valid To" sort="valid_to">
+          <:col :let={%{record: addr}} id="valid_to">
             <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_to)}</span>
           </:col>
 
-          <:action :let={addr} :if={@can_manage?}>
+          <:action :let={%{record: addr}} :if={@can_manage?}>
             <.icon_button
               id={"unlink-address-#{addr.id}"}
               icon="unlink"
@@ -806,11 +835,11 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
           </:action>
 
           <:empty
-            :if={@sorted_addresses == []}
+            :if={@columns.rows == []}
             title="No addresses linked."
             reason={if @can_manage?, do: @owner.empty_manage, else: @owner.empty_read}
           />
-        </.table>
+        </.flex_table>
       </.card>
       <.modal
         :if={@show_attach_modal}

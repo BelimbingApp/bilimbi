@@ -38,6 +38,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.Layouts
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
 
@@ -47,7 +48,18 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   alias Bilimbi.Core.Geonames
 
   @sortable_linked_fields ~w(type name kind is_primary priority valid_from valid_to)a
+  @write_guard_opt_out ~w(grid)
   @verification_statuses ~w(unverified suggested verified)
+
+  @linked_builtins [
+    %{id: "type", label: "Entity Type", sort: "type", sort_id: "sort-type"},
+    %{id: "name", label: "Name", sort: "name", sort_id: "sort-name"},
+    %{id: "kind", label: "Kind", sort: "kind", sort_id: "sort-kind"},
+    %{id: "is_primary", label: "Primary", sort: "is_primary", sort_id: "sort-is-primary"},
+    %{id: "priority", label: "Priority", sort: "priority", sort_id: "sort-priority"},
+    %{id: "valid_from", label: "Valid From", sort: "valid_from", sort_id: "sort-valid-from"},
+    %{id: "valid_to", label: "Valid To", sort: "valid_to", sort_id: "sort-valid-to"}
+  ]
 
   # The facts an inline text edit may write, keyed by the form name the hook
   # pushes. A name outside this map is ignored; user input never becomes an atom.
@@ -111,6 +123,14 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
          |> assign(:country_options, country_options)
          |> assign(:linked_sort_by, sort_by)
          |> assign(:linked_sort_dir, sort_dir)
+         |> assign(
+           :columns,
+           ListColumns.load(
+             ListColumns.mount("address-linked-entities-table", @linked_builtins),
+             address.linked_owners,
+             & &1.attachment_id
+           )
+         )
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
          |> assign(:editing_location?, false)
@@ -154,7 +174,8 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
              socket
              |> assign(:address, address)
              |> assign(:linked_sort_by, sort_by)
-             |> assign(:linked_sort_dir, sort_dir)}
+             |> assign(:linked_sort_dir, sort_dir)
+             |> load_linked_columns(address)}
 
           _ ->
             {:noreply, socket}
@@ -339,6 +360,14 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     {:noreply, push_patch(socket, to: ~p"/addresses/#{socket.assigns.address_id}?#{query}")}
   end
 
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
+
   # ============================================================================
   # Saving
   # ============================================================================
@@ -373,6 +402,15 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     socket
     |> assign(:address, refreshed)
     |> assign(:page_title, page_title(refreshed))
+    |> load_linked_columns(refreshed)
+  end
+
+  defp load_linked_columns(socket, %Detail{} = address) do
+    assign(
+      socket,
+      :columns,
+      ListColumns.load(socket.assigns.columns, address.linked_owners, & &1.attachment_id)
+    )
   end
 
   defp write_forbidden(socket), do: CommitStatus.write_forbidden(socket, @forbidden)
@@ -637,31 +675,38 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
           <.card
             id="address-linked-entities-card"
-            inner_class="p-5 sm:p-6"
+            inner_class="p-0"
             role="region"
             aria-labelledby="address-linked-entities-heading"
           >
-            <.section_heading id="address-linked-entities-heading" title="Linked Entities">
-              <:description>
-                Companies, employees, or other records that use this address. One address can be shared by multiple entities with different roles (e.g., billing, shipping).
-              </:description>
-            </.section_heading>
+            <div class="px-5 pb-4 pt-5 sm:px-6">
+              <.section_heading id="address-linked-entities-heading" title="Linked Entities">
+                <:description>
+                  Companies, employees, or other records that use this address. One address can be shared by multiple entities with different roles (e.g., billing, shipping).
+                </:description>
+              </.section_heading>
+            </div>
 
-            <.table
+            <.flex_table
               id="address-linked-entities-table"
-              rows={@address.linked_owners}
+              columns={@columns.column_views}
+              rows={@columns.rows}
+              mode={@columns.mode}
+              zoom={@columns.zoom}
+              suggestions={@columns.suggestions}
+              add_query={@columns.add_query}
               sort_by={@linked_sort_by}
               sort_dir={@linked_sort_dir}
               framed={false}
               caption="Linked entities"
             >
-              <:col :let={owner} label="Entity Type" sort="type" sort_id="sort-type">
+              <:col :let={%{record: owner}} id="type">
                 <span class="whitespace-nowrap font-medium text-ink">
                   {format_owner_type(owner.owner_type)}
                 </span>
               </:col>
 
-              <:col :let={owner} label="Name" sort="name" sort_id="sort-name">
+              <:col :let={%{record: owner}} id="name">
                 <span class="whitespace-nowrap font-medium">
                   <%= if owner.owner_type == :company do %>
                     <.link
@@ -687,7 +732,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 </span>
               </:col>
 
-              <:col :let={owner} label="Kind" sort="kind" sort_id="sort-kind">
+              <:col :let={%{record: owner}} id="kind">
                 <div class="flex flex-wrap gap-1">
                   <%= if owner.kind != [] do %>
                     <.badge :for={kind <- owner.kind} kind={:neutral} dot={false}>
@@ -699,34 +744,34 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 </div>
               </:col>
 
-              <:col :let={owner} label="Primary" sort="is_primary" sort_id="sort-is-primary">
+              <:col :let={%{record: owner}} id="is_primary">
                 <span class="whitespace-nowrap text-sm text-ink-muted">
                   {if owner.is_primary, do: "Yes", else: "No"}
                 </span>
               </:col>
 
-              <:col :let={owner} label="Priority" sort="priority" sort_id="sort-priority">
+              <:col :let={%{record: owner}} id="priority">
                 <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
                   {owner.priority || "—"}
                 </span>
               </:col>
 
-              <:col :let={owner} label="Valid From" sort="valid_from" sort_id="sort-valid-from">
+              <:col :let={%{record: owner}} id="valid_from">
                 <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
                   {owner.valid_from || "—"}
                 </span>
               </:col>
 
-              <:col :let={owner} label="Valid To" sort="valid_to" sort_id="sort-valid-to">
+              <:col :let={%{record: owner}} id="valid_to">
                 <span class="whitespace-nowrap tabular-nums text-sm text-ink-muted">
                   {owner.valid_to || "—"}
                 </span>
               </:col>
 
-              <:empty :if={@address.linked_owners == []}>
+              <:empty :if={@columns.rows == []}>
                 No linked entities.
               </:empty>
-            </.table>
+            </.flex_table>
           </.card>
         </div>
       </.page>
