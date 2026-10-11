@@ -82,8 +82,10 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
     {:noreply, close_dialog(socket)}
   end
 
-  def handle_event("validate", %{"restriction" => params}, socket) do
-    {:noreply, assign_form(socket, normalize(params, socket))}
+  # A form with no pick posts no `restriction` key at all, so no pick is the
+  # empty selection.
+  def handle_event("validate", params, socket) do
+    {:noreply, assign_form(socket, normalize(Map.get(params, "restriction", %{}), socket))}
   end
 
   # A chip's remove button names the input and the value; the form is the
@@ -102,8 +104,8 @@ defmodule Bilimbi.Base.Authz.Web.FieldRestrictionsLive do
     end
   end
 
-  def handle_event("save", %{"restriction" => params}, socket) do
-    params = normalize(params, socket)
+  def handle_event("save", params, socket) do
+    params = normalize(Map.get(params, "restriction", %{}), socket)
 
     case LiveAuthorization.authorize_event(socket, @capability) do
       {:ok, socket} -> save(socket, params)
