@@ -60,6 +60,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.Tiling.SharedLayouts
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Nav
   alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Base.UI.Workspace
@@ -71,7 +72,18 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @write_guard_opt_out ~w(add-tile close-tile move-tile swap-tile toggle-monocle toggle-split
                           resize-split nudge-split resize-step save-layout update-layout
                           rename-layout delete-layout confirm-delete-layout set-default-layout
-                          clear-default-layout copy-layout set-layout-mode make-master)
+                          clear-default-layout copy-layout set-layout-mode make-master
+                          saved_grid shared_grid)
+
+  @saved_builtins [
+    %{id: "label", label: "Name"},
+    %{id: "default", label: "Opens with the workspace"},
+    %{id: "layout_mode", label: "Tiling layout"}
+  ]
+  @shared_builtins [
+    %{id: "label", label: "Name"},
+    %{id: "audience", label: "Audience"}
+  ]
 
   # The root layout's title suffix, stripped from what a frame reports so
   # the tile is named by the page's own name. Keep in step with
@@ -117,6 +129,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:layouts_open?, false)
      |> assign(:pending_delete, nil)
      |> assign(:save_form, to_form(%{"label" => ""}, as: :layout))
+     |> assign(:saved_columns, ListColumns.mount("workspace-saved-layouts", @saved_builtins))
+     |> assign(:shared_columns, ListColumns.mount("workspace-shared-table", @shared_builtins))
      |> load_saved()
      |> derive()}
   end
@@ -713,6 +727,20 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      socket |> load_saved() |> put_flash(:success, gettext("The workspace now opens empty."))}
   end
 
+  def handle_event("saved_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.saved_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :saved_columns, columns)}
+      _outcome -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("shared_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.shared_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :shared_columns, columns)}
+      _outcome -> {:noreply, socket}
+    end
+  end
+
   # ------------------------------------------------------------------
   # The follow channel
   # ------------------------------------------------------------------
@@ -886,10 +914,14 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   defp load_saved(socket) do
     scope = socket.assigns.settings_scope
+    saved = SavedLayouts.list(scope)
+    shared = SharedLayouts.visible(socket.assigns.company_scope, socket.assigns.role_codes)
 
     assign(socket,
-      saved: SavedLayouts.list(scope),
-      shared: SharedLayouts.visible(socket.assigns.company_scope, socket.assigns.role_codes),
+      saved: saved,
+      shared: shared,
+      saved_columns: ListColumns.load(socket.assigns.saved_columns, saved, & &1["slug"]),
+      shared_columns: ListColumns.load(socket.assigns.shared_columns, shared, & &1["slug"]),
       default_slug: SavedLayouts.default_slug(scope)
     )
   end

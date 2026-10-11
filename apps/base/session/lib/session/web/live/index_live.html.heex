@@ -27,51 +27,41 @@
     </.filter_toolbar>
 
     <.card id="sessions-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="sessions"
-        rows={@streams.sessions}
-        row_id={fn {id, _session} -> id end}
-        row_item={fn {_id, session} -> session end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
         sort_by={@index_state.sort_by}
         sort_dir={@index_state.sort_dir}
-        framed={false}
+        row_id={&"sessions-#{&1}"}
+        caption="Sessions"
       >
-        <:col :let={session} label="User" sort="user_id" sort_id="sessions-sort-user_id">
+        <:col :let={%{record: session}} id="user_id">
           {user_label(session, @user_names)}
         </:col>
-        <:col
-          :let={session}
-          label="IP Address"
-          sort="ip_address"
-          sort_id="sessions-sort-ip_address"
-        >
+        <:col :let={%{record: session}} id="ip_address">
           <span class="tabular-nums text-ink-muted">{session.ip_address || "—"}</span>
         </:col>
-        <:col
-          :let={session}
-          label="User Agent"
-          sort="user_agent"
-          sort_id="sessions-sort-user_agent"
-        >
+        <:col :let={%{record: session}} id="user_agent">
           <span class="max-w-xs truncate text-ink-muted" title={session.user_agent}>
             {truncate_ua(session.user_agent)}
           </span>
         </:col>
-        <:col
-          :let={session}
-          label="Last Activity"
-          sort="last_activity"
-          sort_id="sessions-sort-last_activity"
-        >
+        <:col :let={%{record: session}} id="last_activity">
           <span class="text-ink-muted">
             {relative_activity(session.last_activity)}
           </span>
         </:col>
-        <:col :let={session} label="Status">
+        <:col :let={%{record: session}} id="status">
           <.badge :if={session.id == @current_session_id} kind={:success}>Current</.badge>
         </:col>
 
-        <:action :let={session}>
+        <:action :let={%{record: session}}>
           <.icon_button
             :if={
               session.id != @current_session_id and
@@ -89,7 +79,7 @@
         <:empty :if={@sessions_page.total_entries == 0}>
           No sessions found.
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="sessions-pagination"

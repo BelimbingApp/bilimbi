@@ -4,10 +4,32 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Address
 
   @page_sizes [25, 50, 100]
+  @builtins [
+    %{id: "label", label: "Label", type: :string, sort: "label", sort_id: "addresses-sort-label"},
+    %{id: "address", label: "Address", type: :string},
+    %{id: "locality", label: "Locality", type: :string},
+    %{
+      id: "country_iso",
+      label: "Country",
+      type: :string,
+      sort: "country_iso",
+      sort_id: "addresses-sort-country"
+    },
+    %{
+      id: "verification_status",
+      label: "Status",
+      type: :string,
+      sort: "verification_status",
+      sort_id: "addresses-sort-status"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
   @list ListState.spec!(
           sortable: %{label: :asc, country_iso: :asc, verification_status: :asc},
           default_sort: :label,
@@ -22,7 +44,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     {:ok,
      socket
      |> assign(:pending_delete, nil)
-     |> stream_configure(:addresses, dom_id: &"address-#{&1.id}")}
+     |> assign(:columns, ListColumns.mount("addresses-table", @builtins))}
   end
 
   @impl true
@@ -39,6 +61,14 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     state = ListState.next_sort(socket.assigns.index_state, sort_by)
     {:noreply, push_patch(socket, to: addresses_path(state))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
   end
 
   def handle_event("page", %{"page" => page}, socket) do
@@ -140,16 +170,21 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
         </.filter_toolbar>
 
         <.card id="addresses-card" inner_class="p-0">
-          <.table
+          <.flex_table
             id="addresses-table"
-            rows={@streams.addresses}
-            row_id={fn {dom_id, _address} -> dom_id end}
-            row_item={fn {_dom_id, address} -> address end}
+            framed={false}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"address-#{&1}"}
+            caption="Addresses"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
-            framed={false}
           >
-            <:col :let={address} label="Label" sort="label" sort_id="addresses-sort-label">
+            <:col :let={%{record: address}} id="label">
               <.link
                 :if={allowed?(@current_scope, "admin.address.view")}
                 navigate={~p"/addresses/#{address.id}"}
@@ -164,38 +199,39 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
                 {address.label || "Unlabeled"}
               </span>
             </:col>
-            <:col :let={address} label="Address">
+            <:col :let={%{record: address}} id="address">
               <div class="min-w-56 text-ink-muted">
                 <span>{address.line1 || "—"}</span>
-                <span :if={address.line2} class="block text-xs text-ink-subtle">
+                <span
+                  :if={not is_nil(address.line2) and @columns.mode == :normal}
+                  class="block text-xs text-ink-subtle"
+                >
                   {address.line2}
                 </span>
               </div>
             </:col>
-            <:col :let={address} label="Locality">
+            <:col :let={%{record: address}} id="locality">
               <div class="whitespace-nowrap text-ink-muted">
                 <span>{address.locality || "—"}</span>
-                <span :if={address.postcode} class="block text-xs tabular-nums text-ink-subtle">
+                <span
+                  :if={not is_nil(address.postcode) and @columns.mode == :normal}
+                  class="block text-xs tabular-nums text-ink-subtle"
+                >
                   {address.postcode}
                 </span>
               </div>
             </:col>
-            <:col :let={address} label="Country" sort="country_iso" sort_id="addresses-sort-country">
+            <:col :let={%{record: address}} id="country_iso">
               <span class="whitespace-nowrap font-mono text-xs text-ink-muted">
                 {address.country_iso || "—"}
               </span>
             </:col>
-            <:col
-              :let={address}
-              label="Status"
-              sort="verification_status"
-              sort_id="addresses-sort-status"
-            >
+            <:col :let={%{record: address}} id="verification_status">
               <.badge kind={status_kind(address.verification_status)}>
                 {address.verification_status}
               </.badge>
             </:col>
-            <:action :let={address}>
+            <:action :let={%{record: address}}>
               <.icon_button
                 :if={allowed?(@current_scope, "admin.address.delete")}
                 icon="delete"
@@ -209,7 +245,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             <:empty :if={@addresses_page.entries == []}>
               No addresses found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="addresses-pagination"
@@ -246,7 +282,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     |> assign(:page_sizes, @page_sizes)
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
-    |> stream(:addresses, page.entries, reset: true)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
   end
 
   defp address_page(socket, state) do

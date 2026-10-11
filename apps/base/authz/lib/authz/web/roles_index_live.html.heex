@@ -48,35 +48,45 @@
     </p>
 
     <.card id="roles-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="roles"
-        rows={@streams.roles}
-        row_id={fn {dom_id, _role} -> dom_id end}
-        row_item={fn {_dom_id, role} -> role end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"roles-#{&1}"}
+        caption="Roles"
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
-        framed={false}
       >
-        <:col :let={role} label="Name" sort="name" sort_id="roles-sort-name">
+        <:col :let={%{record: role}} id="name">
           <.link
             navigate={~p"/authz/roles/#{role.id}"}
             class="font-medium text-ink-strong hover:underline"
           >
             {role.name}
           </.link>
-          <p :if={role.description} class="text-xs text-ink-subtle">{role.description}</p>
+          <p
+            :if={not is_nil(role.description) and @columns.mode == :normal}
+            class="text-xs text-ink-subtle"
+          >
+            {role.description}
+          </p>
         </:col>
 
-        <:col :let={role} label="Code" sort="code" sort_id="roles-sort-code">
+        <:col :let={%{record: role}} id="code">
           <span class="font-mono text-xs text-ink-muted">{role.code}</span>
         </:col>
 
-        <:col :let={role} label="Scope" sort="is_system" sort_id="roles-sort-is_system">
+        <:col :let={%{record: role}} id="is_system">
           <.badge kind={scope_kind(role)}>{scope_label(role)}</.badge>
           <.badge :if={role.grant_all} kind={:warning} class="ml-1">Grants all</.badge>
         </:col>
 
-        <:col :let={role} label="Capabilities">
+        <:col :let={%{record: role}} id="capabilities">
           <span class="tabular-nums text-ink-muted">
             <%= if role.grant_all do %>
               <span title="A grant-all role carries every capability, present and future">All</span>
@@ -86,7 +96,7 @@
           </span>
         </:col>
 
-        <:col :let={role} label="Principals">
+        <:col :let={%{record: role}} id="principals">
           <span class="tabular-nums text-ink-muted">{role.principal_count}</span>
         </:col>
 
@@ -95,7 +105,7 @@
             do: "No roles are visible in this tenant.",
             else: "No roles match #{@state.search}."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="roles-pagination"

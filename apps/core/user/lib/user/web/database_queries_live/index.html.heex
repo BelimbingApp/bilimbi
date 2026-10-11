@@ -26,15 +26,21 @@
     </.filter_toolbar>
 
     <.card id="database-queries-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="database-queries-table"
-        rows={@queries}
-        row_id={fn query -> "query-row-#{query.id}" end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"query-row-#{&1}"}
+        caption="Database queries"
         sort_by={@sort_by}
         sort_dir={@sort_dir}
-        framed={false}
       >
-        <:col :let={query} label="Name" sort="name">
+        <:col :let={%{record: query}} id="name">
           <.link
             navigate={~p"/admin/system/database-queries/#{query.slug}"}
             class="font-medium text-action hover:underline"
@@ -42,23 +48,23 @@
             {query.name}
           </.link>
         </:col>
-        <:col :let={query} label="Description" sort="description">
+        <:col :let={%{record: query}} id="description">
           <span class="block max-w-xs truncate text-ink-subtle" title={query.description}>
             {query.description || "—"}
           </span>
         </:col>
-        <:col :let={query} label="Created" sort="created_at">
+        <:col :let={%{record: query}} id="created_at">
           <span class="whitespace-nowrap text-ink-subtle">
             <.datetime id={"created-#{query.id}"} value={query.created_at} />
           </span>
         </:col>
-        <:col :let={query} label="Updated" sort="updated_at">
+        <:col :let={%{record: query}} id="updated_at">
           <span class="whitespace-nowrap text-ink-subtle">
             <.datetime id={"updated-#{query.id}"} value={query.updated_at} />
           </span>
         </:col>
 
-        <:action :let={query}>
+        <:action :let={%{record: query}}>
           <div
             :if={allowed?(@current_scope, "admin.system.database-table.edit")}
             class="inline-flex items-center gap-1.5"
@@ -84,7 +90,7 @@
         <:empty :if={@queries == []}>
           No queries found.
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="database-queries-pagination"

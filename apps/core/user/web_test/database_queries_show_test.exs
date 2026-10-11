@@ -524,7 +524,7 @@ defmodule BilimbiWeb.DatabaseQueriesShowTest do
                "name"
              )
 
-      assert has_element?(view, "tbody#query-results-table tr#result-row-0", "Ada Lovelace")
+      assert has_element?(view, "#query-results-table-rows tr#result-row-0", "Ada Lovelace")
 
       view |> element("#query-results-table-sort-name") |> render_click()
       assert has_element?(view, "th[aria-sort='ascending'] #query-results-table-sort-name")

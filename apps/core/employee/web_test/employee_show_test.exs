@@ -154,7 +154,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> form("#add-subordinate-form")
     |> render_submit(%{"subordinate_id" => to_string(report.id)})
 
-    assert has_element?(view, "tbody#subordinates-table tr#subordinate-row-#{report.id}")
+    assert has_element?(view, "#subordinates-table-rows tr#subordinate-row-#{report.id}")
 
     assert has_element?(
              view,

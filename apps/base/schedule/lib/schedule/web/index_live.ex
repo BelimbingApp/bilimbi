@@ -29,6 +29,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   alias Bilimbi.Base.Schedule.RunPage
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.UI.DateTimeDisplay
+  alias Bilimbi.Base.UI.ListColumns
 
   @execute "admin.system.schedule.execute"
   @manage "admin.system.schedule.manage"
@@ -41,6 +42,60 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   @task_sortable ~w(name next_due last_run)
   @run_sortable ~w(started_at name source status)
   @page_sizes [25, 50, 100]
+  @task_columns [
+    %{
+      id: "name",
+      label: "Name",
+      type: :string,
+      sort: "name",
+      sort_id: "schedule-tasks-sort-name"
+    },
+    %{id: "source", label: "Source", type: :string},
+    %{id: "cron", label: "Cron schedule", type: :string},
+    %{
+      id: "next_due",
+      label: "Next run",
+      type: :datetime,
+      sort: "next_due",
+      sort_id: "schedule-tasks-sort-next_due"
+    },
+    %{id: "status", label: "Status", type: :string},
+    %{
+      id: "last_run",
+      label: "Last run",
+      type: :datetime,
+      sort: "last_run",
+      sort_id: "schedule-tasks-sort-last_run"
+    },
+    %{id: "result", label: "Result", type: :string}
+  ]
+  @run_columns [
+    %{
+      id: "started_at",
+      label: "Started",
+      type: :datetime,
+      sort: "started_at",
+      sort_id: "schedule-runs-sort-started_at"
+    },
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "schedule-runs-sort-name"},
+    %{
+      id: "source",
+      label: "Source",
+      type: :string,
+      sort: "source",
+      sort_id: "schedule-runs-sort-source"
+    },
+    %{
+      id: "status",
+      label: "Status",
+      type: :string,
+      sort: "status",
+      sort_id: "schedule-runs-sort-status"
+    },
+    %{id: "detail", label: "Detail", type: :string}
+  ]
+
+  @write_guard_opt_out ~w(grid_runs grid_tasks)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -62,10 +117,8 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:pending_command, nil)
       |> assign(:browser_timezone, nil)
       |> assign(:page_sizes, @page_sizes)
-      |> stream_configure(:tasks, dom_id: &task_dom_id/1)
-      |> stream_configure(:runs, dom_id: &run_dom_id/1)
-      |> stream(:tasks, [])
-      |> stream(:runs, [])
+      |> assign(:task_columns, ListColumns.mount("schedule-tasks", @task_columns))
+      |> assign(:run_columns, ListColumns.mount("schedule-runs", @run_columns))
 
     socket = assign(socket, :run_zone, display_timezone(socket))
 
@@ -162,6 +215,22 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   def handle_event("sort_runs", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid_tasks", params, socket) do
+    case ListColumns.handle(socket.assigns.task_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :task_columns, columns)}
+      {:sort, column} -> handle_event("sort_tasks", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("grid_runs", params, socket) do
+    case ListColumns.handle(socket.assigns.run_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :run_columns, columns)}
+      {:sort, column} -> handle_event("sort_runs", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   def handle_event("page", %{"page" => page}, socket) do
     {:noreply, push_state(socket, %{socket.assigns.state | page: positive_integer(page, 1)})}
@@ -375,13 +444,13 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         socket
         |> assign(:task_state, :available)
         |> assign(:task_count, length(tasks))
-        |> stream(:tasks, tasks, reset: true)
+        |> assign(:task_columns, ListColumns.load(socket.assigns.task_columns, tasks, & &1.key))
 
       {:error, _reason} ->
         socket
         |> assign(:task_state, :unavailable)
         |> assign(:task_count, 0)
-        |> stream(:tasks, [], reset: true)
+        |> assign(:task_columns, ListColumns.load(socket.assigns.task_columns, [], & &1.key))
     end
   end
 
@@ -410,7 +479,10 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         |> assign(:state, state)
         |> assign(:run_state, :available)
         |> assign(:run_page, page)
-        |> stream(:runs, page.entries, reset: true)
+        |> assign(
+          :run_columns,
+          ListColumns.load(socket.assigns.run_columns, page.entries, & &1.id)
+        )
 
       {:error, reason} ->
         socket
@@ -419,7 +491,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
           if(reason == :invalid_options, do: :invalid_filters, else: :unavailable)
         )
         |> assign(:run_page, empty_run_page(state.page_size))
-        |> stream(:runs, [], reset: true)
+        |> assign(:run_columns, ListColumns.load(socket.assigns.run_columns, [], & &1.id))
     end
   end
 

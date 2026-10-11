@@ -8,11 +8,27 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz.LiveAuthorization
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
   alias Bilimbi.Core.Employee
 
   @delete_capability "admin.employee-type.delete"
+
+  @builtins [
+    %{id: "code", label: "Code", sort: "code", sort_id: "employee-types-sort-code"},
+    %{id: "label", label: "Label", sort: "label", sort_id: "employee-types-sort-label"},
+    %{id: "is_system", label: "Kind", sort: "is_system", sort_id: "employee-types-sort-kind"},
+    %{
+      id: "employees_count",
+      label: "Employees",
+      sort: "employees_count",
+      sort_id: "employee-types-sort-employees",
+      align: :right
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @active_nav "admin.employee-type"
   @default_page_size 25
@@ -54,7 +70,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:deleting_type_id, nil)
      |> assign(:pending_delete, nil)
-     |> stream(:employee_types, [])}
+     |> assign(:columns, ListColumns.mount("employee-types", @builtins))}
   end
 
   @impl true
@@ -86,6 +102,25 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   def handle_event("page", %{"page" => page}, socket) do
     state = ListState.put_page(socket.assigns.index_state, page)
     {:noreply, push_patch(socket, to: employee_types_path(state))}
+  end
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} ->
+        {:noreply, assign(socket, :columns, columns)}
+
+      {:sort, sort_by} ->
+        state = ListState.next_sort(socket.assigns.index_state, sort_by)
+
+        if state == socket.assigns.index_state do
+          {:noreply, socket}
+        else
+          {:noreply, push_patch(socket, to: employee_types_path(state))}
+        end
+
+      :noop ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -218,28 +253,15 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
     {:noreply,
      socket
      |> assign(:deleting_type_id, type_id)
-     |> restream_type(type_id)
      |> start_async(:delete_employee_type, fn ->
        Employee.delete_employee_type(scope, company_id, type_id)
      end)}
   end
 
   defp delete_failed(socket, message) do
-    type_id = socket.assigns.deleting_type_id
-
     socket
     |> assign(:deleting_type_id, nil)
-    |> restream_type(type_id)
     |> put_flash(:error, message)
-  end
-
-  # Rows are streamed, so a busy state reaches the DOM only when its own item
-  # is re-inserted.
-  defp restream_type(socket, type_id) do
-    case Enum.find(socket.assigns.employee_types_page.entries, &(&1.id == type_id)) do
-      nil -> socket
-      type -> stream_insert(socket, :employee_types, type)
-    end
   end
 
   defp load_page(socket, %ListState{} = state) do
@@ -267,7 +289,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
            |> assign(:employee_types_page, page)
            |> assign(:employee_types_count, page.total_entries)
            |> assign(:filters_form, ListState.filters_form(state))
-           |> stream(:employee_types, page.entries, reset: true)}
+           |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))}
         end
 
       {:error, :company_not_found} ->
@@ -401,20 +423,26 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         <.card id="employee-types-card" inner_class="p-0">
           <h2 id="employee-types-table-title" class="sr-only">Employee Types</h2>
 
-          <.table
+          <.flex_table
             id="employee-types"
-            rows={@streams.employee_types}
-            row_id={fn {id, _type} -> id end}
-            row_item={fn {_id, type} -> type end}
+            columns={@columns.column_views}
+            rows={@columns.rows}
+            mode={@columns.mode}
+            zoom={@columns.zoom}
+            suggestions={@columns.suggestions}
+            add_query={@columns.add_query}
+            row_id={&"employee-type-#{&1}"}
+            caption="Employee types"
+            event="grid"
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
           >
-            <:col :let={type} label="Code" sort="code" sort_id="employee-types-sort-code">
+            <:col :let={%{record: type}} id="code">
               <code class="text-xs font-medium">{type.code}</code>
             </:col>
 
-            <:col :let={type} label="Label" sort="label" sort_id="employee-types-sort-label">
+            <:col :let={%{record: type}} id="label">
               <.link
                 id={"employee-type-#{type.id}-link"}
                 navigate={~p"/employee-types/#{type.id}"}
@@ -424,22 +452,20 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
               </.link>
             </:col>
 
-            <:col :let={type} label="Kind" sort="is_system" sort_id="employee-types-sort-kind">
+            <:col :let={%{record: type}} id="is_system">
               <.badge kind={if type.is_system, do: :neutral, else: :success} dot={false}>
                 {if type.is_system, do: "system", else: "custom"}
               </.badge>
             </:col>
 
             <:col
-              :let={type}
-              label="Employees"
-              sort="employees_count"
-              sort_id="employee-types-sort-employees"
+              :let={%{record: type}}
+              id="employees_count"
             >
               <span class="text-xs tabular-nums text-ink-subtle">{type.employees_count}</span>
             </:col>
 
-            <:action :let={type}>
+            <:action :let={%{record: type}}>
               <div :if={not type.is_system} class="flex items-center justify-end gap-3">
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}
@@ -469,7 +495,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             <:empty :if={@employee_types_page.entries == []}>
               No employee types found.
             </:empty>
-          </.table>
+          </.flex_table>
 
           <.pagination
             id="employee-types-pagination"

@@ -39,32 +39,36 @@
     </.filter_toolbar>
 
     <.card id="capabilities-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="capabilities-table"
-        rows={@streams.capabilities}
-        row_id={fn {dom_id, _cap} -> dom_id end}
-        row_item={fn {_dom_id, cap} -> cap end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"capabilities-#{&1}"}
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
-        framed={false}
       >
-        <:col :let={cap} label="Capability" sort="key" sort_id="capabilities-sort-key">
+        <:col :let={%{record: cap}} id="key">
           <span class="font-mono text-xs text-ink">{cap.key}</span>
         </:col>
 
-        <:col :let={cap} label="Domain" sort="domain" sort_id="capabilities-sort-domain">
+        <:col :let={%{record: cap}} id="domain">
           <span class="text-sm text-ink-muted">{cap.domain}</span>
         </:col>
 
-        <:col :let={cap} label="Resource" sort="resource" sort_id="capabilities-sort-resource">
+        <:col :let={%{record: cap}} id="resource">
           <span class="text-sm text-ink-muted">{cap.resource}</span>
         </:col>
 
-        <:col :let={cap} label="Action" sort="action" sort_id="capabilities-sort-action">
+        <:col :let={%{record: cap}} id="action">
           <span class="text-sm text-ink-muted">{cap.action}</span>
         </:col>
 
-        <:col :let={cap} label="Module" sort="module" sort_id="capabilities-sort-module">
+        <:col :let={%{record: cap}} id="module">
           <span class="text-sm text-ink-muted">{cap.module}</span>
         </:col>
 
@@ -73,7 +77,7 @@
             do: "No capabilities found.",
             else: "No capabilities match these filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="capabilities-pagination"

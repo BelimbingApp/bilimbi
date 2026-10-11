@@ -50,27 +50,39 @@
         title="Pending work"
         count={length(@work)}
       />
-      <.table
+      <.flex_table
         id="workflow-reference-work-rows"
-        rows={@work}
-        row_id={fn item -> "workflow-work-#{item.id}" end}
+        columns={@work_columns.column_views}
+        rows={@work_columns.rows}
+        mode={@work_columns.mode}
+        zoom={@work_columns.zoom}
+        suggestions={@work_columns.suggestions}
+        add_query={@work_columns.add_query}
+        event="work_grid"
+        row_id={&"workflow-work-#{&1}"}
         caption="Pending work"
       >
-        <:col :let={item} label="Work">{item.label}</:col>
-        <:col :let={item} label="Status">{item.status}</:col>
+        <:col :let={%{record: item}} id="label">{item.label}</:col>
+        <:col :let={%{record: item}} id="status">{item.status}</:col>
         <:empty :if={@work == []} title="No pending work" reason="Due review work appears here." />
-      </.table>
+      </.flex_table>
     </section>
     <section id="workflow-reference-history" class="mt-8">
       <.section_heading id="workflow-reference-history-heading" title="History" />
-      <.table
+      <.flex_table
         id="workflow-reference-history-rows"
-        rows={@history}
-        row_id={fn entry -> "workflow-history-#{entry.id}" end}
+        columns={@history_columns.column_views}
+        rows={@history_columns.rows}
+        mode={@history_columns.mode}
+        zoom={@history_columns.zoom}
+        suggestions={@history_columns.suggestions}
+        add_query={@history_columns.add_query}
+        event="history_grid"
+        row_id={&"workflow-history-#{&1}"}
         caption="Status history"
       >
-        <:col :let={entry} label="Status">{entry.status}</:col>
-        <:col :let={entry} label="When">
+        <:col :let={%{record: entry}} id="status">{entry.status}</:col>
+        <:col :let={%{record: entry}} id="transitioned_at">
           <.datetime id={"workflow-history-time-#{entry.id}"} value={entry.transitioned_at} />
         </:col>
         <:empty
@@ -78,7 +90,7 @@
           title="No history yet"
           reason="Completed status changes and actions appear here."
         />
-      </.table>
+      </.flex_table>
     </section>
   </.page>
 </Layouts.app>

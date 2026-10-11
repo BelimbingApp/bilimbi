@@ -36,12 +36,22 @@
       <.button id="shared-workspace-publish" type="submit" variant="primary">{gettext("Publish")}</.button>
     </.form>
 
-    <.table id="shared-workspaces" rows={@entries} row_id={&("shared-workspace-" <> &1["slug"])}>
-      <:col :let={entry} label={gettext("Name")}>{entry["label"]}</:col>
-      <:col :let={entry} label={gettext("Audience")}>
+    <.flex_table
+      id="shared-workspaces"
+      columns={@columns.column_views}
+      rows={@columns.rows}
+      mode={@columns.mode}
+      zoom={@columns.zoom}
+      suggestions={@columns.suggestions}
+      add_query={@columns.add_query}
+      row_id={&"shared-workspace-#{&1}"}
+      event="grid"
+    >
+      <:col :let={%{record: entry}} id="label">{entry["label"]}</:col>
+      <:col :let={%{record: entry}} id="audience">
         {if entry["roles"] == [], do: gettext("Company"), else: Enum.join(entry["roles"], ", ")}
       </:col>
-      <:action :let={entry}>
+      <:action :let={%{record: entry}}>
         <.link
           id={"shared-workspace-open-" <> entry["slug"]}
           navigate={~p"/workspace/shared/#{entry["slug"]}"}
@@ -58,7 +68,7 @@
         title={gettext("No shared workspaces")}
         reason={gettext("Publish a workspace to make it available to this company.")}
       />
-    </.table>
+    </.flex_table>
 
     <.confirm_dialog
       :if={@pending_delete}

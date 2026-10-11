@@ -48,7 +48,7 @@ defmodule BilimbiWeb.EmployeeShowAddressesTest do
              "#addresses-panel th[aria-sort='ascending'] button#addresses-table-sort-label"
            )
 
-    assert has_element?(view, "tbody#addresses-table tr#address-row-#{home.id}")
+    assert has_element?(view, "#addresses-table-rows tr#address-row-#{home.id}")
     assert has_element?(view, "#address-link-#{home.id}[href='/addresses/#{home.id}']", "Home")
     assert has_element?(view, "#address-row-#{home.id}", "12 Jalan Damai, Ipoh")
 

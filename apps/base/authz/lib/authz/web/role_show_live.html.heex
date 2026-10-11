@@ -74,26 +74,30 @@
     >
       <.section_heading id="role-principals-heading" title="Principals" />
 
-      <.table
+      <.flex_table
         id="role-principals"
-        rows={@principal_roles}
-        row_id={&"principal-role-#{&1.id}"}
+        columns={@principal_columns.column_views}
+        rows={@principal_columns.rows}
+        mode={@principal_columns.mode}
+        zoom={@principal_columns.zoom}
+        suggestions={@principal_columns.suggestions}
+        add_query={@principal_columns.add_query}
+        row_id={&"principal-role-#{&1}"}
         caption="Principals"
-        framed={false}
       >
-        <:col :let={assignment} label="Type">
+        <:col :let={%{record: assignment}} id="principal_type">
           <.badge>{principal_label(assignment)}</.badge>
         </:col>
-        <:col :let={assignment} label="Principal">
+        <:col :let={%{record: assignment}} id="principal_id">
           <span class="tabular-nums text-ink-muted">{assignment.principal_id}</span>
         </:col>
-        <:col :let={assignment} label="Company">
+        <:col :let={%{record: assignment}} id="company_id">
           <span class="tabular-nums text-ink-muted">{assignment.company_id || "—"}</span>
         </:col>
         <:empty :if={@principal_roles == []}>
           Nobody in this tenant holds this role.
         </:empty>
-      </.table>
+      </.flex_table>
     </.card>
   </.page>
 </Layouts.app>

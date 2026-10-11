@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -23,6 +24,45 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
           page_size_param: "per_page",
           filters: [domain: {:string, ""}]
         )
+  @builtins [
+    %{
+      id: "key",
+      label: "Capability",
+      type: :string,
+      sort: "key",
+      sort_id: "capabilities-sort-key"
+    },
+    %{
+      id: "domain",
+      label: "Domain",
+      type: :string,
+      sort: "domain",
+      sort_id: "capabilities-sort-domain"
+    },
+    %{
+      id: "resource",
+      label: "Resource",
+      type: :string,
+      sort: "resource",
+      sort_id: "capabilities-sort-resource"
+    },
+    %{
+      id: "action",
+      label: "Action",
+      type: :string,
+      sort: "action",
+      sort_id: "capabilities-sort-action"
+    },
+    %{
+      id: "module",
+      label: "Module",
+      type: :string,
+      sort: "module",
+      sort_id: "capabilities-sort-module"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -31,7 +71,8 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
     {:ok,
      socket
      |> assign(:page_title, "Capabilities")
-     |> assign(:domains, domains)}
+     |> assign(:domains, domains)
+     |> assign(:columns, ListColumns.mount("capabilities", @builtins))}
   end
 
   @impl true
@@ -71,6 +112,14 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
 
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
+
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
     {:noreply, push_state(socket, ListState.put_page(socket.assigns.state, page))}
@@ -100,7 +149,7 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       |> assign(:state, state)
       |> assign(:page, page)
       |> assign(:filters_form, ListState.filters_form(state))
-      |> stream(:capabilities, page.entries, reset: true)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.key))
     end
   end
 

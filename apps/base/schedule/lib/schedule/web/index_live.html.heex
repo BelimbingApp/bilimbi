@@ -110,25 +110,33 @@
         Task definitions or their database state are unavailable. No status has been inferred.
       </.alert>
 
-      <div class="mt-4">
-        <.table
+      <.card id="schedule-tasks-card" inner_class="p-0" class="mt-4">
+        <.flex_table
           id="schedule-tasks"
-          rows={@streams.tasks}
-          row_item={fn {_dom_id, task} -> task end}
+          framed={false}
+          columns={@task_columns.column_views}
+          rows={@task_columns.rows}
+          mode={@task_columns.mode}
+          zoom={@task_columns.zoom}
+          suggestions={@task_columns.suggestions}
+          add_query={@task_columns.add_query}
+          row_id={fn key -> "schedule-task-#{dom_key(key)}" end}
           sort_by={@state.task_sort_by}
           sort_dir={@state.task_sort_dir}
-          sort_event="sort_tasks"
+          event="grid_tasks"
           caption="Scheduled tasks"
         >
-          <:col :let={task} label="Name" sort="name" sort_id="schedule-tasks-sort-name">
+          <:col :let={%{record: task}} id="name">
             <div class="min-w-[13rem]">
               <p class="font-medium text-ink">{task.name}</p>
-              <p class="font-mono text-xs text-ink-muted">{task.key}</p>
+              <p :if={@task_columns.mode == :normal} class="font-mono text-xs text-ink-muted">
+                {task.key}
+              </p>
             </div>
           </:col>
-          <:col :let={task} label="Source">
+          <:col :let={%{record: task}} id="source">
             <.badge>{task.source}</.badge>
-            <div class="mt-1 text-xs text-ink-muted">
+            <div :if={@task_columns.mode == :normal} class="mt-1 text-xs text-ink-muted">
               <.link
                 :if={task.owner_route}
                 navigate={task.owner_route}
@@ -139,45 +147,39 @@
               <span :if={!task.owner_route} class="font-mono">{task.owner}</span>
             </div>
           </:col>
-          <:col :let={task} label="Cron schedule">
+          <:col :let={%{record: task}} id="cron">
             <code class="whitespace-nowrap text-xs text-ink">{task.expression}</code>
-            <p class="text-xs text-ink-muted">{task.timezone}</p>
+            <p :if={@task_columns.mode == :normal} class="text-xs text-ink-muted">
+              {task.timezone}
+            </p>
           </:col>
-          <:col
-            :let={task}
-            label="Next run"
-            sort="next_due"
-            sort_id="schedule-tasks-sort-next_due"
-          >
+          <:col :let={%{record: task}} id="next_due">
             <.datetime
               id={"#{task_dom_id(task)}-next-due"}
               value={task.next_due_at}
               class="whitespace-nowrap text-xs text-ink-muted"
             />
           </:col>
-          <:col :let={task} label="Status">
+          <:col :let={%{record: task}} id="status">
             <.badge kind={task_status_kind(task)}>{task_status_label(task)}</.badge>
-            <p class="mt-1 text-xs text-ink-muted">
+            <p :if={@task_columns.mode == :normal} class="mt-1 text-xs text-ink-muted">
               {task.overlap} overlap · {task.misfire} misfires
             </p>
           </:col>
-          <:col
-            :let={task}
-            label="Last run"
-            sort="last_run"
-            sort_id="schedule-tasks-sort-last_run"
-          >
+          <:col :let={%{record: task}} id="last_run">
             <.datetime
               id={"#{task_dom_id(task)}-last-started"}
               value={task.last_started_at}
               class="whitespace-nowrap text-xs text-ink-muted"
             />
           </:col>
-          <:col :let={task} label="Result">
+          <:col :let={%{record: task}} id="result">
             <span class="text-xs text-ink">{status_label(task.last_status)}</span>
-            <p class="text-xs text-ink-muted">{duration(task.last_runtime_ms)}</p>
+            <p :if={@task_columns.mode == :normal} class="text-xs text-ink-muted">
+              {duration(task.last_runtime_ms)}
+            </p>
           </:col>
-          <:action :let={task}>
+          <:action :let={%{record: task}}>
             <div class="flex min-w-max flex-wrap justify-end gap-1">
               <.button
                 :if={@can_execute and task.review_state == :enabled and !task.suppressed?}
@@ -231,8 +233,8 @@
               do: "Nothing is scheduled.",
               else: "No tasks match the current filters."}
           </:empty>
-        </.table>
-      </div>
+        </.flex_table>
+      </.card>
     </section>
 
     <%!-- The hook reports the browser's zone so local-mode filters can bound
@@ -303,41 +305,48 @@
         Run history is unavailable. No empty-history conclusion has been inferred.
       </.alert>
 
-      <div class="mt-4">
-        <.table
+      <.card id="schedule-runs-card" inner_class="p-0" class="mt-4">
+        <.flex_table
           id="schedule-runs"
-          rows={@streams.runs}
-          row_item={fn {_dom_id, run} -> run end}
+          framed={false}
+          columns={@run_columns.column_views}
+          rows={@run_columns.rows}
+          mode={@run_columns.mode}
+          zoom={@run_columns.zoom}
+          suggestions={@run_columns.suggestions}
+          add_query={@run_columns.add_query}
+          row_id={&"schedule-run-#{&1}"}
           sort_by={@state.run_sort_by}
           sort_dir={@state.run_sort_dir}
-          sort_event="sort_runs"
+          event="grid_runs"
           caption="Schedule run history"
         >
-          <:col
-            :let={run}
-            label="Started"
-            sort="started_at"
-            sort_id="schedule-runs-sort-started_at"
-          >
+          <:col :let={%{record: run}} id="started_at">
             <.datetime
               id={"#{run_dom_id(run)}-started-at"}
               value={run.started_at}
               class="whitespace-nowrap text-xs text-ink-muted"
             />
-            <p class="text-xs text-ink-muted">{duration(run.runtime_ms)}</p>
+            <p :if={@run_columns.mode == :normal} class="text-xs text-ink-muted">
+              {duration(run.runtime_ms)}
+            </p>
           </:col>
-          <:col :let={run} label="Name" sort="name" sort_id="schedule-runs-sort-name">
+          <:col :let={%{record: run}} id="name">
             <p class="font-medium text-ink">{run.name}</p>
-            <p class="font-mono text-xs text-ink-muted">{run.key}</p>
+            <p :if={@run_columns.mode == :normal} class="font-mono text-xs text-ink-muted">
+              {run.key}
+            </p>
           </:col>
-          <:col :let={run} label="Source" sort="source" sort_id="schedule-runs-sort-source">
+          <:col :let={%{record: run}} id="source">
             <.badge>{run.source}</.badge>
-            <p class="mt-1 text-xs text-ink-muted">{trigger_label(run)}</p>
+            <p :if={@run_columns.mode == :normal} class="mt-1 text-xs text-ink-muted">
+              {trigger_label(run)}
+            </p>
           </:col>
-          <:col :let={run} label="Status" sort="status" sort_id="schedule-runs-sort-status">
+          <:col :let={%{record: run}} id="status">
             <.badge kind={status_kind(run.status)}>{status_label(run.status)}</.badge>
           </:col>
-          <:col :let={run} label="Detail">
+          <:col :let={%{record: run}} id="detail">
             <span class="text-xs text-ink">{run_result(run)}</span>
           </:col>
           <:empty :if={@run_page.total_entries == 0 and @run_state == :available}>
@@ -346,8 +355,8 @@
                 do: "No runs recorded yet.",
                 else: "No runs match the current filters."}
           </:empty>
-        </.table>
-      </div>
+        </.flex_table>
+      </.card>
 
       <.pagination
         :if={@run_state == :available}

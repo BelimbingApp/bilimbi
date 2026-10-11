@@ -10,9 +10,32 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
 
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.UI.FormErrors
+  alias Bilimbi.Base.UI.ListColumns
   alias Ecto.Changeset
 
   @sortable ~w(id name status)
+  @builtins [
+    %{
+      id: "id",
+      label: "ID",
+      type: :integer,
+      sort: "id",
+      sort_id: "tenants-sort-id",
+      align: :right
+    },
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "tenants-sort-name"},
+    %{id: "parent", label: "Parent", type: :string},
+    %{id: "sub_tenants", label: "Sub-tenants", type: :integer, align: :right},
+    %{
+      id: "status",
+      label: "Status",
+      type: :string,
+      sort: "status",
+      sort_id: "tenants-sort-status"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
   @create_cap "admin.tenancy.tenant.create"
 
   @impl true
@@ -22,6 +45,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
      |> assign(:page_title, "Tenants")
      |> assign(:sort_by, "id")
      |> assign(:sort_dir, :asc)
+     |> assign(:columns, ListColumns.mount("tenants", @builtins))
      |> assign(:show_create, false)
      |> assign_form(create_changeset(%{}))
      |> refresh_tenants()}
@@ -39,6 +63,14 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   def handle_event("show_create", _params, socket) do
     if can_create?(socket) do
@@ -103,7 +135,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
     socket
     |> assign(:tenants_count, length(rows))
     |> assign(:parent_options, parent_options(identities))
-    |> stream(:tenants, rows, reset: true)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, rows, & &1.id))
   end
 
   defp present_tenants(identities, sort_by, sort_dir) do

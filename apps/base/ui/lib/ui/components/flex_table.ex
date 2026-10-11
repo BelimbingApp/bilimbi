@@ -25,10 +25,11 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
 
   The component is presentation only. It takes the plain columns and
   prepared cells described in `Bilimbi.Base.UI.FlexTable` and pushes one
-  event, `event`, with an `op`, to the host that owns the data. It is a
-  table with the density of `table/1`, and a `:slot` column is drawn by the
-  caller's `<:col>` of the same id, so a list page keeps its own links and
-  badges while gaining walked columns beside them.
+  event, `event`, with an `op`, to the host that owns the data. Sort headings
+  use that event too unless `sort_event` routes them to the list's existing
+  sort handler. It is a table with the density of `table/1`. A `:slot` column
+  is drawn by the caller's `<:col>` of the same id, so a list page keeps its
+  own links and badges while gaining walked columns beside them.
 
   Nothing stands above the table but a small notch on the top-left edge of
   its frame, named "Customize table". It opens table customization, a bar
@@ -107,6 +108,16 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
   attr(:sort_by, :any, default: nil, doc: "the spec of the sorted column, as `table/1` takes it")
   attr(:sort_dir, :any, default: nil, doc: "`\"asc\"`/`\"desc\"` or `:asc`/`:desc`")
 
+  attr(:sort_event, :any,
+    default: nil,
+    doc: "optional list-sort event; by default sorting is sent through `event` with `op: sort`"
+  )
+
+  attr(:sort_target, :any,
+    default: nil,
+    doc: "`phx-target` for `sort_event`; defaults to `target` when sorting through `event`"
+  )
+
   attr(:suggestions, :list,
     default: [],
     doc: "column maps the add-a-column box offers for what was typed"
@@ -169,6 +180,14 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       |> assign(:compact?, assigns.mode == :compact)
       |> assign(:delta?, Enum.any?(assigns.columns, &(Map.get(&1, :lens) == :delta)))
       |> assign(:row_class, Bilimbi.Base.UI.FlexTable.row_class(assigns.zoom))
+      |> assign(
+        :heading_sort_event,
+        assigns.sort_event || JS.push(assigns.event, value: %{op: "sort"})
+      )
+      |> assign(
+        :heading_sort_target,
+        if(assigns.sort_event, do: assigns.sort_target, else: assigns.target)
+      )
       |> assign(:zoom_steps, Bilimbi.Base.UI.FlexTable.zoom_steps())
       |> assign(:presets, [
         {:compact, gettext("Compact"), "rows-compact"},
@@ -464,8 +483,8 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
                   table_id={@id}
                   sort_by={@sort_by}
                   sort_dir={@sort_dir}
-                  sort_event={JS.push(@event, value: %{op: "sort"})}
-                  sort_target={@target}
+                  sort_event={@heading_sort_event}
+                  sort_target={@heading_sort_target}
                 />
                 <span :if={!Map.get(column, :sortable, true)}>{column.short_label}</span>
               </th>
@@ -494,16 +513,16 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
                   event={@event}
                   target={@target}
                 />
-                <%!-- A compact row is shorter than a table icon button, so
-                     the row's own controls take a size that fits: sixteen
-                     pixels in an eighteen-pixel row. --%>
+                <%!-- A compact row is shorter than an icon control, so
+                     accessible icon-only actions take sixteen pixels in an
+                     eighteen-pixel row. Text actions remain readable. --%>
                 <td
                   :if={@action != []}
                   class={[
                     "w-0 font-semibold",
                     @row_class,
                     if(@compact?,
-                      do: "px-1.5 py-0 [&_a]:size-4 [&_button]:size-4",
+                      do: "px-1.5 py-0 [&_a[aria-label]]:size-4 [&_button[aria-label]]:size-4",
                       else: "px-2 py-0.5"
                     )
                   ]}

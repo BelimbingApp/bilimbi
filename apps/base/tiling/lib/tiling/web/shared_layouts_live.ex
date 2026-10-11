@@ -7,12 +7,17 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SharedLayouts
+  alias Bilimbi.Base.UI.ListColumns
 
   # The route mounts under ui.workspace.publish. Publishing and deleting are
   # SharedLayouts writes: they take the sealed scope and check that same
   # capability. These handlers only present the outcome. delete-layout opens
   # the confirmation and writes nothing.
-  @write_guard_opt_out ~w(publish-layout delete-layout confirm-delete-layout)
+  @write_guard_opt_out ~w(publish-layout delete-layout confirm-delete-layout grid)
+  @builtins [
+    %{id: "label", label: "Name"},
+    %{id: "audience", label: "Audience"}
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -33,6 +38,7 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
 
   defp mount_company(socket, company_scope) do
     current_scope = socket.assigns.current_scope
+    entries = SharedLayouts.list(company_scope)
 
     role_options =
       current_scope.scope
@@ -43,8 +49,9 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
     socket
     |> assign(:page_title, gettext("Shared workspaces"))
     |> assign(:company_scope, company_scope)
+    |> assign(:columns, ListColumns.mount("shared-workspaces", @builtins))
     |> assign(:role_options, role_options)
-    |> assign(:entries, SharedLayouts.list(company_scope))
+    |> assign_entries(entries)
     |> assign(:pending_delete, nil)
     |> assign(:form, to_form(%{"label" => "", "roles" => []}, as: :layout))
   end
@@ -80,6 +87,13 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
     end
   end
 
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      _outcome -> {:noreply, socket}
+    end
+  end
+
   def handle_event("cancel-delete-layout", _params, socket),
     do: {:noreply, assign(socket, :pending_delete, nil)}
 
@@ -89,10 +103,9 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
         case SharedLayouts.delete(socket.assigns.current_scope.scope, slug) do
           :ok ->
             {:noreply,
-             assign(socket,
-               entries: SharedLayouts.list(socket.assigns.company_scope),
-               pending_delete: nil
-             )}
+             socket
+             |> assign_entries(SharedLayouts.list(socket.assigns.company_scope))
+             |> assign(:pending_delete, nil)}
 
           {:error, :forbidden} ->
             {:noreply,
@@ -122,7 +135,7 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
       {:ok, _entry} ->
         {:noreply,
          socket
-         |> assign(:entries, SharedLayouts.list(socket.assigns.company_scope))
+         |> assign_entries(SharedLayouts.list(socket.assigns.company_scope))
          |> put_flash(:success, gettext("Shared the workspace."))}
 
       {:error, :forbidden} ->
@@ -131,5 +144,11 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, gettext("The workspace could not be shared."))}
     end
+  end
+
+  defp assign_entries(socket, entries) do
+    socket
+    |> assign(:entries, entries)
+    |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1["slug"]))
   end
 end
