@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Media.Web.Response do
     filename = URI.encode(file.filename, &URI.char_unreserved?/1)
 
     conn
-    |> put_resp_header("content-type", if(inline?, do: mime, else: "application/octet-stream"))
+    |> put_resp_content_type(if(inline?, do: mime, else: "application/octet-stream"), nil)
     |> put_resp_header("content-disposition", "#{disposition}; filename*=UTF-8''#{filename}")
     |> put_resp_header("x-content-type-options", "nosniff")
     |> put_resp_header("content-security-policy", "default-src 'none'; sandbox")
