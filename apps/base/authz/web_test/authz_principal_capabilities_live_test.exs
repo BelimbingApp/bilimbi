@@ -334,7 +334,12 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
       conn |> log_in_as() |> live(~p"/authz/principal-capabilities?sort_by=company_name")
 
     assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(1)", "Aurora Works")
-    assert has_element?(view, "#principal-capabilities-rows > tr:nth-child(2)", "Bilimbi Industries")
+
+    assert has_element?(
+             view,
+             "#principal-capabilities-rows > tr:nth-child(2)",
+             "Bilimbi Industries"
+           )
 
     view |> element("#grants-sort-company_name") |> render_click()
     assert %{"sort_by" => "company_name", "sort_dir" => "desc"} = patched_params(view)

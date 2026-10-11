@@ -60,9 +60,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.Tiling.SharedLayouts
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Nav
   alias Bilimbi.Base.UI.RouteContract
-  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.Workspace
 
   # Every event here changes the signed-in account's own workspace: the tree

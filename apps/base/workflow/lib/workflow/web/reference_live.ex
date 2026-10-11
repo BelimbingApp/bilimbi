@@ -123,7 +123,10 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
   defp load_columns(socket, work, history) do
     socket
     |> assign(:work_columns, ListColumns.load(socket.assigns.work_columns, work, & &1.id))
-    |> assign(:history_columns, ListColumns.load(socket.assigns.history_columns, history, & &1.id))
+    |> assign(
+      :history_columns,
+      ListColumns.load(socket.assigns.history_columns, history, & &1.id)
+    )
   end
 
   defp request(action, version) do

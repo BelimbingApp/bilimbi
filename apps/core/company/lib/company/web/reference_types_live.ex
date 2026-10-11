@@ -10,8 +10,8 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.UI.Params
   alias Bilimbi.Base.UI.ListColumns
+  alias Bilimbi.Base.UI.Params
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.LegalEntityType
