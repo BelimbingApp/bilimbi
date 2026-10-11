@@ -471,7 +471,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
               <span class="font-medium text-ink-strong">{dept.type.name}</span>
             </:col>
             <:col :let={dept} label="Category">
-              <.badge kind={:neutral}>
+              <.badge kind={:neutral} dot={false}>
                 {String.capitalize(dept.type.category)}
               </.badge>
             </:col>

@@ -113,7 +113,7 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       # The page's own primary action keeps the button treatment; the type
       # lists are a related workflow, so they demote (DESIGN.md, "Demoted
       # secondary actions").
-      assert has_element?(view, "main header a#companies-add.bg-action", "Add Company")
+      assert has_element?(view, "main header a#companies-add.bg-action", "Company")
     end
 
     test "search, status filter, and sort live in the URL", %{conn: conn} do

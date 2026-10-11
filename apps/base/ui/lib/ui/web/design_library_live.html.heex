@@ -2171,7 +2171,15 @@
                   :warning
                 }>
                   Pending
-                </.badge><.badge kind={:danger}>Suspended</.badge>
+                </.badge><.badge kind={:danger}>Suspended</.badge><.badge dot={false}>
+                  Manager
+                </.badge>
+              </div>
+              <div
+                id="component-create-button"
+                class="flex flex-wrap gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
+              >
+                <.create_button noun="Company" navigate="/companies/create" />
               </div>
               <div
                 id="component-restricted"

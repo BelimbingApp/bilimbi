@@ -519,7 +519,8 @@ Use `<.icon_button>` for familiar repeated secondary actions where words would
 create table or toolbar noise. Inline controls are `size-6` (24px targets); table and toolbar
 controls are `size-7`. Every icon-only action has an accessible label and title.
 Keep primary and unfamiliar actions as words. Destructive actions use calm
-danger text with quiet hover feedback, never a solid red button.
+danger text with quiet hover feedback, never a solid red button; a destructive
+icon button is grey at rest and turns danger on hover and keyboard focus.
 
 Use the shared `<.input>` and `<.form>` components for forms where available.
 Keep forms driven by a `to_form/2` assign and give important forms and controls

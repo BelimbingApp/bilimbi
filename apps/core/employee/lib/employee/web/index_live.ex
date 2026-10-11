@@ -366,14 +366,12 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
           <:actions>
             <div class="flex items-center gap-3">
-              <.button
+              <.create_button
                 :if={allowed?(@current_scope, "admin.employee.create")}
                 id="employee-new"
+                noun="Employee"
                 navigate={~p"/employees/new"}
-                variant="primary"
-              >
-                New Employee
-              </.button>
+              />
 
               <.action_link
                 :if={allowed?(@current_scope, "admin.employee-type.list")}
@@ -453,7 +451,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               sort="employee_type_label"
               sort_id="employees-sort-type"
             >
-              <.badge kind={:neutral}>
+              <.badge kind={:neutral} dot={false}>
                 {employee.employee_type_label || employee.employee_type}
               </.badge>
             </:col>
@@ -466,13 +464,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
             <:action :let={employee}>
               <div class="flex items-center justify-end gap-3">
-                <.icon_button
-                  :if={allowed?(@current_scope, "admin.employee.update")}
-                  icon="edit"
-                  label={"Edit #{employee.full_name}"}
-                  id={"employee-#{employee.id}-edit"}
-                  navigate={~p"/employees/#{employee.id}"}
-                />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.delete")}
                   icon="delete"

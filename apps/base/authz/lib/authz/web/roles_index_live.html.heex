@@ -16,14 +16,12 @@
         System roles ship with the platform; custom roles belong to a company in this tenant
       </:subtitle>
       <:actions>
-        <.button
+        <.create_button
           :if={@can_create?}
           id="roles-create"
+          noun="Role"
           navigate={~p"/authz/roles/create"}
-          variant="primary"
-        >
-          Create Role
-        </.button>
+        />
       </:actions>
     </.header>
 
