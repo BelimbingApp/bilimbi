@@ -25,6 +25,9 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
     * `auditable_type` defaults to the Ecto schema module name; a schema
       that must match a Belimbing morph string defines
       `__audit_auditable_type__/0`;
+    * schemas with separately protected payloads declare
+      `__audit_redacted_fields__/0`; struct and bulk writes redact those fields
+      here, so deletion cannot create a second payload inspection surface;
     * Base Audit's own schemas are never captured, and further exclusions
       live in `:bilimbi_base_audit, :exclude_schemas` — the port of
       `audit.exclude_models`, one justified entry at a time.
@@ -167,8 +170,8 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
     if changed == [] do
       nil
     else
-      {sanitize(Map.new(changed, &{&1, Map.get(old_row, &1)})),
-       sanitize(Map.new(changed, &{&1, Map.get(new_row, &1)}))}
+      {sanitize(Map.new(changed, &{&1, Map.get(old_row, &1)}), schema),
+       sanitize(Map.new(changed, &{&1, Map.get(new_row, &1)}), schema)}
     end
   end
 
@@ -269,7 +272,9 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
       nil
     else
       originals = Map.new(changed, fn {field, _v} -> {field, Map.get(changeset.data, field)} end)
-      {sanitize(originals), sanitize(changed)}
+
+      {sanitize(originals, changeset.data.__struct__),
+       sanitize(changed, changeset.data.__struct__)}
     end
   end
 
@@ -288,7 +293,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
     |> Map.new(fn field -> {field, Map.get(struct, field)} end)
     |> Enum.filter(fn {_field, value} -> storable_value?(value) end)
     |> Map.new()
-    |> sanitize()
+    |> sanitize(schema)
   end
 
   # Associations, embeds-not-loaded, and other non-serializable values stay
@@ -297,8 +302,15 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   defp storable_value?(%Ecto.Changeset{}), do: false
   defp storable_value?(_value), do: true
 
-  defp sanitize(values) do
-    Map.new(values, fn {field, value} -> {field, field_value(field, value)} end)
+  defp sanitize(values, schema) do
+    protected =
+      if function_exported?(schema, :__audit_redacted_fields__, 0),
+        do: schema.__audit_redacted_fields__(),
+        else: []
+
+    Map.new(values, fn {field, value} ->
+      {field, if(field in protected, do: @redacted_marker, else: field_value(field, value))}
+    end)
   end
 
   defp field_value(field, _value) when field in @redacted_fields, do: @redacted_marker

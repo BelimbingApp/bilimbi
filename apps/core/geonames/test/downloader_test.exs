@@ -1,9 +1,11 @@
 defmodule Bilimbi.Core.Geonames.DownloaderTest do
-  use ExUnit.Case, async: true
+  use Bilimbi.Base.Database.DataCase, async: true
 
   alias Bilimbi.Core.Geonames.Downloader
 
   setup do
+    Bilimbi.Base.Integration.TestFixtures.create_exchanges_table!()
+
     directory =
       Path.join(
         System.tmp_dir!(),
