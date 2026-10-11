@@ -15,6 +15,8 @@ Use `<.restricted>` for a field the viewer may not see (a `Bilimbi.Base.Authz.Re
 
 Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
 
+Use `<.period_filter>` as the canonical compact date filter for list and history pages, never bare date inputs or a hand-rolled range: it owns preset labels, validated custom drafts and cancellation. `Bilimbi.Base.UI.PeriodFilter` owns URL params and day boundaries; the comment on `period_filter/1` owns integration.
+
 Use `<.tabs>` for sibling views of one page. Its comment owns the narrow-screen strip: one line, horizontal scroll, and edge controls only while a tab is out of view. A hand-rolled flex row of links clips the later labels on a phone.
 
 A table is flat. `table/1` takes no radius, so a rounded table is hand-written markup. See `DESIGN.md` "Table geometry" and the comment on `table/1`.
@@ -114,7 +116,7 @@ as `table/1` is `framed={false}` there, so the card is the one frame;
 rises out of the card, and the card's headroom for it is the `data-unframed`
 rule in `apps/web/assets/css/app.css`: do not add a margin or padding for
 it at a call site. See the component comment in
-`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
+`lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`. A date/time cell keeps its typed value through every lens and renders through `<.datetime>`, never its preformatted `text`; `flex_table_text/1` owns that so a band follows the top-bar clock too.
 For a list without a Grid catalog, use `Bilimbi.Base.UI.ListColumns` to feed
 the same notch and built-in column controls; do not make a page-local picker.
 

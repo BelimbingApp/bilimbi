@@ -9,6 +9,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryComponentsLive do
   def mount(_params, _session, socket), do: DesignLibraryLive.mount_area(:components, socket)
 
   @impl true
+  def handle_params(params, uri, socket), do: DesignLibraryLive.handle_params(params, uri, socket)
+
+  @impl true
   def handle_event(event, params, socket),
     do: DesignLibraryLive.handle_event(event, params, socket)
 

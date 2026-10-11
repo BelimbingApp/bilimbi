@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   alias Bilimbi.Base.Grid.Web.PageColumns
   alias Bilimbi.Base.Integration
   alias Bilimbi.Base.UI.ListState
+  alias Bilimbi.Base.UI.PeriodFilter
 
   @write_guard_opt_out ~w(grid)
   # `since` belongs to PageColumns comparison state. Range filters use
@@ -13,11 +14,7 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
           default_page_size: 25,
           filters: [
             direction: {:one_of, ~w(incoming outgoing), "outgoing"},
-            status: {:one_of, ["", "success", "http_error", "connection_error", "unknown"], ""},
-            http_status: {:string, ""},
-            actor: {:string, ""},
-            from: {:string, ""},
-            through: {:string, ""}
+            status: {:one_of, ["", "success", "http_error", "connection_error", "unknown"], ""}
           ]
         )
   @builtins [
@@ -34,6 +31,7 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(:browser_timezone, nil)
      |> assign(:page_title, "API Exchanges")
      |> assign(:active_nav, "admin.system.integration")
      |> assign(
@@ -46,10 +44,30 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   def handle_params(params, _uri, socket) do
     state = ListState.parse(params, @list)
 
+    # Preserve previously shared date links; new links use Belimbing's period/from/to.
+    period_params =
+      if not Map.has_key?(params, "period") and
+           (Map.get(params, "from", "") != "" or Map.get(params, "through", "") != ""),
+         do: Map.merge(params, %{"period" => "custom", "to" => Map.get(params, "through", "")}),
+         else: params
+
+    clock =
+      PeriodFilter.clock(
+        socket.assigns.current_scope.shell_preferences,
+        socket.assigns.browser_timezone
+      )
+
+    period = PeriodFilter.parse(period_params, clock.today)
+
+    {since, until, range_error} =
+      case PeriodFilter.bounds(period, clock.timezone, clock.tz_db) do
+        {:ok, since, until} -> {since, until, nil}
+        {:error, error} -> {~U[1970-01-01 00:00:00Z], ~U[1970-01-01 00:00:00Z], error}
+      end
+
     options =
       [page: state.page, page_size: state.page_size, search: state.search] ++
-        Map.to_list(Map.drop(state.filters, [:from, :through])) ++
-        [since: state.filters.from, until: state.filters.through]
+        Map.to_list(state.filters) ++ [since: since, until: until]
 
     case Integration.list_page(socket.assigns.current_scope.scope, options) do
       {:ok, page} ->
@@ -60,6 +78,10 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
 
         {:noreply,
          socket
+         |> assign(:period_params, params)
+         |> assign(:clock, clock)
+         |> assign(:period, period)
+         |> assign(:range_error, range_error)
          |> assign(:state, state)
          |> assign(:page, page)
          |> assign(:rows, Map.new(page.entries, &{&1.id, &1}))
@@ -77,18 +99,29 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   @impl true
   def handle_event("filters", %{"filters" => values}, socket) do
     state = ListState.apply_filters(socket.assigns.state, values)
-    {:noreply, push_patch(socket, to: exchanges_path(state, socket.assigns.columns))}
+
+    {:noreply,
+     push_patch(socket, to: exchanges_path(state, socket.assigns.columns, socket.assigns.period))}
+  end
+
+  def handle_event("browser_timezone", %{"timezone" => timezone}, socket) do
+    handle_params(socket.assigns.period_params, nil, assign(socket, :browser_timezone, timezone))
   end
 
   def handle_event("page", %{"page" => page}, socket) do
     state = ListState.put_page(socket.assigns.state, page)
-    {:noreply, push_patch(socket, to: exchanges_path(state, socket.assigns.columns))}
+
+    {:noreply,
+     push_patch(socket, to: exchanges_path(state, socket.assigns.columns, socket.assigns.period))}
   end
 
   def handle_event("grid", params, socket) do
     case PageColumns.handle(socket.assigns.columns, params) do
       {:patch, columns} ->
-        {:noreply, push_patch(socket, to: exchanges_path(socket.assigns.state, columns))}
+        {:noreply,
+         push_patch(socket,
+           to: exchanges_path(socket.assigns.state, columns, socket.assigns.period)
+         )}
 
       {:update, columns} ->
         {:noreply, assign(socket, :columns, columns)}
@@ -101,16 +134,25 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
     end
   end
 
-  defp tab_path(state, columns, direction),
+  defp tab_path(state, columns, period, direction),
     do:
       exchanges_path(
         %{state | page: 1, filters: Map.put(state.filters, :direction, direction)},
-        columns
+        columns,
+        period
       )
 
-  defp exchanges_path(state, columns),
-    do:
-      ~p"/system/api-exchanges?#{Map.merge(ListState.to_params(state), PageColumns.params(columns))}"
+  defp exchanges_path(state, columns, period) do
+    params =
+      ListState.to_params(state)
+      |> Map.merge(PageColumns.params(columns))
+      |> Map.merge(PeriodFilter.params(period))
+
+    ~p"/system/api-exchanges?#{params}"
+  end
+
+  defp period_path(state, columns, params, clock),
+    do: exchanges_path(%{state | page: 1}, columns, PeriodFilter.parse(params, clock.today))
 
   @impl true
   def render(assigns) do
@@ -124,61 +166,62 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
         </.header>
         <.tabs id="exchange-tabs" aria-label="Exchange direction" class="mb-2">
           <:tab
-            patch={tab_path(@state, @columns, "outgoing")}
+            patch={tab_path(@state, @columns, @period, "outgoing")}
             current={@state.filters.direction == "outgoing"}
           >
             Outgoing
           </:tab>
           <:tab
-            patch={tab_path(@state, @columns, "incoming")}
+            patch={tab_path(@state, @columns, @period, "incoming")}
             current={@state.filters.direction == "incoming"}
           >
             Incoming
           </:tab>
         </.tabs>
-        <.filter_toolbar id="exchange-filters" form={@filters_form} event="filters">
-          <:control
-            type={:search}
-            field={@filters_form[:search]}
-            id="exchange-search"
-            label="Host or operation"
-            placeholder="Host, path or operation"
+        <div id="exchange-filter-region" phx-hook="BrowserTimeZone" class="mb-2 flex flex-wrap items-start gap-3">
+          <.filter_toolbar
+            id="exchange-filters"
+            form={@filters_form}
+            event="filters"
+            class="mb-0 min-w-0 flex-1"
+          >
+            <:control
+              type={:search}
+              field={@filters_form[:search]}
+              id="exchange-search"
+              label="Search API exchanges"
+              placeholder="Host, path, operation, status or person/agent ID"
+            />
+            <:control
+              type={:select}
+              field={@filters_form[:status]}
+              id="exchange-status"
+              label="Outcome"
+              options={[
+                {"All outcomes", ""},
+                {"Success", "success"},
+                {"HTTP error", "http_error"},
+                {"Connection error", "connection_error"},
+                {"Unknown", "unknown"}
+              ]}
+            />
+          </.filter_toolbar>
+          <.period_filter
+            id="exchange-period"
+            clock={@clock}
+            state={@period}
+            current_scope={@current_scope}
+            path={&period_path(@state, @columns, &1, @clock)}
           />
-          <:control
-            type={:select}
-            field={@filters_form[:status]}
-            id="exchange-status"
-            label="Outcome"
-            options={[
-              {"All outcomes", ""},
-              {"Success", "success"},
-              {"HTTP error", "http_error"},
-              {"Connection error", "connection_error"},
-              {"Unknown", "unknown"}
-            ]}
-          />
-          <:control
-            type={:search}
-            field={@filters_form[:http_status]}
-            id="exchange-http-status"
-            label="HTTP status"
-            placeholder="HTTP status (e.g. 403)"
-          />
-          <:control
-            type={:search}
-            field={@filters_form[:actor]}
-            id="exchange-actor"
-            label="Person or agent ID"
-            placeholder="Person or agent ID"
-          />
-          <:control type={:date} field={@filters_form[:from]} id="exchange-since" label="From (UTC)" />
-          <:control
-            type={:date}
-            field={@filters_form[:through]}
-            id="exchange-until"
-            label="Through (UTC)"
-          />
-        </.filter_toolbar>
+        </div>
+        <p
+          :if={@range_error}
+          id="exchange-range-error"
+          role="alert"
+          class="mb-2 text-sm text-danger-ink"
+        >
+          {@range_error}
+        </p>
         <p
           :if={Bilimbi.Base.Tenancy.Scope.platform_operator?(@current_scope.scope)}
           class="mb-2 text-xs text-warning-ink"

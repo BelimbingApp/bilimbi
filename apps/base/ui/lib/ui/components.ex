@@ -1275,6 +1275,37 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Canonical compact date filter for list and history pages.
+
+  Use this instead of bare date inputs or a hand-written range. The component
+  keeps drafts private until Apply range succeeds; Cancel, Escape and backdrop
+  dismissal preserve the applied URL state. `state` comes from PeriodFilter.parse/2
+  and `path` maps PeriodFilter.params/1 to the host's patch URL, resetting its page.
+  `clock` comes from PeriodFilter.clock/2 using the top-bar shell preferences
+  and the browser zone reported by the existing BrowserTimeZone hook.
+  """
+  attr(:id, :string, required: true)
+  attr(:state, Bilimbi.Base.UI.PeriodFilter, required: true)
+  attr(:path, :any, required: true)
+  attr(:current_scope, :map, required: true)
+  attr(:clock, :map, required: true)
+  attr(:label, :string, default: "Period")
+
+  def period_filter(assigns) do
+    ~H"""
+    <.live_component
+      module={Bilimbi.Base.UI.PeriodFilterComponent}
+      id={@id}
+      state={@state}
+      clock={@clock}
+      path={@path}
+      current_scope={@current_scope}
+      label={@label}
+    />
+    """
+  end
+
+  @doc """
   Renders a compact tab strip for sibling views of the same page.
 
   The selected tab uses the lime `brand-strong` underline. Unselected tabs stay
@@ -1310,6 +1341,9 @@ defmodule Bilimbi.Base.UI.Components do
     attr(:value, :string)
   end
 
+  # Horizontal overflow makes the other axis auto in CSS. Clip that axis: the
+  # tab underline overlaps the strip border by 1px and otherwise creates a
+  # vertical scrollbar even when every label fits.
   def tabs(assigns) do
     ~H"""
     <nav
@@ -1321,7 +1355,7 @@ defmodule Bilimbi.Base.UI.Components do
       <div
         id={"#{@id}-scroller"}
         data-tab-scroller
-        class="flex w-full min-w-0 max-w-full flex-nowrap gap-1 overflow-x-auto overscroll-x-contain scroll-px-8 border-b border-line [scrollbar-width:thin]"
+        class="flex w-full min-w-0 max-w-full flex-nowrap gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-px-8 border-b border-line [scrollbar-width:thin]"
       >
         <.tab_item :for={tab <- @tab} tab={tab} />
       </div>

@@ -275,7 +275,9 @@ defmodule Bilimbi.Base.Integration do
           where(
             query,
             [e],
-            ilike(e.host, ^pattern) or ilike(e.operation, ^pattern) or ilike(e.path, ^pattern)
+            ilike(e.host, ^pattern) or ilike(e.operation, ^pattern) or ilike(e.path, ^pattern) or
+              ilike(fragment("?::text", e.response_status), ^pattern) or
+              ilike(fragment("?::text", e.person_id), ^pattern) or ilike(e.agent_id, ^pattern)
           ),
         else: query
 
@@ -296,6 +298,13 @@ defmodule Bilimbi.Base.Integration do
   end
 
   defp time_filter(query, "", _), do: query
+
+  # Shared calendar filters supply UTC instants with an exclusive upper bound.
+  defp time_filter(query, %DateTime{} = instant, :since),
+    do: where(query, [e], e.occurred_at >= ^DateTime.to_naive(instant))
+
+  defp time_filter(query, %DateTime{} = instant, :until),
+    do: where(query, [e], e.occurred_at < ^DateTime.to_naive(instant))
 
   defp time_filter(query, value, bound) do
     case Date.from_iso8601(value) do

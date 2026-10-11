@@ -12,7 +12,27 @@
 const BrowserTimeZone = {
   mounted() {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-    this.pushEvent("browser_timezone", {timezone: timeZone})
+    this.reportTimeZone = () => this.pushEvent("browser_timezone", {timezone: timeZone})
+    this.reportTimeZone()
+    this.observeClock()
+  },
+  updated() {
+    this.observeClock()
+  },
+  observeClock() {
+    const shell = document.querySelector("#app-shell")
+    if (this.clockShell === shell) return
+    this.clockObserver?.disconnect()
+    this.clockShell = shell
+    if (!shell) return
+    // A saved top-bar mode changes displayed calendar days as well as labels.
+    // Re-report the browser zone so the host recomputes its range from the
+    // freshly authorized shell preferences, without a reload or a URL change.
+    this.clockObserver = new MutationObserver(() => this.reportTimeZone())
+    this.clockObserver.observe(shell, {attributes: true, attributeFilter: ["data-display-mode"]})
+  },
+  destroyed() {
+    this.clockObserver?.disconnect()
   },
 }
 
