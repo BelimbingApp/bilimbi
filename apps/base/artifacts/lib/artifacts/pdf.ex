@@ -172,7 +172,7 @@ defmodule Bilimbi.Base.Artifacts.PDF do
            ),
          true <-
            Enum.all?([:template_version, :data_version], fn key ->
-             value = Keyword.get(opts, key, "spike")
+             value = Keyword.get(opts, key, Artifact.unversioned())
              is_binary(value) and byte_size(value) in 1..255
            end) do
       :ok

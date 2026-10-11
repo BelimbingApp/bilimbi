@@ -27,8 +27,6 @@ built-in columns and row height.
 
 Expose a module operation to agents through an `agent_api` contribution and a `Bilimbi.Base.AgentApi.Operation` handler that calls your own facade with the scope it receives, standing on the capability the matching page's route or event asks for. Never add a route or controller per module, and never take an actor, tenant or company id from input: the host serves every operation, and the dispatcher asks the capability before the facade runs. `Bilimbi.Base.AgentApi.ContributionValidator`'s moduledoc owns the contract; Core Company's `AgentOperations` is the example.
 
-Use `Bilimbi.Base.Artifacts.put/6` for private uploads and `Bilimbi.Base.Artifacts.PDF` for HTML rendering, signed render URLs, queued PDFs and password protection, rather than module-local storage, browser commands or qpdf invocations. The authorization and private byte lifecycle are owned by `apps/base/artifacts/docs/README.md` and the PDF contract in `apps/base/artifacts/lib/artifacts/pdf.ex`.
-
 ## List filters and pagination
 
 Use `<.filter_toolbar>` and `<.pagination>` for an operational list, which keeps its page, search, filters, sort and page size in URL state. Parse and patch that URL state with `Bilimbi.Base.UI.ListState`, and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced; their moduledocs own the contract. Two lists on one page use `ListState`'s `param_prefix` and `omit_defaults`, and rows a panel already holds in memory page through `ListState.paginate/2`; a private `build_page` or `normalize_table_state` is the copy those replaced. A country select takes `Geonames.country_options/0`, not a private `"Name (ISO)"` mapper over `list_countries/0`. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components/lists.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.
@@ -86,6 +84,8 @@ A query over a tenant-owned table begins with `Tenancy.scope_query/2`; `BilimbiW
 ## Routes
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
+
+Use `Bilimbi.Base.Artifacts.put/6` for private uploads and `Bilimbi.Base.Artifacts.PDF` for HTML rendering, signed render URLs, queued PDFs and password protection, rather than module-local storage, browser commands or qpdf invocations. The authorization and private byte lifecycle are owned by `apps/base/artifacts/docs/README.md` and the PDF contract in `apps/base/artifacts/lib/artifacts/pdf.ex`.
 
 ## Composition lock
 

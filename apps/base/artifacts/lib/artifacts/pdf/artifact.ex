@@ -6,14 +6,19 @@ defmodule Bilimbi.Base.Artifacts.PDF.Artifact do
   defstruct @enforce_keys
   @type t :: %__MODULE__{}
 
+  @unversioned "unversioned"
+
+  @doc false
+  def unversioned, do: @unversioned
+
   @doc false
   def new(document, scope, opts) do
     protected? = Keyword.get(opts, :password) not in [nil, ""]
-    data_version = Keyword.get(opts, :data_version, "spike")
+    data_version = Keyword.get(opts, :data_version, @unversioned)
 
     %__MODULE__{
       document: document,
-      template_version: Keyword.get(opts, :template_version, "spike"),
+      template_version: Keyword.get(opts, :template_version, @unversioned),
       data_version: if(protected?, do: data_version <> " (encrypted)", else: data_version),
       produced_by: Scope.actor(scope).user_id,
       produced_at: DateTime.utc_now()
