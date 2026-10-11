@@ -2,8 +2,9 @@
 
 `base/artifacts` stores sensitive uploaded and generated business documents.
 Domain modules use `Bilimbi.Base.Artifacts` rather than exposing private files.
-This slice provides private storage and a PDF generation contract, with no media
-browser, public URLs, reusable access tokens or document business workflows.
+This module provides private storage, a simple PDF serializer and the Base PDF
+port: HTML printing, single-use signed render URLs, AES-256 protection and queued
+completion events. Business modules own document workflows and templates.
 
 ## Owning-module integration
 
@@ -107,11 +108,118 @@ create no empty trailing pages.
 Body text supports printable ASCII and Latin-1 U+00A0–U+00FF through the font's
 WinAnsi encoding. Unsupported characters and controls return
 `{:error, :unsupported_text}`; they are never silently replaced. PDF metadata
-supports Unicode. Owners requiring other scripts or richer layouts need a
-separately selected renderer behind the same behaviour. Content operands are
+supports Unicode. Owners requiring other scripts or richer layouts use the HTML renderer below
+or a separately selected renderer behind the same behaviour. Content operands are
 escaped and metadata uses hex strings, so text cannot inject PDF instructions.
 Identical input produces identical bytes: the serializer adds no timestamps,
 random IDs or environment-derived metadata. It never interprets HTML or URLs.
+
+## HTML PDFs and password protection
+
+Implement `Bilimbi.Base.Artifacts.PDF.render_html/4` on the trusted Owner. Return
+`{:ok, complete_html_binary}` after selecting the subject's permitted data and
+rendering its HEEx template. Use `PDF.render_inline/6` when the template needs
+only its supplied scope/data; use `PDF.render_view/6` to execute it inside an
+HTTP request through `/pdf/render/:token`. Both receive the original sealed
+scope, recheck create authorization before rendering and again at publication,
+and return `{:ok, %PDF.Artifact{}}` holding the existing private document metadata.
+The HTTP route builds no login session and accepts no template, actor or data
+parameters. It checks the live tenant and installed actor verifier, then the
+owner's current permission. Unknown, expired, replayed or refused requests
+return 404; responses are no-store, noindex and nosniff. Phoenix endpoint and
+router logging respect this route's `log: false`. Template failures return a
+fixed empty 500 without logging document contents. The render process records
+the signed actor and a token-free route pattern in its audit context.
+
+```elixir
+alias Bilimbi.Base.Artifacts.PDF
+{:ok, artifact} = PDF.render_inline(scope, company_id, DocumentOwner, reference,
+  selected_data, template_version: "payslip-v1", data_version: "run-17",
+  password: password)
+{:ok, %{bytes: bytes}} = Artifacts.read(scope, company_id, DocumentOwner,
+  artifact.document.id)
+```
+
+Optional passwords protect the bytes before publication, so a queued protected
+render never stores an unprotected copy. `PDF.protect_with_password/6` instead
+reads an existing PDF through Artifacts and stores a new AES-256 protected copy,
+leaving its source unchanged. An omitted owner password uses the user password;
+an empty user password is refused by this operation. A protected artifact's data
+version gains ` (encrypted)`. `PDF.persist/6` is the writer seam for existing PDF
+bytes; it stores through `Artifacts.put/6`, never a second filesystem service.
+`PDF.Artifact.to_map/1` returns artifact ID, versions, byte count, digest, producer
+and production time. Versions and production time describe this returned value;
+the existing artifact table retains the byte lifecycle and audit provenance.
+
+The PDF-only runner uses Node's standard library and Chromium's
+[DevTools printToPDF API](https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF).
+It adds no npm/Hex browser dependency and has no AI integration. Install Node.js
+22 or newer, a sandbox-capable Chromium and qpdf 10.6 or newer. Configure their
+executables in Operator Settings. `PDF.protection_available?/0` checks the
+configured Node.js and qpdf executables before offering password protection. Do not disable Chromium's sandbox. Documents
+must embed their CSS, images and fonts: scripts, downloads, remote resources,
+local file resources and navigation beyond the initial signed URL are blocked.
+The HTML route allows embedded styles and data resources through its CSP.
+Chromium prints the selected paper size and background option. HTML generation
+is for trusted owner templates, never arbitrary user-supplied URLs or templates.
+
+Temporary requests, plaintext inputs, passwords, encrypted output and browser
+profiles stay inside random 0700 directories; document and request files use 0600 permissions and are
+removed after success, failure or timeout. qpdf uses
+[QPDFJob JSON](https://qpdf.readthedocs.io/en/stable/qpdf-job.html) rather than putting
+passwords in process arguments. Tool output is discarded, and callers receive
+fixed error atoms. Deadlines kill the tool process group, including Chromium
+children. A machine/application crash can leave temporary directories: include
+`bilimbi-pdf-*` in the host's private temporary-file cleanup policy.
+
+Signed render claims are bounded, short-lived and held only in the issuing
+node's memory. Atomic consumption prevents concurrent replay; expiry timers and
+explicit render cleanup erase them. The signed URL is a transient capability,
+never a document download token. Set `pdf.render_origin` to the application
+origin reachable from Chromium and route `/pdf/render/*` back to the issuing
+node. Multi-node deployments need that node affinity; restart discards pending
+claims and the caller retries with a fresh URL. Do not log these URL paths at
+the application proxy. Inline mode needs no origin or HTTP endpoint.
+
+## Queued rendering and completion
+
+Implement `pdf_request/4` and `pdf_rendered/4` on the trusted Owner. The first
+receives the current execution scope, company, document reference and opaque
+request ID and returns `{:ok, %{mode: :inline | :view | :document, data: map,
+options: keyword, metadata: map}}`. It resolves current authorized data,
+versions, passwords and completion routing metadata. `:document` uses the
+existing `render_pdf/4` callback; the other modes use `render_html/4`.
+
+`PDF.enqueue(scope, company_id, DocumentOwner, reference, request_id)` authorizes
+and uses `Queue.enqueue_for/3`. Only the adapter name, company, subject, kind and
+request ID enter Oban; document data, passwords and caller-selected actors are
+refused by the worker's exact allowlist. The adapter is selected in trusted
+server code. Queue re-proves the user and impersonation before execution, and
+the worker rechecks the owner's current create access before selecting data. Actorless legacy jobs do not become privileged system
+jobs: `enqueue/5` refuses an anonymous system scope. Scheduled document owners
+use their declared system-principal worker and call the synchronous PDF API;
+Base PDF does not borrow a user or invent Domain permissions.
+
+On success, `pdf_rendered/4` receives a `%PDF.Rendered{request_id, job_id,
+artifact, metadata}` completion fact. It contains no input data or passwords.
+No event is delivered for a failed/refused render. Publication failure retries;
+permission refusal cancels. Completion handlers must return `:ok` or
+`{:error, reason}`. Delivery, including completion callbacks, is at least once,
+matching Belimbing's queue; owners use the request ID to enforce their business
+idempotency. A failed callback can retry and produce another tracked artifact;
+retention still owns cleanup. No payroll or other Domain adopter is wired here.
+
+## PDF port compatibility
+
+Belimbing's `app/Base/Pdf` owns no tables or migrations. Its generated-file
+paths, cache tokens, Laravel jobs and Blade views are framework internals;
+Bilimbi uses the existing `base_artifacts` table, scoped storage, HEEx callbacks
+and Base Queue. No existing table or column is changed by this port. Drain or
+disposition Laravel PDF jobs at cutover; never deserialize them into Oban. Old
+render URLs expire at cutover. Existing Domain records containing legacy
+`disk`/`path` PDF metadata remain unchanged: the Domain that adopts their document
+workflow must provide its explicit legacy-file bridge, rather than Base
+inventing an unscoped importer. This port does not migrate Domain documents.
 
 ## Operator settings and storage
 
@@ -122,6 +230,16 @@ settings; documents and retention operations remain tenant/company scoped.
 
 | Key | Meaning |
 | --- | --- |
+| `pdf.node_binary` | Node.js executable; default `node`. |
+| `pdf.chromium.binary` | Chromium executable; default `chromium`. |
+| `pdf.qpdf.binary` | qpdf executable; default `qpdf`. |
+| `pdf.render_origin` | Issuing node's reachable application origin; initially empty. |
+| `pdf.signed_url_ttl_seconds` | Single-use render token expiry; default 60, range 1–600 seconds. |
+| `pdf.max_render_tokens` | Pending render claims per node; default 100. |
+| `pdf.render_timeout_seconds` | Chromium deadline; default 30, range 1–600 seconds. |
+| `pdf.qpdf.timeout_seconds` | qpdf deadline; default 60, range 1–600 seconds. |
+| `pdf.paper.format` | A4 (default), A3, A5, Letter, Legal or Tabloid. |
+| `pdf.paper.print_background` | Print background graphics; default true. |
 | `artifacts.storage_root` | Existing absolute private directory; initially empty, so storage is disabled. |
 | `artifacts.retention_days` | Required positive period; initially unset. Expiry is captured at creation. Changes affect new documents. |
 | `artifacts.max_bytes` | Maximum uploaded/generated size; safety default 10 MiB. |
@@ -198,3 +316,13 @@ has a PostgreSQL positivity check and the owning-module validation contract.
 Run `mix bilimbi.migrate` from the umbrella root. Focused tests run with
 `cd apps/base/artifacts && mix test`, using module-owned temporary tables and
 the shared SQL sandbox.
+
+Backend tests cover the writer, protection, queue privacy/completion, token
+concurrency/expiry and the real host render route. Executable fixtures exercise
+failure and timeout deterministically without requiring OS tools in CI. Run
+real tool tests after installing Chromium and qpdf:
+
+```bash
+PDF_TEST_CHROMIUM=/usr/bin/google-chrome PDF_TEST_QPDF=/usr/bin/qpdf \
+  MIX_TEST_PARTITION=_pdf mix test --include pdf_tools
+```

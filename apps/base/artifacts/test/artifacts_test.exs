@@ -62,7 +62,9 @@ defmodule Bilimbi.Base.ArtifactsTest do
   test "operator form discovers every editable artifact setting" do
     fields = Bilimbi.Base.Settings.Form.fields(["operator"], nil)
 
-    assert Enum.sort(Enum.map(fields, & &1.key)) ==
+    assert Enum.sort(
+             Enum.map(Enum.filter(fields, &String.starts_with?(&1.key, "artifacts.")), & &1.key)
+           ) ==
              ~w(artifacts.max_bytes artifacts.purge_batch_size artifacts.purge_max_attempts
                 artifacts.purge_retry_minutes artifacts.retention_days artifacts.storage_root)
   end

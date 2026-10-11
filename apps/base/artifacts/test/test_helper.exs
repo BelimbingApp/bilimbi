@@ -3,5 +3,5 @@ Code.ensure_loaded!(Bilimbi.Base.Tenancy.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Base.Settings.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Base.Audit.TestFixtures)
 
-ExUnit.start()
+ExUnit.start(exclude: [:pdf_tools])
 Ecto.Adapters.SQL.Sandbox.mode(Bilimbi.Base.Repo, :manual)

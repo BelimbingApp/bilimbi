@@ -9,12 +9,13 @@
     "base/audit",
     "base/database",
     "base/module_registry",
+    "base/queue",
     "base/settings",
     "base/tenancy"
   ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{20_260_930_120_000 => :bilimbi_only},
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Base.Artifacts.SchemaContract,
   contribution_provider: Bilimbi.Base.Artifacts.Contributions,
   dev_seed: nil

@@ -369,7 +369,8 @@ defmodule Bilimbi.Base.Artifacts do
     end
   end
 
-  defp authorize(scope, company, owner, operation, ref) do
+  @doc false
+  def authorize(scope, company, owner, operation, ref) do
     with :ok <- company_access(scope, company) do
       case owner.authorize(scope, company, operation, ref) do
         :ok -> :ok
