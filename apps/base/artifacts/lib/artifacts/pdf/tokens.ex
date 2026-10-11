@@ -26,11 +26,7 @@ defmodule Bilimbi.Base.Artifacts.PDF.Tokens do
       {:reply, {:error, :render_tokens_full}, state}
     else
       id = Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
-
-      signature =
-        :crypto.mac(:hmac, :sha256, state.secret, id) |> Base.url_encode64(padding: false)
-
-      token = id <> "." <> signature
+      token = id <> "." <> sign(state.secret, id)
       timer = Process.send_after(self(), {:expire, token}, ttl * 1000)
       entry = {System.monotonic_time(:millisecond) + ttl * 1000, claims, timer}
       {:reply, {:ok, token}, %{state | claims: Map.put(state.claims, token, entry)}}
@@ -38,7 +34,7 @@ defmodule Bilimbi.Base.Artifacts.PDF.Tokens do
   end
 
   def handle_call({:consume, token}, _from, state) do
-    {entry, claims} = Map.pop(state.claims, token)
+    {entry, claims} = pop_verified(state, token)
 
     result =
       case entry do
@@ -57,10 +53,32 @@ defmodule Bilimbi.Base.Artifacts.PDF.Tokens do
   end
 
   def handle_call({:revoke, token}, _from, state) do
-    {entry, claims} = Map.pop(state.claims, token)
+    {entry, claims} = pop_verified(state, token)
     if entry, do: Process.cancel_timer(elem(entry, 2))
     {:reply, :ok, %{state | claims: claims}}
   end
+
+  defp pop_verified(state, token) do
+    if verified?(state.secret, token),
+      do: Map.pop(state.claims, token),
+      else: {nil, state.claims}
+  end
+
+  defp verified?(secret, token) when is_binary(token) do
+    case String.split(token, ".") do
+      [id, signature] ->
+        expected = sign(secret, id)
+        byte_size(signature) == byte_size(expected) and :crypto.hash_equals(expected, signature)
+
+      _ ->
+        false
+    end
+  end
+
+  defp verified?(_secret, _token), do: false
+
+  defp sign(secret, id),
+    do: :crypto.mac(:hmac, :sha256, secret, id) |> Base.url_encode64(padding: false)
 
   @impl true
   def handle_info({:expire, token}, state),

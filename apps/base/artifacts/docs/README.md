@@ -173,7 +173,8 @@ children. A machine/application crash can leave temporary directories: include
 `bilimbi-pdf-*` in the host's private temporary-file cleanup policy.
 
 Signed render claims are bounded, short-lived and held only in the issuing
-node's memory. Atomic consumption prevents concurrent replay; expiry timers and
+node's memory. A per-boot HMAC is verified before a token is consumed or
+revoked, so a forged or altered token is refused and touches no claim. Atomic consumption prevents concurrent replay; expiry timers and
 explicit render cleanup erase them. The signed URL is a transient capability,
 never a document download token. Set `pdf.render_origin` to the application
 origin reachable from Chromium and route `/pdf/render/*` back to the issuing
