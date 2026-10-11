@@ -61,7 +61,10 @@ defmodule Bilimbi.Core.Geonames.Downloader do
     # look like a working page (#273).
     response =
       try do
-        Req.get(request_options)
+        Bilimbi.Base.Integration.request_system(
+          %{system: "geonames", operation: "reference.download", owner_type: "core/geonames"},
+          Keyword.put(request_options, :method, :get)
+        )
       rescue
         exception in [Mint.TransportError, Mint.HTTPError, Req.TransportError] ->
           {:error, exception}

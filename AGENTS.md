@@ -433,7 +433,9 @@ integration must never make a Core module fail to boot.
 ## 8. Dependencies and HTTP
 
 A module that needs outbound HTTP adds `Req` to its own `mix.exs`; Web (its
-Swoosh API client) and Core Geonames (reference-data import) own it today. Do
+Swoosh API client), Core Geonames (response types) and Base Integration own it
+today. Send outbound calls through `Bilimbi.Base.Integration.request/3` so the
+exchange is recorded and redacted (`apps/base/integration/docs/README.md`). Do
 not place Req in a container for a future child, and do not add or use
 `HTTPoison`, `Tesla`, or `:httpc`.
 

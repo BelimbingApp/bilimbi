@@ -9,6 +9,7 @@
     "base/authz",
     "base/database",
     "base/grid",
+    "base/integration",
     "base/module_registry",
     "base/tenancy",
     "base/ui"

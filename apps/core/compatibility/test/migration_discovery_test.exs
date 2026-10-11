@@ -48,6 +48,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/authz",
              "base/queue",
              "base/schedule",
+             "base/integration",
              "base/perf",
              "base/session",
              "base/workflow",
@@ -113,7 +114,9 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs,
              Bilimbi.Base.Schedule.Migrations.AddTriggerProvenanceToRuns,
              Bilimbi.Core.Company.Migrations.BackfillAuthzDecisionLogTenants,
-             Bilimbi.Base.Authz.Migrations.ClearFieldRestrictionsForHideFromReading
+             Bilimbi.Base.Authz.Migrations.ClearFieldRestrictionsForHideFromReading,
+             Bilimbi.Base.Integration.Migrations.CreateCompatibleExchanges,
+             Bilimbi.Base.Integration.Migrations.GeneralizeExchanges
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -152,6 +155,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :bilimbi_only,
+             :bilimbi_only,
+             :compatible_baseline,
              :bilimbi_only
            ]
 
