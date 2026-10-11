@@ -4,8 +4,8 @@ defmodule BilimbiWeb.GeonamesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
