@@ -39,8 +39,10 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
       across every module's operations and guides. A guide's key may be
       the owner prefix itself;
     * `kind` is `:read` or `:write`. A write declares `approval`, `:level`
-      (it runs at once for a connection allowed to write) or `:required`
-      (a person always approves it); a read declares none;
+      or `:required`; a read declares none. The field is left from an
+      earlier draft and decides nothing: ADR 0021 Decision 8 gates every
+      write on a preview and its plan token, and the write step drops
+      the field;
     * `capability` is a well-formed capability key: the one the matching
       screen's route or event asks for. A read operation stands on a read
       capability, and no operation or guide stands on an access-control

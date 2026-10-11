@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
        operation's capability: the same key the screen's route or event
        asks, judged on the sealed person and read afresh;
     4. a write is not run: writes are not enabled yet, so every write
-       answers `{:error, :writes_not_enabled}` whatever its approval;
+       answers `{:error, :writes_not_enabled}`;
     5. the handler calls its own facade with the scope, so the facade's
        changesets, field restrictions and internal checks apply unchanged;
     6. the result is made JSON-ready by `Bilimbi.Base.AgentApi.Json`.
