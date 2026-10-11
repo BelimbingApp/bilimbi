@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Workflow.Coordination do
   @moduledoc false
   import Ecto.Query
+  require Logger
   alias Bilimbi.Base.{Audit, Repo, Tenancy}
   alias Bilimbi.Base.Tenancy.Scope
 
@@ -75,11 +76,12 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   end
 
   # Belimbing's every-minute `blb:workflow:reconcile`: every running run of
-  # every live tenant is locked and settled on its saved graph. This is Base's
-  # own lease and timer hygiene, so it runs under each tenant's system scope
-  # and asks no owner for `:reconcile` authority; it executes no owner code
-  # beyond the subject lock. A run whose definition, subject or tenant is not
-  # proved is skipped and left as it is.
+  # every live tenant is locked and settled on its saved graph, paged by id in
+  # batches of `:limit` until none remain. This is Base's own lease and timer
+  # hygiene, so it runs under each tenant's system scope and asks no owner for
+  # `:reconcile` authority; it executes no owner code beyond the subject lock.
+  # A run whose definition, subject or tenant is not proved, or whose owner
+  # code raises, is logged, skipped and left as it is.
   def sweep(opts) do
     opts = Keyword.validate!(opts, limit: 500)
     limit = opts[:limit]
@@ -88,26 +90,46 @@ defmodule Bilimbi.Base.Workflow.Coordination do
       do: raise(ArgumentError, "sweep limit must be 1..5000")
 
     summary =
-      Tenancy.list_tenants()
-      |> Enum.reduce(%{reconciled: 0, skipped: 0}, fn tenant, acc ->
-        scope = Scope.for_tenant(tenant)
+      Enum.reduce(Tenancy.list_tenants(), %{reconciled: 0, skipped: 0}, fn tenant, acc ->
+        sweep_tenant(Scope.for_tenant(tenant), limit, 0, acc)
+      end)
 
+    {:ok, summary}
+  end
+
+  defp sweep_tenant(scope, limit, after_id, acc) do
+    ids =
+      Repo.all(
         from(r in Tenancy.scope_query(RunSchema, scope),
-          where: r.status == "running" and r.scope_type == "tenant",
+          where: r.status == "running" and r.scope_type == "tenant" and r.id > ^after_id,
           order_by: [asc: r.id],
           limit: ^limit,
           select: r.id
         )
-        |> Repo.all()
-        |> Enum.reduce(acc, fn run_id, acc ->
-          case maintain(scope, run_id) do
-            {:ok, _run} -> Map.update!(acc, :reconciled, &(&1 + 1))
-            {:error, _reason} -> Map.update!(acc, :skipped, &(&1 + 1))
-          end
-        end)
-      end)
+      )
 
-    {:ok, summary}
+    acc = Enum.reduce(ids, acc, &sweep_run(scope, &1, &2))
+
+    if length(ids) < limit, do: acc, else: sweep_tenant(scope, limit, List.last(ids), acc)
+  end
+
+  defp sweep_run(scope, run_id, acc) do
+    case maintain_safely(scope, run_id) do
+      {:ok, _run} -> Map.update!(acc, :reconciled, &(&1 + 1))
+      {:error, _reason} -> Map.update!(acc, :skipped, &(&1 + 1))
+    end
+  end
+
+  defp maintain_safely(scope, run_id) do
+    maintain(scope, run_id)
+  rescue
+    exception ->
+      Logger.error(
+        "workflow maintenance skipped process run #{run_id} of tenant " <>
+          "#{Scope.tenant_id(scope)}: #{Exception.message(exception)}"
+      )
+
+      {:error, :maintenance_failed}
   end
 
   defp maintain(scope, run_id) do

@@ -340,9 +340,10 @@ definition it does nothing until an operator reviews it on the Schedule
 board. Each pass calls `reconcile_running_runs/1`, which settles every
 running tenant-scoped run of every live tenant on its saved graph (expired
 leases, due timers, satisfied dependencies) under that tenant's system scope,
-skipping runs whose definition, subject or tenant cannot be proved; then
-`deliver_transition_events/1`, which delivers up to 100 due outbox rows in id
-order. `mix bilimbi.workflow.reconcile [--outbox-limit N]` runs the same pass
+paging by id until none remain and skipping runs whose definition, subject or
+tenant cannot be proved or whose owner code raises (logged, left unchanged).
+It then calls `deliver_transition_events/1`, which delivers up to 100 due
+outbox rows in id order, even if the sweep itself failed. `mix bilimbi.workflow.reconcile [--outbox-limit N]` runs the same pass
 by hand, for a backlog or before the definition is reviewed.
 
 Writes made by maintenance, and by listeners during delivery, are audited.

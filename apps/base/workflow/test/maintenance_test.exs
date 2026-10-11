@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Workflow.MaintenanceTest do
     OutboxSchema,
     RunSchema,
     TestListener,
+    TestSubjectSchema,
     WorkSchema
   }
 
@@ -125,6 +126,64 @@ defmodule Bilimbi.Base.Workflow.MaintenanceTest do
     assert %NaiveDateTime{} = Repo.get!(OutboxSchema, row.id).delivered_at
     assert [%{event: %{to_status: "review"}}] = TestListener.deliveries()
     assert {:error, :invalid_args} = MaintenanceWorker.validate_scheduled_args(%{"x" => 1})
+  end
+
+  test "the sweep pages through more running runs than one batch holds", c do
+    for n <- 1..3 do
+      assert {:ok, _} =
+               Workflow.start_run(c.scope, "example.parallel", c.subject,
+                 idempotency_key: "page-#{n}"
+               )
+    end
+
+    assert {:ok, %{reconciled: 3, skipped: 0}} = Workflow.reconcile_running_runs(limit: 2)
+    assert {:ok, %{reconciled: 3, skipped: 0}} = Workflow.reconcile_running_runs(limit: 3)
+  end
+
+  test "a run whose subject adapter raises is skipped while the others are reconciled", c do
+    other = subject!()
+
+    assert {:ok, bad} =
+             Workflow.start_run(c.scope, "example.parallel", c.subject, idempotency_key: "bad")
+
+    assert {:ok, good} =
+             Workflow.start_run(c.scope, "example.parallel", other, idempotency_key: "good")
+
+    Repo.update_all(from(s in TestSubjectSchema, where: s.id == ^c.subject.id),
+      set: [marker: "explode"]
+    )
+
+    before = Repo.get!(RunSchema, bad.id)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, %{reconciled: 1, skipped: 1}} = Workflow.reconcile_running_runs(limit: 1)
+      end)
+
+    assert log =~ "skipped process run #{bad.id}"
+    assert Repo.get!(RunSchema, bad.id) == before
+    assert Repo.get!(RunSchema, good.id).status == "running"
+  end
+
+  test "the scheduled job still delivers due events when a run's owner code raises", c do
+    other = subject!()
+    assert {:ok, _} = Workflow.transition(c.scope, other, "review")
+    assert [row] = Repo.all(OutboxSchema)
+
+    assert {:ok, _} =
+             Workflow.start_run(c.scope, "example.parallel", c.subject, idempotency_key: "bad")
+
+    Repo.update_all(from(s in TestSubjectSchema, where: s.id == ^c.subject.id),
+      set: [marker: "explode"]
+    )
+
+    execution = %Execution{job_id: 1, attempt: 1, max_attempts: 3, queue: "default"}
+
+    ExUnit.CaptureLog.capture_log(fn ->
+      assert :ok = MaintenanceWorker.handle_scheduled_job(%{}, execution)
+    end)
+
+    assert %NaiveDateTime{} = Repo.get!(OutboxSchema, row.id).delivered_at
   end
 
   test "sweep limits are bounded" do

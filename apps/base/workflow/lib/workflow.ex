@@ -172,12 +172,13 @@ defmodule Bilimbi.Base.Workflow do
 
   @doc """
   Locks and settles every running, tenant-scoped process run of every live
-  tenant, up to `:limit` (default 500) per tenant, and returns
+  tenant, paged by id in batches of `:limit` (default 500), and returns
   `%{reconciled, skipped}`. Expired leases are repaired and due timers and
   satisfied dependencies released on the saved graph, as `reconcile_run/2`
   does for one run. Owner `:reconcile` authority is not asked: this is Base's
   own lease hygiene under each tenant's system scope, and a run whose
-  definition, subject or tenant cannot be proved is skipped unchanged.
+  definition, subject or tenant cannot be proved, or whose owner code raises,
+  is logged and skipped unchanged.
   """
   @spec reconcile_running_runs(keyword()) :: {:ok, map()}
   def reconcile_running_runs(opts \\ []), do: Coordination.sweep(opts)

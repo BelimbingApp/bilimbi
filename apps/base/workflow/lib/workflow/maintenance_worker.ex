@@ -19,8 +19,12 @@ defmodule Bilimbi.Base.Workflow.MaintenanceWorker do
 
   @impl true
   def handle_scheduled_job(%{}, _execution) do
-    {:ok, _runs} = Coordination.sweep([])
-    {:ok, _events} = TransitionOutbox.deliver_due(limit: 100)
+    try do
+      {:ok, _runs} = Coordination.sweep([])
+    after
+      {:ok, _events} = TransitionOutbox.deliver_due(limit: 100)
+    end
+
     :ok
   end
 end

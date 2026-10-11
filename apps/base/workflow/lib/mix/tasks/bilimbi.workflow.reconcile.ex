@@ -24,15 +24,16 @@ defmodule Mix.Tasks.Bilimbi.Workflow.Reconcile do
 
     Mix.Task.run("app.start")
 
-    {:ok, runs} = Workflow.reconcile_running_runs()
+    try do
+      {:ok, runs} = Workflow.reconcile_running_runs()
+      Mix.shell().info("Process runs reconciled: #{runs.reconciled} (skipped #{runs.skipped})")
+    after
+      {:ok, events} =
+        Workflow.deliver_transition_events(limit: Keyword.get(opts, :outbox_limit, 100))
 
-    {:ok, events} =
-      Workflow.deliver_transition_events(limit: Keyword.get(opts, :outbox_limit, 100))
-
-    Mix.shell().info("Process runs reconciled: #{runs.reconciled} (skipped #{runs.skipped})")
-
-    Mix.shell().info(
-      "Transition events delivered: #{events.delivered} (deferred #{events.deferred})"
-    )
+      Mix.shell().info(
+        "Transition events delivered: #{events.delivered} (deferred #{events.deferred})"
+      )
+    end
   end
 end
