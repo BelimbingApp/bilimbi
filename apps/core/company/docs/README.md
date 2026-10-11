@@ -188,17 +188,18 @@ operator tenant marker.
 
 ## Transactional live-company proof
 
-`lock_live_company/2` is the Company collaboration seam for a sibling workflow
+`lock_writable_company/2` is the Company collaboration seam for a sibling workflow
 that already holds an explicit shared `Bilimbi.Base.Repo` transaction. It locks
-one live Company row through the supplied `%Bilimbi.Base.Tenancy.Scope{}` and
+one live, writable Company row through the supplied `%Bilimbi.Base.Tenancy.Scope{}` and
 returns `LiveCompanyProof`, a schema-free value containing only its id. Missing,
-cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`;
+cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`; an
+archived company is read-only and returns `{:error, :company_archived}`;
 calling outside an explicit transaction returns `{:error, :transaction_required}`.
 
 The proof remains valid only until that transaction commits or rolls back. A
 cross-module workflow acquires locks in this order: Company, then Employee,
 then User; within each record kind, ids ascend. It must not take an Employee or
-User lock before calling `lock_live_company/2`.
+User lock before calling `lock_writable_company/2`.
 
 ## External access
 
