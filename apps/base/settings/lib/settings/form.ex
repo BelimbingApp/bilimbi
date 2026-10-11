@@ -379,6 +379,16 @@ defmodule Bilimbi.Base.Settings.Form do
     end
   end
 
+  # Structured settings use JSON in generated forms. This preserves maps and
+  # arrays across the browser's text boundary instead of stringifying a map or
+  # joining an array into text that the definition cannot accept on save.
+  defp convert(value, %Definition{type: :array}) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, decoded} when is_map(decoded) or is_list(decoded) -> {:ok, decoded}
+      _ -> {:error, "must be a JSON object or array"}
+    end
+  end
+
   # Anything else is already the declared type or is not going to become it:
   # `Definition.accepts?/2` is the same check `Settings.put/3` would raise on,
   # asked where a message can still be shown.

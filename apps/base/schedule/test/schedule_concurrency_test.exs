@@ -35,7 +35,9 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
 
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
-        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database} WITH (FORCE)", [])
+        # ExUnit stops the supervised repos before on_exit, and the later
+        # callback stops this fixture's Oban. No client needs forced signalling.
+        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database}", [])
       end)
     end)
 

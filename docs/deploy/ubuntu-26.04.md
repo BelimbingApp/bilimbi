@@ -66,6 +66,8 @@ sudo bash scripts/deploy/setup-ubuntu.sh
 Copy the script to the server first if it has no source checkout. The script
 installs PostgreSQL 18 from the PGDG apt repository, Caddy, a `bilimbi` system
 user, and owned directories.
+It also installs `file` and its MIME database for Media's server-side upload
+validation; both the native setup and runtime container include it.
 It prompts for a PostgreSQL role password only when creating the role. Save that
 password in your secret store. The database and role are both named `bilimbi`.
 PostgreSQL remains local; do not open port 5432 publicly.

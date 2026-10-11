@@ -41,7 +41,8 @@ defmodule Bilimbi.Core.Geonames.PostcodeConcurrencyTest do
 
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
-        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database} WITH (FORCE)", [])
+        # ExUnit stops the supervised repos before on_exit; no backend needs forced signalling.
+        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database}", [])
       end)
     end)
 

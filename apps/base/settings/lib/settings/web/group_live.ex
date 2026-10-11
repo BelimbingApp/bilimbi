@@ -463,6 +463,10 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp boolean_checked?(_field), do: false
 
   defp input_value(%{value: nil}), do: ""
+
+  defp input_value(%{definition: %{type: :array}, value: value})
+       when is_map(value) or is_list(value), do: Jason.encode!(value)
+
   defp input_value(%{value: value}) when is_list(value), do: Enum.join(value, ", ")
   defp input_value(%{value: value}), do: to_string(value)
 end

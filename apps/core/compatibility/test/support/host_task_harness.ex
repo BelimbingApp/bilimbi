@@ -102,7 +102,7 @@ defmodule Bilimbi.Core.Compatibility.HostTaskHarness do
   Every installed migration as the umbrella root's runtime, the one the host
   tasks run in, discovers it.
   """
-  def workspace_migration_entries(env) do
+  def workspace_migration_entries(env, layers \\ [:base, :core, :domain, :extension]) do
     {output, status} =
       System.cmd(
         System.find_executable("mix"),
@@ -110,8 +110,12 @@ defmodule Bilimbi.Core.Compatibility.HostTaskHarness do
           "run",
           "--no-start",
           "-e",
-          ~s[IO.puts("migration_entries:" <> Base.encode64(:erlang.term_to_binary(] <>
-            ~s[Bilimbi.Core.Compatibility.migration_entries())))]
+          "versions = Bilimbi.Base.ModuleRegistry.migration_modules!() " <>
+            "|> Enum.filter(&(&1.layer in #{inspect(layers)})) " <>
+            "|> Enum.flat_map(&Map.keys(&1.migration_dispositions)); " <>
+            "entries = Bilimbi.Core.Compatibility.migration_entries() " <>
+            "|> Enum.filter(fn {version, _, _} -> version in versions end); " <>
+            ~s[IO.puts("migration_entries:" <> Base.encode64(:erlang.term_to_binary(entries)))]
         ],
         cd: @workspace_root,
         env: [{"MIX_ENV", "test"} | env],

@@ -2,6 +2,8 @@
 
 Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note holds only what no component owns.
 
+Use `Bilimbi.Base.Media` for uploads and subject-authorized private attachments, and `Bilimbi.Base.Artifacts.generate_pdf/5` with its PDF adapter for generated private documents, not hand-rolled storage, download routes, or PDF serializers. Their facade comments and `apps/base/media/docs/README.md` own the access and lifecycle contracts.
+
 ## Flexible columns on a list
 
 List pages use `<.flex_table>` with the notch, not `<.table>`.

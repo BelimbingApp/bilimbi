@@ -42,6 +42,9 @@ defmodule BilimbiWeb.TenantScopeGateTest do
   # {path relative to the workspace root, "function/arity", schema or table}
   # => the reason this read may span tenants.
   @allowed %{
+    {"apps/base/media/lib/media/asset_store.ex", "private_binding?/1",
+     "Bilimbi.Base.Media.AttachmentSchema"} =>
+      "Owner-local global invariant: a generic asset stream or deletion must refuse private bindings in every tenant; assets have no tenant column in the compatible schema.",
     {"apps/core/agent_access/lib/agent_access.ex", "lockedless_connection/1",
      "Bilimbi.Core.AgentAccess.Connection"} =>
       "Bounded OAuth credential resolution before a tenant is known; live identity is re-proven before use.",
