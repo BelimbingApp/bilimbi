@@ -343,8 +343,9 @@ leases, due timers, satisfied dependencies) under that tenant's system scope,
 paging by id until none remain and skipping runs whose definition, subject or
 tenant cannot be proved or whose owner code raises (logged, left unchanged).
 It then calls `deliver_transition_events/1`, which delivers up to 100 due
-outbox rows in id order, even if the sweep itself failed. `mix bilimbi.workflow.reconcile [--outbox-limit N]` runs the same pass
-by hand, for a backlog or before the definition is reviewed.
+outbox rows in id order, even if the sweep itself failed.
+`mix bilimbi.workflow.reconcile [--outbox-limit N]` runs the same pass by
+hand, for a backlog or before the definition is reviewed.
 
 Writes made by maintenance, and by listeners during delivery, are audited.
 Nobody signed in for them and they name no system principal, so their audit

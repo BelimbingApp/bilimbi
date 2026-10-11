@@ -56,8 +56,9 @@ that runs every minute once an operator reviews it, and as
 every live tenant on its saved graph under that tenant's system scope,
 without asking the owner's `:reconcile` policy, then delivers due events.
 This is Base's own lease and timer hygiene: it executes no owner code beyond
-the subject lock, and skips a run whose definition, subject or tenant it
-cannot prove.
+the subject lock, and skips, logging it, a run whose definition, subject or tenant it
+cannot prove or whose subject lock raises; delivery runs even if the sweep
+fails.
 
 ## Consequences
 
