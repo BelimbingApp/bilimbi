@@ -27,7 +27,12 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              socket
              |> assign(:page_title, "#{company.display_name} — Departments")
              |> assign(:active_nav, "admin.company")
-             |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+             |> assign(
+               :can_update?,
+               allowed?(socket.assigns.current_scope, @update_capability) and
+                 not archived_company?(scope, company_id)
+             )
+             |> assign(:company_archived?, archived_company?(scope, company_id))
              |> assign(:company, company)
              |> assign(:departments_count, length(departments))
              |> assign(:department_head_names, department_head_names)
@@ -65,10 +70,15 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              "edit_head",
              "save_head"
            ] do
-    if can_update?(socket) do
-      handle_write_event(event, params, socket)
-    else
-      write_forbidden(socket)
+    cond do
+      not can_update?(socket) ->
+        write_forbidden(socket)
+
+      archived_company?(socket.assigns.current_scope.scope, socket.assigns.company.id) ->
+        archived_refused(socket)
+
+      true ->
+        handle_write_event(event, params, socket)
     end
   end
 
@@ -112,6 +122,9 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          |> assign(:available_types, available_types)
          |> assign_form(changeset)}
 
+      {:error, :company_archived} ->
+        archived_refused(socket)
+
       {:error, :company_not_found} ->
         {:noreply,
          socket
@@ -138,6 +151,9 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
+
+      {:error, :company_archived} ->
+        archived_refused(socket)
 
       {:error, :company_not_found} ->
         {:noreply,
@@ -340,6 +356,18 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
     Authz.can(socket.assigns.current_scope.actor, @update_capability).allowed
   end
 
+  # The mount-time `company_archived?` assign hides the controls; each write
+  # asks Core Company again so a company archived under the page is refused
+  # in these words. An archived company is read-only for good.
+  defp archived_company?(scope, company_id) do
+    match?({:error, :company_archived}, Company.require_writable_company(scope, company_id))
+  end
+
+  defp archived_refused(socket) do
+    {:noreply,
+     put_flash(socket, :error, "This company is archived and read-only, so nothing was changed.")}
+  end
+
   defp assign_form(socket, nil), do: assign(socket, :form, nil)
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
@@ -430,6 +458,10 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             />
           </:actions>
         </.header>
+
+        <.alert :if={@company_archived?} id="company-archived" kind={:warning} class="mt-4">
+          This company is archived and read-only.
+        </.alert>
 
         <.card
           id="company-departments-card"

@@ -26,7 +26,10 @@ other companies in the tenant also require `admin.company.tenant-wide.manage`.
 The selector uses the host's `Bilimbi.Base.Settings.CompanyScopeService`
 implementation, configured as `:company_scope_service`, so Base does not depend
 on Core business implementations. Every save, clear, and stored-value reveal
-rechecks the company target.
+rechecks the company target. Its `writable/2` answers whether the company may
+take a write at all: an archived company is read-only, so the page shows its
+values with a read-only notice and no save or clear controls, and a save or
+restore that arrives anyway is refused in those words.
 
 Company scope discovers every editable group with company-scoped definitions.
 It shows effective values and distinguishes a company override from inheritance

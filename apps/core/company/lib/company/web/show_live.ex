@@ -124,8 +124,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # The page's own sentences for a refused write; any other reason falls
   # through to `CommitStatus.failure_message/0`.
   @failures %{
-    not_found: "This company no longer exists in this workspace. Return to the list to find it."
+    not_found: "This company no longer exists in this workspace. Return to the list to find it.",
+    company_archived: "This company is archived and read-only, so the change was not saved."
   }
+
+  @archived_notice "This company is archived and read-only."
+  @doc false
+  def archived_notice, do: @archived_notice
 
   @fact_labels %{
     "name" => "Name",
@@ -264,7 +269,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:company, company)
          |> Workspace.announce(%{kind: "core/company", id: company.id})
          |> assign(:is_primary, is_primary)
-         |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+         |> assign_writability(company)
          |> assign(:can_lifecycle?, can_lifecycle?(scope, company_id))
          |> assign(:legal_entity_types, legal_entity_types)
          |> assign(:country_options, Geonames.country_options())
@@ -629,8 +634,24 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # through Base Settings and reports on its own fact like the rest.
   defp write_event("save_timezone", params, socket) do
     socket = assign(socket, :editing_field, nil)
-    tz = params |> Map.get("timezone", "") |> to_string() |> String.trim()
     company = socket.assigns.company
+
+    case Company.require_writable_company(socket.assigns.current_scope.scope, company.id) do
+      {:ok, _company_id} ->
+        save_timezone(socket, company, params)
+
+      {:error, reason} ->
+        {:noreply,
+         CommitStatus.put(
+           socket,
+           "timezone",
+           {:error, CommitStatus.failure_message(@failures, reason)}
+         )}
+    end
+  end
+
+  defp save_timezone(socket, company, params) do
+    tz = params |> Map.get("timezone", "") |> to_string() |> String.trim()
     settings_scope = SettingsScope.company(company.id, company.tenant_id)
 
     cond do
@@ -803,6 +824,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     socket
     |> assign(:company, updated)
     |> assign(:page_title, Company.Summary.display_name(updated))
+    |> assign_writability(updated)
+  end
+
+  # An archived company is read-only: the page offers no editor, no choice,
+  # no activity or metadata control, and says so once under the header. The
+  # domain refuses the write either way (`Company.require_writable_company/2`);
+  # `@failures` carries its sentence for a company archived under the page.
+  defp assign_writability(socket, company) do
+    archived? = Company.archived?(company)
+
+    socket
+    |> assign(:archived?, archived?)
+    |> assign(
+      :can_update?,
+      allowed?(socket.assigns.current_scope, @update_capability) and not archived?
+    )
   end
 
   defp decode_metadata(""), do: {:ok, nil}
@@ -948,6 +985,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :archived_notice, @archived_notice)
+
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page variant={:detail}>
@@ -1003,6 +1042,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
         <.alert :if={@is_primary} kind={:info} class="mt-4">
           This is the primary company representing its tenant.
+        </.alert>
+
+        <%!-- The one place the page says why it offers no editor: archiving
+             is final, so the notice states the condition and no next step. --%>
+        <.alert :if={@archived?} id="company-archived" kind={:warning} class="mt-4">
+          {@archived_notice}
         </.alert>
 
         <%!-- Section 1: Company Details. The facts are the shared `<.list>`

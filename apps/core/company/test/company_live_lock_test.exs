@@ -46,12 +46,12 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
   test "requires an explicit shared Repo transaction", %{schema: schema, scope: scope} do
     on_schema!(schema, fn ->
       refute Repo.in_transaction?()
-      assert {:error, :transaction_required} = Company.lock_live_company(scope, 73)
+      assert {:error, :transaction_required} = Company.lock_writable_company(scope, 73)
 
       assert {:ok, {:ok, %LiveCompanyProof{id: 73}}} =
                Repo.transaction(fn ->
                  assert Repo.in_transaction?()
-                 Company.lock_live_company(scope, 73)
+                 Company.lock_writable_company(scope, 73)
                end)
     end)
   end
@@ -59,7 +59,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
   test "returns generic misses and keeps its proof schema-free", %{schema: schema, scope: scope} do
     on_schema!(schema, fn ->
       assert {:ok, {:ok, %LiveCompanyProof{id: 73} = proof}} =
-               Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
+               Repo.transaction(fn -> Company.lock_writable_company(scope, 73) end)
 
       assert Map.keys(Map.from_struct(proof)) == [:id]
       refute is_struct(proof, Schema)
@@ -69,7 +69,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
       for company_id <- [0, -1, nil, "73", 74, 75] do
         assert {:ok, {:error, :not_found}} =
-                 Repo.transaction(fn -> Company.lock_live_company(scope, company_id) end)
+                 Repo.transaction(fn -> Company.lock_writable_company(scope, company_id) end)
       end
     end)
   end
@@ -77,7 +77,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
   test "rejects a malformed scope at the public boundary", %{schema: schema} do
     on_schema!(schema, fn ->
       assert_raise FunctionClauseError, fn ->
-        Repo.transaction(fn -> apply(Company, :lock_live_company, [41, 73]) end)
+        Repo.transaction(fn -> apply(Company, :lock_writable_company, [41, 73]) end)
       end
     end)
   end
@@ -89,12 +89,14 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
     on_schema!(schema, fn ->
       assert {:error, :rollback} =
                Repo.transaction(fn ->
-                 assert {:ok, %LiveCompanyProof{id: 73}} = Company.lock_live_company(scope, 73)
+                 assert {:ok, %LiveCompanyProof{id: 73}} =
+                          Company.lock_writable_company(scope, 73)
+
                  Repo.rollback(:rollback)
                end)
 
       assert {:ok, {:ok, %LiveCompanyProof{id: 73}}} =
-               Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
+               Repo.transaction(fn -> Company.lock_writable_company(scope, 73) end)
     end)
   end
 
@@ -105,7 +107,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
       Task.async(fn ->
         checkout_on_schema!(schema, fn ->
           Repo.transaction(fn ->
-            assert {:ok, %LiveCompanyProof{id: 73}} = Company.lock_live_company(scope, 73)
+            assert {:ok, %LiveCompanyProof{id: 73}} = Company.lock_writable_company(scope, 73)
             send(parent, :holder_locked)
             await_message!(:commit_holder)
           end)
@@ -136,7 +138,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
     on_schema!(schema, fn ->
       assert {:ok, {:error, :not_found}} =
-               Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
+               Repo.transaction(fn -> Company.lock_writable_company(scope, 73) end)
     end)
   end
 
@@ -172,7 +174,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
         checkout_on_schema!(schema, fn ->
           send(parent, {:proof_contender_backend, backend_pid!()})
 
-          Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
+          Repo.transaction(fn -> Company.lock_writable_company(scope, 73) end)
         end)
       end)
 

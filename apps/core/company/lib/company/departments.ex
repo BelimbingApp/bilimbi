@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.Company.Departments do
   alias Bilimbi.Core.Company.Department
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.Schema
+  alias Bilimbi.Core.Company.WritableCompany
 
   @spec list_departments(Scope.t(), pos_integer(), keyword()) ::
           {:ok, [Department.t()]} | {:error, :company_not_found}
@@ -73,12 +74,15 @@ defmodule Bilimbi.Core.Company.Departments do
     end
   end
 
+  # A write on a department begins with `WritableCompany.fetch_parent/2`:
+  # an archived company's departments are read-only (`:company_archived`).
   @spec create_department(Scope.t(), pos_integer(), map()) ::
-          {:ok, Department.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | Ecto.Changeset.t()}
   def create_department(%Scope{} = scope, company_id, attrs) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         %Department{company_id: company_id}
@@ -92,11 +96,12 @@ defmodule Bilimbi.Core.Company.Departments do
   end
 
   @spec update_department_status(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
-          {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | :not_found | Ecto.Changeset.t()}
   def update_department_status(%Scope{} = scope, company_id, department_id, status) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         query =
@@ -118,11 +123,12 @@ defmodule Bilimbi.Core.Company.Departments do
   end
 
   @spec update_department_head(Scope.t(), pos_integer(), pos_integer(), pos_integer() | nil) ::
-          {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | :not_found | Ecto.Changeset.t()}
   def update_department_head(%Scope{} = scope, company_id, department_id, head_id) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         query =
@@ -144,11 +150,11 @@ defmodule Bilimbi.Core.Company.Departments do
   end
 
   @spec delete_department(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :company_not_found | :not_found}
+          :ok | {:error, :company_not_found | :company_archived | :not_found}
   def delete_department(%Scope{} = scope, company_id, department_id) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         query =

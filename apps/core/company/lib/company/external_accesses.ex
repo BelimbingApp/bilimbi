@@ -10,10 +10,12 @@ defmodule Bilimbi.Core.Company.ExternalAccesses do
   alias Bilimbi.Core.Company.ExternalAccessSummary
   alias Bilimbi.Core.Company.Relationship
   alias Bilimbi.Core.Company.Schema
+  alias Bilimbi.Core.Company.WritableCompany
 
   @list_limit 200
 
-  @type access_lookup_error :: :not_found | :company_not_found | :relationship_not_found
+  @type access_lookup_error ::
+          :not_found | :company_not_found | :company_archived | :relationship_not_found
 
   @spec list_external_accesses(Scope.t(), pos_integer()) ::
           {:ok, [ExternalAccessSummary.t()]} | {:error, :company_not_found}
@@ -58,11 +60,17 @@ defmodule Bilimbi.Core.Company.ExternalAccesses do
     end
   end
 
+  # Every write begins with `WritableCompany.fetch_parent/2`: an archived
+  # company's external accesses are read-only (`:company_archived`).
   @spec create_external_access(Scope.t(), pos_integer(), map()) ::
           {:ok, ExternalAccessSummary.t()}
-          | {:error, :company_not_found | :relationship_not_found | Ecto.Changeset.t()}
+          | {:error,
+             :company_not_found
+             | :company_archived
+             | :relationship_not_found
+             | Ecto.Changeset.t()}
   def create_external_access(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- live_company(scope, company_id),
+    with {:ok, _company} <- WritableCompany.fetch_parent(scope, company_id),
          {:ok, relationship_id} <- relationship_id_from(attributes),
          :ok <- prove_relationship(company_id, relationship_id) do
       company_id
@@ -159,7 +167,7 @@ defmodule Bilimbi.Core.Company.ExternalAccesses do
 
   defp mutate_live_access(scope, company_id, access_id, fun) do
     Repo.transaction(fn ->
-      case live_company(scope, company_id) do
+      case WritableCompany.fetch_parent(scope, company_id) do
         {:error, reason} ->
           Repo.rollback(reason)
 

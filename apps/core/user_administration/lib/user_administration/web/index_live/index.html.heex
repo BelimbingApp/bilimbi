@@ -100,7 +100,7 @@
           <div class="flex items-center gap-2">
             <.link
               :if={
-                not user.company_archived and
+                not user.company_deleted and
                   allowed?(@current_scope, "admin.company.view")
               }
               id={"user-#{user.id}-company"}
@@ -110,7 +110,7 @@
               {user.company_name}
             </.link>
             <span :if={
-              user.company_archived or
+              user.company_deleted or
                 not allowed?(@current_scope, "admin.company.view")
             }>
               {user.company_name}
