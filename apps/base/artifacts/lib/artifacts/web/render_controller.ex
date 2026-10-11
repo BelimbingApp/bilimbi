@@ -57,15 +57,14 @@ defmodule Bilimbi.Base.Artifacts.Web.RenderController do
            scope = %Scope{scope | tenant: live_scope.tenant},
            :ok <- verify_actor(scope),
            :ok <- Artifacts.authorize(scope, company, owner, :create, ref),
-           {:ok, html} when is_binary(html) <- owner.render_html(scope, company, ref, data) do
+           {:ok, body} when is_binary(body) <- owner.render_html(scope, company, ref, data) do
         conn
         |> private_headers()
-        |> put_resp_header("content-type", "text/html; charset=utf-8")
         |> put_resp_header(
           "content-security-policy",
           "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
         )
-        |> send_resp(200, html)
+        |> html(body)
       else
         _ -> conn |> private_headers() |> send_resp(404, "")
       end
