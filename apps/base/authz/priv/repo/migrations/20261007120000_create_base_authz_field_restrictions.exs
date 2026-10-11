@@ -4,12 +4,14 @@ defmodule Bilimbi.Base.Authz.Migrations.CreateFieldRestrictions do
 
   A restriction names one field of one catalog table (`Bilimbi.Base.Grid`'s
   table and field ids, such as `companies` / `email`) in one tenant, and the
-  roles that may still see it. Everyone else in the tenant reads the field
-  as restricted on the record page, in grid columns, in the audit views, and
-  may not write it. Which roles see the field is the join table: deleting a
-  role or a restriction removes its rows. The restriction rows themselves
-  are audited like every write through the repo, and Base Authz records a
-  retained `authz.field_restriction.set` / `.removed` action naming who
+  roles it was set for. The roles meant "may still see" when this migration
+  shipped; `20261010150000_clear_field_restrictions_for_hide_from_reading`
+  flipped them to the roles the field is restricted for. A restricted reader
+  gets the field as restricted on the record page, in grid columns, in the
+  audit views, and may not write it. Which roles are named is the join table:
+  deleting a role or a restriction removes its rows. The restriction rows
+  themselves are audited like every write through the repo, and Base Authz
+  records a retained `authz.field_restriction.set` / `.removed` action naming who
   changed what.
   """
 

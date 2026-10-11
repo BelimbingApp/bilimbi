@@ -114,9 +114,9 @@ queries `companies` directly (BLB-S1-010 option a).
 ## Field access
 
 An operator may restrict any non-protected field of the `companies` catalog
-table to roles (Administration › Authorization › Field Access). Every summary
-this module returns is built through `Summary.for_scope/2`, so a reader who
-holds none of those roles gets a `Bilimbi.Base.Authz.Restricted` marker in
+table for roles (Administration › Authorization › Field Restrictions). Every
+summary this module returns is built through `Summary.for_scope/2`, so a
+reader who holds any of those roles gets a `Bilimbi.Base.Authz.Restricted` marker in
 that field; `create_company/3` and `update_company/3` refuse any attempt to
 set it with an error on the field, whatever the value; the administration
 search skips the column (`searchable_columns/1`); the companies grid leaves
@@ -125,7 +125,7 @@ values through the table's `record_types` (`auditable_types/0`). `code` and
 `status` are protected, and the key `id` and the label `name` are protected
 implicitly. `restricted_field_markers/1` returns the restricted summary keys with their
 `Restricted` markers for the create and setup forms, which show them as
-`<.restricted_field>` rows naming the roles that see each. The
+`<.restricted_field>` rows, which name no role. The
 seam itself is Base Authz's (`apps/base/authz/docs/README.md`
 "Field-level authorization").
 

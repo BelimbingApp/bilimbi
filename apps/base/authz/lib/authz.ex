@@ -288,13 +288,14 @@ defmodule Bilimbi.Base.Authz do
   end
 
   @doc """
-  Restricts one catalog field in the scope's tenant to `role_ids`, or
+  Restricts one catalog field in the scope's tenant for `role_ids`, or
   replaces the roles of an existing restriction.
 
-  Everyone in the tenant who holds none of those roles reads the field as
-  `Bilimbi.Base.Authz.Restricted` and may not write it. The field must be in
-  `field_restriction_catalog/0` (`:not_restrictable`), and every role must be
-  one the scope may see (`{:unknown_roles, ids}`). The caller must be a
+  Everyone in the tenant who holds any of those roles reads the field as
+  `Bilimbi.Base.Authz.Restricted` and may not write it; everyone else sees
+  it. The field must be in `field_restriction_catalog/0`
+  (`:not_restrictable`), at least one role must be named (`:no_roles`), and
+  every role must be one the scope may see (`{:unknown_roles, ids}`). The caller must be a
   signed-in user holding `admin.authz.field.manage`; the write and a retained
   `authz.field_restriction.set` audit action naming them commit together.
   """
@@ -303,12 +304,38 @@ defmodule Bilimbi.Base.Authz do
           | {:error,
              :forbidden
              | :not_restrictable
+             | :no_roles
              | {:unknown_roles, [term()]}
              | :audit_unavailable}
   def put_field_restriction(%Scope{} = scope, table_id, field_id, role_ids)
       when is_binary(table_id) and is_binary(field_id) and is_list(role_ids) do
     with {:ok, operator} <- administrator(scope, "admin.authz.field.manage") do
       FieldRestrictions.put(scope, table_id, field_id, role_ids, operator, registry!())
+    end
+  end
+
+  @doc """
+  Restricts several catalog fields in the scope's tenant for the same
+  `role_ids` in one transaction, each as `put_field_restriction/4` would:
+  one restriction row and one retained `authz.field_restriction.set` audit
+  action per field, and nothing written when any field is not restrictable
+  (`:not_restrictable`), any role is out of scope (`{:unknown_roles, ids}`),
+  `fields` is empty (`:no_fields`) or `role_ids` is empty (`:no_roles`). The caller must be a signed-in user
+  holding `admin.authz.field.manage`.
+  """
+  @spec put_field_restrictions(Scope.t(), [{String.t(), String.t()}], [pos_integer()]) ::
+          {:ok, [FieldRestrictionSummary.t()]}
+          | {:error,
+             :forbidden
+             | :no_fields
+             | :no_roles
+             | :not_restrictable
+             | {:unknown_roles, [term()]}
+             | :audit_unavailable}
+  def put_field_restrictions(%Scope{} = scope, fields, role_ids)
+      when is_list(fields) and is_list(role_ids) do
+    with {:ok, operator} <- administrator(scope, "admin.authz.field.manage") do
+      FieldRestrictions.put_many(scope, fields, role_ids, operator, registry!())
     end
   end
 
@@ -329,23 +356,25 @@ defmodule Bilimbi.Base.Authz do
 
   @doc """
   The catalog fields the scope's actor may not see, per table:
-  `%{table_id => %{field_id => [role names that see it]}}`.
+  `%{table_id => [field_id]}`, each list sorted.
 
-  One query for the tenant's restrictions and, only when there are any, one
-  for the roles the actor holds in the company they signed in at. Nothing is
-  kept between calls, so a revoked role or a removed restriction takes effect
-  on the next check, on any node and inside an open LiveView. No decision-log
-  row is written: nothing was attempted, the read model simply has this shape
-  for this reader. A system scope, named or not, holds no roles and is
-  withheld every restricted field.
+  A field is withheld when the actor holds any role its restriction names;
+  the restriction wins over the other roles they hold, and a grant-all role
+  is no exemption. One query for the tenant's restrictions and, only when
+  there are any, one for the roles the actor holds in the company they
+  signed in at. Nothing is kept between calls, so a revoked role or a
+  removed restriction takes effect on the next check, on any node and inside
+  an open LiveView. No decision-log row is written: nothing was attempted,
+  the read model simply has this shape for this reader. A system scope,
+  named or not, holds no roles, so nothing is restricted for it.
   """
-  @spec restricted_fields(Scope.t()) :: %{String.t() => %{String.t() => [String.t()]}}
+  @spec restricted_fields(Scope.t()) :: %{String.t() => [String.t()]}
   def restricted_fields(%Scope{} = scope), do: FieldRestrictions.restricted(scope, &registry!/0)
 
   @doc "The field ids of `table_id` the scope's actor may not see, sorted."
   @spec restricted_fields(Scope.t(), String.t()) :: [String.t()]
   def restricted_fields(%Scope{} = scope, table_id) when is_binary(table_id) do
-    scope |> restricted_fields() |> Map.get(table_id, %{}) |> Map.keys() |> Enum.sort()
+    scope |> restricted_fields() |> Map.get(table_id, [])
   end
 
   @doc """
@@ -396,7 +425,7 @@ defmodule Bilimbi.Base.Authz do
       %{}
     else
       for table <- field_restriction_catalog(),
-          fields = restricted |> Map.get(table.id, %{}) |> Map.keys() |> Enum.sort(),
+          fields = Map.get(restricted, table.id, []),
           fields != [],
           type <- table.record_types,
           type in types,

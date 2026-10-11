@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.Authz.FieldRestrictionSummary do
   @moduledoc """
   Stable read model of one field access restriction: the catalog table and
-  field it names, with their labels, and the roles that still see the field.
+  field it names, with their labels, and the roles it is restricted for.
   """
 
   @enforce_keys [:id, :table_id, :field_id]

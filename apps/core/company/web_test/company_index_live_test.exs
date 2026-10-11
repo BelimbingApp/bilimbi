@@ -187,7 +187,7 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       assert has_element?(view, "#companies", "Bilimbi Industries")
     end
 
-    test "a restricted jurisdiction reads Restricted, has no column, sort or search for a non-holder",
+    test "a restricted jurisdiction reads Restricted, has no column, sort or search for a holder",
          %{conn: conn} do
       from(c in "companies", where: c.id == 73) |> Repo.update_all(set: [jurisdiction: "MY"])
       grant_capabilities!(["admin.company.list"])
@@ -195,13 +195,15 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       {:ok, scope} = Tenancy.scope(41)
       operator = Tenancy.Authentication.sign_in(scope, 92, 73)
       {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
+      {:ok, _} = Authz.put_field_restriction(operator, "companies", "jurisdiction", [finance.id])
 
+      # Visible by default: the viewer holds no restricted role yet.
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
       assert has_element?(view, "#companies-card th", "Jurisdiction")
       assert has_element?(view, "#companies-sort-jurisdiction")
       assert has_element?(view, "#companies", "MY")
 
-      {:ok, _} = Authz.put_field_restriction(operator, "companies", "jurisdiction", [finance.id])
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
 
       {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
       refute html =~ "MY"
@@ -212,7 +214,8 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       refute has_element?(view, "#companies-search[placeholder*='jurisdiction']")
       assert has_element?(view, "#companies-search[placeholder*='legal name']")
 
-      {:ok, _} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+      {:ok, [restriction]} = Authz.list_field_restrictions(operator)
+      {:ok, :removed} = Authz.remove_field_restriction(operator, restriction.id)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
       assert has_element?(view, "#companies-card th", "Jurisdiction")

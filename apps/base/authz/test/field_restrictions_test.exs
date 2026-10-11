@@ -1,9 +1,10 @@
 defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
   @moduledoc """
-  Field access is the operator's call: a restriction names a catalog field
-  and the roles that still see it, and everyone else in the tenant reads the
-  field as `Restricted`, may not write it, and loses the grid column. The
-  catalog never offers a field a module protected or every reader needs.
+  Field restrictions are the operator's call: every field is visible until a
+  restriction names a catalog field and the roles it is restricted for, and
+  a holder of any of those roles reads the field as `Restricted`, may not
+  write it, and loses the grid column. The catalog never offers a field a
+  module protected or every reader needs.
   """
 
   use Bilimbi.Base.Database.DataCase, async: false
@@ -148,6 +149,9 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
       assert {:error, {:unknown_roles, [999_999]}} =
                Authz.put_field_restriction(operator, "records", "tax_id", [viewer.id, 999_999])
 
+      # A restriction for nobody restricts nothing, so it is not a restriction.
+      assert {:error, :no_roles} = Authz.put_field_restriction(operator, "records", "tax_id", [])
+
       assert {:ok, []} = Authz.list_field_restrictions(operator)
     end
 
@@ -175,8 +179,8 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
 
       {:ok, actions} = Audit.list_actions(operator)
       summaries = Enum.map(actions, & &1.payload["summary"])
-      assert Enum.any?(summaries, &(&1 == "Restricted records.tax_id to Finance"))
-      assert Enum.any?(summaries, &(&1 == "Restricted records.tax_id to Finance, Viewer"))
+      assert Enum.any?(summaries, &(&1 == "Restricted records.tax_id for Finance"))
+      assert Enum.any?(summaries, &(&1 == "Restricted records.tax_id for Finance, Viewer"))
       assert Enum.any?(summaries, &(&1 == "Unrestricted records.tax_id"))
 
       assert Enum.all?(actions, &(&1.actor_type == "user" and &1.actor_id == 7))
@@ -215,6 +219,50 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
                Authz.list_field_restrictions(operator)
     end
 
+    test "several fields restrict together to the same roles, one row and one action each, or not at all",
+         %{operator: operator, scope: scope, finance: finance} do
+      bystander = reader(scope, 8)
+
+      assert {:error, :forbidden} =
+               Authz.put_field_restrictions(bystander, [{"records", "tax_id"}], [finance.id])
+
+      assert {:error, :no_fields} = Authz.put_field_restrictions(operator, [], [finance.id])
+
+      assert {:error, :no_roles} =
+               Authz.put_field_restrictions(operator, [{"records", "tax_id"}], [])
+
+      # One bad pick writes nothing: the batch is all or nothing.
+      assert {:error, :not_restrictable} =
+               Authz.put_field_restrictions(
+                 operator,
+                 [{"records", "tax_id"}, {"records", "code"}],
+                 [finance.id]
+               )
+
+      assert {:error, {:unknown_roles, [999_999]}} =
+               Authz.put_field_restrictions(operator, [{"records", "tax_id"}], [999_999])
+
+      assert {:ok, []} = Authz.list_field_restrictions(operator)
+
+      assert {:ok, [tax_id, email]} =
+               Authz.put_field_restrictions(
+                 operator,
+                 [{"records", "tax_id"}, {"records", "email"}, {"records", "tax_id"}],
+                 [finance.id]
+               )
+
+      assert %FieldRestrictionSummary{field_id: "tax_id", role_names: ["Finance"]} = tax_id
+      assert %FieldRestrictionSummary{field_id: "email", role_names: ["Finance"]} = email
+
+      assert {:ok, [%{field_id: "email"}, %{field_id: "tax_id"}]} =
+               Authz.list_field_restrictions(operator)
+
+      {:ok, actions} = Audit.list_actions(operator)
+      summaries = Enum.map(actions, & &1.payload["summary"])
+      assert "Restricted records.tax_id for Finance" in summaries
+      assert "Restricted records.email for Finance" in summaries
+    end
+
     test "another tenant neither sees nor removes it", %{operator: operator, finance: finance} do
       assert {:ok, restriction} =
                Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])
@@ -231,45 +279,50 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
   end
 
   describe "reading" do
-    test "a holder of an allowed role sees the value; everyone else gets Restricted naming the roles",
-         %{scope: scope, operator: operator, finance: finance} do
+    test "a holder of a restricted role gets Restricted naming the roles; everyone else sees the value",
+         %{scope: scope, operator: operator, finance: finance, viewer: viewer} do
       assert {:ok, _} = Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])
 
+      # Visible by default: a reader holding no restricted role sees the value.
       without = reader(scope, 8)
-      assert Authz.restricted_fields(without) == %{"records" => %{"tax_id" => ["Finance"]}}
-      assert Authz.restricted_fields(without, "records") == ["tax_id"]
-
-      assert %Record{tax_id: %Restricted{} = marker, email: "a@x.test"} =
-               Authz.redact(without, "records", record())
-
-      assert marker == %Restricted{table_id: "records", field_id: "tax_id", roles: ["Finance"]}
-
-      assert [%Record{tax_id: %Restricted{}}, %Record{tax_id: %Restricted{}}] =
-               Authz.redact(without, "records", [record(), record()])
-
-      # Another table is untouched, and so is a record that lacks the field.
-      assert record() == Authz.redact(without, "notes", record())
-      assert %Other{id: 1} == Authz.redact(without, "records", %Other{id: 1})
+      assert Authz.restricted_fields(without) == %{}
+      assert record() == Authz.redact(without, "records", record())
 
       assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
       holder = reader(scope, 8)
-      assert Authz.restricted_fields(holder) == %{}
-      assert record() == Authz.redact(holder, "records", record())
+      assert Authz.restricted_fields(holder) == %{"records" => ["tax_id"]}
+      assert Authz.restricted_fields(holder, "records") == ["tax_id"]
+
+      assert %Record{tax_id: %Restricted{} = marker, email: "a@x.test"} =
+               Authz.redact(holder, "records", record())
+
+      assert marker == %Restricted{table_id: "records", field_id: "tax_id"}
+
+      assert [%Record{tax_id: %Restricted{}}, %Record{tax_id: %Restricted{}}] =
+               Authz.redact(holder, "records", [record(), record()])
+
+      # Another table is untouched, and so is a record that lacks the field.
+      assert record() == Authz.redact(holder, "notes", record())
+      assert %Other{id: 1} == Authz.redact(holder, "records", %Other{id: 1})
+
+      # The restriction wins: an unrestricted role beside it lifts nothing.
+      assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, viewer.id)
+      assert Authz.restricted_fields(reader(scope, 8), "records") == ["tax_id"]
 
       # No decision is logged for either reader: nothing was attempted. (The
       # operator's own capability check is the one row.)
       assert Repo.aggregate(from(log in DecisionLog, where: log.actor_id == 8), :count) == 0
     end
 
-    test "a restriction with no role hides the field from everyone, and a system scope sees nothing restricted",
-         %{scope: scope, operator: operator} do
-      assert {:ok, _} = Authz.put_field_restriction(operator, "records", "email", [])
+    test "a system scope holds no role, so nothing is restricted for it", %{
+      scope: scope,
+      operator: operator,
+      finance: finance
+    } do
+      assert {:ok, _} = Authz.put_field_restriction(operator, "records", "email", [finance.id])
 
-      assert %Record{email: %Restricted{roles: []} = marker} =
-               Authz.redact(operator, "records", record())
-
-      assert marker.roles == []
-      assert Authz.restricted_fields(scope, "records") == ["email"]
+      assert Authz.restricted_fields(scope) == %{}
+      assert record() == Authz.redact(scope, "records", record())
     end
 
     test "removing the restriction or the role is seen on the very next read", %{
@@ -282,10 +335,13 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
 
       assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
       holder = reader(scope, 8)
-      assert Authz.restricted_fields(holder, "records") == []
+      assert Authz.restricted_fields(holder, "records") == ["tax_id"]
 
       %{entries: [assignment]} = Authz.list_principal_role_assignments(operator, :user, 8)
       assert {:ok, :unassigned} = Authz.unassign_role(operator, finance.id, assignment.id)
+      assert Authz.restricted_fields(holder, "records") == []
+
+      assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
       assert Authz.restricted_fields(holder, "records") == ["tax_id"]
 
       assert {:ok, :removed} = Authz.remove_field_restriction(operator, restriction.id)
@@ -298,6 +354,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
       finance: finance
     } do
       assert {:ok, _} = Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])
+      assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
 
       assert Authz.withheld_fields_by_type(reader(scope, 8), [
                "Test.Record",
@@ -316,6 +373,7 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
       finance: finance
     } do
       assert {:ok, _} = Authz.put_field_restriction(operator, "records", "tax_id", [finance.id])
+      assert {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 8, finance.id)
       without = reader(scope, 8)
       types = %{tax_id: :string, email: :string, name: :string}
       data = %{tax_id: "TAX-1", email: "a@x.test", name: "Acme"}
@@ -341,11 +399,10 @@ defmodule Bilimbi.Base.Authz.FieldRestrictionsTest do
 
   describe "the marker" do
     test "carries data only: it is not a string and cannot be interpolated" do
-      marker = %Restricted{table_id: "records", field_id: "tax_id", roles: ["A", "B"]}
+      marker = %Restricted{table_id: "records", field_id: "tax_id"}
 
       assert Restricted.restricted?(marker)
       refute Restricted.restricted?("TAX-1")
-      assert marker.roles == ["A", "B"]
       assert_raise Protocol.UndefinedError, fn -> to_string(marker) end
       assert_raise Protocol.UndefinedError, fn -> Phoenix.HTML.Safe.to_iodata(marker) end
     end

@@ -55,8 +55,8 @@ defmodule Bilimbi.Core.Company do
   (`Bilimbi.Base.Authz.put_field_restriction/4`); everyone else reads it as
   the same marker in every summary this module returns, may not set it on
   create or update, does not search it, and does not see it as a grid column.
-  The create forms use the keys to show those fields as read-only rows and
-  the markers to name the roles that see them. One evaluation answers both.
+  The create forms use the keys to show those fields as read-only rows. One
+  evaluation answers both.
   """
   @spec restricted_field_markers(Scope.t()) :: %{atom() => Restricted.t()}
   def restricted_field_markers(%Scope{} = scope) do

@@ -28,9 +28,9 @@ and keeps the tables whose capability the actor holds. Every later call
 takes that catalog, so there is no spelling of a path that reaches a table
 the account may not read.
 
-An operator may restrict a field of the catalog to roles at runtime
-(Administration › Authorization › Field Access, `Bilimbi.Base.Authz`), and
-the catalog leaves such a field out for an account that holds none of them,
+An operator may restrict a field of the catalog for roles at runtime
+(Administration › Authorization › Field Restrictions, `Bilimbi.Base.Authz`),
+and the catalog leaves such a field out for an account that holds one of them,
 so the column the record page withholds cannot be added, suggested, rolled
 up or kept in a view here either. A table's key, label and time fields,
 hidden fields and the fields a link joins on are never offered for
