@@ -304,7 +304,7 @@ defmodule Bilimbi.Base.Integration do
 
         if bound == :since,
           do: where(query, [e], e.occurred_at >= ^instant),
-          else: where(query, [e], e.occurred_at < ^NaiveDateTime.add(instant, 86400))
+          else: where(query, [e], e.occurred_at < ^NaiveDateTime.add(instant, 86_400))
 
       _ ->
         query
@@ -314,7 +314,7 @@ defmodule Bilimbi.Base.Integration do
   @doc "Globally clears retained previews after the configured TTL; metadata remains for diagnosis."
   def prune_payloads(now \\ NaiveDateTime.utc_now()) do
     days = Settings.get("integration.payload_retention_days")
-    cutoff = NaiveDateTime.add(now, -days * 86400)
+    cutoff = NaiveDateTime.add(now, -days * 86_400)
     # Global machine housekeeping of this module's payloads, independent of
     # manual scoped cleanup. No actor mutation; no extra retained copy in audit.
     {count, _} =

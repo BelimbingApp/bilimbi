@@ -55,23 +55,24 @@ defmodule Bilimbi.Base.Integration.Web.ShowLive do
     do: {:noreply, assign(socket, :confirming_delete, false)}
 
   def handle_event("delete", _, socket) do
-    with {:ok, socket} <-
-           LiveAuthorization.authorize_event(socket, "admin.system.outbound-exchange.delete") do
-      case Integration.delete_exchange(
-             socket.assigns.current_scope.scope,
-             socket.assigns.exchange.id
-           ) do
-        :ok ->
-          {:noreply,
-           socket
-           |> put_flash(:success, "Exchange deleted.")
-           |> push_navigate(to: ~p"/system/api-exchanges")}
+    case LiveAuthorization.authorize_event(socket, "admin.system.outbound-exchange.delete") do
+      {:ok, socket} ->
+        case Integration.delete_exchange(
+               socket.assigns.current_scope.scope,
+               socket.assigns.exchange.id
+             ) do
+          :ok ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "Exchange deleted.")
+             |> push_navigate(to: ~p"/system/api-exchanges")}
 
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Exchange could not be deleted: #{reason}.")}
-      end
-    else
-      {:denied, socket} -> {:noreply, socket}
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Exchange could not be deleted: #{reason}.")}
+        end
+
+      {:denied, socket} ->
+        {:noreply, socket}
     end
   end
 

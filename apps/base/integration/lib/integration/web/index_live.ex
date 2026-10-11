@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.Integration.Web.IndexLive do
   @moduledoc false
   use Bilimbi.Base.UI, :live_view
-  alias Bilimbi.Base.Integration
   alias Bilimbi.Base.Grid.Web.PageColumns
+  alias Bilimbi.Base.Integration
   alias Bilimbi.Base.UI.ListState
 
   @write_guard_opt_out ~w(grid)
