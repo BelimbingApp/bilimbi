@@ -1206,7 +1206,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   defp address_kinds(assigns) do
     ~H"""
     <span :if={@kinds == []} class="text-ink-subtle">—</span>
-    <.badge :for={kind <- @kinds} kind={:neutral}>{String.capitalize(kind)}</.badge>
+    <.badge :for={kind <- @kinds} kind={:neutral} dot={false}>{String.capitalize(kind)}</.badge>
     """
   end
 

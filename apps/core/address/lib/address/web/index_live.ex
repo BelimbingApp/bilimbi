@@ -150,14 +150,12 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             />
           </:title_actions>
           <:actions>
-            <.button
+            <.create_button
               :if={allowed?(@current_scope, "admin.address.create")}
               id="address-create"
+              noun="Address"
               navigate={~p"/addresses/create"}
-              variant="primary"
-            >
-              <.icon name="create" /> Create Address
-            </.button>
+            />
           </:actions>
         </.header>
 

@@ -6,14 +6,12 @@
         User-defined SQL queries rendered as browsable pages
       </:subtitle>
       <:actions>
-        <.button
+        <.create_button
           :if={allowed?(@current_scope, "admin.system.database-table.edit")}
           id="btn-create-query"
+          noun="Query"
           navigate={~p"/admin/system/database-queries/_new"}
-          variant="primary"
-        >
-          <.icon name="create" class="size-4 mr-1.5" /> Create Query
-        </.button>
+        />
       </:actions>
     </.header>
 

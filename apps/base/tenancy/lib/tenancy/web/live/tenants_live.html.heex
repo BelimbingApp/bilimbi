@@ -14,14 +14,12 @@
       </:title_actions>
       <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
       <:actions>
-        <.button
+        <.create_button
           :if={allowed?(@current_scope, "admin.tenancy.tenant.create")}
           id="tenants-add"
-          variant="primary"
+          noun="Tenant"
           phx-click="show_create"
-        >
-          <.icon name="create" class="size-4" /> Add Tenant
-        </.button>
+        />
       </:actions>
     </.header>
 

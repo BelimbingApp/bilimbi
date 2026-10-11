@@ -455,7 +455,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
       page_title: "Department Types",
       subtitle: "Manage standard department categories and organizational functions",
       active_nav: "admin.company.department-type",
-      add_label: "Add Department Type",
+      add_label: "Department Type",
       caption: "Department Types",
       empty: "No department types found.",
       new_title: "New Department Type",
@@ -503,7 +503,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
       page_title: "Legal Entity Types",
       subtitle: "Manage corporate and legal forms recognized in this platform",
       active_nav: "admin.company.legal-entity-type",
-      add_label: "Add Legal Entity Type",
+      add_label: "Legal Entity Type",
       caption: "Legal Entity Types",
       empty: "No legal entity types defined yet.",
       new_title: "New Legal Entity Type",
@@ -559,15 +559,13 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
           <:subtitle>{@spec.subtitle}</:subtitle>
           <:actions>
             <.back_link id={@spec.dom.back} navigate={~p"/companies"} title="Back to companies" />
-            <.button
+            <.create_button
               :if={@can_create?}
               id={@spec.dom.new}
+              noun={@spec.add_label}
               phx-click="new"
-              variant="primary"
               class="text-xs"
-            >
-              {@spec.add_label}
-            </.button>
+            />
           </:actions>
         </.header>
 
@@ -612,7 +610,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
               <span class="font-medium text-ink-strong">{type.name}</span>
             </:col>
             <:col :let={%{record: type}} :if={@spec.category?} id="category">
-              <.badge kind={:neutral}>
+              <.badge kind={:neutral} dot={false}>
                 {String.capitalize(type.category)}
               </.badge>
             </:col>

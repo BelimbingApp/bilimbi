@@ -735,7 +735,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
               <:col :let={%{record: owner}} id="kind">
                 <div class="flex flex-wrap gap-1">
                   <%= if owner.kind != [] do %>
-                    <.badge :for={kind <- owner.kind} kind={:neutral}>
+                    <.badge :for={kind <- owner.kind} kind={:neutral} dot={false}>
                       {String.capitalize(kind)}
                     </.badge>
                   <% else %>

@@ -345,11 +345,35 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders the primary create button of a page header: the plus icon and the
+  record noun, no verb ("+ Company", "+ User"). The accessible name is
+  "New <noun>", so the visible text stays inside it. Use it for every
+  list-page header create action instead of a hand-written
+  `<.button variant="primary">` with its own verb and icon. It accepts the
+  attributes `button/1` does (`navigate`, `phx-click`, `type`, `id`, `class`).
+  """
+  attr(:noun, :string, required: true, doc: "the record type, such as \"Company\"")
+  attr(:rest, :global, include: ~w(href navigate patch type))
+  attr(:class, :any, default: nil)
+
+  def create_button(assigns) do
+    ~H"""
+    <.button variant="primary" class={@class} {@rest}>
+      <.icon name="create" class="size-4" /><span class="sr-only">New </span>{@noun}
+    </.button>
+    """
+  end
+
+  @doc """
   Renders a compact status badge with a state dot, for entity statuses such
   as `"active"` or `"archived"`. Neutral by default; pass `kind` for a
   status color.
+
+  The dot marks a status. A badge that names a type, role, category or kind
+  passes `dot={false}`: it classifies the row, it does not report a state.
   """
   attr(:kind, :atom, values: [:neutral, :success, :warning, :danger], default: :neutral)
+  attr(:dot, :boolean, default: true)
   attr(:class, :any, default: nil)
   slot(:inner_block, required: true)
 
@@ -366,7 +390,7 @@ defmodule Bilimbi.Base.UI.Components do
         @class
       ]}
     >
-      <span class="size-1.5 rounded-full bg-current opacity-70"></span>
+      <span :if={@dot} class="size-1.5 rounded-full bg-current opacity-70"></span>
       {render_slot(@inner_block)}
     </span>
     """
@@ -690,7 +714,8 @@ defmodule Bilimbi.Base.UI.Components do
       assigns.context == :inline && "size-6 rounded-sm",
       assigns.context == :table && "size-7 rounded-md",
       assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
-      assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+      assigns.kind == :danger &&
+        "text-ink-muted hover:bg-danger-surface hover:text-danger focus-visible:bg-danger-surface focus-visible:text-danger",
       if(assigns.busy,
         do: "cursor-progress bg-surface-sunken ring-1 ring-line",
         else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"

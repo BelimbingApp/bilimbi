@@ -115,7 +115,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
     assert table =~ "size-7 rounded-md"
     assert table =~ "size-4"
-    assert table =~ "text-danger hover:bg-danger-surface"
+    assert table =~ "hover:bg-danger-surface hover:text-danger"
   end
 
   test "a busy button says so to assistive technology and refuses a second activation" do

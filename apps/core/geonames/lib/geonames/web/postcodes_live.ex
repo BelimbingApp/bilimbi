@@ -244,15 +244,13 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             />
           </:title_actions>
           <:actions>
-            <.button
+            <.create_button
               :if={@can_update?}
               id="postcodes-new"
               type="button"
-              variant="primary"
+              noun="Postcode"
               phx-click="new-postcode"
-            >
-              <.icon name="create" class="size-4" /> New Postcode
-            </.button>
+            />
           </:actions>
         </.header>
 

@@ -15,7 +15,7 @@
 @source "../../../../apps/extensions";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their icon rendering. */
-@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,lock-closed,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-circle,user-group,users}");
+@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,lock-closed,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-group,users}");
 
 @plugin "../vendor/heroicons";
 

@@ -532,7 +532,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert {:ok, _} = Employee.get_employee(scope, 73, employee.id)
   end
 
-  test "the list's Edit action opens the employee's read-first record page", %{
+  test "the list has no row edit action; the name opens the record page", %{
     conn: conn,
     employee: employee
   } do
@@ -540,29 +540,16 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
-    # The action keeps its capability gate and its glyph; it leads to the
-    # record page, where every fact edits in place, not to a separate form.
-    assert has_element?(view, "a#employee-#{employee.id}-edit[href='/employees/#{employee.id}']")
+    refute has_element?(view, "#employee-#{employee.id}-edit")
     refute has_element?(view, "a[href$='/edit']")
 
     {:ok, show, _html} =
       view
-      |> element("#employee-#{employee.id}-edit")
+      |> element("a[href='/employees/#{employee.id}']", employee.full_name)
       |> render_click()
       |> follow_redirect(conn |> log_in_as(), ~p"/employees/#{employee.id}")
 
     assert has_element?(show, "#employee-full-name[phx-hook='InlineEdit']")
-  end
-
-  test "hides the Edit action from an actor who may not update employees", %{
-    conn: conn,
-    employee: employee
-  } do
-    grant_capabilities!(["admin.employee.list", "admin.employee.view"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
-
-    refute has_element?(view, "#employee-#{employee.id}-edit")
   end
 
   test "renders show page header with the pin and no edit button", %{
