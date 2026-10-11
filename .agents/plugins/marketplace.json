@@ -1,0 +1,12 @@
+{
+  "name": "bilimbi-local",
+  "interface": {"displayName": "Bilimbi"},
+  "plugins": [
+    {
+      "name": "bilimbi",
+      "source": {"source": "local", "path": "./plugins/codex/bilimbi"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,6 +1,21 @@
 version: 2
 
 updates:
+  - package-ecosystem: gomod
+    directory: /clients/bilimbi-cli
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:15"
+      timezone: Asia/Kuala_Lumpur
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      native-client:
+        patterns:
+          - "*"
+
   - package-ecosystem: mix
     directory: /
     schedule:
