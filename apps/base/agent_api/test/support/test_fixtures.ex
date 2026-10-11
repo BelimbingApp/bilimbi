@@ -14,8 +14,8 @@ defmodule Bilimbi.Base.AgentApi.TestFixtures do
 
   @doc "Creates the plan storage from its owner's contract, for host and lock tests."
   def create_plan_tables!(opts \\ []) do
-    alias Bilimbi.Base.Database.TestTables
     alias Bilimbi.Base.AgentApi.SchemaContract
+    alias Bilimbi.Base.Database.TestTables
     alias Bilimbi.Base.Repo
     alias Ecto.Adapters.SQL
     persistent = TestTables.persistent?(opts)

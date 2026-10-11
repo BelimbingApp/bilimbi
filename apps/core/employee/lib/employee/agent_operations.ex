@@ -86,7 +86,7 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
           "short_name" => text,
           "designation" => text,
           "employee_type" => text,
-          "job_description" => %{"type" => "string", "maxLength" => 10000},
+          "job_description" => %{"type" => "string", "maxLength" => 10_000},
           "email" => text,
           "mobile_number" => text,
           "status" => %{

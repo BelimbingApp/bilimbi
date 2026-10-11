@@ -1,9 +1,9 @@
 defmodule Bilimbi.Base.Authz.AgentPolicy do
   @moduledoc false
   alias Bilimbi.Base.Authz.CapabilityKey
-  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.Tenancy.Scope
   @read_verbs ~w(view list search)
   @access_control_prefixes ~w(admin.authz. admin.agent-connection. base.settings.)
   @access_control_keys ~w(admin.user.impersonate)
