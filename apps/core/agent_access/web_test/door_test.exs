@@ -239,15 +239,21 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
 
     {:ok, [connection]} = AgentAccess.list_connections(scope)
     assert map_size(connection.seen_agent_ids) == 20
+    assert Map.has_key?(connection.seen_agent_ids, "codex/model-25")
+    refute Map.has_key?(connection.seen_agent_ids, "codex/model-1")
+
+    {:ok, tenant} = Tenancy.scope(41)
+    agent = %{type: :agent, connection_id: claims.id, agent_id: "codex/model-25"}
+    assert :ok = AgentAccess.observe(Authentication.sign_in(tenant, 91, 73, agent: agent))
+    assert {:ok, [^connection]} = AgentAccess.list_connections(scope)
   end
 
   test "trailing slashes are logged like the exact path", %{conn: conn} do
     conn |> post("/oauth/token/", %{}) |> response(400)
     conn |> recycle() |> get("/.well-known/bilimbi/") |> response(200)
 
-    assert Repo.all(
-             from(e in Bilimbi.Base.Integration.Exchange, select: e.endpoint, order_by: e.id)
-           ) == ["/oauth/token", "/.well-known/bilimbi"]
+    assert Enum.sort(Repo.all(from(e in Bilimbi.Base.Integration.Exchange, select: e.endpoint))) ==
+             ["/.well-known/bilimbi", "/oauth/token"]
   end
 
   test "refresh rotates and replay revokes all tokens", %{scope: scope} do

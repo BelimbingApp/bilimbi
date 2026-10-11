@@ -247,12 +247,12 @@ defmodule Bilimbi.Core.AgentAccess do
 
       with :ok <- live_grant(connection) do
         unless known?(connection, label) do
-          seen =
+          newest =
             connection.seen_agent_ids
-            |> Map.put(label, DateTime.to_iso8601(now()))
-            |> Enum.sort_by(fn {_, at} -> at end, :desc)
-            |> Enum.take(@seen_limit)
-            |> Map.new()
+            |> Enum.sort_by(fn {name, at} -> {at, name} end, :desc)
+            |> Enum.take(@seen_limit - 1)
+
+          seen = Map.new([{label, DateTime.to_iso8601(DateTime.utc_now())} | newest])
 
           {:ok, _} = Repo.update(Ecto.Changeset.change(connection, seen_agent_ids: seen))
         end
