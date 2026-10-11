@@ -9,6 +9,9 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionProvider do
   Every consumer follows the same eager, provenance-carrying,
   validator-owned snapshot lifecycle.
 
+  Base Media adds `:media` for descriptor-owned attachment subject authorizers;
+  `Bilimbi.Base.Media.ContributionValidator` owns its payload contract.
+
   Providers run once when the deployment contribution snapshot is built. They
   return consumer-owned plain terms and must not perform I/O or depend on
   request, tenant, or process-local state.
@@ -26,6 +29,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionProvider do
           | :workflow
           | :grid
           | :agent_api
+          | :media
 
   @callback contributions() :: %{optional(consumer()) => term()}
 end

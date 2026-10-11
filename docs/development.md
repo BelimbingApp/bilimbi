@@ -160,6 +160,7 @@ apps/
 │   ├── datetime/                 # Time display and clocks
 │   ├── grid/                     # Field-and-link catalog and flexible columns on list pages
 │   ├── locale/                   # Locale and localization
+│   ├── media/                    # Uploaded assets and private subject attachments
 │   ├── menu/                     # Navigation from module contributions
 │   ├── module_registry/          # Descriptor discovery and installed-module registry
 │   ├── perf/                     # Performance health

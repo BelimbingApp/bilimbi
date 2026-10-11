@@ -1,0 +1,2 @@
+Code.require_file(Path.expand("../../../web/test/test_helper.exs", __DIR__))
+Code.ensure_loaded!(Bilimbi.Base.Media.TestFixtures)

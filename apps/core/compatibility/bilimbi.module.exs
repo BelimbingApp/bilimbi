@@ -11,6 +11,7 @@
     "base/database",
     "base/datetime",
     "base/locale",
+    "base/media",
     "base/menu",
     "base/perf",
     "base/queue",

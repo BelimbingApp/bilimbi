@@ -24,7 +24,7 @@ RUN test -n "$RELEASE_VERSION" && \
 
 FROM ubuntu:26.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3t64 libncurses6 libstdc++6 && \
+    ca-certificates libssl3t64 libncurses6 libstdc++6 file && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --gid 10001 bilimbi && \
     useradd --uid 10001 --gid bilimbi --home /var/lib/bilimbi --shell /usr/sbin/nologin bilimbi && \
