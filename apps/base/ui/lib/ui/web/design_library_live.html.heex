@@ -2333,53 +2333,62 @@
                   Search, selects, multi-select, and compact period filter
                 </h3>
                 <div class="flex flex-wrap items-start gap-3">
-                <.filter_toolbar
-                  id="design-library-filter-full"
-                  class="mb-0 min-w-0 flex-1"
-                  form={@filter_toolbar_full_form}
-                  event="filter-toolbar-preview"
-                >
-                  <:control
-                    type={:search}
-                    field={@filter_toolbar_full_form[:search]}
-                    id="design-library-filter-full-search"
-                    label="Search example companies"
-                    placeholder="Search example companies…"
+                  <.filter_toolbar
+                    id="design-library-filter-full"
+                    class="mb-0 min-w-0 flex-1"
+                    form={@filter_toolbar_full_form}
+                    event="filter-toolbar-preview"
+                  >
+                    <:control
+                      type={:search}
+                      field={@filter_toolbar_full_form[:search]}
+                      id="design-library-filter-full-search"
+                      label="Search example companies"
+                      placeholder="Search example companies…"
+                    />
+                    <:control
+                      type={:select}
+                      field={@filter_toolbar_full_form[:status]}
+                      id="design-library-filter-full-status"
+                      label="Status filter"
+                      options={[
+                        {"All statuses", ""},
+                        {"Active", "active"},
+                        {"Pending", "pending"}
+                      ]}
+                    />
+                    <:control
+                      type={:select}
+                      field={@filter_toolbar_full_form[:kind]}
+                      id="design-library-filter-full-kind"
+                      label="Kind filter"
+                      options={[
+                        {"All kinds", ""},
+                        {"Standard", "standard"},
+                        {"Advanced", "advanced"}
+                      ]}
+                    />
+                    <:control
+                      type={:multi_select}
+                      field={@filter_toolbar_full_form[:roles]}
+                      id="design-library-filter-full-roles"
+                      label="Role filter"
+                      placeholder="All roles"
+                      selection_label=":count role selected|:count roles selected"
+                      options={[
+                        {"Administrator", "admin"},
+                        {"Operator", "operator"},
+                        {"Reviewer", "reviewer"}
+                      ]}
+                    />
+                  </.filter_toolbar>
+                  <.period_filter
+                    id="design-library-filter-period"
+                    state={@period}
+                    clock={@period_clock}
+                    current_scope={@current_scope}
+                    path={fn params -> ~p"/system/design-library/components?#{params}" end}
                   />
-                  <:control
-                    type={:select}
-                    field={@filter_toolbar_full_form[:status]}
-                    id="design-library-filter-full-status"
-                    label="Status filter"
-                    options={[{"All statuses", ""}, {"Active", "active"}, {"Pending", "pending"}]}
-                  />
-                  <:control
-                    type={:select}
-                    field={@filter_toolbar_full_form[:kind]}
-                    id="design-library-filter-full-kind"
-                    label="Kind filter"
-                    options={[
-                      {"All kinds", ""},
-                      {"Standard", "standard"},
-                      {"Advanced", "advanced"}
-                    ]}
-                  />
-                  <:control
-                    type={:multi_select}
-                    field={@filter_toolbar_full_form[:roles]}
-                    id="design-library-filter-full-roles"
-                    label="Role filter"
-                    placeholder="All roles"
-                    selection_label=":count role selected|:count roles selected"
-                    options={[
-                      {"Administrator", "admin"},
-                      {"Operator", "operator"},
-                      {"Reviewer", "reviewer"}
-                    ]}
-                  />
-                </.filter_toolbar>
-                <.period_filter id="design-library-filter-period" state={@period} clock={@period_clock} current_scope={@current_scope}
-                  path={fn params -> ~p"/system/design-library/components?#{params}" end} />
                 </div>
               </div>
               <div id="filter-toolbar-search-only" class="border-t border-line pt-4">

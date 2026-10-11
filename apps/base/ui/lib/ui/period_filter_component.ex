@@ -120,7 +120,7 @@ defmodule Bilimbi.Base.UI.PeriodFilterComponent do
             <.input field={@draft[:to]} id={"#{@id}-draft-to"} type="date" label="To" required />
           </div>
           <div class="flex justify-end gap-2">
-            <.button id={"#{@id}-cancel"}  phx-click="cancel" phx-target={@myself}>Cancel</.button>
+            <.button id={"#{@id}-cancel"} phx-click="cancel" phx-target={@myself}>Cancel</.button>
             <.button id={"#{@id}-apply"} type="submit">Apply range</.button>
           </div>
         </.form>

@@ -171,7 +171,11 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
             Incoming
           </:tab>
         </.tabs>
-        <div id="exchange-filter-region" phx-hook="BrowserTimeZone" class="mb-2 flex flex-wrap items-start gap-3">
+        <div
+          id="exchange-filter-region"
+          phx-hook="BrowserTimeZone"
+          class="mb-2 flex flex-wrap items-start gap-3"
+        >
           <.filter_toolbar
             id="exchange-filters"
             form={@filters_form}
