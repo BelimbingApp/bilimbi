@@ -146,6 +146,13 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
 
     {:ok,
      socket
+     |> assign(:browser_timezone, nil)
+     |> assign(:period_params, %{})
+     |> assign(
+       :period_clock,
+       Bilimbi.Base.UI.PeriodFilter.clock(socket.assigns.current_scope.shell_preferences, nil)
+     )
+     |> assign(:period, Bilimbi.Base.UI.PeriodFilter.parse(%{}))
      |> assign(:page_title, "#{area_title} · Design Library")
      |> assign(:area, area)
      |> assign(:area_title, area_title)
@@ -155,6 +162,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:nav_example, @nav_example)
      |> assign(:nav_example_active, @nav_example_active)
      |> assign(:sample_form, to_form(sample_data, as: :sample))
+     |> assign(:sample_input_datetime, input_datetime(sample_data["datetime_field"]))
      |> assign(:pattern_form, to_form(%{"search" => ""}, as: :pattern))
      |> assign(
        :error_form,
@@ -188,9 +196,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
            "search" => "",
            "status" => "",
            "kind" => "",
-           "roles" => [],
-           "start_date" => "",
-           "end_date" => ""
+           "roles" => []
          },
          as: :toolbar_full
        )
@@ -202,6 +208,30 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    clock =
+      Bilimbi.Base.UI.PeriodFilter.clock(
+        socket.assigns.current_scope.shell_preferences,
+        socket.assigns.browser_timezone
+      )
+
+    {:noreply,
+     assign(socket,
+       period_params: params,
+       period_clock: clock,
+       period: Bilimbi.Base.UI.PeriodFilter.parse(params, clock.today)
+     )}
+  end
+
+  @impl true
+  def handle_event("browser_timezone", %{"timezone" => timezone}, socket),
+    do:
+      handle_params(
+        socket.assigns.period_params,
+        nil,
+        assign(socket, :browser_timezone, timezone)
+      )
+
   # The flexible-table specimen: every op changes the sample's state and
   # re-prepares its rows.
   def handle_event("sample-flex", params, socket) do
@@ -245,7 +275,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
 
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
-    {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+    {:noreply,
+     assign(socket,
+       sample_form: to_form(sample_data, as: :sample),
+       sample_input_datetime: input_datetime(sample_data["datetime_field"])
+     )}
   end
 
   # A chip's remove button names the input and the value; the owner of the
@@ -547,4 +581,18 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "admin.system.design-library.design-spec"
     }
   end
+
+  # The datetime-local input emits no seconds when they are zero. Treat the
+  # specimen's value like the UTC naive timestamps stored by real modules;
+  # display it through datetime/1 so the top-bar clock still applies.
+  defp input_datetime(value) when is_binary(value) do
+    value = if byte_size(value) == 16, do: value <> ":00", else: value
+
+    case NaiveDateTime.from_iso8601(value) do
+      {:ok, datetime} -> datetime
+      _ -> nil
+    end
+  end
+
+  defp input_datetime(_), do: nil
 end

@@ -6,7 +6,8 @@ own authentication and call the inbound recorder after dispatch. Business writes
 continue to use the ordinary mutation audit independently of exchange logging.
 
 Administration → API Exchanges lists incoming and outgoing exchanges, with
-host/path/operation, HTTP status, outcome, person/agent and inclusive UTC date filters, URL
+one search across host/path/operation, HTTP status and person/agent IDs, an outcome select,
+and the canonical compact period filter (inclusive calendar days in the top-bar clock mode), URL
 pagination and the shared flexible table. Each exchange opens a read-only detail
 page. Bodies and headers are absent by default; payload inspection is explicit.
 
@@ -56,6 +57,10 @@ inspect/delete only their own rows. The platform-operator scope may inspect
 all rows, including anonymous system traffic and null-owned legacy exchanges;
 operator status does not bypass capabilities. The list and detail API return
 metadata maps and never expose the persistence schema or retained payloads.
+`list_page/2` searches host, path, operation, HTTP status and person/agent IDs
+with one `search` value. Its `since` and `until` accept UTC `DateTime` bounds
+(`until` is exclusive). The web adapter resolves calendar days in the selected display zone
+before calling this API.
 
 ## Privacy and retention
 

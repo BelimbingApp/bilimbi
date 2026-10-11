@@ -702,7 +702,7 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       >
         <span class="absolute inset-y-0 left-0" data-bar={Bilimbi.Base.UI.FlexTable.bar_width(@cell)}></span>
       </span>
-      <span class="truncate">{@cell.text}</span>
+      <.flex_table_text id={@id} cell={@cell} />
     </span>
     """
   end
@@ -723,25 +723,38 @@ defmodule Bilimbi.Base.UI.Components.FlexTable do
       >
         <polyline points={@points} fill="none" stroke="currentColor" stroke-width="1.5" />
       </svg>
-      <span class="truncate">{@cell.text}</span>
+      <.flex_table_text id={@id} cell={@cell} />
     </span>
     """
   end
 
-  defp flex_table_value(%{column: %{type: type}, cell: %{value: %NaiveDateTime{}}} = assigns)
-       when type == :datetime do
+  defp flex_table_value(assigns) do
+    ~H"""
+    <.flex_table_text id={@id} cell={@cell} />
+    """
+  end
+
+  attr(:id, :string, required: true)
+  attr(:cell, :map, required: true)
+
+  # A lens changes the visual encoding, never the timestamp's display clock.
+  # Keep typed instants through every lens (DateTime and NaiveDateTime alike),
+  # and route their text through the same component ordinary table slots use.
+  defp flex_table_text(%{cell: %{value: value}} = assigns)
+       when is_struct(value, DateTime) or is_struct(value, NaiveDateTime) or
+              is_struct(value, Date) do
     ~H"""
     <.datetime id={@id} value={@cell.value} />
     """
   end
 
-  defp flex_table_value(%{cell: %{text: ""}} = assigns) do
+  defp flex_table_text(%{cell: %{text: ""}} = assigns) do
     ~H"""
     <span class="text-ink-faint">—</span>
     """
   end
 
-  defp flex_table_value(assigns) do
+  defp flex_table_text(assigns) do
     ~H"""
     <span class="truncate">{@cell.text}</span>
     """

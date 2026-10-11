@@ -156,7 +156,7 @@ defmodule Bilimbi.Base.IntegrationTest do
              )
 
     assert {:ok, %{entries: []}} =
-             Integration.list_page(scope, direction: "incoming", since: "2999-01-01")
+             Integration.list_page(scope, direction: "incoming", since: ~U[2999-01-01 00:00:00Z])
 
     assert {:ok, %{entries: []}} =
              Integration.list_page(scope, direction: "incoming", http_status: "200")
