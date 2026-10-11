@@ -136,7 +136,6 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
     |> assign(:tenants_count, length(rows))
     |> assign(:parent_options, parent_options(identities))
     |> assign(:columns, ListColumns.load(socket.assigns.columns, rows, & &1.id))
-    |> stream(:tenants, rows, reset: true)
   end
 
   defp present_tenants(identities, sort_by, sort_dir) do

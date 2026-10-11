@@ -57,8 +57,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
      socket
      |> assign(:columns, ListColumns.mount("countries-table", @builtins))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
-     |> assign(:updating_countries?, false)
-     |> stream_configure(:countries, dom_id: &"country-#{&1.id}")}
+     |> assign(:updating_countries?, false)}
   end
 
   @impl true
@@ -329,7 +328,6 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> assign(:columns, ListColumns.load(socket.assigns.columns, countries_page.entries, & &1.id))
-    |> stream(:countries, countries_page.entries, reset: true)
   end
 
   defp countries_path(state) do

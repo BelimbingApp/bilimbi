@@ -241,7 +241,6 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
         |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
         |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
         |> assign(:user_names, user_names(socket, page.entries))
-        |> stream(:sessions, page.entries, reset: true)
     end
   end
 

@@ -125,7 +125,6 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
       |> assign(:page, page)
       |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
       |> assign(:filters_form, ListState.filters_form(state))
-      |> stream(:roles, page.entries, reset: true)
     end
   end
 

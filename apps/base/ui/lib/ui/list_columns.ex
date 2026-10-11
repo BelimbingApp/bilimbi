@@ -67,7 +67,7 @@ defmodule Bilimbi.Base.UI.ListColumns do
   @doc "Applies a flexible-table operation to built-in columns or row height."
   @spec handle(t(), map()) :: outcome()
   def handle(%__MODULE__{} = state, %{"op" => "sort", "sort" => spec}) do
-    case Enum.find(state.builtins, &(to_string(Map.get(&1, :sort)) == spec)) do
+    case Enum.find(state.builtins, &(&1.id == spec)) do
       %{sort: sort} when not is_nil(sort) -> {:sort, to_string(sort)}
       _other -> :noop
     end

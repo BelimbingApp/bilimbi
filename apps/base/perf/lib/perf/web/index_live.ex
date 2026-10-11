@@ -43,8 +43,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
      |> assign(:filters, default_filters())
      |> assign(:filters_form, filters_form(default_filters()))
      |> assign(:samples_page, empty_page())
-     |> assign(:total, 0)
-     |> stream(:samples, [])}
+     |> assign(:total, 0)}
   end
 
   @impl true
@@ -80,8 +79,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
              |> assign(
                :sample_columns,
                ListColumns.load(socket.assigns.sample_columns, page.entries, & &1.id)
-             )
-             |> stream(:samples, page.entries, reset: true)}
+             )}
         end
 
       {:error, _reason} ->
@@ -92,8 +90,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
          |> assign(:samples_page, empty_page())
          |> assign(:total, 0)
          |> assign(:sample_columns, ListColumns.load(socket.assigns.sample_columns, [], & &1.id))
-         |> put_flash(:error, "Performance history is unavailable.")
-         |> stream(:samples, [], reset: true)}
+         |> put_flash(:error, "Performance history is unavailable.")}
     end
   end
 

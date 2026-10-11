@@ -44,8 +44,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     {:ok,
      socket
      |> assign(:pending_delete, nil)
-     |> assign(:columns, ListColumns.mount("addresses-table", @builtins))
-     |> stream_configure(:addresses, dom_id: &"address-#{&1.id}")}
+     |> assign(:columns, ListColumns.mount("addresses-table", @builtins))}
   end
 
   @impl true
@@ -286,7 +285,6 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
-    |> stream(:addresses, page.entries, reset: true)
   end
 
   defp address_page(socket, state) do

@@ -68,8 +68,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
      |> assign(:editing_postcode_id, nil)
      |> assign(:editing_revision, nil)
      |> assign(:postcode_form, nil)
-     |> assign(:admin1_options, [])
-     |> stream_configure(:postcodes, dom_id: &"postcode-#{&1.id}")}
+     |> assign(:admin1_options, [])}
   end
 
   @impl true
@@ -482,7 +481,6 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     |> assign(:index_state, state)
     |> assign(:summary_state, summary)
     |> assign(:columns, ListColumns.load(socket.assigns.columns, postcodes_page.entries, & &1.id))
-    |> stream(:postcodes, postcodes_page.entries, reset: true)
   end
 
   defp save_postcode(socket, params) do
@@ -548,7 +546,6 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
        |> assign(:postcode_rows, Map.put(socket.assigns.postcode_rows, postcode.id, postcode))
        |> assign(:postcodes_page, %{page | entries: entries})
        |> assign(:columns, ListColumns.load(socket.assigns.columns, entries, & &1.id))
-       |> stream_insert(:postcodes, postcode)
        |> put_flash(:success, "Postcode #{postcode.postcode} updated.")}
     else
       {:error, %Ecto.Changeset{}} ->

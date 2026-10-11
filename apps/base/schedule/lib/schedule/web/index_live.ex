@@ -119,10 +119,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:page_sizes, @page_sizes)
       |> assign(:task_columns, ListColumns.mount("schedule-tasks", @task_columns))
       |> assign(:run_columns, ListColumns.mount("schedule-runs", @run_columns))
-      |> stream_configure(:tasks, dom_id: &task_dom_id/1)
-      |> stream_configure(:runs, dom_id: &run_dom_id/1)
-      |> stream(:tasks, [])
-      |> stream(:runs, [])
 
     socket = assign(socket, :run_zone, display_timezone(socket))
 
@@ -449,14 +445,12 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         |> assign(:task_state, :available)
         |> assign(:task_count, length(tasks))
         |> assign(:task_columns, ListColumns.load(socket.assigns.task_columns, tasks, & &1.key))
-        |> stream(:tasks, tasks, reset: true)
 
       {:error, _reason} ->
         socket
         |> assign(:task_state, :unavailable)
         |> assign(:task_count, 0)
         |> assign(:task_columns, ListColumns.load(socket.assigns.task_columns, [], & &1.key))
-        |> stream(:tasks, [], reset: true)
     end
   end
 
@@ -489,7 +483,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
           :run_columns,
           ListColumns.load(socket.assigns.run_columns, page.entries, & &1.id)
         )
-        |> stream(:runs, page.entries, reset: true)
 
       {:error, reason} ->
         socket
@@ -499,7 +492,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         )
         |> assign(:run_page, empty_run_page(state.page_size))
         |> assign(:run_columns, ListColumns.load(socket.assigns.run_columns, [], & &1.id))
-        |> stream(:runs, [], reset: true)
     end
   end
 
@@ -668,8 +660,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     %RunPage{entries: [], page: 1, page_size: page_size, total_entries: 0, total_pages: 0}
   end
 
-  defp task_dom_id(task), do: "schedule-task-#{dom_key(task.key)}"
-  defp run_dom_id(run), do: "schedule-run-#{run.id}"
   defp dom_key(key), do: String.replace(key, ~r/[^a-zA-Z0-9_-]/, "-")
 
   defp error_message(:forbidden), do: LiveAuthorization.denied_message()

@@ -45,8 +45,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     {:ok,
      socket
      |> assign(:columns, ListColumns.mount("admin1-table", @builtins))
-     |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
-     |> stream_configure(:admin1, dom_id: &"admin1-#{&1.id}")}
+     |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))}
   end
 
   @impl true
@@ -246,7 +245,6 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     |> assign(:filters_form, ListState.filters_form(state))
     |> assign(:index_state, state)
     |> assign(:columns, ListColumns.load(socket.assigns.columns, admin1_page.entries, & &1.id))
-    |> stream(:admin1, admin1_page.entries, reset: true)
   end
 
   # The form field stays `countryIso`. The URL key stays `filterCountryIso`.

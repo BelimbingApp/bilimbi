@@ -407,7 +407,6 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
     socket
     |> assign(:types_count, length(types))
     |> assign(:columns, ListColumns.load(socket.assigns.columns, types, & &1.id))
-    |> stream(:types, types, reset: true)
   end
 
   defp replace_type(types, updated_type) do

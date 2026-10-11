@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   @valid_address_kinds ~w(headquarters billing shipping branch other)
   @builtins [
     %{id: "label", label: "Label", type: :string, sort: "label"},
-    %{id: "address", label: "Address", type: :string, sort: "line1"},
+    %{id: "line1", label: "Address", type: :string, sort: "line1"},
     %{id: "kind", label: "Kind", type: :string, sort: "kind"},
     %{id: "is_primary", label: "Primary", type: :boolean, sort: "is_primary"},
     %{id: "priority", label: "Priority", type: :integer, sort: "priority", align: :right},
@@ -393,7 +393,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
      socket
      |> assign(:addresses_sort_by, sort_col)
      |> assign(:addresses_sort_dir, new_dir)
-     |> assign(:sorted_addresses, sorted)}
+     |> assign(:columns, ListColumns.load(socket.assigns.columns, sorted, & &1.id))}
   end
 
   def handle_event("addresses_grid", params, socket) do
@@ -575,7 +575,6 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
     socket
     |> assign(:attached_addresses, attached)
     |> assign(:available_addresses, available)
-    |> assign(:sorted_addresses, sorted)
     |> assign(:columns, ListColumns.load(columns, sorted, & &1.id))
   end
 
@@ -702,7 +701,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
             </.link>
           </:col>
 
-          <:col :let={%{record: addr}} id="address">
+          <:col :let={%{record: addr}} id="line1">
             <span class="text-ink-subtle">{format_address_summary(addr)}</span>
           </:col>
 
@@ -836,7 +835,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
           </:action>
 
           <:empty
-            :if={@sorted_addresses == []}
+            :if={@columns.rows == []}
             title="No addresses linked."
             reason={if @can_manage?, do: @owner.empty_manage, else: @owner.empty_read}
           />
