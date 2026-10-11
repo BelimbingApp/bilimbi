@@ -4,6 +4,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Geonames
@@ -682,7 +683,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
   describe "country update outcome messages" do
     # `handle_async/3` reloads the page after flashing, so the socket needs the
-    # index state that a mounted view would carry. Streams are configured too,
+    # index state, columns and streams that a mounted view would carry;
     # otherwise the reload raises before the flash can be read.
     defp update_socket do
       %Phoenix.LiveView.Socket{
@@ -692,6 +693,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
           __changed__: %{},
           flash: %{},
           updating_countries?: true,
+          columns: ListColumns.mount("countries-table", [%{id: "iso", label: "ISO"}]),
           index_state:
             Bilimbi.Core.Geonames.Web.CamelList.parse(
               %{
