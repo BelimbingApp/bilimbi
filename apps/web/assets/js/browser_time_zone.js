@@ -5,7 +5,9 @@
 // is shown on. A screen whose date filters bound displayed days mounts this
 // on the region that holds them and receives one `browser_timezone` event;
 // the server proves the name against its own time zone database and keeps
-// bounding UTC, the text it rendered itself, when it cannot honor it.
+// bounding UTC, the text it rendered itself, when it cannot honor it. The
+// hook reports again when the top-bar clock mode (`data-display-mode` on
+// `#app-shell`) changes, so the screen recomputes its days without a reload.
 //
 // The zone is the same expression `date_time.js` formats with, so the day a
 // row displays on and the day the server bounds are read from one source.
