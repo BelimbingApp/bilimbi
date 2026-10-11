@@ -72,7 +72,7 @@ bilimbi logout office
 actual `harness/model-ver-effort`, not the example when a different model runs.
 `call` reads one JSON object from stdin by default (`--input -`). It describes
 the operation first and refuses every kind except `read`. This release has no
-write, preview, dry-run or plan-code command.
+direct write call. Supported writes use `plan`, review, `commit` and report.
 
 Discovery verifies API version 1, the public `bilimbi-native` client and both
 OAuth grants. Endpoints must stay on the supplied origin; redirects are
@@ -101,6 +101,30 @@ the connection on the server; use Bilimbi's **Connected agents** page for that.
 The operating system releases the profile lock if a command is killed, so a
 crash never leaves it behind. Do not run simultaneous sign-ins to the same
 server.
+
+## Safe write loop
+
+Create an input file containing `{"operations":[{"key":"core.company.create",
+"input":{"name":"Example"}}]}` after discovering the operation and searching
+for duplicates. Run `bilimbi plan --input operations.json > plan.json`, then
+`bilimbi review --input plan.json --session review-session.json` and wait for
+its submission. The page shows the server's validated changes, defaults and
+expiry. Those evidence cells are read-only; changes belong in the comments,
+followed by a new plan and review. Ordinary local presentation documents retain
+editable cells. No business write happens until commit.
+
+After the person's go, `bilimbi commit --plan <code> > report.json` sends the
+exact saved operations to the same server. Plans are private files below the
+OS configuration directory's `bilimbi/plans`, bound to their server origin;
+credentials remain separate. Commit requires a locally available code and the
+matching active server. There is no automatic write retry. Expired or changed
+plans require a fresh dry run and go. If a commit response is lost, search or
+read the records to establish what happened before making another plan.
+
+`bilimbi report --input report.json --session review-session.json` shows the
+committed records and server-supplied verification links in the same tab.
+Company managers can turn writes off on the company page. Permissions, field
+restrictions and company workflows are checked again on commit.
 
 ## Local review and report contract
 

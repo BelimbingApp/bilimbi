@@ -222,3 +222,19 @@ passing that identity. `relationship_id` must belong to the granting company.
 
 `ExternalAccessSummary.valid?/1,2` matches Belimbing `isValid()`: active, not
 pending, and not expired.
+
+## Agent writes
+
+`core.company.create` is a supported agent write: `preview_create_company/2`
+shares create's defaults, validation and restricted-field refusal, and checks
+current global code uniqueness without reserving it. It returns a prospective
+read model; commit still calls `create_company/3`. The agent dispatcher checks
+`admin.company.create` on both requests. A preview is not a permission to bypass
+company workflows or to write through `call/3`.
+
+`agent_writes_enabled?/2` reads the live company's switch;
+`set_agent_writes_enabled/3` authorizes the target under `admin.company.update`
+and refuses an archived company before writing the setting. The company's
+Agent access fact exposes this switch, on by default. Turning it off stops
+agents signed in there and employee writes targeting it, including plans
+already reviewed. It does not change a person's ordinary screen permissions.

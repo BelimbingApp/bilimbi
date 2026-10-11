@@ -5,9 +5,10 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
 
   Their declarations live in `Bilimbi.Core.Employee.Contributions`, and the
   capability each stands on is the one the matching page asks for:
-  `admin.employee.list` for the Employees list. Like that page, the list is
-  the employees of the company the person signed in at, which the scope
-  names; no company is taken from input.
+  `admin.employee.list` for the Employees list and `admin.employee.create`
+  for creating a person. An employer target is authorized through Company,
+  like the form's selector. Omitting a list target uses the signed-in company;
+  targets never replace the scope's authenticated person, company or tenant.
   """
 
   @behaviour Bilimbi.Base.AgentApi.Operation
@@ -21,6 +22,7 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
   @spec declarations() :: [map()]
   def declarations do
     [
+      create_declaration(),
       %{
         key: "core.employee.list",
         title: "List employees",
@@ -40,6 +42,12 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
                 "Words matched against full name, short name, employee number, email, " <>
                   "designation and job description."
             },
+            "employer_company_id" => %{
+              "type" => "integer",
+              "minimum" => 1,
+              "description" =>
+                "Optional employer to search, authorized like the company selector; defaults to your signed-in company."
+            },
             "page" => %{"type" => "integer", "minimum" => 1},
             "page_size" => %{"type" => "integer", "minimum" => 1, "maximum" => 100}
           }
@@ -55,9 +63,100 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
     ]
   end
 
+  defp create_declaration do
+    text = %{"type" => "string", "maxLength" => 255}
+
+    %{
+      key: "core.employee.create",
+      title: "Create a person at a company",
+      summary:
+        "Record a person as an employee of their employer, including an external company. Search first.",
+      keywords: ["add", "namecard", "contact", "person", "people"],
+      kind: :write,
+      safe_write: true,
+      capability: "admin.employee.create",
+      handler: __MODULE__,
+      input: %{
+        "type" => "object",
+        "required" => ["employer_company_id", "employee_number", "full_name"],
+        "properties" => %{
+          "employer_company_id" => %{"type" => "integer", "minimum" => 1},
+          "employee_number" => text,
+          "full_name" => text,
+          "short_name" => text,
+          "designation" => text,
+          "employee_type" => text,
+          "job_description" => %{"type" => "string", "maxLength" => 10000},
+          "email" => text,
+          "mobile_number" => text,
+          "status" => %{
+            "type" => "string",
+            "enum" => ~w(pending probation active inactive terminated)
+          }
+        }
+      },
+      output: %{"type" => "object", "description" => "Created employee and its Bilimbi URL."}
+    }
+  end
+
+  @impl true
+  def preview("core.employee.create", %Scope{} = scope, input) do
+    with :ok <- authorize_employer(scope, input["employer_company_id"]),
+         {:ok, employee} <-
+           Employee.preview_create_employee(
+             scope,
+             input["employer_company_id"],
+             Map.delete(input, "employer_company_id")
+           ) do
+      changes =
+        employee
+        |> Map.from_struct()
+        |> Map.drop([:id, :created_at, :updated_at])
+        |> Enum.reject(fn {_, v} -> is_nil(v) end)
+        |> Enum.sort()
+        |> Enum.map(fn {k, v} -> %{field: Atom.to_string(k), from: nil, to: v} end)
+
+      {:ok, %{summary: "Create person at their employer", changes: changes}}
+    end
+  end
+
+  @impl true
+  def commit("core.employee.create", %Scope{} = scope, input) do
+    with :ok <- authorize_employer(scope, input["employer_company_id"]),
+         {:ok, employee} <-
+           Employee.create_employee(
+             scope,
+             input["employer_company_id"],
+             Map.delete(input, "employer_company_id")
+           ) do
+      path = "/employees/#{employee.id}"
+
+      path =
+        if employee.company_id == Scope.actor(scope).company_id,
+          do: path,
+          else: path <> "?employer_company_id=#{employee.company_id}"
+
+      {:ok, %{record: employee, path: path}}
+    end
+  end
+
+  defp authorize_employer(scope, company_id) do
+    with {:ok, _company} <-
+           Bilimbi.Core.Company.authorize_company_target(
+             scope,
+             company_id,
+             "admin.employee.create"
+           ) do
+      if Bilimbi.Base.Authz.AgentPolicy.writes_enabled_in_company?(scope, company_id),
+        do: :ok,
+        else: {:error, :writes_not_enabled}
+    end
+  end
+
   @impl true
   def call("core.employee.list", %Scope{} = scope, input) do
-    %Actor{company_id: company_id} = Scope.actor(scope)
+    %Actor{company_id: signed_in_company_id} = Scope.actor(scope)
+    company_id = Map.get(input, "employer_company_id", signed_in_company_id)
 
     options = [
       page: Map.get(input, "page", 1),
@@ -65,6 +164,13 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
       search: Map.get(input, "search", "")
     ]
 
+    with {:ok, _} <-
+           Bilimbi.Core.Company.authorize_company_target(scope, company_id, "admin.employee.list") do
+      list_page(scope, company_id, options)
+    end
+  end
+
+  defp list_page(scope, company_id, options) do
     case Employee.list_administration_page(scope, company_id, options) do
       {:ok, page} ->
         {:ok,

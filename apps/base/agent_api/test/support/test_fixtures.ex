@@ -12,6 +12,53 @@ defmodule Bilimbi.Base.AgentApi.TestFixtures do
 
   @descriptor %{id: "base/agent_api", otp_app: :bilimbi_base_agent_api}
 
+  @doc "Creates the plan storage from its owner's contract, for host and lock tests."
+  def create_plan_tables!(opts \\ []) do
+    alias Bilimbi.Base.Database.TestTables
+    alias Bilimbi.Base.AgentApi.SchemaContract
+    alias Bilimbi.Base.Repo
+    alias Ecto.Adapters.SQL
+    persistent = TestTables.persistent?(opts)
+    [table] = SchemaContract.storage_tables()
+
+    columns =
+      Enum.map_join(table.columns, ", ", fn {name, spec} ->
+        type =
+          case spec.type do
+            {:varchar, size} -> "varchar(#{size})"
+            {:timestamp, precision} -> "timestamp(#{precision}) without time zone"
+            type -> Atom.to_string(type)
+          end
+
+        name <>
+          " " <>
+          type <>
+          if(spec.nullable, do: "", else: " NOT NULL") <>
+          if(name == "id", do: " PRIMARY KEY", else: "")
+      end)
+
+    foreign_keys =
+      Enum.map_join(table.foreign_keys, "", fn {name, spec} ->
+        {target, columns} = spec.references
+
+        ", CONSTRAINT #{name} FOREIGN KEY (#{Enum.join(spec.columns, ",")}) REFERENCES #{target}(#{Enum.join(columns, ",")}) ON DELETE RESTRICT"
+      end)
+
+    SQL.query!(
+      Repo,
+      "#{TestTables.create(persistent)} #{table.name} (#{columns}#{foreign_keys}) #{TestTables.on_commit(persistent)}",
+      []
+    )
+
+    for {name, index} <- table.indexes, name != table.name <> "_pkey" do
+      SQL.query!(
+        Repo,
+        "CREATE #{if index.unique, do: "UNIQUE ", else: ""}INDEX #{name} ON #{table.name}(#{Enum.join(index.columns, ",")})",
+        []
+      )
+    end
+  end
+
   def descriptor, do: @descriptor
 
   @doc """

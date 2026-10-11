@@ -38,6 +38,26 @@ defmodule Bilimbi.Base.UI.EventAuthorizationTest do
     refute_received {:written, _}
   end
 
+  test "a page target constraint runs after host refresh and survives host policy replacement" do
+    EventAuthorization.install(fn socket ->
+      {:cont, Phoenix.Component.assign(socket, :current_scope, :refreshed)}
+    end)
+
+    EventAuthorization.constrain(fn socket ->
+      send(self(), {:target_checked, socket.assigns.current_scope})
+      {:halt, socket}
+    end)
+
+    assert {:noreply, _} = Component.handle_event("write", %{}, socket())
+    assert_received {:target_checked, :refreshed}
+    refute_received {:written, _}
+
+    EventAuthorization.install(fn socket -> {:cont, socket} end)
+    assert {:noreply, _} = Component.handle_event("write", %{}, socket())
+    assert_received {:target_checked, :stale}
+    refute_received {:written, _}
+  end
+
   defp socket do
     %Phoenix.LiveView.Socket{
       assigns: %{__changed__: %{}, flash: %{}, current_scope: :stale},

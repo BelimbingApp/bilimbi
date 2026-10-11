@@ -86,7 +86,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		return err
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Fprintln(out, "bilimbi login <address> [--name <profile>] | logout [name] | profiles | use <name>\nbilimbi search <words> | describe <key> | guide <key> | call <key> [--input <file|->]\nbilimbi review --input <file|-> [--session <file>] [--timeout 30m]\nbilimbi report --input <file|-> [--session <file>] [--timeout 30m]\nHeaders: --agent-id harness/model-ver-effort --run-id <run>, or BILIMBI_AGENT_ID/BILIMBI_RUN_ID.\nJSON goes to stdout; browser addresses and device codes go to stderr.")
+		fmt.Fprintln(out, "bilimbi login <address> [--name <profile>] | logout [name] | profiles | use <name>\nbilimbi search <words> | describe <key> | guide <key> | call <key> [--input <file|->]\nbilimbi plan --input <file|-> | commit --plan <code>\nbilimbi review --input <file|-> [--session <file>] [--timeout 30m]\nbilimbi report --input <file|-> [--session <file>] [--timeout 30m]\nHeaders: --agent-id harness/model-ver-effort --run-id <run>, or BILIMBI_AGENT_ID/BILIMBI_RUN_ID.\nJSON goes to stdout; browser addresses and device codes go to stderr.")
 		return nil
 	}
 	command, tail := args[0], args[1:]
@@ -211,7 +211,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		}
 		return outputJSON(out, map[string]string{"logged_out": name})
 	}
-	if command != "search" && command != "describe" && command != "guide" && command != "call" {
+	if command != "search" && command != "describe" && command != "guide" && command != "call" && command != "plan" && command != "commit" {
 		return errors.New("unknown command; use bilimbi help")
 	}
 	if agent == "" || runID == "" {
@@ -276,6 +276,37 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 			resource = "guides"
 		}
 		path = "/" + resource + "/" + url.PathEscape(tail[0])
+	case "plan":
+		flags := flag.NewFlagSet("plan", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		file := flags.String("input", "-", "JSON operations")
+		if flags.Parse(tail) != nil || flags.NArg() != 0 {
+			return errors.New("usage: plan --input <file|->")
+		}
+		var request planRequest
+		if err = readJSON(input, *file, &request); err != nil {
+			return err
+		}
+		if len(request.Operations) == 0 {
+			return errors.New("plan needs operations")
+		}
+		body, path, method = request, "/plans", "POST"
+	case "commit":
+		flags := flag.NewFlagSet("commit", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		code := flags.String("plan", "", "reviewed plan code")
+		if flags.Parse(tail) != nil || flags.NArg() != 0 || !validPlanCode(*code) {
+			return errors.New("usage: commit --plan <code>")
+		}
+		var saved savedPlan
+		if err = readJSON(nil, planPath(store, *code), &saved); err != nil {
+			return errors.New("plan is unavailable locally; create a new plan")
+		}
+		if saved.Server != p.Discovery.Server || saved.Code != *code {
+			return errors.New("plan belongs to a different server; select its profile")
+		}
+		body = map[string]any{"plan_code": *code, "operations": saved.Operations}
+		path, method = "/plans/commit", "POST"
 	case "call":
 		if len(tail) == 0 {
 			return errors.New("call requires an operation key")
@@ -310,7 +341,26 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 	}
 	result, err := client.api(ctx, p.Discovery, creds, method, path, body)
 	if err != nil {
+		if command == "commit" && len(result) > 0 {
+			if outputErr := outputJSON(out, result); outputErr != nil {
+				return outputErr
+			}
+		}
 		return err
+	}
+	if command == "plan" {
+		var response planResponse
+		if err = json.Unmarshal(result, &response); err != nil {
+			return errors.New("invalid plan response")
+		}
+		if response.Valid {
+			if !validPlanCode(response.Code) {
+				return errors.New("invalid plan code from server")
+			}
+			if err = writeJSON(planPath(store, response.Code), savedPlan{Server: p.Discovery.Server, Code: response.Code, Operations: body.(planRequest).Operations}); err != nil {
+				return err
+			}
+		}
 	}
 	return outputJSON(out, result)
 }

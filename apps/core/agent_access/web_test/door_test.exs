@@ -470,7 +470,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
              AgentAccess.decide(borrowed, device.user_code, :approve, DateTime.add(now(), 86_400))
   end
 
-  test "facets lose platform, access-control and write capabilities even under direct grants" do
+  test "facets lose platform and access-control grants; a company can turn writes off" do
     grant_capabilities!(
       ~w(admin.system.database-table.list admin.authz.role.list admin.company.update)
     )
@@ -487,6 +487,15 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
 
     assert Bilimbi.Base.Authz.can(facet, "admin.authz.role.list").reason ==
              :denied_agent_access_control
+
+    assert Bilimbi.Base.Authz.can(facet, "admin.company.update").allowed
+
+    {:ok, _} =
+      Bilimbi.Base.Settings.put(
+        "authz.agent_writes_enabled",
+        false,
+        Bilimbi.Base.Settings.Scope.company(73, 41)
+      )
 
     assert Bilimbi.Base.Authz.can(facet, "admin.company.update").reason ==
              :denied_agent_writes_off

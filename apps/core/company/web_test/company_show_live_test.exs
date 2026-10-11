@@ -68,6 +68,25 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
   end
 
   describe "Show" do
+    test "a company manager can turn agent writes off and on with permission checked afresh", %{
+      conn: conn
+    } do
+      grant_capabilities!(~w(admin.company.list admin.company.view admin.company.update))
+      {:ok, view, _} = conn |> log_in_as() |> live(~p"/companies/73")
+      assert has_element?(view, "#company-agent-writes-display", "Allowed")
+      view |> element("#company-agent-writes-display") |> render_click()
+      view |> form("#company-agent-writes-form", %{"agent_writes" => "false"}) |> render_change()
+      assert has_element?(view, "#company-agent-writes-display", "Off")
+      refute Settings.get("authz.agent_writes_enabled", SettingsScope.company(73, 41))
+      view |> element("#company-agent-writes-display") |> render_click()
+      view |> form("#company-agent-writes-form", %{"agent_writes" => "true"}) |> render_change()
+      assert Settings.get("authz.agent_writes_enabled", SettingsScope.company(73, 41))
+      {:ok, scope} = Tenancy.scope(41)
+      revoke_capability!(scope, "admin.company.update")
+      render_change(view, "save_agent_writes", %{"agent_writes" => "false"})
+      assert Settings.get("authz.agent_writes_enabled", SettingsScope.company(73, 41))
+    end
+
     test "header shows the name once, with legal name or code as subtitle", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
       conn = log_in_as(conn)

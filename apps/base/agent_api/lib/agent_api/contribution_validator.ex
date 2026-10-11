@@ -38,11 +38,10 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
       `/` read as `.` (`core.company.` for `core/company`), and is unique
       across every module's operations and guides. A guide's key may be
       the owner prefix itself;
-    * `kind` is `:read` or `:write`. A write declares `approval`, `:level`
-      or `:required`; a read declares none. The field is left from an
-      earlier draft and decides nothing: ADR 0021 Decision 8 gates every
-      write on a dry run and its plan code, and safe writes drop
-      the field;
+    * `kind` is `:read` or `:write`. A supported write declares
+      `safe_write: true` and exports `preview/3` and `commit/3`. Every write
+      goes through a dry run and its plan code; `call/3` never runs writes.
+      An unsupported write remains discoverable but refused;
     * `capability` is a well-formed capability key: the one the matching
       screen's route or event asks for. A read operation stands on a read
       capability, and no operation or guide stands on an access-control
@@ -85,7 +84,7 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
     :keywords,
     :kind,
     :capability,
-    :approval,
+    :safe_write,
     :input,
     :output,
     :handler
@@ -144,6 +143,8 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
       )
     end
 
+    handler = handler!(attrs.handler, kind, key, descriptor)
+
     %Definition{
       key: key,
       owner: descriptor.id,
@@ -152,10 +153,10 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
       keywords: keywords!(Map.get(attrs, :keywords, []), key, descriptor),
       kind: kind,
       capability: capability,
-      approval: approval!(kind, Map.get(attrs, :approval), key, descriptor),
+      safe_write: safe_write!(attrs, kind, key, descriptor),
       input: input!(attrs.input, key, descriptor),
       output: output!(Map.get(attrs, :output, %{"type" => "object"}), key, descriptor),
-      handler: handler!(attrs.handler, kind, key, descriptor)
+      handler: handler
     }
   end
 
@@ -219,16 +220,22 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
   defp kind!(_kind, key, descriptor),
     do: invalid!(descriptor, key, "kind must be :read or :write")
 
-  defp approval!(:read, nil, _key, _descriptor), do: nil
+  defp safe_write!(attrs, kind, key, descriptor) do
+    case Map.get(attrs, :safe_write, false) do
+      false ->
+        false
 
-  defp approval!(:read, _approval, key, descriptor),
-    do: invalid!(descriptor, key, "is a read and declares no approval")
+      true when kind == :write ->
+        unless function_exported?(attrs.handler, :commit, 3) do
+          invalid!(descriptor, key, "safe_write requires preview/3 and commit/3")
+        end
 
-  defp approval!(:write, approval, _key, _descriptor) when approval in [:level, :required],
-    do: approval
+        true
 
-  defp approval!(:write, _approval, key, descriptor),
-    do: invalid!(descriptor, key, "is a write and must declare approval :level or :required")
+      _ ->
+        invalid!(descriptor, key, "safe_write must be false or true on a write")
+    end
+  end
 
   defp capability!(capability, key, descriptor) do
     cond do

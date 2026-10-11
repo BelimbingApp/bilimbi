@@ -52,7 +52,6 @@ defmodule Bilimbi.Base.AgentApi.TestOperations do
           title: "Change a record",
           summary: "Change a test record's label.",
           kind: :write,
-          approval: :level,
           capability: "admin.test.record.update",
           input: %{
             "type" => "object",

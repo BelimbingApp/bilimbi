@@ -111,3 +111,22 @@ platform-wide, and cannot be modified or deleted. Custom employee types
 that the custom type is not referenced by any employee in the company
 (`:in_use`).
 
+
+## Agent writes
+
+`core.employee.create` records a person at their own employer, including an
+external company; it never creates a login. `employer_company_id` is a business
+target authorized through `Company.authorize_company_target/3`, like the create
+form's selector, and never substitutes the scope's person or signed-in company.
+`core.employee.list` accepts the same optional target for duplicate searches;
+omitting it searches the signed-in company.
+
+`preview_create_employee/3` shares create's changeset, reserved-identity and
+reference checks, plus a non-reserving uniqueness check. It writes nothing.
+Commit calls `create_employee/3`, so the company must still be writable and its
+references valid. The operation checks the signed-in and target companies'
+agent-write switches, and the dispatcher asks `admin.employee.create` afresh.
+
+An external employment report links to `/employees/:id?employer_company_id=...`.
+The record page authorizes that employer through the same Company target API;
+every page write rechecks the target permission, including tenant-wide reach.

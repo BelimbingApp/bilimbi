@@ -36,6 +36,33 @@ defmodule BilimbiWeb.AgentApiController do
   end
 
   def invoke(conn, _), do: conn |> put_status(400) |> json(%{error: "invalid_request"})
+
+  def plan(conn, %{"operations" => operations}) do
+    conn = Plug.Conn.assign(conn, :agent_operation, "agent_api.plan")
+    reply(conn, AgentApi.plan(conn.assigns.agent_scope, operations))
+  end
+
+  def plan(conn, _), do: conn |> put_status(400) |> json(%{error: "invalid_request"})
+
+  def commit(conn, %{"plan_code" => code, "operations" => operations}) do
+    conn = Plug.Conn.assign(conn, :agent_operation, "agent_api.commit")
+
+    case AgentApi.commit(conn.assigns.agent_scope, code, operations) do
+      {:ok, report} ->
+        results =
+          Enum.map(report["results"], fn item ->
+            Map.put(item, "url", BilimbiWeb.Endpoint.url() <> item["path"])
+          end)
+
+        reply(conn, {:ok, Map.put(report, "results", results)})
+
+      error ->
+        reply(conn, error)
+    end
+  end
+
+  def commit(conn, _), do: conn |> put_status(400) |> json(%{error: "invalid_request"})
+
   defp reply(conn, {:ok, result}), do: json(conn, wire(result))
 
   defp reply(conn, {:error, {:invalid_input, fields}}),
@@ -47,6 +74,19 @@ defmodule BilimbiWeb.AgentApiController do
   defp reply(conn, {:error, reason})
        when reason in [:unknown_operation, :unknown_guide, :not_found],
        do: conn |> put_status(404) |> json(%{error: reason})
+
+  defp reply(conn, {:error, reason})
+       when reason in [
+              :invalid_plan_code,
+              :plan_mismatch,
+              :plan_expired,
+              :plan_already_used,
+              :stale_plan
+            ],
+       do: conn |> put_status(409) |> json(%{error: reason})
+
+  defp reply(conn, {:error, {:plan_rejected, results}}),
+    do: conn |> put_status(422) |> json(%{error: "plan_rejected", results: results})
 
   defp reply(conn, {:error, :writes_not_enabled}),
     do: conn |> put_status(409) |> json(%{error: "writes_not_enabled"})

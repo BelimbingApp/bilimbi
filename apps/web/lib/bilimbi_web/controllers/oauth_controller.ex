@@ -19,6 +19,8 @@ defmodule BilimbiWeb.OAuthController do
     json(conn, %{
       api_base: BilimbiWeb.Endpoint.url() <> "/api/v1",
       api_version: "1",
+      plan_endpoint: url(~p"/api/v1/plans"),
+      commit_endpoint: url(~p"/api/v1/plans/commit"),
       server_name: URI.parse(BilimbiWeb.Endpoint.url()).host,
       client_id: AgentAccess.client_id()
     })

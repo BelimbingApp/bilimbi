@@ -21,6 +21,7 @@ defmodule Bilimbi.Core.Company.AgentOperations do
   @spec declarations() :: [map()]
   def declarations do
     [
+      create_declaration(),
       %{
         key: "core.company.list",
         title: "List companies",
@@ -73,6 +74,59 @@ defmodule Bilimbi.Core.Company.AgentOperations do
         handler: __MODULE__
       }
     ]
+  end
+
+  defp create_declaration do
+    text = %{"type" => "string", "maxLength" => 255}
+
+    %{
+      key: "core.company.create",
+      title: "Create a company",
+      summary: "Create an organisation in your tenant after searching for an existing company.",
+      keywords: ["add", "namecard", "contact", "business"],
+      kind: :write,
+      safe_write: true,
+      capability: "admin.company.create",
+      handler: __MODULE__,
+      input: %{
+        "type" => "object",
+        "required" => ["name"],
+        "properties" => %{
+          "name" => text,
+          "code" => text,
+          "legal_name" => text,
+          "registration_number" => text,
+          "tax_id" => text,
+          "jurisdiction" => %{"type" => "string", "maxLength" => 2},
+          "email" => text,
+          "website" => text,
+          "status" => %{"type" => "string", "enum" => Schema.initial_statuses()}
+        }
+      },
+      output: %{"type" => "object", "description" => "Created company and its Bilimbi URL."}
+    }
+  end
+
+  @impl true
+  def preview("core.company.create", %Scope{} = scope, input) do
+    with {:ok, company} <- Company.preview_create_company(scope, input) do
+      changes =
+        company
+        |> Map.from_struct()
+        |> Map.drop([:id, :tenant_id])
+        |> Enum.reject(fn {_, v} -> is_nil(v) end)
+        |> Enum.sort()
+        |> Enum.map(fn {k, v} -> %{field: Atom.to_string(k), from: nil, to: v} end)
+
+      {:ok, %{summary: "Create company", changes: changes}}
+    end
+  end
+
+  @impl true
+  def commit("core.company.create", %Scope{} = scope, input) do
+    with {:ok, company} <- Company.create_company(scope, input) do
+      {:ok, %{record: company, path: "/companies/#{company.id}"}}
+    end
   end
 
   @impl true

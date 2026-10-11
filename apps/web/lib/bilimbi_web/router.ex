@@ -98,6 +98,8 @@ defmodule BilimbiWeb.Router do
     get "/operations/:key", AgentApiController, :describe
     get "/guides/:key", AgentApiController, :guide
     post "/operations/:key/call", AgentApiController, :invoke
+    post "/plans", AgentApiController, :plan
+    post "/plans/commit", AgentApiController, :commit
   end
 
   # Signed machine traffic uses only this reserved scope. Browser routes keep

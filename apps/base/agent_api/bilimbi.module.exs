@@ -9,11 +9,13 @@
     "base/authz",
     "base/database",
     "base/module_registry",
+    "base/settings",
     "base/tenancy"
   ],
-  migrations: nil,
+  migrations: "priv/repo/migrations",
+  migration_dispositions: %{20_261_011_140_000 => :bilimbi_only},
   web: nil,
-  schema_contract: nil,
-  contribution_provider: nil,
+  schema_contract: Bilimbi.Base.AgentApi.SchemaContract,
+  contribution_provider: Bilimbi.Base.AgentApi.Contributions,
   dev_seed: nil
 ]

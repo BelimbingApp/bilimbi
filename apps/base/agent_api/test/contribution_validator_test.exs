@@ -35,12 +35,11 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidatorTest do
     assert %Definition{
              owner: "base/agent_api",
              kind: :read,
-             approval: nil,
              capability: "admin.test.record.view",
              keywords: ["show", "detail"]
            } = operations["base.agent_api.record.get"]
 
-    assert %Definition{kind: :write, approval: :level, keywords: []} =
+    assert %Definition{kind: :write, safe_write: false, keywords: []} =
              operations["base.agent_api.record.update"]
 
     # An operation that describes no output gets an object.
@@ -157,20 +156,20 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidatorTest do
     )
   end
 
-  test "a read must stand on a read capability, and only a write declares approval" do
+  test "a read must stand on a read capability, and only a write declares safe_write" do
     refused(
       %{operations: [get_operation(%{capability: "admin.test.record.update"})]},
       ~r/is a read but its capability admin.test.record.update does not end in a read verb/
     )
 
     refused(
-      %{operations: [get_operation(%{approval: :level})]},
-      ~r/is a read and declares no approval/
+      %{operations: [get_operation(%{safe_write: true})]},
+      ~r/safe_write must be false or true on a write/
     )
 
     refused(
-      %{operations: [write_operation(%{approval: :sometimes})]},
-      ~r/must declare approval :level or :required/
+      %{operations: [write_operation(%{safe_write: true})]},
+      ~r/safe_write requires preview\/3 and commit\/3/
     )
 
     refused(%{operations: [get_operation(%{kind: :delete})]}, ~r/kind must be :read or :write/)

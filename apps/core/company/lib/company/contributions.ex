@@ -60,13 +60,22 @@ defmodule Bilimbi.Core.Company.Contributions do
           %{
             key: "core.company",
             title: "Companies",
-            summary: "What a company is in this tenant, and how to find and read one.",
+            summary: "What a company is in this tenant, and how to find, read and create one.",
             keywords: ["organisation", "business", "firm", "status"],
             capability: "admin.company.list",
             body: """
             A company is an organisation recorded in your tenant. A company may
             have a parent company, and one company is the tenant's primary
             company.
+
+            Before creating, search by company name, legal name and email with
+            `core.company.list`. Reuse the existing company rather than making
+            a duplicate. A namecard's organisation becomes a company; the person
+            becomes an employee of that company, even when it is an external
+            supplier or customer. Use `core.company.create` through a dry run,
+            local review and plan-code commit. A missing code is generated from
+            the name and shown in the preview. Do not invent legal identifiers
+            or a jurisdiction from a phone number; ask when the source is unclear.
 
             A company's status is one of pending, active, suspended or archived.
             Status changes only through the lifecycle actions on the company's

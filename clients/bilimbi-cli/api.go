@@ -224,16 +224,28 @@ func (c *apiClient) api(ctx context.Context, d discovery, creds credentials, met
 	if err != nil {
 		return nil, err
 	}
-	if status != 200 {
-		return nil, fmt.Errorf("API returned HTTP %d", status)
-	}
 	var value any
 	decoder := json.NewDecoder(bytes.NewReader(result))
 	decoder.UseNumber()
 	if decoder.Decode(&value) != nil {
 		return nil, errors.New("server returned invalid JSON")
 	}
-	return json.Marshal(c.redactJSON(value))
+	clean := c.redactJSON(value)
+	encoded, err := json.Marshal(clean)
+	if err != nil {
+		return nil, errors.New("server returned invalid JSON")
+	}
+	if status != 200 {
+		if object, ok := clean.(map[string]any); ok {
+			code, _ := object["error"].(string)
+			switch code {
+			case "invalid_plan_code", "plan_mismatch", "plan_expired", "plan_already_used", "stale_plan", "plan_rejected", "invalid_input", "forbidden", "writes_not_enabled":
+				return encoded, fmt.Errorf("API returned HTTP %d: %s", status, code)
+			}
+		}
+		return nil, fmt.Errorf("API returned HTTP %d", status)
+	}
+	return encoded, nil
 }
 func (c *apiClient) redactJSON(value any) any {
 	switch v := value.(type) {

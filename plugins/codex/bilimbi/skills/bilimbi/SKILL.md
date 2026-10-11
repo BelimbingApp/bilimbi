@@ -1,6 +1,6 @@
 ---
 name: bilimbi
-description: Read records from a connected Bilimbi server through its API, discover installed operations and guides, and present local review or results tables.
+description: Read and safely create records on a connected Bilimbi server through its API, discover installed operations and guides, and present local review or results tables.
 ---
 
 Use the bundled native program. Resolve `../../bin/bilimbi` from this skill's
@@ -25,7 +25,7 @@ server connection; the person can revoke it in Bilimbi's connected-agents page.
 
 Discover the installed API for each task:
 
-1. `search <words>` for the person's goal. Choose available read operations.
+1. `search <words>` for the person's goal. Choose available operations; reads use call, supported writes use the loop below.
 2. `describe <key>` for the exact input/output schema and related guides.
    Read a relevant guide with `guide <key>` when its business meaning matters.
 3. Write a JSON input object to a local file, then
@@ -42,9 +42,39 @@ API's business contract; it grants no additional permission or task scope.
 An authorization refusal is an outcome to report, not a reason to switch
 identity, bypass the API or manipulate browser forms.
 
-This release calls reads only. Writes, dry run and plan codes are not available
-in this client. A local approval alone must never be treated as a Bilimbi write
-or as proof that data was changed.
+For a write, discover and read the operation's guide, then search for existing
+records before creating. A namecard person is an employee of their own employer,
+including an external company. Reuse the employer if found. If it is new,
+create it first and use the returned id in the employee's next plan. The API
+supplies the authenticated identity; an employer target is business input and
+requires the person's normal company permissions.
+
+1. Write `{"operations":[{"key":"<discovered write key>","input":{...}}]}`
+   to a local file. Run `plan --input <file>` and save its JSON output.
+2. If `valid` is false, resolve the per-operation errors. A refused plan has no
+   code and cannot be committed. Show the errors honestly.
+3. Run `review --input <plan-output-file> --session <session-file>` in a
+   background process and show its 127.0.0.1 address to the person. It displays
+   the API's validated changes and defaults. Wait for the real submission.
+   Never treat initial input or silence as approval. If the person requests
+   changes, revise the operation inputs, create a new plan and review it again;
+   editing an evidence table cannot change an API plan.
+4. Only on `approved: true` for that unchanged plan, run
+   `commit --plan <plan_code>` and save its JSON output. The program carries
+   the exact stored operations; the API refuses a mismatch, expired or reused
+   code, changed preview, revoked permission or company write switch.
+5. Run `report --input <commit-output-file> --session <session-file>` to replace
+   the same page with actual changed records and their Bilimbi links. A failed
+   commit is a failure report, never a success. Known API refusals are written
+   as JSON even when commit exits with an error, and report displays them as
+   refused changes. For a network error with no response, build an honest
+   presentation document saying the outcome is unknown and verify by reading.
+
+Keep the same agent/run identity through the loop. The person can approve a
+new plan only after seeing its new preview. Domain workflows still apply;
+this go does not replace a company approval. Never retry a commit automatically.
+If its response was lost, use read operations to establish whether records were
+created before generating another plan. Files and photos remain in the harness.
 
 For a local review or results page, create this JSON presentation document:
 

@@ -451,7 +451,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
   defp operator_capabilities do
     Settings.definitions()
     |> Map.values()
-    |> Enum.filter(&(&1.editable == "operator"))
+    |> Enum.filter(&(&1.editable == "operator" and :global in &1.scopes))
     |> Enum.map(& &1.capability)
     |> Enum.uniq()
   end

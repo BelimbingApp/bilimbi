@@ -25,7 +25,7 @@ built-in columns and row height.
 
 ## Agent operations
 
-Expose a module operation to agents through an `agent_api` contribution and a `Bilimbi.Base.AgentApi.Operation` handler that calls your own facade with the scope it receives, standing on the capability the matching page's route or event asks for. Never add a route or controller per module, and never take an actor, tenant or company id from input: the host serves every operation, and the dispatcher asks the capability before the facade runs. `Bilimbi.Base.AgentApi.ContributionValidator`'s moduledoc owns the contract; Core Company's `AgentOperations` is the example.
+Expose a module operation to agents through an `agent_api` contribution and a `Bilimbi.Base.AgentApi.Operation` handler that calls your own facade with the scope it receives, standing on the capability the matching page's route or event asks for. Never add a route or controller per module, and never take an actor or tenant identity from input. An employer target goes through `Company.authorize_company_target/3`, like the form selector, and never replaces the signed-in company: the host serves every operation, and the dispatcher asks the capability before the facade runs. `Bilimbi.Base.AgentApi.ContributionValidator`'s moduledoc owns the contract; Core Company's `AgentOperations` is the example.
 
 ## List filters and pagination
 

@@ -15,8 +15,9 @@ defmodule Bilimbi.Base.AgentApi do
   that is not installed contributes nothing, so its operations are not
   found and not called.
 
-  Only read operations run. A write answers `{:error, :writes_not_enabled}`
-  until writes go through a dry run and the person's go (ADR 0021).
+  `call/3` runs reads. Supported writes use `plan/2` then `commit/3`, bound
+  to the preview and person, with the native client obtaining the person's go.
+  Unsupported writes answer `{:error, :writes_not_enabled}` (ADR 0021).
   """
 
   alias Bilimbi.Base.AgentApi.Definition
@@ -30,7 +31,7 @@ defmodule Bilimbi.Base.AgentApi do
   @default_limit 10
   @max_limit 50
 
-  @type disposition :: :call | {:refused, :writes_not_enabled}
+  @type disposition :: :call | :plan | {:refused, :writes_not_enabled}
 
   @type result :: %{
           type: :operation | :guide,
@@ -58,8 +59,9 @@ defmodule Bilimbi.Base.AgentApi do
       agent can tell the person what to ask for.
 
   Each result names its `type`, `key`, `title`, `summary` and, for an
-  operation, its `kind` and its `disposition`: `:call` for a read, and
-  `{:refused, :writes_not_enabled}` for a write.
+  operation, its `kind` and its `disposition`: `:call` for a read, `:plan`
+  for a supported write, and `{:refused, :writes_not_enabled}` for an
+  unsupported write.
   """
   @spec search(Scope.t(), String.t(), keyword()) :: [result()]
   def search(%Scope{} = scope, words, opts \\ []) when is_binary(words) and is_list(opts) do
@@ -95,7 +97,7 @@ defmodule Bilimbi.Base.AgentApi do
          summary: operation.summary,
          kind: operation.kind,
          capability: operation.capability,
-         approval: operation.approval,
+         safe_write: operation.safe_write,
          disposition: disposition(operation),
          input: operation.input,
          output: operation.output,
@@ -134,6 +136,12 @@ defmodule Bilimbi.Base.AgentApi do
     |> Map.get(key)
     |> Dispatcher.call(scope, input)
   end
+
+  @doc "Validates a bounded list of writes and returns their review data and plan code."
+  defdelegate plan(scope, operations), to: Bilimbi.Base.AgentApi.Plans, as: :preview
+
+  @doc "Commits exactly the reviewed plan as the same person, once, atomically."
+  defdelegate commit(scope, code, operations), to: Bilimbi.Base.AgentApi.Plans
 
   defp registry!, do: ContributionRegistry.consumer!(:agent_api)
 
@@ -186,6 +194,7 @@ defmodule Bilimbi.Base.AgentApi do
   defp kind(%Guide{}), do: nil
 
   defp disposition(%Definition{kind: :read}), do: :call
+  defp disposition(%Definition{kind: :write, safe_write: true}), do: :plan
   defp disposition(%Definition{kind: :write}), do: {:refused, :writes_not_enabled}
   defp disposition(%Guide{}), do: nil
 end

@@ -41,12 +41,40 @@ operation stands on an access-control capability (authorization
 administration, impersonation, settings management, agent-connection
 management).
 
-## What is not here yet
+## Safe writes
 
-Only reads run; every write answers `{:error, :writes_not_enabled}`. There
-is no HTTP surface, connection, token or agent identity on the scope, no
-API request log, and no dry run, plan code or write. ADR 0021 describes
-how each of those arrives.
+A write that declares `safe_write: true` implements `preview/3` and `commit/3`
+as well as the read handler contract. Preview uses its own facade's validation
+and returns a summary and `{field, from, to}` changes, including defaults; it
+never writes business records. Commit calls the ordinary mutation facade and
+returns `{record, path}`. No handler bypasses field restrictions or workflows.
+Unsupported writes remain refused, and `call/3` always refuses writes.
+
+`plan/2` takes an ordered list of string-keyed `{key, input}` objects. It
+returns each validation outcome and, only if all are valid, a `plan_code` and
+`expires_at`. The code is random and stored only as a hash. Storage contains
+only input, preview and identity digests, never business values. A code binds
+operations, exact inputs, tenant, person, signed-in company and connection.
+Map order is irrelevant; operation order and JSON value types are significant.
+
+`commit/3` takes that code and the same operations. It locks the code, rejects
+expiry, reuse or a changed identity/input, rechecks live authorization and the
+preview, then writes all operations and consumes the code in one transaction.
+A later failure rolls back every write and mutation audit, leaving the code
+unconsumed. Uniqueness can still change between preview and commit; a preview
+is validation, not a reservation. Changed preview data requires a fresh plan.
+
+The default lifetime is ten minutes and the default limit is twenty operations,
+operator settings `agent_api.plan_expiry_seconds` and
+`agent_api.plan_max_operations`. `authz.agent_writes_enabled` defaults to true
+for each company. It is checked for the signed-in company and an employee's
+employer. Company managers change it on the company page; turning it off stops
+existing uncommitted plans too. The code proves the reviewed data, not human
+consent; the local client obtains the person's go (ADR 0021).
+
+The host serves the HTTP endpoints, connection authentication and the general
+API request log; see `apps/web/docs/agent-api.md`. Client files stay in the
+harness. Core supplies the first supported writes: company and employee create.
 
 ## Tests
 

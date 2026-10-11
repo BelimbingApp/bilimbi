@@ -580,14 +580,10 @@ defmodule Bilimbi.Core.Company do
   @spec create_company(Scope.t(), map(), keyword()) ::
           {:ok, Summary.t()} | {:error, Ecto.Changeset.t()}
   def create_company(%Scope{} = scope, attributes, opts \\ []) do
-    tenant_id = Scope.tenant_id(scope)
     is_primary? = Keyword.get(opts, :is_primary, false)
 
     Repo.transaction(fn ->
-      changeset =
-        tenant_id
-        |> Schema.creation_changeset(attributes)
-        |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
+      changeset = creation_changeset(scope, attributes)
 
       case Repo.insert(changeset) do
         {:ok, company} ->
@@ -608,6 +604,49 @@ defmodule Bilimbi.Core.Company do
       end
     end)
     |> unwrap_mutation()
+  end
+
+  @doc "Whether agents may write while signed in at or targeting this live company."
+  def agent_writes_enabled?(%Scope{} = scope, company_id) do
+    with {:ok, _} <- get_company(scope, company_id) do
+      {:ok, Bilimbi.Base.Authz.AgentPolicy.writes_enabled_in_company?(scope, company_id)}
+    end
+  end
+
+  @doc "Changes the company's agent-write switch under the company update permission."
+  def set_agent_writes_enabled(%Scope{} = scope, company_id, enabled?)
+      when is_boolean(enabled?) do
+    with {:ok, _} <- authorize_company_target(scope, company_id, "admin.company.update"),
+         {:ok, _} <- require_writable_company(scope, company_id) do
+      Bilimbi.Base.Settings.put(
+        "authz.agent_writes_enabled",
+        enabled?,
+        Bilimbi.Base.Settings.Scope.company(company_id, Scope.tenant_id(scope))
+      )
+    end
+  end
+
+  @doc "Validates a prospective company, including generated defaults and field access, without writing."
+  @spec preview_create_company(Scope.t(), map()) ::
+          {:ok, Summary.t()} | {:error, Ecto.Changeset.t()}
+  def preview_create_company(%Scope{} = scope, attributes) do
+    # Code uniqueness is deliberately global: the compatible companies_code_unique
+    # constraint spans tenants, so a tenant-scoped uniqueness check would lie.
+    scope
+    |> creation_changeset(attributes)
+    |> Ecto.Changeset.unsafe_validate_unique(:code, Repo)
+    |> Ecto.Changeset.apply_action(:insert)
+    |> case do
+      {:ok, company} -> {:ok, Summary.for_scope(company, scope)}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
+  defp creation_changeset(scope, attributes) do
+    scope
+    |> Scope.tenant_id()
+    |> Schema.creation_changeset(attributes)
+    |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
   end
 
   @doc """

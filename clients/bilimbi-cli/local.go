@@ -31,11 +31,12 @@ type link struct {
 // This document is local presentation data, not a server plan or proof of go.
 // Job 4 can carry a validated API plan in rows without changing the lifecycle.
 type document struct {
-	Title   string           `json:"title"`
-	Summary string           `json:"summary,omitempty"`
-	Columns []column         `json:"columns"`
-	Rows    []map[string]any `json:"rows"`
-	Links   []link           `json:"links,omitempty"`
+	ReadOnly bool             `json:"read_only,omitempty"`
+	Title    string           `json:"title"`
+	Summary  string           `json:"summary,omitempty"`
+	Columns  []column         `json:"columns"`
+	Rows     []map[string]any `json:"rows"`
+	Links    []link           `json:"links,omitempty"`
 }
 type submission struct {
 	Approved bool     `json:"approved"`
@@ -193,6 +194,9 @@ func (p *localPage) submit(w http.ResponseWriter, r *http.Request) {
 			updated[k] = v
 		}
 		for j, col := range d.Columns {
+			if d.ReadOnly {
+				continue
+			}
 			values, exists := r.PostForm[fmt.Sprintf("cell-%d-%d", i, j)]
 			if !exists || len(values) != 1 {
 				http.Error(w, "Missing field", 400)
@@ -261,7 +265,7 @@ var localTemplate = template.Must(template.New("local").Parse(`<!doctype html>
 <p class="badge">Bilimbi · {{if eq .Mode "report"}}Results{{else}}Read-only review{{end}}</p><h1>{{.Document.Title}}</h1>{{if .Document.Summary}}<p>{{.Document.Summary}}</p>{{end}}
 {{if and (eq .Mode "review") .Received}}<p class="status" role="status">Review submitted. Waiting for the agent's report.</p>{{end}}
 <form method="post" action="{{.Path}}/submit"><div class="table"><table><thead><tr>{{range .Document.Columns}}<th scope="col">{{.Label}}</th>{{end}}</tr></thead><tbody>
-{{range .Rows}}<tr>{{range .}}<td>{{if and (eq $.Mode "review") (not $.Received)}}
+{{range .Rows}}<tr>{{range .}}<td>{{if and (eq $.Mode "review") (not $.Received) (not $.Document.ReadOnly)}}
 {{if eq .Kind "boolean"}}<select name="{{.Name}}" aria-label="{{.Label}}"><option value="true" {{if eq .Value "true"}}selected{{end}}>Yes</option><option value="false" {{if eq .Value "false"}}selected{{end}}>No</option></select>
 {{else if eq .Kind "number"}}<input type="number" step="any" name="{{.Name}}" value="{{.Value}}" aria-label="{{.Label}}" required>
 {{else}}<textarea name="{{.Name}}" aria-label="{{.Label}}" rows="2">
@@ -281,8 +285,12 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *timeout <= 0 {
 		return errors.New("usage: review|report --input <file|-> [--session <file>] [--timeout 30m]")
 	}
-	var d document
-	if err := readJSON(input, *file, &d); err != nil {
+	var raw json.RawMessage
+	if err := readJSON(input, *file, &raw); err != nil {
+		return err
+	}
+	d, err := localDocument(raw, command)
+	if err != nil {
 		return err
 	}
 	if err := validateDocument(d); err != nil {
