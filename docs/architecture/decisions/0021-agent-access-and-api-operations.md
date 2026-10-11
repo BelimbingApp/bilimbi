@@ -17,10 +17,11 @@ registers, and how its work is recorded
 
 People want agents they already use, such as coding agents and chat apps, to
 look things up and fill in records in Bilimbi. The owner decided that Bilimbi
-itself stays free of AI, that agents come in through an API that runs the
-same operations and checks as the screens, that an agent can do what its
-person can do and nothing more, that the person sees and agrees to every
-change before it is written, and that every call is logged.
+itself stays free of AI and is only the API: the work, the files and the
+person's review happen in the agent's harness. The API runs the same
+operations and checks as the screens, an agent can do what its person can
+do and nothing more, the person sees and agrees to every change before it
+is written, and every call is logged.
 
 Four facts shaped the decision.
 
@@ -40,23 +41,34 @@ Four facts shaped the decision.
 
 ## Decision
 
+**Everything happens in the harness; Bilimbi is the API.** A person asks
+their agent for any task, such as entering a namecard or adding people from
+a spreadsheet, and the agent does it through the API.
+
+- Files stay in the harness, for example photos taken on a phone and handed
+  to the agent. Bilimbi never receives files.
+- The review and report page is a local page on `127.0.0.1`, served by the
+  native Bilimbi program (Decision 9). Review happens at the desktop; a
+  phone only supplies files.
+- Bilimbi hosts no review page and keeps no work sessions.
+
 1. **A connection is an OAuth grant owned by one person.** Bilimbi is its
    own authorization server. Any signed-in person may connect an agent to
    their own account. A connection binds the person, the company they
    approved it in, and that company's tenant, with an end date and the
    agent ID shown at approval. Core Agent Access (`core/agent_access`)
    owns connections and their tokens.
-   - The primary way to connect is the device authorization grant (RFC 8628):
-     the agent shows a code, and the person approves in Bilimbi on a page
-     that names the stated agent ID.
-   - Authorization code with PKCE `S256` serves clients that can open a
-     browser on a loopback address (RFC 8252) and operator-registered front
-     ends.
+   - Bilimbi has many independent adopters, so the person gives the agent
+     their server's address once. The client then discovers the server
+     through OAuth authorization-server metadata (RFC 8414) plus a Bilimbi
+     descriptor, and signs in with the device authorization grant
+     (RFC 8628) under one public client id that every Bilimbi accepts.
+   - In the device grant, the agent shows a code, and the person approves
+     in Bilimbi on a page that names the stated agent ID.
    - Access tokens are opaque, last one hour and are stored only as hashes.
      Refresh tokens rotate, and replaying a rotated one revokes the
      connection.
-   - There is no shared or service-account token. A shared front end
-     obtains a grant per user.
+   - There is no shared or service-account token.
    - A connection cannot be approved or used under impersonation.
 
 2. **The bearer edge is the second caller of the authentication seam.**
@@ -89,7 +101,7 @@ Four facts shaped the decision.
    store request or result bodies by default, because they can carry
    secrets and pay. A write's changes are recorded by the existing
    mutation audit as the person's rows (`actor_type "user"`), joined to
-   the request by its trace id. The Bilimbi command-line client calls the
+   the request by its trace id. The native Bilimbi program calls the
    API, so its calls are logged too; work done without the API, such as a
    server-side task, is covered by the audit alone. The `"agent"` actor
    type keeps its Belimbing meaning.
@@ -111,7 +123,7 @@ Four facts shaped the decision.
    - validate the input's shape;
    - ask `Authz.can(scope, capability)`, the same key the screen's route or
      event asks;
-   - for a write, check the plan token (Decision 8);
+   - for a write, check the plan code (Decision 8);
    - call the handler, so the facade's changesets, field restrictions and
      internal checks apply unchanged.
 
@@ -121,51 +133,53 @@ Four facts shaped the decision.
    guides. The Bilimbi skill teaches search, then describe, then call, and
    lists no operations.
 
-8. **Writes go preview, go, write, report.**
-   - The agent asks for a preview: a dry run that returns the change plan
-     (each record and field, before and after) and a plan token bound to
-     that plan, the person and the input.
-   - The agent shows the person a summary of the plan and waits for their
-     go.
-   - On the go, the agent calls the write with the plan token. Bilimbi
+8. **Writes go dry run, go, write, report.**
+   - The agent asks the API for a dry run. It validates the changes and
+     returns the change plan (each record and field, before and after) and
+     a plan code bound to that plan, the person and the input.
+   - The agent shows the plan on the local review page, where the person
+     can edit, comment, answer questions and give their go.
+   - On the go, the agent calls the write carrying the plan code. Bilimbi
      refuses it if the input or the records' current values no longer
      match the plan.
-   - The agent then reports what was written, with links into Bilimbi so
+   - The same local page then shows the report, with links into Bilimbi so
      the person can check each change.
+
+   The go itself is not proven to Bilimbi. The agent acts as the person,
+   with the person's own permissions, and the API request log records the
+   run.
 
    Domain workflows still apply: a change that needs approval when made on
    a screen enters the same approval workflow when an agent makes it. There
    is no separate permission for agent changes.
 
-9. **The client is a skill and a command-line client, not a protocol
-   server.** Bilimbi ships one generic skill and one native command-line
-   client with `login`, `search`, `describe`, `call` and `logout`. The
-   client signs in with the device grant, keeps the token in the operating
-   system's credential store and out of the conversation, and sends the
-   agent ID (`harness/model-ver-effort`) and a run id with every call.
-   - Both are packaged as thin plugins for each agent harness, Codex first.
-   - The skill is an asset of Base Agent API, in this repository, versioned
-     and tested with the API it teaches.
-   - Each running Bilimbi serves its own copy, as a zip carrying that
-     server's address.
+9. **The client is one native Bilimbi program and a skill, not a protocol
+   server.** The program has `login <address>`, profiles for more than one
+   server, `search`, `describe`, `call` and `logout`. It signs in with the
+   device grant, keeps the token in the operating system's credential store
+   and out of the conversation, sends the agent ID
+   (`harness/model-ver-effort`) and a run id with every call, and serves
+   the local review and report page. It needs no other runtime.
+   - The program and the skill are packaged as thin plugins for each agent
+     harness, Codex first.
+   - The skill is versioned and tested with the API it teaches.
    - A Domain's or Extension's skill text is its `guides`, in its own
      repository, served through search.
-   - A separate public skills repository may only mirror the served copy.
    - An MCP server is not part of this decision.
 
 ## The owner's decisions
 
 - **D1 and D2. Who may connect, and how writes are agreed.** Anyone may
   connect an agent, and it can do what the person can do (Decision 3).
-  Writes follow preview, go, write, report (Decision 8), and a company can
+  Writes follow dry run, go, write, report (Decision 8), and a company can
   switch agent writes off.
 - **D3. An agent ID that differs from the approved one.** Record it, flag
   it on the connected-agents page as "also seen as …", and never refuse a
   request because of it. The token grants access; the stated ID proves
   nothing.
-- **D4. The client.** One native Bilimbi command-line client plus the
-  skill, packaged as thin plugins per agent harness, with the Codex plugin
-  first (Decision 9).
+- **D4. The client.** One native Bilimbi program plus the skill,
+  packaged as thin plugins per agent harness, with the Codex plugin first
+  (Decision 9).
 - **D5. Logging.** One general API request log for every call, reads
   included, and the existing mutation audit for changes (Decision 4).
 - **D6. One central AI provider for a company.** Deferred. People connect
@@ -174,18 +188,20 @@ Four facts shaped the decision.
 
 ## Build order
 
-Each step is its own change.
+Each job is its own change.
 
-1. Self-registration, search, describe, and read calls in process.
-2. The sealed agent facet and its Authz bounds.
-3. Connections: Core Agent Access, the device grant and the consent page.
-4. The HTTP API and the general API request log.
-5. The command-line client, the skill, the Codex plugin, and a "Connect
-   an AI assistant" page.
-6. Preview, plan token and write for the first write operations.
-7. The connected-agents page, the agent-writes switch and settings.
-8. Reviewing one agent run from the request log and the audit.
-9. Authorization code with PKCE, registered front ends, and OpenAPI.
+1. Foundation: self-registration, search, describe and read calls, in
+   process.
+2. The door: the HTTP endpoint, discovery (RFC 8414 plus a Bilimbi
+   descriptor), OAuth device sign-in with one public client id, and the
+   general API request log.
+3. The native Bilimbi program and the Codex plugin: `login <address>`,
+   profiles, the operating system's credential store, search, describe
+   and call, the agent and run headers, the local review and report page,
+   and the skill.
+4. Safe writes on the API: dry run and plan code, creating a company and a
+   person, and their guides.
+5. A namecard, end to end, from a phone photo to records in Bilimbi.
 
 ## Consequences
 
@@ -206,9 +222,11 @@ Each step is its own change.
   text.
 - Domain and Extension operations use meta-terms in keys, titles and
   guides; company wording belongs in configurable keywords.
-- The first step's validator still accepts an `approval` field on write
-  operations, from an earlier draft of this record. The write step
-  replaces it with the plan token.
+- The first job's validator still accepts an `approval` field on write
+  operations, from an earlier draft of this record. The safe-writes job
+  replaces it with the plan code.
+- Bilimbi cannot tell whether the person really gave the go. It relies on
+  the person's own permissions, the plan code and the request log.
 
 ## Alternatives considered
 
@@ -219,7 +237,7 @@ Each step is its own change.
   through the clipboard and chat transcripts, and the agent could not set
   itself up.
 - **MCP as the first client surface.** Tool lists cost context in every
-  session, and a skill plus a command-line client cover coding agents. MCP
+  session, and a skill plus the native program cover coding agents. MCP
   can wrap the same API later.
 - **A per-module API.** Every Domain would write controllers, and an agent
   would need module-specific instructions that drift.
@@ -228,5 +246,8 @@ Each step is its own change.
   capability. The person who asked for the change is the one who should
   agree to it, and domain workflows already route changes that need
   someone else's approval.
+- **A review page and work sessions hosted by Bilimbi.** Files and
+  drafts would have to move into Bilimbi, and every harness would depend
+  on a Bilimbi page. A local page in the harness keeps Bilimbi an API.
 - **An audit log only for agents.** A separate agent log would duplicate
   the request facts every API caller needs and split one trail in two.

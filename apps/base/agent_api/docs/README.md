@@ -45,7 +45,7 @@ management).
 
 Only reads run; every write answers `{:error, :writes_not_enabled}`. There
 is no HTTP surface, connection, token or agent identity on the scope, no
-API request log, and no preview, plan token or write. ADR 0021 describes
+API request log, and no dry run, plan code or write. ADR 0021 describes
 how each of those arrives.
 
 ## Tests

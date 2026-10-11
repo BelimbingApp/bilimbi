@@ -41,7 +41,7 @@ defmodule Bilimbi.Base.AgentApi.ContributionValidator do
     * `kind` is `:read` or `:write`. A write declares `approval`, `:level`
       or `:required`; a read declares none. The field is left from an
       earlier draft and decides nothing: ADR 0021 Decision 8 gates every
-      write on a preview and its plan token, and the write step drops
+      write on a dry run and its plan code, and safe writes drop
       the field;
     * `capability` is a well-formed capability key: the one the matching
       screen's route or event asks for. A read operation stands on a read
