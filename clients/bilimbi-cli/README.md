@@ -114,6 +114,14 @@ review input are ignored. Those evidence cells are read-only; changes belong in
 the comments, followed by a new plan and review. Ordinary local presentation
 documents retain editable cells. No business write happens until commit.
 
+`review --notes readings.txt` adds local UTF-8 notes beside the review table,
+labelled **Notes from the agent**. Use them for source readings, uncertain
+fields, duplicate-search evidence and employer questions. They are escaped
+plain text, remain separate from the server's validated preview and are never
+sent to Bilimbi. Answers belong in **Comments or questions** with **Request
+changes**; revised inputs need a new plan. Notes are also preserved in the
+printed submission's `document.notes`.
+
 The client enforces the person's go locally; Bilimbi does not verify it. When
 `review` receives the plan output from `plan` and the person approves, it writes
 an approval marker for that plan code beside the saved plan file.
@@ -184,6 +192,25 @@ This document is independent of a Bilimbi plan: `review` and `report` only
 present it, and a local approval alone performs no mutation. For a plan, the
 safe write loop above builds the document from the saved server results, and
 only `commit` writes.
+
+## Namecard device test
+
+The [Codex skill](../../plugins/codex/bilimbi/skills/bilimbi/SKILL.md#namecards-from-codex-remote)
+contains the namecard recipe. Start on the desktop, attach photos in the same
+conversation through Codex Remote on the phone, and return to the desktop
+for the local draft and validated-plan reviews. Photos stay in the harness.
+Review confirms uncertain readings, duplicate matches and the person/employer
+shape before any commit. New employers are committed and reported first;
+their returned ids feed separately reviewed employee plans. A later failure
+must report the earlier successful company creation.
+
+Phone delivery requires a real paired-device test. A local synthetic image
+can prove extraction, searches, review, API writes and verification links,
+but cannot establish Remote attachment delivery. Remote access and pairing
+come from [OpenAI's host setup](https://learn.chatgpt.com/docs/remote-connections),
+and [photo capture belongs to the mobile prompt](https://developers.openai.com/blog/mastering-codex-remote-for-engineering).
+The native program and browser must share the desktop host: a remote machine's
+loopback URL cannot be opened directly on the phone or another computer.
 
 ## Build and verify
 
