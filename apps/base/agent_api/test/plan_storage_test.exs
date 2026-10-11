@@ -18,6 +18,8 @@ defmodule Bilimbi.Base.AgentApi.PlanStorageTest do
              SQL.query(
                Repo,
                "INSERT INTO base_agent_api_plans (id,tenant_id,binding_hash,operations_hash,preview_hash,expires_at) VALUES ('missing-tenant',999999,'a','b','c',now())",
-               [], mode: :savepoint)
+               [],
+               mode: :savepoint
+             )
   end
 end
