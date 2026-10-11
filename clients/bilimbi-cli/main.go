@@ -86,7 +86,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		return err
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Fprintln(out, "bilimbi login <address> [--name <profile>] | logout [name] | profiles | use <name>\nbilimbi search <words> | describe <key> | guide <key> | call <key> [--input <file|->]\nbilimbi plan --input <file|-> | commit --plan <code>\nbilimbi review --input <file|-> [--session <file>] [--timeout 30m]\nbilimbi report --input <file|-> [--session <file>] [--timeout 30m]\nHeaders: --agent-id harness/model-ver-effort --run-id <run>, or BILIMBI_AGENT_ID/BILIMBI_RUN_ID.\nJSON goes to stdout; browser addresses and device codes go to stderr.")
+		fmt.Fprintln(out, "bilimbi login <address> [--name <profile>] | logout [name] | profiles | use <name>\nbilimbi search <words> | describe <key> | guide <key> | call <key> [--input <file|->]\nbilimbi plan --input <file|-> | commit --plan <code>\nbilimbi review --input <file|-> [--notes <file>] [--session <file>] [--timeout 30m]\nbilimbi report --input <file|-> [--session <file>] [--timeout 30m]\nHeaders: --agent-id harness/model-ver-effort --run-id <run>, or BILIMBI_AGENT_ID/BILIMBI_RUN_ID.\nJSON goes to stdout; browser addresses and device codes go to stderr.")
 		return nil
 	}
 	command, tail := args[0], args[1:]

@@ -275,3 +275,81 @@ func TestReviewSubmitNormalizesLineEndings(t *testing.T) {
 		t.Fatal("submission never delivered")
 	}
 }
+
+func TestPlanReviewNotesKeepSavedEvidenceAndRevisionDoesNotApprove(t *testing.T) {
+	store, _ := testStore(t)
+	code := strings.Repeat("n", 43)
+	var saved savedPlan
+	if err := json.Unmarshal([]byte(`{"results":[{"key":"core.company.create","valid":true,"preview":{"changes":[{"field":"name","from":null,"to":"Validated employer"}]}}]}`), &saved); err != nil {
+		t.Fatal(err)
+	}
+	saved.Code = code
+	saved.Expires = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	if err := writeJSON(planPath(store, code), saved); err != nil {
+		t.Fatal(err)
+	}
+	notesFile := filepath.Join(t.TempDir(), "readings.txt")
+	notes := "Phone digit uncertain <script>bad()</script>\nRecord as employee of this external employer?"
+	if err := os.WriteFile(notesFile, []byte(notes), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stdout, stderr := notifyWriter{make(chan string, 4)}, notifyWriter{make(chan string, 4)}
+	finished := make(chan error, 1)
+	go func() {
+		finished <- localCommand(ctx, "review", []string{"--notes", notesFile}, strings.NewReader(`{"plan_code":"`+code+`","notes":"replace the preview","results":[]}`), stdout, stderr, store)
+	}()
+	var address string
+	select {
+	case line := <-stderr.lines:
+		address = strings.TrimSpace(strings.TrimPrefix(line, "Open "))
+	case <-ctx.Done():
+		t.Fatal("review not started")
+	}
+	resp, err := http.Get(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), "Validated employer") || !strings.Contains(string(body), "Phone digit uncertain &lt;script&gt;") || strings.Contains(string(body), "<script>") || strings.Contains(string(body), `name="cell-`) {
+		t.Fatal("notes lost, unescaped, or replaced editable server evidence")
+	}
+	u, _ := url.Parse(address)
+	p := &localPage{url: address, host: u.Host}
+	form := url.Values{"decision": {"revise"}, "comment": {"Use the external employer; omit the unreadable phone"}, "cell-0-3": {"Tampered"}}
+	resp = localRequest(t, p, "/submit", "http://"+p.host, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatal("revision refused", resp.StatusCode)
+	}
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal("revision did not finish")
+	}
+	var result submission
+	if err := json.Unmarshal([]byte(<-stdout.lines), &result); err != nil || result.Approved || result.Comment != form.Get("comment") || result.Document.Notes != notes || result.Document.Rows[0]["to"] != "Validated employer" {
+		t.Fatal("revision lost notes, comments or saved evidence", err)
+	}
+	if _, err := os.Stat(approvalPath(store, code)); !os.IsNotExist(err) {
+		t.Fatal("revision approved the plan")
+	}
+}
+
+func TestReviewRefusesInvalidNotesBeforeOpeningPage(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "notes.txt")
+	data, _ := json.Marshal(testDocument())
+	for _, content := range [][]byte{{0xff}, bytes.Repeat([]byte("x"), maxJSON+1)} {
+		if err := os.WriteFile(file, content, 0600); err != nil {
+			t.Fatal(err)
+		}
+		var stderr bytes.Buffer
+		if err := localCommand(context.Background(), "review", []string{"--notes", file}, bytes.NewReader(data), io.Discard, &stderr, nil); err == nil || stderr.Len() != 0 {
+			t.Fatal("invalid notes opened a page", err)
+		}
+	}
+}

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type column struct {
@@ -34,6 +35,7 @@ type document struct {
 	ReadOnly bool             `json:"read_only,omitempty"`
 	Title    string           `json:"title"`
 	Summary  string           `json:"summary,omitempty"`
+	Notes    string           `json:"notes,omitempty"`
 	Columns  []column         `json:"columns"`
 	Rows     []map[string]any `json:"rows"`
 	Links    []link           `json:"links,omitempty"`
@@ -59,6 +61,9 @@ type localPage struct {
 }
 
 func validateDocument(d document) error {
+	if len(d.Notes) > maxJSON || !utf8.ValidString(d.Notes) {
+		return errors.New("review notes must be UTF-8 text within the document size limit")
+	}
 	if d.Title == "" || len(d.Columns) == 0 || len(d.Columns) > 100 || len(d.Rows) > 10000 {
 		return errors.New("local document needs a title, 1–100 columns, and at most 10000 rows")
 	}
@@ -262,7 +267,8 @@ var localTemplate = template.Must(template.New("local").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Document.Title}} · Bilimbi</title>
 {{if and .Received (eq .Mode "review")}}<meta http-equiv="refresh" content="2">{{end}}
 <style>body{font:14px system-ui,sans-serif;color:#292524;background:#fafaf9;margin:0;padding:24px}main{max-width:1100px;margin:auto}h1{font-size:22px;font-weight:600;color:#365314}p{line-height:1.5}table{border-collapse:collapse;width:100%;background:white}th,td{text-align:left;border:1px solid #d6d3d1;padding:8px;vertical-align:top}th{background:#f5f5f4;font-weight:600}input,textarea,select,button{font:inherit;border:1px solid #a8a29e;border-radius:4px;padding:7px;box-sizing:border-box}input,textarea{width:100%;min-width:100px}textarea{resize:vertical}button{cursor:pointer;background:white;margin:12px 8px 0 0}button.primary{background:#365314;color:white;border-color:#365314}a{color:#365314}label{display:block;margin:16px 0 5px}:focus-visible{outline:2px solid #65a30d;outline-offset:2px}.table{overflow:auto}.status{padding:12px;border:1px solid #a8a29e;background:white}.value{white-space:pre-wrap;overflow-wrap:anywhere}.badge{font-size:12px;color:#57534e}ul{padding-left:20px}@media(prefers-color-scheme:dark){body{background:#1c1917;color:#e7e5e4}h1,a{color:#bef264}table,.status,button,input,textarea,select{background:#292524;color:#e7e5e4}th{background:#44403c}}</style></head><body><main>
-<p class="badge">Bilimbi · {{if eq .Mode "report"}}Results{{else}}Read-only review{{end}}</p><h1>{{.Document.Title}}</h1>{{if .Document.Summary}}<p>{{.Document.Summary}}</p>{{end}}
+<p class="badge">Bilimbi · {{if eq .Mode "report"}}Results{{else if .Document.ReadOnly}}Read-only review{{else}}Review draft{{end}}</p><h1>{{.Document.Title}}</h1>{{if .Document.Summary}}<p>{{.Document.Summary}}</p>{{end}}
+{{if .Document.Notes}}<section aria-labelledby="review-notes"><h2 id="review-notes">Notes from the agent</h2><p class="value">{{.Document.Notes}}</p></section>{{end}}
 {{if and (eq .Mode "review") .Received}}<p class="status" role="status">Review submitted. Waiting for the agent's report.</p>{{end}}
 <form method="post" action="{{.Path}}/submit"><div class="table"><table><thead><tr>{{range .Document.Columns}}<th scope="col">{{.Label}}</th>{{end}}</tr></thead><tbody>
 {{range .Rows}}<tr>{{range .}}<td>{{if and (eq $.Mode "review") (not $.Received) (not $.Document.ReadOnly)}}
@@ -281,9 +287,10 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 	flags.SetOutput(io.Discard)
 	file := flags.String("input", "-", "JSON document")
 	sessionFile := flags.String("session", "", "local session descriptor")
+	notesFile := flags.String("notes", "", "local UTF-8 review notes")
 	timeout := flags.Duration("timeout", 30*time.Minute, "page lifetime")
-	if flags.Parse(args) != nil || flags.NArg() != 0 || *timeout <= 0 {
-		return errors.New("usage: review|report --input <file|-> [--session <file>] [--timeout 30m]")
+	if flags.Parse(args) != nil || flags.NArg() != 0 || *timeout <= 0 || (command != "review" && *notesFile != "") {
+		return errors.New("usage: review|report --input <file|-> [--session <file>] [--timeout 30m]; review also accepts --notes <file>")
 	}
 	var raw json.RawMessage
 	if err := readJSON(input, *file, &raw); err != nil {
@@ -301,6 +308,20 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 		d = reviewDocument(*saved)
 	} else if d, err = localDocument(raw, command); err != nil {
 		return err
+	}
+	// Notes explain harness readings and questions beside the server evidence.
+	// They never replace saved results or operations, and never go to Bilimbi.
+	if *notesFile != "" {
+		file, err := os.Open(*notesFile)
+		if err != nil {
+			return errors.New("cannot read review notes")
+		}
+		notes, readErr := io.ReadAll(io.LimitReader(file, maxJSON+1))
+		file.Close()
+		if readErr != nil {
+			return errors.New("cannot read review notes")
+		}
+		d.Notes = string(notes)
 	}
 	if err := validateDocument(d); err != nil {
 		return err
