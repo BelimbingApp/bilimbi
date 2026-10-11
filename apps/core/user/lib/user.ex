@@ -102,9 +102,6 @@ defmodule Bilimbi.Core.User do
 
   @password_reset_max_age 3_600
   @password_reset_throttle 60
-  # No caller's own session is spared when a company is archived: the host
-  # acts on a committed fact, not inside one of the account's own sessions.
-  @no_current_session "company-archived"
 
   @doc """
   Lists the users affiliated with one company inside the scope's tenant.
@@ -125,48 +122,6 @@ defmodule Bilimbi.Core.User do
         |> Enum.map(&Summary.from_schema/1)
 
       {:ok, users}
-    end
-  end
-
-  @doc """
-  Ends every durable session of an archived company's accounts.
-
-  An archived company's accounts cannot sign in or keep a session (the login
-  edge refuses them through `Company.fetch_tenant_id_for_company/1` on every
-  request); this removes the rows and so closes their open tabs at once
-  rather than at their next action. The host calls it when a company is
-  archived. A company that is not archived is
-  `{:error, :company_not_archived}` and nothing ends; a missing one is
-  `{:error, :company_not_found}`. Returns how many sessions ended.
-  """
-  @spec terminate_company_sessions(Scope.t(), pos_integer()) ::
-          {:ok, non_neg_integer()} | {:error, :company_not_found | :company_not_archived}
-  def terminate_company_sessions(%Scope{} = scope, company_id)
-      when is_integer(company_id) and company_id > 0 do
-    case Company.require_writable_company(scope, company_id) do
-      {:error, :company_archived} ->
-        user_ids =
-          Repo.all(
-            from(user in Schema,
-              where: user.company_id == ^company_id,
-              order_by: user.id,
-              select: user.id
-            )
-          )
-
-        count =
-          Enum.reduce(user_ids, 0, fn user_id, total ->
-            {:ok, ended} = Session.terminate_user_sessions(user_id, @no_current_session)
-            total + ended
-          end)
-
-        {:ok, count}
-
-      {:ok, _company_id} ->
-        {:error, :company_not_archived}
-
-      {:error, :not_found} ->
-        {:error, :company_not_found}
     end
   end
 
@@ -342,7 +297,12 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Authenticates the globally unique email and upgrades legacy bcrypt on success."
+  @doc """
+  Authenticates the globally unique email and upgrades legacy bcrypt on success.
+
+  The stored hash of an archived company's account is never rewritten; the
+  host refuses its sign-in.
+  """
   @spec authenticate(String.t(), String.t()) ::
           {:ok, Summary.t()} | {:error, credential_error()}
   def authenticate(email, password) when is_binary(email) and is_binary(password) do
@@ -390,8 +350,8 @@ defmodule Bilimbi.Core.User do
   @doc """
   Stores a one-time reset token and passes its plaintext only to `deliver_fun`.
 
-  Unknown accounts and throttled requests both return `:ok`, so a public
-  caller can always give the same response. Delivery receives a safe
+  Unknown accounts, accounts of an archived company, and throttled requests
+  all return `:ok`, so a public caller can always give the same response. Delivery receives a safe
   `Summary` and the plaintext token; the database stores only its hash.
   """
   @spec request_password_reset(
@@ -405,7 +365,7 @@ defmodule Bilimbi.Core.User do
     throttle_seconds = non_negative_seconds!(opts[:throttle_seconds], :throttle_seconds)
     email = Schema.normalize_email(email)
 
-    case Repo.get_by(Schema, email: email) do
+    case unfrozen_user(Repo.get_by(Schema, email: email)) do
       nil ->
         random_token() |> Password.hash()
         :ok
@@ -419,7 +379,12 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Consumes a valid reset token, replaces the password, and rotates `remember_token`."
+  @doc """
+  Consumes a valid reset token, replaces the password, and rotates `remember_token`.
+
+  An account of an archived company is frozen and answers
+  `{:error, :invalid_or_expired_token}` like an unknown one.
+  """
   @spec reset_password(String.t(), String.t(), String.t(), keyword()) ::
           {:ok, Summary.t()} | {:error, :invalid_or_expired_token | Changeset.t()}
   def reset_password(email, token, new_password, opts \\ [])
@@ -971,8 +936,19 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  # An archived company's accounts are frozen: their stored credential never
+  # changes, and a public caller sees them as it sees an unknown email.
+  defp unfrozen_user(nil), do: nil
+
+  defp unfrozen_user(%Schema{company_id: company_id} = user) do
+    case Company.fetch_tenant_id_for_company(company_id) do
+      {:error, :company_archived} -> nil
+      _live_or_absent -> user
+    end
+  end
+
   defp maybe_upgrade_credential(%Schema{password_hash: hash} = user, password) do
-    if Password.legacy?(hash) do
+    if Password.legacy?(hash) and unfrozen_user(user) do
       user
       |> Schema.credential_upgrade_changeset(Password.hash(password))
       |> Repo.update()
@@ -1021,7 +997,7 @@ defmodule Bilimbi.Core.User do
   end
 
   defp valid_password_reset(email, token, max_age) do
-    user = Repo.get_by(Schema, email: email)
+    user = unfrozen_user(Repo.get_by(Schema, email: email))
     reset = Repo.get(PasswordResetToken, email)
 
     if is_nil(user) or is_nil(reset) do

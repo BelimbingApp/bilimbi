@@ -20,11 +20,6 @@ config :web, BilimbiWeb.Endpoint,
 config :bilimbi_core_user,
   pubsub_server: BilimbiWeb.PubSub
 
-# Committed company lifecycle operations ride the host's PubSub so the host
-# can end an archived company's sessions (BilimbiWeb.CompanySessionTermination).
-config :bilimbi_core_company,
-  pubsub_server: BilimbiWeb.PubSub
-
 # Session terminations ride the host's PubSub so the host can end the live
 # sockets of a session that ended (BilimbiWeb.SessionDisconnect).
 config :bilimbi_base_session,

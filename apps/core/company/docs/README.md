@@ -101,7 +101,7 @@ records stay listed, viewable and auditable.
 | Employees and employee types: create, update, delete, subordinates, affiliation lock | Core Employee |
 | User accounts: create, update, delete, employee link, moving an account into it | Core User |
 | Roles, role capabilities, role assignments, direct and system-principal grants | Base Authz |
-| Company-scoped settings and shared workspace layouts | Base Settings (through the host's `SettingsCompanyScope.writable/2`), Base Tiling |
+| Company-scoped settings and shared workspace layouts; the company page's default timezone | Base Settings (through the host's `SettingsCompanyScope.writable/2`), Base Tiling, `web/show_live.ex` |
 
 The lifecycle table above already ends at `archived`. Pages withhold their
 edit, create and delete controls and show one "archived and read-only"
@@ -111,12 +111,11 @@ refused too.
 An archived company's accounts cannot sign in, be impersonated, or keep a
 session. `fetch_tenant_id_for_company/1`, the Web login edge's one company
 read, answers `{:error, :company_archived}`, so the login form says so and
-every request or LiveView event of a session opened before is refused. Each
-committed lifecycle operation is published to `subscribe_lifecycle/0`; on
-`archive` the host (`BilimbiWeb.CompanySessionTermination`) asks Core User
-to end the company's sessions (`User.terminate_company_sessions/2`) so open
-tabs close at once. Nothing stores the refusal: it is read from the status
-on every request, so sign-in follows the status if it ever changes back.
+every request or LiveView event of a session opened before is refused.
+Nothing stores the refusal: it is read from the status on every request, so
+sign-in follows the status if it ever changes back. The public password
+reset treats such an account as an unknown email (nothing is delivered, no
+token redeems) and a sign-in never rewrites its stored hash.
 
 Soft deletion (`deleted_at`) is a separate fact from the `archived` status,
 as it is in Belimbing, where `archive()` sets the status and `delete()`

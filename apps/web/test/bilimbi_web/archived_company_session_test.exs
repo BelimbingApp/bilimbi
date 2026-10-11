@@ -1,8 +1,8 @@
 defmodule BilimbiWeb.ArchivedCompanySessionTest do
   @moduledoc """
   An archived company's accounts cannot sign in, be impersonated, or keep a
-  session. The login edge refuses them on every request, and archiving ends
-  their durable sessions as soon as it commits.
+  session. The login edge reads the company's status on every request and
+  LiveView event, so the refusal follows the archive without anything stored.
   """
 
   use BilimbiWeb.ConnCase, async: false
@@ -46,26 +46,11 @@ defmodule BilimbiWeb.ArchivedCompanySessionTest do
     %{scope: scope, member: member}
   end
 
-  test "archiving ends the company's sessions and later sign-in is refused", %{
-    conn: conn,
-    scope: scope,
-    member: member
-  } do
+  test "archiving the company refuses its accounts at the login form", %{scope: scope} do
     grant_capabilities!(["admin.company.update", "admin.company.tenant-wide.manage"])
-
-    member_conn = log_in_as(conn, %{"user_id" => member.id, "company_id" => 74})
-    assert {:ok, _view, _html} = live(member_conn, ~p"/dashboard")
-
-    admin_conn = log_in_as(build_conn())
-    admin_session = Plug.Conn.get_session(admin_conn, "current_user")["session_id"]
 
     {:ok, _company} =
       Company.archive_company(Authentication.sign_in(scope, 91, 73), 74, reason: "closed")
-
-    _ = :sys.get_state(BilimbiWeb.CompanySessionTermination)
-
-    assert [%Session.Summary{id: ^admin_session}] = Session.list_sessions()
-    assert {:error, {:redirect, %{to: "/"}}} = live(member_conn, ~p"/dashboard")
 
     {:ok, view, _html} = live(build_conn(), ~p"/")
 
@@ -89,7 +74,6 @@ defmodule BilimbiWeb.ArchivedCompanySessionTest do
     member_conn = log_in_as(conn, %{"user_id" => member.id, "company_id" => 74})
     assert {:ok, _view, _html} = live(member_conn, ~p"/dashboard")
 
-    # The status alone decides, whether or not the termination ran.
     archive_status!(74)
 
     assert {:error, {:redirect, %{to: "/"}}} = live(member_conn, ~p"/dashboard")
@@ -105,18 +89,6 @@ defmodule BilimbiWeb.ArchivedCompanySessionTest do
 
     refute redirected_to(resp) == ~p"/dashboard"
     assert [%Session.Summary{user_id: 91}] = Session.list_sessions()
-  end
-
-  test "ending sessions is refused for a company that is not archived", %{
-    conn: conn,
-    scope: scope,
-    member: member
-  } do
-    log_in_as(conn, %{"user_id" => member.id, "company_id" => 74})
-
-    assert {:error, :company_not_archived} = User.terminate_company_sessions(scope, 74)
-    assert [%Session.Summary{user_id: user_id}] = Session.list_sessions()
-    assert user_id == member.id
   end
 
   # The status the lifecycle writes, without its audit and capability

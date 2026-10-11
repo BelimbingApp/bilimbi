@@ -37,7 +37,6 @@ defmodule Bilimbi.Core.Company.Lifecycle do
           | {:invalid_transition, String.t()}
 
   @capability "admin.company.update"
-  @topic "core_company_lifecycle"
   @reason_max_length 500
 
   # operation => {from statuses, to status, audit event}
@@ -96,7 +95,6 @@ defmodule Bilimbi.Core.Company.Lifecycle do
           {:error, reason} -> Repo.rollback(reason)
         end
       end)
-      |> tap(&publish(&1, scope, operation, company_id))
     end
   end
 
@@ -167,52 +165,6 @@ defmodule Bilimbi.Core.Company.Lifecycle do
     |> Tenancy.scope_query(scope)
     |> where([primary], primary.company_id == ^company_id)
     |> Repo.exists?()
-  end
-
-  @doc """
-  Subscribes the calling process to committed lifecycle events:
-  `{:company_lifecycle, %{tenant_id:, company_id:, operation:, status:}}`.
-
-  The message is a fact, published after the transaction commits and never
-  for a refused or rolled-back operation. Without a configured transport
-  (`:bilimbi_core_company, :pubsub_server`) nothing is published and this
-  returns `:ok`.
-  """
-  @spec subscribe() :: :ok | {:error, :pubsub_unavailable}
-  def subscribe do
-    with_pubsub(&Phoenix.PubSub.subscribe(&1, @topic))
-  end
-
-  # After the commit, so a subscriber never reacts to a status that was
-  # rolled back. Delivery is best-effort: the event is already on record.
-  defp publish({:ok, _summary}, %Scope{} = scope, operation, company_id) do
-    event = %{
-      tenant_id: Scope.tenant_id(scope),
-      company_id: company_id,
-      operation: operation,
-      status: to(operation)
-    }
-
-    _ = with_pubsub(&Phoenix.PubSub.broadcast(&1, @topic, {:company_lifecycle, event}))
-    :ok
-  end
-
-  defp publish(_result, _scope, _operation, _company_id), do: :ok
-
-  defp with_pubsub(delivery) do
-    case Application.get_env(:bilimbi_core_company, :pubsub_server) do
-      nil ->
-        :ok
-
-      server ->
-        case delivery.(server) do
-          :ok -> :ok
-          {:error, _reason} -> {:error, :pubsub_unavailable}
-        end
-    end
-  rescue
-    # A configured transport that is not running (a package test VM).
-    ArgumentError -> {:error, :pubsub_unavailable}
   end
 
   defp to(operation), do: @transitions |> Map.fetch!(operation) |> elem(1)

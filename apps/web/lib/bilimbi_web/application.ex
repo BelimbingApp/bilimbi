@@ -18,8 +18,7 @@ defmodule BilimbiWeb.Application do
       BilimbiWeb.WebhookRateLimit,
       BilimbiWeb.Endpoint,
       # Broadcasts through the endpoint, so it starts after it.
-      BilimbiWeb.SessionDisconnect,
-      BilimbiWeb.CompanySessionTermination
+      BilimbiWeb.SessionDisconnect
     ]
 
     Supervisor.start_link(children,

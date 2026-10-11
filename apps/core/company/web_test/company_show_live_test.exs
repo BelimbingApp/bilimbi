@@ -1010,6 +1010,36 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert {:ok, %{name: "Bilimbi Subsidiary"}} = Company.get_company(scope!(), 74)
     end
 
+    test "an archived company's default timezone cannot be changed or cleared", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      settings_scope = SettingsScope.company(74, 41)
+      {:ok, _} = Settings.put("localization.timezone", "Asia/Kuala_Lumpur", settings_scope)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      assert has_element?(view, "#company-timezone-display", "Asia/Kuala_Lumpur")
+
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 74")
+
+      render_change(view, "save_timezone", %{"timezone" => "Asia/Tokyo"})
+
+      assert has_element?(
+               view,
+               "#company-timezone-status[role='alert']",
+               "This company is archived and read-only, so the change was not saved."
+             )
+
+      render_change(view, "save_timezone", %{"timezone" => ""})
+
+      assert has_element?(view, "#company-timezone-status[role='alert']")
+      assert Settings.get("localization.timezone", settings_scope) == "Asia/Kuala_Lumpur"
+    end
+
     test "refuses in-place writes once the update capability is gone", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

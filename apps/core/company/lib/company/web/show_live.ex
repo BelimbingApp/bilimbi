@@ -634,8 +634,24 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # through Base Settings and reports on its own fact like the rest.
   defp write_event("save_timezone", params, socket) do
     socket = assign(socket, :editing_field, nil)
-    tz = params |> Map.get("timezone", "") |> to_string() |> String.trim()
     company = socket.assigns.company
+
+    case Company.require_writable_company(socket.assigns.current_scope.scope, company.id) do
+      {:ok, _company_id} ->
+        save_timezone(socket, company, params)
+
+      {:error, reason} ->
+        {:noreply,
+         CommitStatus.put(
+           socket,
+           "timezone",
+           {:error, CommitStatus.failure_message(@failures, reason)}
+         )}
+    end
+  end
+
+  defp save_timezone(socket, company, params) do
+    tz = params |> Map.get("timezone", "") |> to_string() |> String.trim()
     settings_scope = SettingsScope.company(company.id, company.tenant_id)
 
     cond do

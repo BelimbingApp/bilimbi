@@ -667,22 +667,12 @@ defmodule Bilimbi.Core.Company do
   `{:error, :invalid_reason}`. `archive_company/3` and `suspend_company/3`
   refuse the tenant's primary company with `{:error, :primary_company}` and
   the performing account's own signed-in company with `{:error, :own_company}`.
-  The table of operations is `docs/README.md` "Lifecycle". Each committed
-  operation is published to `subscribe_lifecycle/0` subscribers.
+  The table of operations is `docs/README.md` "Lifecycle".
   """
   @spec archive_company(Scope.t(), pos_integer(), keyword()) ::
           {:ok, Summary.t()} | {:error, lifecycle_error()}
   def archive_company(%Scope{} = scope, company_id, opts \\ []),
     do: Lifecycle.apply(:archive, scope, company_id, opts)
-
-  @doc """
-  Subscribes the calling process to committed lifecycle operations, published
-  as `{:company_lifecycle, %{tenant_id:, company_id:, operation:, status:}}`
-  after the transaction commits. The host ends an archived company's sessions
-  from this (`BilimbiWeb.CompanySessionTermination`).
-  """
-  @spec subscribe_lifecycle() :: :ok | {:error, :pubsub_unavailable}
-  defdelegate subscribe_lifecycle(), to: Lifecycle, as: :subscribe
 
   @doc "Suspends an `active` company. See `archive_company/3` for the shared contract."
   @spec suspend_company(Scope.t(), pos_integer(), keyword()) ::
