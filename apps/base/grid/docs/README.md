@@ -118,5 +118,7 @@ A walked column does not sort: the page owns the order of its rows.
   filters, so a walked column is read-only context.
 - In-cell editing.
 - Base Authz tables (roles, grants) in the catalog.
-- More list pages: employees, addresses and the reference lists declare
-  their tables in the catalog but do not host the flexible table yet.
+- More catalog-backed list pages: employees, addresses and the reference
+  lists declare their tables in the catalog, and their lists draw the
+  flexible table's notch through `Bilimbi.Base.UI.ListColumns`, but they do
+  not host walked columns through `PageColumns` yet.
