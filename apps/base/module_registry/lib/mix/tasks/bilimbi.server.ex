@@ -2,9 +2,9 @@ defmodule Mix.Tasks.Bilimbi.Server do
   @moduledoc """
   Starts the Bilimbi Phoenix server after validating workspace-graph metadata.
 
-  A stale graph is repaired before Phoenix starts. Other compilation and
-  application-start errors are left unchanged so this task does not hide
-  unrelated failures.
+  A stale graph is repaired before compilation and Phoenix startup. Other
+  compilation and application-start errors are left unchanged so this task
+  does not hide unrelated failures.
 
   In development the database is brought up to date first: the task runs
   `mix bilimbi.migrate`, the one Bilimbi migration path, before `phx.server`,
@@ -35,8 +35,9 @@ defmodule Mix.Tasks.Bilimbi.Server do
 
   @impl Mix.Task
   def run(args) do
-    Mix.Task.run("compile")
-
+    # A pulled module can introduce a struct used by an existing module. Check
+    # before compiling: stale builds can fail expanding that struct before a
+    # post-compile check ever gets the chance to repair the graph.
     case graph_status() do
       :ok ->
         :ok
@@ -47,12 +48,13 @@ defmodule Mix.Tasks.Bilimbi.Server do
 
         Mix.Task.run("clean", ["--deps"])
         Mix.Task.Compiler.reenable()
-        Mix.Task.run("compile")
+    end
 
-        case graph_status() do
-          :ok -> :ok
-          {:stale, retry_issues} -> Mix.raise(rebuild_failure_message(retry_issues))
-        end
+    Mix.Task.run("compile")
+
+    case graph_status() do
+      :ok -> :ok
+      {:stale, issues} -> Mix.raise(rebuild_failure_message(issues))
     end
 
     start(args, Mix.env())
