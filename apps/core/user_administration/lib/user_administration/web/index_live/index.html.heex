@@ -143,7 +143,7 @@
             <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.impersonate") and
-                  not user.company_deleted and
+                  not user.company_archived and
                   user.id != @current_scope.user["user_id"] and
                   is_nil(@current_scope.impersonator)
               }
@@ -157,7 +157,7 @@
             <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.impersonate") and
-                  (user.company_deleted or
+                  (user.company_archived or
                      user.id == @current_scope.user["user_id"] or
                      not is_nil(@current_scope.impersonator))
               }
@@ -173,8 +173,8 @@
                   @current_scope.impersonator != nil ->
                     gettext("Cannot impersonate while impersonating")
 
-                  user.company_deleted ->
-                    gettext("Deleted-company users cannot be impersonated")
+                  user.company_archived ->
+                    gettext("Archived-company users cannot be impersonated")
 
                   true ->
                     gettext("Impersonate this user")

@@ -24,6 +24,7 @@ defmodule Bilimbi.Core.Company.MixProject do
       {:db_connection, "~> 2.10"},
       {:jason, "~> 1.4"},
       {:phoenix_live_view, "~> 1.2.0"},
+      {:phoenix_pubsub, "~> 2.2"},
       {:postgrex, "~> 0.22"}
     ]
   end

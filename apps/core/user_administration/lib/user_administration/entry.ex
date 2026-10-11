@@ -3,9 +3,9 @@ defmodule Bilimbi.Core.UserAdministration.Entry do
   One UI-safe User administration entry.
 
   `company_archived` is true when the account's company is archived or
-  soft-deleted: either way the account is read-only. `company_deleted` is
-  true only for a soft-deleted company, which the company page no longer
-  opens and whose accounts have no session to impersonate.
+  soft-deleted: either way the account is read-only and cannot sign in or be
+  impersonated. `company_deleted` is true only for a soft-deleted company,
+  whose page no longer opens, so the list names it without a link.
   """
 
   alias Bilimbi.Core.UserAdministration.Role

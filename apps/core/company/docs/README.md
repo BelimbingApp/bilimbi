@@ -108,12 +108,20 @@ edit, create and delete controls and show one "archived and read-only"
 notice, but the refusal lives in the domain, so a stale or forged commit is
 refused too.
 
-Archiving freezes writes, not sessions: sign-in and impersonation for an
-account of an archived company are unchanged. Soft deletion (`deleted_at`)
-is a separate fact from the `archived` status, as it is in Belimbing, where
-`archive()` sets the status and `delete()` retires the row. A soft-deleted
-company is not found at all, so its accounts cannot sign in or be
-impersonated. There is no `delete_company` in this API today.
+An archived company's accounts cannot sign in, be impersonated, or keep a
+session. `fetch_tenant_id_for_company/1`, the Web login edge's one company
+read, answers `{:error, :company_archived}`, so the login form says so and
+every request or LiveView event of a session opened before is refused. Each
+committed lifecycle operation is published to `subscribe_lifecycle/0`; on
+`archive` the host (`BilimbiWeb.CompanySessionTermination`) asks Core User
+to end the company's sessions (`User.terminate_company_sessions/2`) so open
+tabs close at once. Nothing stores the refusal: it is read from the status
+on every request, so sign-in follows the status if it ever changes back.
+
+Soft deletion (`deleted_at`) is a separate fact from the `archived` status,
+as it is in Belimbing, where `archive()` sets the status and `delete()`
+retires the row. A soft-deleted company is not found at all. There is no
+`delete_company` in this API today.
 
 ## Tenant-wide reads
 

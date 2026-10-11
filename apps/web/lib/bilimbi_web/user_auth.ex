@@ -46,8 +46,10 @@ defmodule BilimbiWeb.UserAuth do
   `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` is the public
   company → tenant read for the login edge (issue #87, PR #95) — the same
   exception class as `User.authenticate/2`'s unscoped email lookup. It
-  fails closed for absent, soft-deleted, or invalid IDs; tenant liveness
-  is re-proven by `Tenancy.scope/1` on every request.
+  fails closed for absent, soft-deleted, archived, or invalid IDs; tenant
+  liveness is re-proven by `Tenancy.scope/1` on every request. An archived
+  company's accounts therefore cannot sign in, be impersonated, or keep a
+  session: the next request or LiveView event of an open session is refused.
   """
 
   import Plug.Conn
@@ -133,7 +135,8 @@ defmodule BilimbiWeb.UserAuth do
   IDs only, after the company → tenant seam proves a tenant is available.
   Display fields are loaded later from live User and Company rows.
   """
-  @spec session_user(Summary.t()) :: {:ok, map()} | {:error, :tenant_unavailable}
+  @spec session_user(Summary.t()) ::
+          {:ok, map()} | {:error, :tenant_unavailable | :company_archived}
   def session_user(%Summary{} = user) do
     with {:ok, _tenant_id} <- tenant_id_for_user(user) do
       {:ok,
@@ -146,13 +149,14 @@ defmodule BilimbiWeb.UserAuth do
 
   # Belimbing resolves the tenant from the user's current company
   # (TenantContext). The public company → tenant read fails closed for
-  # absent, soft-deleted, or invalid IDs; tenant liveness itself is
+  # absent, soft-deleted, archived, or invalid IDs; tenant liveness itself is
   # re-proven by Tenancy.scope/1 on every request.
   defp tenant_id_for_user(%Summary{company_id: nil}), do: {:error, :tenant_unavailable}
 
   defp tenant_id_for_user(%Summary{company_id: company_id}) do
     case Company.fetch_tenant_id_for_company(company_id) do
       {:ok, tenant_id} -> {:ok, tenant_id}
+      {:error, :company_archived} -> {:error, :company_archived}
       {:error, :not_found} -> {:error, :tenant_unavailable}
     end
   end

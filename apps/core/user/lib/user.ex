@@ -102,6 +102,9 @@ defmodule Bilimbi.Core.User do
 
   @password_reset_max_age 3_600
   @password_reset_throttle 60
+  # No caller's own session is spared when a company is archived: the host
+  # acts on a committed fact, not inside one of the account's own sessions.
+  @no_current_session "company-archived"
 
   @doc """
   Lists the users affiliated with one company inside the scope's tenant.
@@ -122,6 +125,48 @@ defmodule Bilimbi.Core.User do
         |> Enum.map(&Summary.from_schema/1)
 
       {:ok, users}
+    end
+  end
+
+  @doc """
+  Ends every durable session of an archived company's accounts.
+
+  An archived company's accounts cannot sign in or keep a session (the login
+  edge refuses them through `Company.fetch_tenant_id_for_company/1` on every
+  request); this removes the rows and so closes their open tabs at once
+  rather than at their next action. The host calls it when a company is
+  archived. A company that is not archived is
+  `{:error, :company_not_archived}` and nothing ends; a missing one is
+  `{:error, :company_not_found}`. Returns how many sessions ended.
+  """
+  @spec terminate_company_sessions(Scope.t(), pos_integer()) ::
+          {:ok, non_neg_integer()} | {:error, :company_not_found | :company_not_archived}
+  def terminate_company_sessions(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    case Company.require_writable_company(scope, company_id) do
+      {:error, :company_archived} ->
+        user_ids =
+          Repo.all(
+            from(user in Schema,
+              where: user.company_id == ^company_id,
+              order_by: user.id,
+              select: user.id
+            )
+          )
+
+        count =
+          Enum.reduce(user_ids, 0, fn user_id, total ->
+            {:ok, ended} = Session.terminate_user_sessions(user_id, @no_current_session)
+            total + ended
+          end)
+
+        {:ok, count}
+
+      {:ok, _company_id} ->
+        {:error, :company_not_archived}
+
+      {:error, :not_found} ->
+        {:error, :company_not_found}
     end
   end
 
