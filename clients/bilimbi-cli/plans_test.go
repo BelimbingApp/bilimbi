@@ -105,10 +105,11 @@ func TestPlanAndCommitPreserveInputsAndServerBinding(t *testing.T) {
 
 func TestAPIPlanReviewUsesValidatedReadOnlyChangesAndCommitReportLinks(t *testing.T) {
 	raw := json.RawMessage(`{"valid":true,"expires_at":"2026-10-11T14:00:00Z","results":[{"key":"core.company.create","valid":true,"preview":{"summary":"Create company","changes":[{"field":"name","from":null,"to":"Example <script>"}]}}]}`)
-	doc, err := localDocument(raw, "review")
-	if err != nil {
+	var plan savedPlan
+	if err := json.Unmarshal(raw, &plan); err != nil {
 		t.Fatal(err)
 	}
+	doc := reviewDocument(plan)
 	if !doc.ReadOnly || len(doc.Rows) != 1 || doc.Rows[0]["to"] != "Example <script>" {
 		t.Fatal("review lost server evidence")
 	}
@@ -183,9 +184,6 @@ func TestApprovalIsBoundToTheReviewedPlanAndExpiredPlansArePruned(t *testing.T) 
 	review := func(code string, operations []plannedOperation) json.RawMessage {
 		raw, _ := json.Marshal(map[string]any{"valid": true, "plan_code": code, "operations": operations, "results": []any{}})
 		return raw
-	}
-	if recordReview(store, review(codeA, operationsB), true) == nil {
-		t.Fatal("review of other operations unlocked a plan")
 	}
 	if recordReview(store, review(strings.Repeat("c", 43), operationsA), true) == nil {
 		t.Fatal("review of an unknown plan accepted")
@@ -284,5 +282,29 @@ func TestRequestingChangesWithdrawsEarlierApproval(t *testing.T) {
 	args := []string{"commit", "--plan", code, "--agent-id", "codex/test-high", "--run-id", "task"}
 	if err := run(context.Background(), args, nil, &out, &stderr, store); err == nil || requests != 0 {
 		t.Fatal("withdrawn plan was committed", err)
+	}
+}
+
+func TestReviewShowsSavedResultsNotResultsCarriedByTheInput(t *testing.T) {
+	store, _ := testStore(t)
+	code := strings.Repeat("t", 43)
+	saved := savedPlan{Server: "s", Code: code, Expires: time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+	if err := json.Unmarshal([]byte(`{"results":[{"key":"core.company.create","valid":true,"preview":{"changes":[{"field":"name","from":null,"to":"Real change"}]}}]}`), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(planPath(store, code), saved); err != nil {
+		t.Fatal(err)
+	}
+	tampered, _ := json.Marshal(map[string]any{"valid": true, "plan_code": code, "results": []any{map[string]any{"key": "core.company.create", "valid": true, "preview": map[string]any{"changes": []any{map[string]any{"field": "name", "from": nil, "to": "Benign"}}}}}})
+	reviewed, err := savedForReview(store, tampered)
+	if err != nil || reviewed == nil {
+		t.Fatal("saved plan not found", err)
+	}
+	doc := reviewDocument(*reviewed)
+	if len(doc.Rows) != 1 || doc.Rows[0]["to"] != "Real change" {
+		t.Fatalf("review displayed agent-supplied results: %v", doc.Rows)
+	}
+	if _, err = savedForReview(store, json.RawMessage(`{"valid":true,"results":[{"key":"x","valid":true}]}`)); err == nil {
+		t.Fatal("review of an unsaved plan accepted")
 	}
 }

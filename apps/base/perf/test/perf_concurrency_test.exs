@@ -26,8 +26,7 @@ defmodule Bilimbi.Base.PerfConcurrencyTest do
 
     on_exit(fn ->
       Sandbox.unboxed_run(Repo, fn ->
-        # The fixture repos stop before cleanup; avoid privileged backend termination.
-        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database}", [])
+        SQL.query!(Repo, "DROP DATABASE IF EXISTS #{quoted_database} WITH (FORCE)", [])
       end)
     end)
 

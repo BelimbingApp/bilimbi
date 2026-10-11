@@ -18,30 +18,31 @@ type plannedOperation struct {
 type planRequest struct {
 	Operations []plannedOperation `json:"operations"`
 }
+type planResult struct {
+	Key     string         `json:"key"`
+	Valid   bool           `json:"valid"`
+	Error   map[string]any `json:"error"`
+	Preview struct {
+		Summary string `json:"summary"`
+		Changes []struct {
+			Field string `json:"field"`
+			From  any    `json:"from"`
+			To    any    `json:"to"`
+		} `json:"changes"`
+	} `json:"preview"`
+}
 type savedPlan struct {
 	Server     string             `json:"server"`
 	Code       string             `json:"plan_code"`
 	Expires    string             `json:"expires_at"`
 	Operations []plannedOperation `json:"operations"`
+	Results    []planResult       `json:"results"`
 }
 type planResponse struct {
-	Valid      bool               `json:"valid"`
-	Code       string             `json:"plan_code"`
-	Expires    string             `json:"expires_at"`
-	Operations []plannedOperation `json:"operations"`
-	Results    []struct {
-		Key     string         `json:"key"`
-		Valid   bool           `json:"valid"`
-		Error   map[string]any `json:"error"`
-		Preview struct {
-			Summary string `json:"summary"`
-			Changes []struct {
-				Field string `json:"field"`
-				From  any    `json:"from"`
-				To    any    `json:"to"`
-			} `json:"changes"`
-		} `json:"preview"`
-	} `json:"results"`
+	Valid   bool         `json:"valid"`
+	Code    string       `json:"plan_code"`
+	Expires string       `json:"expires_at"`
+	Results []planResult `json:"results"`
 }
 
 var codePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
@@ -76,43 +77,63 @@ func discardPlan(store *profileStore, code string) {
 	_ = os.Remove(approvalPath(store, code))
 }
 
-// The person's go is enforced here, not by Bilimbi. A submitted approval of an
-// API plan response unlocks only the saved plan with that code, and only when
-// the reviewed operations are the saved ones. Any later submission without
+// The person's go is enforced here, not by Bilimbi. The review of an API plan is
+// identified only by its plan code and always shows what Bilimbi returned when
+// the plan was saved, never results carried by the review input. An approval
+// unlocks only the saved plan with that code; any later submission without
 // approval withdraws it.
-func recordReview(store *profileStore, raw json.RawMessage, approved bool) error {
+func planCode(raw json.RawMessage) (string, bool) {
 	var values map[string]json.RawMessage
 	if json.Unmarshal(raw, &values) != nil {
-		return errors.New("invalid local document")
+		return "", false
 	}
 	if _, custom := values["columns"]; custom {
-		return nil
+		return "", false
 	}
 	var plan planResponse
-	if err := readJSON(bytes.NewReader(raw), "-", &plan); err != nil || !plan.Valid {
-		return nil
-	}
-	if !approved {
-		if validPlanCode(plan.Code) {
-			_ = os.Remove(approvalPath(store, plan.Code))
-		}
-		return nil
+	_ = json.Unmarshal(raw, &plan)
+	return plan.Code, true
+}
+func savedForReview(store *profileStore, raw json.RawMessage) (*savedPlan, error) {
+	code, isPlan := planCode(raw)
+	if !isPlan {
+		return nil, nil
 	}
 	prunePlans(store)
 	var saved savedPlan
-	if !validPlanCode(plan.Code) || readJSON(nil, planPath(store, plan.Code), &saved) != nil || saved.Code != plan.Code {
-		return errors.New("reviewed plan is unavailable locally; create a new plan")
+	if !validPlanCode(code) || readJSON(nil, planPath(store, code), &saved) != nil || saved.Code != code {
+		return nil, errors.New("review needs a plan saved by this program; create a new plan")
 	}
-	reviewed, _ := json.Marshal(plan.Operations)
-	planned, _ := json.Marshal(saved.Operations)
-	if !bytes.Equal(reviewed, planned) {
-		return errors.New("reviewed operations differ from the saved plan; create a new plan")
+	return &saved, nil
+}
+func recordReview(store *profileStore, raw json.RawMessage, approved bool) error {
+	code, isPlan := planCode(raw)
+	if !isPlan {
+		return nil
 	}
-	return writeJSON(approvalPath(store, plan.Code), map[string]string{"plan_code": plan.Code})
+	if !approved {
+		if validPlanCode(code) {
+			_ = os.Remove(approvalPath(store, code))
+		}
+		return nil
+	}
+	if _, err := savedForReview(store, raw); err != nil {
+		return err
+	}
+	return writeJSON(approvalPath(store, code), map[string]string{"plan_code": code})
 }
 
 // The API's changes are review evidence. Editing them would not edit the saved
 // operations. Ask for changes in the comment, then generate and review a new plan.
+func reviewDocument(plan savedPlan) document {
+	doc := document{ReadOnly: true, Title: "Review changes", Summary: "Validated changes from Bilimbi, saved when the plan was created. Nothing has been written. Request changes in the comment; changed inputs require a new plan. Review expires at " + plan.Expires + ".", Columns: []column{{"operation", "Operation"}, {"field", "Field"}, {"from", "Before"}, {"to", "After"}}}
+	for _, result := range plan.Results {
+		for _, change := range result.Preview.Changes {
+			doc.Rows = append(doc.Rows, map[string]any{"operation": result.Key, "field": change.Field, "from": change.From, "to": change.To})
+		}
+	}
+	return doc
+}
 func localDocument(raw json.RawMessage, mode string) (document, error) {
 	var values map[string]json.RawMessage
 	if json.Unmarshal(raw, &values) != nil {
@@ -126,27 +147,7 @@ func localDocument(raw json.RawMessage, mode string) (document, error) {
 		return doc, nil
 	}
 	if mode == "review" {
-		var plan planResponse
-		if err := readJSON(bytes.NewReader(raw), "-", &plan); err != nil || len(plan.Results) == 0 {
-			return document{}, errors.New("review needs a document or API plan results")
-		}
-		doc := document{ReadOnly: true, Title: "Review changes", Summary: "Validated changes from Bilimbi. Nothing has been written. Request changes in the comment; changed inputs require a new plan.", Columns: []column{{"operation", "Operation"}, {"field", "Field"}, {"from", "Before"}, {"to", "After"}}}
-		if plan.Expires != "" {
-			doc.Summary += " Review expires at " + plan.Expires + "."
-		}
-		if !plan.Valid {
-			doc.Summary = "Bilimbi refused this plan. Resolve the errors and create a new plan."
-		}
-		for _, result := range plan.Results {
-			if !result.Valid {
-				doc.Rows = append(doc.Rows, map[string]any{"operation": result.Key, "field": "Refused", "from": nil, "to": result.Error})
-				continue
-			}
-			for _, change := range result.Preview.Changes {
-				doc.Rows = append(doc.Rows, map[string]any{"operation": result.Key, "field": change.Field, "from": change.From, "to": change.To})
-			}
-		}
-		return doc, nil
+		return document{}, errors.New("review needs a document or a plan saved by this program")
 	}
 	if _, refused := values["error"]; refused {
 		var failure map[string]any

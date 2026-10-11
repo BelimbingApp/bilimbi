@@ -289,8 +289,17 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 	if err := readJSON(input, *file, &raw); err != nil {
 		return err
 	}
-	d, err := localDocument(raw, command)
-	if err != nil {
+	var d document
+	var err error
+	var saved *savedPlan
+	if command == "review" {
+		if saved, err = savedForReview(store, raw); err != nil {
+			return err
+		}
+	}
+	if saved != nil {
+		d = reviewDocument(*saved)
+	} else if d, err = localDocument(raw, command); err != nil {
 		return err
 	}
 	if err := validateDocument(d); err != nil {

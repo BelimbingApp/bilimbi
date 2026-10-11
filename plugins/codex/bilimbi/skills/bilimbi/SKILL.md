@@ -55,7 +55,8 @@ requires the person's normal company permissions.
    code and cannot be committed. Show the errors honestly.
 3. Run `review --input <plan-output-file> --session <session-file>` in a
    background process and show its 127.0.0.1 address to the person. It displays
-   the API's validated changes and defaults. Wait for the real submission.
+   the validated changes and defaults the program saved when it created the
+   plan, found by plan code, not content in the file. Wait for the real submission.
    Never treat initial input or silence as approval. If the person requests
    changes, revise the operation inputs, create a new plan and review it again;
    editing an evidence table cannot change an API plan.

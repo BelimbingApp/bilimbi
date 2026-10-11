@@ -109,14 +109,14 @@ Create an input file containing `{"operations":[{"key":"core.company.create",
 for duplicates. Run `bilimbi plan --input operations.json > plan.json`, then
 `bilimbi review --input plan.json --session review-session.json` and wait for
 its submission. The page shows the server's validated changes, defaults and
-expiry. Those evidence cells are read-only; changes belong in the comments,
+expiry as saved when `plan` ran, found by the plan code; results carried in the
+review input are ignored. Those evidence cells are read-only; changes belong in the comments,
 followed by a new plan and review. Ordinary local presentation documents retain
 editable cells. No business write happens until commit.
 
 The client enforces the person's go locally; Bilimbi does not verify it. When
-`review` receives the plan output unchanged from `plan` and the person approves,
-it writes an approval marker for that plan code beside the plan file, only if the
-reviewed operations match the saved ones. `bilimbi commit --plan <code> >
+`review` receives the plan output from `plan` and the person approves, it writes
+an approval marker for that plan code beside the saved plan file. `bilimbi commit --plan <code> >
 report.json` refuses without that marker, so a review of one plan never unlocks
 another, a later review that requests changes withdraws the marker, and a successful commit deletes the plan file and its marker. It sends
 the exact saved operations to the same server. Plans are private files below the

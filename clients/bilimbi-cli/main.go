@@ -363,7 +363,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 			if _, expiry := time.Parse(time.RFC3339, response.Expires); !validPlanCode(response.Code) || expiry != nil {
 				return errors.New("invalid plan code or expiry from server")
 			}
-			if err = writeJSON(planPath(store, response.Code), savedPlan{Server: p.Discovery.Server, Code: response.Code, Expires: response.Expires, Operations: body.(planRequest).Operations}); err != nil {
+			if err = writeJSON(planPath(store, response.Code), savedPlan{Server: p.Discovery.Server, Code: response.Code, Expires: response.Expires, Operations: body.(planRequest).Operations, Results: response.Results}); err != nil {
 				return err
 			}
 		}
