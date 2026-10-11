@@ -60,6 +60,9 @@ defmodule BilimbiWeb.TenantScopeGateTest do
       "Owner-local invariant proof over one proved run's children; it must see a contradictory tenant row a scoped read would hide.",
     {"apps/base/workflow/lib/workflow/engine.ex", "bind/2", "Bilimbi.Base.Workflow.BindingSchema"} =>
       "Global (flow, flow_id) uniqueness proof: a scoped miss must never let a legacy subject be rebound to another tenant.",
+    {"apps/base/workflow/lib/workflow/transition_outbox.ex", "binding/2",
+     "Bilimbi.Base.Workflow.BindingSchema"} =>
+      "Resolves which tenant a retained transition event belongs to from the proven (flow, flow_id) binding; there is no scope yet to apply, and the row's own claims are never believed.",
     {"apps/core/company/lib/company.ex", "fetch_tenant_id_for_company/1",
      "Bilimbi.Core.Company.Schema"} =>
       "Derives the tenant a company belongs to, so the caller can build its scope; there is no scope yet to apply.",
