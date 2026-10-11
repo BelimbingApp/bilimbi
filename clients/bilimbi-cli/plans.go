@@ -78,8 +78,9 @@ func discardPlan(store *profileStore, code string) {
 
 // The person's go is enforced here, not by Bilimbi. A submitted approval of an
 // API plan response unlocks only the saved plan with that code, and only when
-// the reviewed operations are the saved ones.
-func approvePlan(store *profileStore, raw json.RawMessage) error {
+// the reviewed operations are the saved ones. Any later submission without
+// approval withdraws it.
+func recordReview(store *profileStore, raw json.RawMessage, approved bool) error {
 	var values map[string]json.RawMessage
 	if json.Unmarshal(raw, &values) != nil {
 		return errors.New("invalid local document")
@@ -89,6 +90,12 @@ func approvePlan(store *profileStore, raw json.RawMessage) error {
 	}
 	var plan planResponse
 	if err := readJSON(bytes.NewReader(raw), "-", &plan); err != nil || !plan.Valid {
+		return nil
+	}
+	if !approved {
+		if validPlanCode(plan.Code) {
+			_ = os.Remove(approvalPath(store, plan.Code))
+		}
 		return nil
 	}
 	prunePlans(store)

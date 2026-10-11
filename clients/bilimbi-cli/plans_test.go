@@ -65,7 +65,7 @@ func TestPlanAndCommitPreserveInputsAndServerBinding(t *testing.T) {
 	if err = run(context.Background(), args, nil, &out, &stderr, store); err == nil || committed != 0 {
 		t.Fatal("commit without an approved review was sent", err)
 	}
-	if err = approvePlan(store, json.RawMessage(reviewedPlanJSON(t, code, planned))); err != nil {
+	if err = recordReview(store, json.RawMessage(reviewedPlanJSON(t, code, planned)), true); err != nil {
 		t.Fatal(err)
 	}
 	if err = run(context.Background(), args, nil, &out, &stderr, store); err != nil {
@@ -184,13 +184,13 @@ func TestApprovalIsBoundToTheReviewedPlanAndExpiredPlansArePruned(t *testing.T) 
 		raw, _ := json.Marshal(map[string]any{"valid": true, "plan_code": code, "operations": operations, "results": []any{}})
 		return raw
 	}
-	if approvePlan(store, review(codeA, operationsB)) == nil {
+	if recordReview(store, review(codeA, operationsB), true) == nil {
 		t.Fatal("review of other operations unlocked a plan")
 	}
-	if approvePlan(store, review(strings.Repeat("c", 43), operationsA)) == nil {
+	if recordReview(store, review(strings.Repeat("c", 43), operationsA), true) == nil {
 		t.Fatal("review of an unknown plan accepted")
 	}
-	if err := approvePlan(store, review(codeA, operationsA)); err != nil {
+	if err := recordReview(store, review(codeA, operationsA), true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(approvalPath(store, codeA)); err != nil {
@@ -200,7 +200,7 @@ func TestApprovalIsBoundToTheReviewedPlanAndExpiredPlansArePruned(t *testing.T) 
 		t.Fatal("review of plan A unlocked plan B")
 	}
 	custom, _ := json.Marshal(map[string]any{"plan_code": codeB, "columns": []any{}, "rows": []any{}, "title": "x"})
-	if err := approvePlan(store, custom); err != nil {
+	if err := recordReview(store, custom, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(approvalPath(store, codeB)); err == nil {
@@ -221,5 +221,68 @@ func TestApprovalIsBoundToTheReviewedPlanAndExpiredPlansArePruned(t *testing.T) 
 	}
 	if _, err := os.Stat(planPath(store, codeA)); err != nil {
 		t.Fatal("live plan pruned")
+	}
+}
+
+func submitReview(t *testing.T, store *profileStore, plan []byte, decision string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stdout, stderr := notifyWriter{make(chan string, 4)}, notifyWriter{make(chan string, 4)}
+	finished := make(chan error, 1)
+	go func() {
+		finished <- localCommand(ctx, "review", nil, bytes.NewReader(plan), stdout, stderr, store)
+	}()
+	var address string
+	select {
+	case line := <-stderr.lines:
+		address = strings.TrimSpace(strings.TrimPrefix(line, "Open "))
+	case <-ctx.Done():
+		t.Fatal("page not started")
+	}
+	u, _ := url.Parse(address)
+	page := &localPage{url: address, host: u.Host}
+	resp := localRequest(t, page, "/submit", "http://"+page.host, "application/x-www-form-urlencoded", strings.NewReader(url.Values{"decision": {decision}}.Encode()))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("review refused: %d", resp.StatusCode)
+	}
+	if err := <-finished; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRequestingChangesWithdrawsEarlierApproval(t *testing.T) {
+	code := strings.Repeat("w", 43)
+	requests := 0
+	server := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		_ = outputJSON(w, map[string]any{"results": []any{}})
+	})
+	store, _ := testStore(t)
+	d := exampleDiscovery(server.URL)
+	if _, err := store.put(d.Server, credentials{Access: "access", Refresh: "refresh", Expires: time.Now().Add(time.Hour)}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.save(profiles{Active: "test", Items: map[string]profile{"test": {Discovery: d, Backend: "native"}}}); err != nil {
+		t.Fatal(err)
+	}
+	operations := []plannedOperation{{Key: "core.company.create", Input: map[string]any{"name": "A"}}}
+	expires := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	if err := writeJSON(planPath(store, code), savedPlan{Server: d.Server, Code: code, Expires: expires, Operations: operations}); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := json.Marshal(map[string]any{"valid": true, "plan_code": code, "expires_at": expires, "operations": operations, "results": []any{map[string]any{"key": "core.company.create", "valid": true, "preview": map[string]any{"changes": []any{map[string]any{"field": "name", "from": nil, "to": "A"}}}}}})
+	submitReview(t, store, plan, "approve")
+	if _, err := os.Stat(approvalPath(store, code)); err != nil {
+		t.Fatal("approval marker missing", err)
+	}
+	submitReview(t, store, plan, "revise")
+	if _, err := os.Stat(approvalPath(store, code)); err == nil {
+		t.Fatal("requesting changes kept the approval")
+	}
+	var out, stderr bytes.Buffer
+	args := []string{"commit", "--plan", code, "--agent-id", "codex/test-high", "--run-id", "task"}
+	if err := run(context.Background(), args, nil, &out, &stderr, store); err == nil || requests != 0 {
+		t.Fatal("withdrawn plan was committed", err)
 	}
 }

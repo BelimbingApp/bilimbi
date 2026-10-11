@@ -118,7 +118,7 @@ The client enforces the person's go locally; Bilimbi does not verify it. When
 it writes an approval marker for that plan code beside the plan file, only if the
 reviewed operations match the saved ones. `bilimbi commit --plan <code> >
 report.json` refuses without that marker, so a review of one plan never unlocks
-another, and a successful commit deletes the plan file and its marker. It sends
+another, a later review that requests changes withdraws the marker, and a successful commit deletes the plan file and its marker. It sends
 the exact saved operations to the same server. Plans are private files below the
 OS configuration directory's `bilimbi/plans`, bound to their server origin;
 credentials remain separate. Any `plan`, `review` approval or `commit` first

@@ -340,10 +340,8 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 	if command == "review" {
 		select {
 		case result := <-p.submitted:
-			if result.Approved {
-				if err = approvePlan(store, raw); err != nil {
-					return err
-				}
+			if err = recordReview(store, raw, result.Approved); err != nil {
+				return err
 			}
 			if err = outputJSON(out, result); err != nil {
 				return err
