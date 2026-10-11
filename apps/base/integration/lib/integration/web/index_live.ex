@@ -44,20 +44,13 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   def handle_params(params, _uri, socket) do
     state = ListState.parse(params, @list)
 
-    # Preserve previously shared date links; new links use Belimbing's period/from/to.
-    period_params =
-      if not Map.has_key?(params, "period") and
-           (Map.get(params, "from", "") != "" or Map.get(params, "through", "") != ""),
-         do: Map.merge(params, %{"period" => "custom", "to" => Map.get(params, "through", "")}),
-         else: params
-
     clock =
       PeriodFilter.clock(
         socket.assigns.current_scope.shell_preferences,
         socket.assigns.browser_timezone
       )
 
-    period = PeriodFilter.parse(period_params, clock.today)
+    period = PeriodFilter.parse(params, clock.today)
 
     {since, until, range_error} =
       case PeriodFilter.bounds(period, clock.timezone, clock.tz_db) do

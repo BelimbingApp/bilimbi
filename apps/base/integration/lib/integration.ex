@@ -306,20 +306,6 @@ defmodule Bilimbi.Base.Integration do
   defp time_filter(query, %DateTime{} = instant, :until),
     do: where(query, [e], e.occurred_at < ^DateTime.to_naive(instant))
 
-  defp time_filter(query, value, bound) do
-    case Date.from_iso8601(value) do
-      {:ok, date} ->
-        instant = NaiveDateTime.new!(date, ~T[00:00:00])
-
-        if bound == :since,
-          do: where(query, [e], e.occurred_at >= ^instant),
-          else: where(query, [e], e.occurred_at < ^NaiveDateTime.add(instant, 86_400))
-
-      _ ->
-        query
-    end
-  end
-
   @doc "Globally clears retained previews after the configured TTL; metadata remains for diagnosis."
   def prune_payloads(now \\ NaiveDateTime.utc_now()) do
     days = Settings.get("integration.payload_retention_days")

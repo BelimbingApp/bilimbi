@@ -100,13 +100,22 @@ defmodule Bilimbi.Base.UI.PeriodFilter do
     if Date.compare(from, to) == :gt do
       {:error, "Start date must be on or before end date."}
     else
-      with {:ok, first} <- DateTime.new(from, ~T[00:00:00], timezone, tz_db),
-           {:ok, after_last} <- DateTime.new(Date.add(to, 1), ~T[00:00:00], timezone, tz_db) do
+      with {:ok, first} <- day_start(from, timezone, tz_db),
+           {:ok, after_last} <- day_start(Date.add(to, 1), timezone, tz_db) do
         {:ok, DateTime.shift_zone!(first, "Etc/UTC", tz_db),
          DateTime.shift_zone!(after_last, "Etc/UTC", tz_db)}
       else
         _ -> {:error, "The date range cannot be resolved in this time zone."}
       end
+    end
+  end
+
+  defp day_start(date, timezone, tz_db) do
+    case DateTime.new(date, ~T[00:00:00], timezone, tz_db) do
+      {:ok, midnight} -> {:ok, midnight}
+      {:gap, _just_before, just_after} -> {:ok, just_after}
+      {:ambiguous, first, _second} -> {:ok, first}
+      {:error, _} = error -> error
     end
   end
 

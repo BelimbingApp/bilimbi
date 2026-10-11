@@ -59,8 +59,7 @@ operator status does not bypass capabilities. The list and detail API return
 metadata maps and never expose the persistence schema or retained payloads.
 `list_page/2` searches host, path, operation, HTTP status and person/agent IDs
 with one `search` value. Its `since` and `until` accept UTC `DateTime` bounds
-(`until` is exclusive), or legacy ISO date strings selecting inclusive UTC
-days. The web adapter resolves calendar days in the selected display zone
+(`until` is exclusive). The web adapter resolves calendar days in the selected display zone
 before calling this API.
 
 ## Privacy and retention
