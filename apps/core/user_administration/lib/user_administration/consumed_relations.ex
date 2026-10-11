@@ -25,6 +25,7 @@ defmodule Bilimbi.Core.UserAdministration.ConsumedRelations do
         "id" => %{type: :bigint, nullable: false},
         "tenant_id" => %{type: :bigint, nullable: false},
         "name" => %{type: {:varchar, 255}, nullable: false},
+        "status" => %{type: {:varchar, 255}, nullable: false},
         "deleted_at" => %{type: {:timestamp, 0}, nullable: true}
       }
     },

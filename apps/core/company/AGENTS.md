@@ -34,6 +34,15 @@ and the bodies are `lifecycle.ex`. A page offers `lifecycle_operations/1`'s
 answer and nothing else; do not add a status select or a second transition
 list.
 
+## Archived is read-only
+
+A write to a company or into it begins with `require_writable_company/2`
+(`lock_writable_company/2` under the company row lock); a Base module asks
+`Bilimbi.Base.Authz.company_writable/2`. Both answer
+`{:error, :company_archived}` from `WritableCompany`. Do not compare
+`status == "archived"` in a sibling or a page, and do not guard a read with
+it. The write inventory is [`docs/README.md`](docs/README.md#an-archived-company-is-read-only).
+
 ## Maintaining this file
 
 Keep this note short. Point at the function docs; do not copy them.

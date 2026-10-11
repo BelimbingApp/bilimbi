@@ -71,6 +71,21 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
   end
 
   describe "reassign_user_company/5" do
+    test "refuses to move an account into or out of an archived company", %{admin: admin} do
+      CompanyFixtures.insert_company!(%{
+        id: 22,
+        tenant_id: 2,
+        name: "Acme Archived",
+        code: "ACM-3",
+        status: "archived"
+      })
+
+      UserFixtures.insert_user!(%{id: 704, company_id: 20, email: "stays@example.com"})
+
+      assert {:error, :company_archived} = User.reassign_user_company(admin, 20, 704, 22)
+      assert {:ok, %Summary{company_id: 20}} = User.get_user(admin, 20, 704)
+    end
+
     test "reassigns company, resets or updates employee, terminates sessions and audits",
          %{admin: admin, emp_20: emp_20} do
       UserFixtures.insert_user!(%{

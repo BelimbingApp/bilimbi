@@ -36,7 +36,11 @@ defmodule Bilimbi.Core.Address do
   @linked_owner_sort_fields ~w(type name kind is_primary priority valid_from valid_to)a
 
   @type error_reason ::
-          :address_in_use | :address_not_found | :attachment_not_found | :company_not_found
+          :address_in_use
+          | :address_not_found
+          | :attachment_not_found
+          | :company_not_found
+          | :company_archived
 
   @doc "Address kinds supported by compatible Company attachments."
   @spec company_attachment_kinds() :: [String.t()]
@@ -136,19 +140,26 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
-  @spec update_address(Scope.t(), pos_integer(), map()) ::
-          {:ok, Summary.t()} | {:error, :address_not_found | Ecto.Changeset.t()}
-  def update_address(%Scope{} = scope, address_id, attributes) do
-    case get_schema(scope, address_id) do
-      nil ->
-        {:error, :address_not_found}
+  @doc """
+  Updates an address's own facts.
 
-      address ->
-        case address |> Schema.update_changeset(attributes) |> Repo.update() do
-          {:ok, updated} -> {:ok, Summary.from_schema(updated)}
-          {:error, changeset} -> {:error, changeset}
-        end
-    end
+  An address an archived company links to, directly or through one of its
+  employees, is part of that company's record and stays as it is:
+  `{:error, :company_archived}`.
+  """
+  @spec update_address(Scope.t(), pos_integer(), map()) ::
+          {:ok, Summary.t()}
+          | {:error, :address_not_found | :company_archived | Ecto.Changeset.t()}
+  def update_address(%Scope{} = scope, address_id, attributes) do
+    Repo.transaction(fn ->
+      address = lock_address!(scope, address_id)
+      refuse_archived_owner!(scope, address.id)
+
+      case address |> Schema.update_changeset(attributes) |> Repo.update() do
+        {:ok, updated} -> Summary.from_schema(updated)
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
   end
 
   @spec delete_address(Scope.t(), pos_integer()) ::
@@ -185,7 +196,8 @@ defmodule Bilimbi.Core.Address do
 
   @spec attach_to_company(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, :attached}
-          | {:error, :address_not_found | :company_not_found | Ecto.Changeset.t()}
+          | {:error,
+             :address_not_found | :company_not_found | :company_archived | Ecto.Changeset.t()}
   def attach_to_company(%Scope{} = scope, address_id, company_id, attributes \\ %{}) do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
@@ -210,7 +222,8 @@ defmodule Bilimbi.Core.Address do
 
   @doc "Creates a manual address and its Company attachment in one transaction."
   @spec create_and_attach_to_company(Scope.t(), pos_integer(), map(), map()) ::
-          {:ok, Summary.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+          {:ok, Summary.t()}
+          | {:error, :company_not_found | :company_archived | Ecto.Changeset.t()}
   def create_and_attach_to_company(
         %Scope{} = scope,
         company_id,
@@ -269,7 +282,11 @@ defmodule Bilimbi.Core.Address do
   @spec update_company_attachment(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, :updated}
           | {:error,
-             :address_not_found | :attachment_not_found | :company_not_found | Ecto.Changeset.t()}
+             :address_not_found
+             | :attachment_not_found
+             | :company_not_found
+             | :company_archived
+             | Ecto.Changeset.t()}
   def update_company_attachment(%Scope{} = scope, address_id, company_id, attributes)
       when is_map(attributes) do
     Repo.transaction(fn ->
@@ -294,7 +311,9 @@ defmodule Bilimbi.Core.Address do
 
   @doc "Removes one Company's link to an address without deleting the address."
   @spec detach_from_company(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :address_not_found | :attachment_not_found | :company_not_found}
+          :ok
+          | {:error,
+             :address_not_found | :attachment_not_found | :company_not_found | :company_archived}
   def detach_from_company(%Scope{} = scope, address_id, company_id) do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
@@ -515,7 +534,8 @@ defmodule Bilimbi.Core.Address do
   @doc "Attaches an existing address to an employee."
   @spec attach_to_employee(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, :attached}
-          | {:error, :address_not_found | :employee_not_found | Ecto.Changeset.t()}
+          | {:error,
+             :address_not_found | :employee_not_found | :company_archived | Ecto.Changeset.t()}
   def attach_to_employee(%Scope{} = scope, address_id, employee_id, attributes \\ %{}) do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
@@ -540,7 +560,9 @@ defmodule Bilimbi.Core.Address do
 
   @doc "Removes one Employee's link to an address without deleting the address."
   @spec detach_from_employee(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :address_not_found | :attachment_not_found | :employee_not_found}
+          :ok
+          | {:error,
+             :address_not_found | :attachment_not_found | :employee_not_found | :company_archived}
   def detach_from_employee(%Scope{} = scope, address_id, employee_id) do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
@@ -561,7 +583,11 @@ defmodule Bilimbi.Core.Address do
   @spec update_employee_attachment(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, :updated}
           | {:error,
-             :address_not_found | :attachment_not_found | :employee_not_found | Ecto.Changeset.t()}
+             :address_not_found
+             | :attachment_not_found
+             | :employee_not_found
+             | :company_archived
+             | Ecto.Changeset.t()}
   def update_employee_attachment(%Scope{} = scope, address_id, employee_id, attributes)
       when is_map(attributes) do
     Repo.transaction(fn ->
@@ -604,11 +630,52 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
+  # An attachment is the company's record: an archived company's addresses
+  # stay as they are (`:company_archived`), and so do its employees' below.
   defp require_company!(%Scope{} = scope, company_id) do
-    case Company.require_live_company(scope, company_id) do
+    case Company.require_writable_company(scope, company_id) do
       {:ok, company} -> company
       {:error, :not_found} -> Repo.rollback(:company_not_found)
+      {:error, :company_archived} -> Repo.rollback(:company_archived)
     end
+  end
+
+  # The address row is locked first, so no attachment can appear between this
+  # check and the caller's write.
+  defp refuse_archived_owner!(%Scope{} = scope, address_id) do
+    company_identity = Company.addressable_identity()
+    employee_identity = Employee.addressable_identity()
+
+    owners =
+      Repo.all(
+        from(attachment in Addressable,
+          where: attachment.address_id == ^address_id,
+          select: {attachment.addressable_type, attachment.addressable_id}
+        )
+      )
+
+    company_ids =
+      Enum.flat_map(owners, fn
+        {^company_identity, company_id} ->
+          [company_id]
+
+        {^employee_identity, employee_id} ->
+          case Employee.get_employee(scope, employee_id) do
+            {:ok, employee} -> [employee.company_id]
+            {:error, _reason} -> []
+          end
+
+        _other ->
+          []
+      end)
+
+    if Enum.any?(
+         Enum.uniq(company_ids),
+         &match?({:error, :company_archived}, Company.require_writable_company(scope, &1))
+       ),
+       do: Repo.rollback(:company_archived)
+
+    :ok
   end
 
   defp lock_company_attachments!(address_id, company_id) do
@@ -634,9 +701,13 @@ defmodule Bilimbi.Core.Address do
   end
 
   defp require_employee!(%Scope{} = scope, employee_id) do
-    case Employee.get_employee(scope, employee_id) do
-      {:ok, employee} -> employee
+    with {:ok, employee} <- Employee.get_employee(scope, employee_id),
+         {:ok, _company_id} <- Company.require_writable_company(scope, employee.company_id) do
+      employee
+    else
       {:error, :employee_not_found} -> Repo.rollback(:employee_not_found)
+      {:error, :not_found} -> Repo.rollback(:employee_not_found)
+      {:error, :company_archived} -> Repo.rollback(:company_archived)
     end
   end
 

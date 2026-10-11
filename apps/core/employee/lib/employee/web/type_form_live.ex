@@ -49,6 +49,14 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
         {:error, :company_not_found} ->
           {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
 
+        {:error, :company_archived} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "That company is archived and read-only, so no type can be added."
+           )}
+
         {:error, %Changeset{} = domain_changeset} ->
           {:noreply,
            assign_form(

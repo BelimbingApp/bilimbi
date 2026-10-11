@@ -95,6 +95,40 @@ defmodule BilimbiWeb.SettingsCompanyScopeTest do
     assert has_element?(view, "#input-tests-company_limit[value='6']")
   end
 
+  test "an archived company's settings are shown read-only and a forged save is refused", %{
+    conn: conn
+  } do
+    install_company_setting!()
+    grant_capabilities!(["base.settings.company.manage", "admin.company.tenant-wide.manage"])
+
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 41,
+      name: "Archived company",
+      code: "archived_company",
+      status: "archived"
+    })
+
+    company_scope = Settings.Scope.company(74, 41)
+    {:ok, _} = Settings.put(@company_setting, 18, company_scope)
+    {:ok, view, _} = open(conn)
+
+    switch_company(view, "73")
+    refute has_element?(view, "#settings-company-archived")
+    assert has_element?(view, "#settings-save")
+
+    switch_company(view, "74")
+    assert has_element?(view, "#settings-company-archived", "archived and read-only")
+    assert has_element?(view, "#input-tests-company_limit[value='18']")
+    refute has_element?(view, "#settings-save")
+    refute has_element?(view, "#settings-restore")
+    refute has_element?(view, "#clear-tests-company_limit")
+
+    render_submit(view, "save", %{"settings" => %{@company_setting => "24"}})
+    assert has_element?(view, "#flash-error", "archived and read-only")
+    assert Settings.get(@company_setting, company_scope) == 18
+  end
+
   test "discovers company-only settings in another declared group", %{conn: conn} do
     installed = ContributionRegistry.snapshot!()
     on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)

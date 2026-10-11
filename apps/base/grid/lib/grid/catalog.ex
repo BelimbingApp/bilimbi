@@ -4,7 +4,7 @@ defmodule Bilimbi.Base.Grid.Catalog do
 
   `for_scope/1` reads the installed contribution snapshot once, keeps only
   the tables whose capability the scope's actor holds and, within them,
-  only the fields no operator restricted to roles they lack, and settles which
+  only the fields no operator restricted for a role they hold, and settles which
   key of its source each of their fields is read from, so a catalog is
   both the vocabulary of a grid and the proof of what it may show. Every
   later call takes the catalog, not the scope: a path is resolved against
@@ -46,14 +46,14 @@ defmodule Bilimbi.Base.Grid.Catalog do
       |> Map.new(fn {id, table} ->
         {id,
          table
-         |> without_restricted(restricted |> Map.get(id, %{}) |> Map.keys())
+         |> without_restricted(Map.get(restricted, id, []))
          |> resolve_columns!(scope)}
       end)
 
     %__MODULE__{scope: scope, tables: visible}
   end
 
-  # A field an operator restricted to roles this reader does not hold is not
+  # A field an operator restricted for a role this reader holds is not
   # in their catalog (`Bilimbi.Base.Authz.restricted_fields/1`). Left out, not
   # marked: a path to it is then unknown, the add box never offers it, and a
   # kept view that names it loses that column, exactly as a table the reader

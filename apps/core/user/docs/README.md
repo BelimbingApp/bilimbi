@@ -139,12 +139,13 @@ another company of the tenant.
 derived from `company_id`, so `get_tenant_user/2` resolves no user without
 one. The detail page mounts no such account, so every fact it shows has a
 company to be written through. An account whose
-company is archived (soft-deleted) reads as "Archived company" rather than
-as no company, and the page shows it read-only: no in-place editor, company
-select, role or capability picker, password form, employee action, delete
-zone or Impersonate is offered, because every write on the account resolves
-its company and an archived one is refused, and the host cannot open a
-session for it. One `<.alert kind={:warning}>` under the header says so and
+company is archived (its status, or soft-deleted) reads as "Archived company"
+rather than as no company, and the page shows it read-only: no in-place
+editor, company select, role or capability picker, password form, employee
+action, delete zone or Impersonate is offered, because every write on the
+account begins with `Company.require_writable_company/2`, which refuses an
+archived company, and the host cannot open a session for it
+(`apps/core/company/docs/README.md`, "An archived company is read-only"). One `<.alert kind={:warning}>` under the header says so and
 says what it prevents; archiving is final, so it states that as a rule and
 names neither the company (no declared Company API returns an archived
 company) nor a next step (there is no restore or move, and `users.email` is

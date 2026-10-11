@@ -32,6 +32,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
              :undeclared_system_principal
              | :capability_not_declared
              | :company_not_found
+             | :company_archived
              | :audit_unavailable
              | {:unknown_capabilities, [String.t()]}}
   def grant(%Scope{} = scope, company_id, principal, capability, granter, registry)
@@ -41,7 +42,7 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
     with {:ok, declared} <- SystemPrincipals.fetch(principal),
          :ok <- known(capability, registry),
          :ok <- declared_capability(declared, capability),
-         :ok <- company_in_scope(scope, company_id, registry) do
+         :ok <- writable_company(scope, company_id, registry) do
       transaction(fn ->
         now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
@@ -83,12 +84,24 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
     do: {:error, {:unknown_capabilities, [inspect(capability)]}}
 
   @spec revoke(Scope.t(), term(), term(), term(), granter(), map()) ::
-          {:ok, :revoked | :not_found} | {:error, :audit_unavailable}
+          {:ok, :revoked | :not_found} | {:error, :company_archived | :audit_unavailable}
   def revoke(%Scope{} = scope, company_id, principal, capability, granter, registry)
       when is_integer(company_id) and is_binary(principal) and is_binary(capability) do
     capability = String.downcase(capability)
     company_ids = directory!(registry).company_ids(scope)
 
+    # A grant in an archived company stays as it is; a company out of scope
+    # simply holds no grant the scope can see, as the delete below answers.
+    case company_id > 0 and directory!(registry).company_writable(scope, company_id) do
+      {:error, :company_archived} -> {:error, :company_archived}
+      _other -> revoke_in_scope(scope, company_id, company_ids, principal, capability, granter)
+    end
+  end
+
+  def revoke(_scope, _company_id, _principal, _capability, _granter, _registry),
+    do: {:ok, :not_found}
+
+  defp revoke_in_scope(scope, company_id, company_ids, principal, capability, granter) do
     transaction(fn ->
       {count, _rows} =
         Repo.delete_all(
@@ -114,9 +127,6 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
       end
     end)
   end
-
-  def revoke(_scope, _company_id, _principal, _capability, _granter, _registry),
-    do: {:ok, :not_found}
 
   @spec list(Scope.t(), keyword(), map()) :: [SystemPrincipalGrant.t()]
   def list(%Scope{} = scope, opts, registry) when is_list(opts) do
@@ -215,11 +225,12 @@ defmodule Bilimbi.Base.Authz.SystemPrincipalService do
     if capability in capabilities, do: :ok, else: {:error, :capability_not_declared}
   end
 
-  defp company_in_scope(scope, company_id, registry) do
-    if is_integer(company_id) and company_id > 0 and
-         directory!(registry).company_in_scope?(scope, company_id),
-       do: :ok,
-       else: {:error, :company_not_found}
+  # A grant is a write into the company: the directory says whether it may
+  # take one (`:company_archived` when it is archived).
+  defp writable_company(scope, company_id, registry) do
+    if is_integer(company_id) and company_id > 0,
+      do: directory!(registry).company_writable(scope, company_id),
+      else: {:error, :company_not_found}
   end
 
   defp filter_principal(query, nil), do: query

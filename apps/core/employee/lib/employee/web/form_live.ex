@@ -66,6 +66,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     "job_description"
   ]
   @create_capability "admin.employee.create"
+  @archived_company "That company is archived and read-only, so no employee can be changed in it."
   @update_capability "admin.employee.update"
 
   @impl true
@@ -265,6 +266,9 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       {:error, :company_not_found} ->
         {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
 
+      {:error, :company_archived} ->
+        {:noreply, put_flash(socket, :error, @archived_company)}
+
       {:error, %Changeset{} = domain_changeset} ->
         {:noreply,
          assign_form(
@@ -295,6 +299,9 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       {:error, :invariant_violation} ->
         {:noreply,
          put_flash(socket, :error, "The platform orchestrator identity cannot be changed.")}
+
+      {:error, :company_archived} ->
+        {:noreply, put_flash(socket, :error, @archived_company)}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "That employee could not be updated.")}

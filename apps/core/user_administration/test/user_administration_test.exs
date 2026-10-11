@@ -66,6 +66,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert Map.keys(Map.from_struct(entry)) |> Enum.sort() ==
              [
                :company_archived,
+               :company_deleted,
                :company_id,
                :company_name,
                :created_at,
