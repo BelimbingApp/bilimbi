@@ -82,6 +82,14 @@ defmodule Bilimbi.Core.User.ActorVerifierTest do
     assert {:error, :actor_refused} = Authentication.resume(token)
   end
 
+  test "a job for a user of a company archived since it was queued is refused", %{scope: scope} do
+    token = delegate(scope, @target_id)
+
+    SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 73")
+
+    assert {:error, :actor_refused} = Authentication.resume(token)
+  end
+
   describe "a job queued under impersonation" do
     setup %{scope: scope} do
       {:ok, _entry} =
