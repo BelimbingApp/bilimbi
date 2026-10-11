@@ -6,6 +6,8 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
   alias Bilimbi.Base.UI.ListState
 
   @write_guard_opt_out ~w(grid)
+  # `since` belongs to PageColumns comparison state. Range filters use
+  # separate URL keys so filtering preserves the account's table arrangement.
   @list ListState.spec!(
           page_sizes: [25, 50, 100, 300],
           default_page_size: 25,
@@ -14,8 +16,8 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
             status: {:one_of, ["", "success", "http_error", "connection_error", "unknown"], ""},
             http_status: {:string, ""},
             actor: {:string, ""},
-            since: {:string, ""},
-            until: {:string, ""}
+            from: {:string, ""},
+            through: {:string, ""}
           ]
         )
   @builtins [
@@ -46,7 +48,8 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
 
     options =
       [page: state.page, page_size: state.page_size, search: state.search] ++
-        Map.to_list(state.filters)
+        Map.to_list(Map.drop(state.filters, [:from, :through])) ++
+        [since: state.filters.from, until: state.filters.through]
 
     case Integration.list_page(socket.assigns.current_scope.scope, options) do
       {:ok, page} ->
@@ -168,10 +171,10 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
             label="Person or agent ID"
             placeholder="Person or agent ID"
           />
-          <:control type={:date} field={@filters_form[:since]} id="exchange-since" label="From (UTC)" />
+          <:control type={:date} field={@filters_form[:from]} id="exchange-since" label="From (UTC)" />
           <:control
             type={:date}
-            field={@filters_form[:until]}
+            field={@filters_form[:through]}
             id="exchange-until"
             label="Through (UTC)"
           />
@@ -220,7 +223,7 @@ defmodule Bilimbi.Base.Integration.Web.IndexLive do
             <:col :let={%{key: id}} id="status">
               {@rows[id].response_status || @rows[id].outcome}
             </:col>
-            <:col :let={%{key: id}} id="duration_ms">{@rows[id].duration_ms}</:col>
+            <:col :let={%{key: id}} id="duration_ms">{@rows[id].duration_ms || "—"}</:col>
             <:col :let={%{key: id}} id="actor">
               {@rows[id].person_id || @rows[id].agent_id || "System"}
             </:col>
