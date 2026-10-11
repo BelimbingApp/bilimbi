@@ -29,7 +29,7 @@ defmodule Bilimbi.Core.AgentAccess.RotationLockTest do
             scope,
             device.user_code,
             :approve,
-            DateTime.add(DateTime.utc_now(), 86400)
+            DateTime.add(DateTime.utc_now(), 86_400)
           )
 
         {:ok, tokens} = AgentAccess.exchange(AgentAccess.client_id(), device.device_code)
@@ -93,7 +93,7 @@ defmodule Bilimbi.Core.AgentAccess.RotationLockTest do
             scope,
             device.user_code,
             :approve,
-            DateTime.add(DateTime.utc_now(), 86400)
+            DateTime.add(DateTime.utc_now(), 86_400)
           )
 
         device

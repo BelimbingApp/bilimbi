@@ -32,15 +32,17 @@ defmodule BilimbiWeb.AgentAuth do
         ip_address: conn.remote_ip |> :inet.ntoa() |> to_string()
       })
 
-      with :ok <- AgentAccess.observe(scope) do
-        {:ok, actor} = Authz.scope_actor(scope)
+      case AgentAccess.observe(scope) do
+        :ok ->
+          {:ok, actor} = Authz.scope_actor(scope)
 
-        conn
-        |> assign(:agent_scope, scope)
-        |> assign(:agent_connection_id, claims.id)
-        |> assign(:agent_actor, actor)
-      else
-        _ -> refused(conn)
+          conn
+          |> assign(:agent_scope, scope)
+          |> assign(:agent_connection_id, claims.id)
+          |> assign(:agent_actor, actor)
+
+        _ ->
+          refused(conn)
       end
     else
       _ -> refused(conn)

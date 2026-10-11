@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.Authz.Evaluator do
   @moduledoc false
 
-  alias Bilimbi.Base.Authz.AgentPolicy
   alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz.AgentPolicy
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.Authz.EffectivePermissions
   alias Bilimbi.Base.Authz.Resource

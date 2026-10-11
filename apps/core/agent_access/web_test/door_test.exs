@@ -31,7 +31,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
         scope,
         device.user_code,
         :approve,
-        DateTime.add(now(), 86400)
+        DateTime.add(now(), 86_400)
       )
 
     {:ok, tokens} = AgentAccess.exchange(AgentAccess.client_id(), device.device_code)
@@ -84,7 +84,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
         scope,
         response["user_code"],
         :approve,
-        DateTime.add(now(), 86400)
+        DateTime.add(now(), 86_400)
       )
 
     # Advance the protocol clock deterministically, rather than sleeping.
@@ -467,7 +467,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     device = start()
 
     assert {:error, :person_required} =
-             AgentAccess.decide(borrowed, device.user_code, :approve, DateTime.add(now(), 86400))
+             AgentAccess.decide(borrowed, device.user_code, :approve, DateTime.add(now(), 86_400))
   end
 
   test "facets lose platform, access-control and write capabilities even under direct grants" do
