@@ -39,18 +39,26 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
 
   @spec user(Identity.t(), pos_integer(), pos_integer(), pos_integer() | nil, String.t() | nil) ::
           Actor.t()
-  def user(%Identity{id: tenant_id}, user_id, company_id, impersonator_id, session_id)
+  def user(
+        %Identity{id: tenant_id},
+        user_id,
+        company_id,
+        impersonator_id,
+        session_id,
+        facet \\ nil
+      )
       when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0 and
              ((is_nil(impersonator_id) and is_nil(session_id)) or
                 (is_integer(impersonator_id) and impersonator_id > 0 and is_binary(session_id) and
                    session_id != "")) do
     %Actor{
       type: :user,
+      facet: facet,
       user_id: user_id,
       company_id: company_id,
       impersonator_id: impersonator_id,
       impersonation_session_id: session_id,
-      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id, session_id, nil)
+      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id, session_id, nil, facet)
     }
   end
 
@@ -69,7 +77,16 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
       )
       when type in [:user, :system] and is_binary(supplied) do
     expected =
-      seal(tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal)
+      seal(
+        tenant_id,
+        type,
+        user_id,
+        company_id,
+        impersonator_id,
+        session_id,
+        system_principal,
+        actor.facet
+      )
 
     # hash_equals/2 compares in constant time but only equal-length binaries.
     if byte_size(expected) == byte_size(supplied) and :crypto.hash_equals(expected, supplied) and
@@ -178,10 +195,20 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
 
   defp well_formed?(_actor), do: false
 
-  defp seal(tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal) do
+  defp seal(
+         tenant_id,
+         type,
+         user_id,
+         company_id,
+         impersonator_id,
+         session_id,
+         system_principal,
+         facet \\ nil
+       ) do
     payload =
       :erlang.term_to_binary(
-        {tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal},
+        {tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal,
+         facet},
         [:deterministic]
       )
 

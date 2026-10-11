@@ -31,9 +31,10 @@ approve as anyone. Workflow approvals, a later port, need the same guarantee.
    carries no authority.
 
 2. **Only the authentication edge attaches a user.**
-   `Bilimbi.Base.Tenancy.Authentication.sign_in/4` has one caller,
-   `BilimbiWeb.UserAuth`, which calls it only after proving the durable
-   session, the user, the company, and the tenant. That happens once per HTTP
+   `Bilimbi.Base.Tenancy.Authentication.sign_in/4` has two approved callers:
+   `BilimbiWeb.UserAuth` proves the durable session, user, company and tenant;
+   `BilimbiWeb.AgentAuth` proves the OAuth connection and live user, company
+   and tenant and seals an agent facet (ADR 0021). That happens once per HTTP
    request and once per LiveView mount, so `@current_scope.scope` names the
    signed-in user everywhere. A scope's actor is set once. Signing in a scope
    that already names a user raises.

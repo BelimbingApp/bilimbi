@@ -23,29 +23,20 @@ defmodule Bilimbi.Base.AgentApi.Reach do
   """
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Authz.CapabilityKey
   alias Bilimbi.Base.Tenancy.Scope
-
-  @read_verbs ~w(view list search)
-  @access_control_prefixes ~w(admin.authz. admin.agent-connection. base.settings.)
-  @access_control_keys ~w(admin.user.impersonate)
 
   @doc "The verbs a read capability ends in."
   @spec read_verbs() :: [String.t()]
-  def read_verbs, do: @read_verbs
+  def read_verbs, do: Authz.agent_read_verbs()
 
   @doc "Whether `capability` is a well-formed key ending in a read verb."
   @spec read?(String.t()) :: boolean()
-  def read?(capability) when is_binary(capability) do
-    CapabilityKey.valid?(capability) and CapabilityKey.parse!(capability).action in @read_verbs
-  end
+  def read?(capability) when is_binary(capability), do: Authz.agent_read_capability?(capability)
 
   @doc "Whether `capability` controls access, so no agent may ever hold it."
   @spec access_control?(String.t()) :: boolean()
-  def access_control?(capability) when is_binary(capability) do
-    capability in @access_control_keys or
-      String.starts_with?(capability, @access_control_prefixes)
-  end
+  def access_control?(capability) when is_binary(capability),
+    do: Authz.agent_access_control_capability?(capability)
 
   @doc "The capabilities the scope's person holds now, without the access-control set."
   @spec capabilities(Scope.t()) :: MapSet.t(String.t())

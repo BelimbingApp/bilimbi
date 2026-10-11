@@ -69,6 +69,15 @@ defmodule Bilimbi.Base.Authz do
   @spec resource(String.t(), String.t() | integer() | nil, keyword()) :: Resource.t()
   def resource(type, id \\ nil, opts \\ []), do: Resource.new!(type, id, opts)
 
+  @doc "Read verbs allowed to a connected agent (ADR 0021)."
+  defdelegate agent_read_verbs(), to: Bilimbi.Base.Authz.AgentPolicy, as: :read_verbs
+  @doc "Whether a capability reads, by its registered key's verb."
+  defdelegate agent_read_capability?(key), to: Bilimbi.Base.Authz.AgentPolicy, as: :read?
+  @doc "Whether a capability administers access and is unavailable to agents."
+  defdelegate agent_access_control_capability?(key),
+    to: Bilimbi.Base.Authz.AgentPolicy,
+    as: :access_control?
+
   @spec capabilities() :: [String.t()]
   def capabilities, do: registry!().capabilities
 
@@ -254,10 +263,24 @@ defmodule Bilimbi.Base.Authz do
         permissions
         |> EffectivePermissions.allowed(registry.capabilities)
         |> then(fn allowed ->
-          if Scope.platform_operator?(actor.scope) do
+          if Scope.platform_operator?(actor.scope) and is_nil(Scope.actor(actor.scope).facet) do
             allowed
           else
             allowed -- registry.platform_capabilities
+          end
+        end)
+        |> then(fn allowed ->
+          if Scope.actor(actor.scope).facet do
+            Enum.reject(
+              allowed,
+              &Bilimbi.Base.Authz.AgentPolicy.refusal(
+                actor.scope,
+                &1,
+                registry.platform_capabilities
+              )
+            )
+          else
+            allowed
           end
         end),
       denied: EffectivePermissions.denied(permissions),

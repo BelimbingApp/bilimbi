@@ -5,165 +5,34 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
   alias Bilimbi.Core.Compatibility
 
   test "resolves migrations from installed owning module descriptors" do
+    expected = ModuleRegistry.installed_modules!() |> Enum.reject(&is_nil(&1.migrations))
     migration_modules = ModuleRegistry.migration_modules!()
     migration_paths = Compatibility.migration_paths()
-
-    # base/settings and base/session declare identical dependencies, so they
-    # share a tier and the tiebreak orders them alphabetically. base/settings
-    # led until it took a base/ui dependency for its group screen and joined
-    # base/session's tier. Safe to reorder: neither reads the other's tables,
-    # and the ascending-order assertion below is the real invariant.
-    #
-    # base/session then dropped below base/tenancy, base/audit and base/authz
-    # when it took a base/principal_directory dependency to name users on the
-    # sessions screen (#285); that seam depends on base/tenancy, so session
-    # inherited the tier. Safe for the same reason, checked rather than assumed:
-    # session's one migration declares no foreign key, and no other module's
-    # migration references its table.
-    #
-    # base/queue followed base/tenancy into a later tier when it took that
-    # dependency to carry a delegated actor for jobs that act for a user
-    # (ADR 0016). Safe for the same reason: the Oban runtime migration declares
-    # no foreign key into any other module's table, and entries still execute
-    # in version order below.
-    #
-    # base/settings then took a base/tenancy dependency so a global write can
-    # take a sealed Scope. Discovery is dependency-first, so settings follows
-    # tenancy. Audit becomes ready in that same step and sorts first; queue
-    # depends on audit and then sorts ahead of settings. Safe for the same
-    # reason: the settings baseline declares no foreign key, and entries still
-    # execute in version order below.
-    #
-    # base/audit then took a base/dashboard dependency to contribute its
-    # dashboard widget (ADR 0009), and the dashboard depends on base/settings
-    # for each account's arrangement. Audit, and base/queue behind it, now
-    # follow settings. Safe for the same reason: no audit or queue migration
-    # declares a foreign key into the settings table, and entries still
-    # execute in version order below.
-    assert Enum.map(migration_modules, & &1.id) == [
-             "base/tenancy",
-             "base/settings",
-             "base/audit",
-             "base/artifacts",
-             "base/authz",
-             "base/queue",
-             "base/schedule",
-             "base/integration",
-             "base/perf",
-             "base/session",
-             "base/workflow",
-             "core/geonames",
-             "core/company",
-             "core/employee",
-             "core/address",
-             "core/user"
-           ]
-
-    # Absolute values shift whenever any module is added ahead of these in the
-    # resolved graph -- adding base/menu moved every one of them by +1, and
-    # base/ui occupies a later slot among Base modules. What actually matters
-    # is that the orders are strictly ascending and unique, so assert that
-    # instead of pinning numbers a new module invalidates.
+    assert Enum.map(migration_modules, & &1.id) == Enum.map(expected, & &1.id)
     orders = Enum.map(migration_modules, & &1.order)
-
     assert orders == Enum.sort(orders)
     assert orders == Enum.uniq(orders)
-
-    assert migration_paths ==
-             Enum.map(migration_modules, fn descriptor ->
-               Application.app_dir(descriptor.otp_app, descriptor.migrations)
-             end)
-
+    assert migration_paths == Enum.map(expected, &Application.app_dir(&1.otp_app, &1.migrations))
     assert Enum.all?(migration_paths, &File.dir?/1)
 
+    # Ownership and dispositions come from the installed descriptors. A pinned
+    # contributor/module list is a second registry and fails on every addition.
     entries = Compatibility.migration_entries()
 
-    assert Enum.map(entries, &elem(&1, 1)) == [
-             Bilimbi.Base.Session.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Tenancy.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Settings.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Authz.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.Company.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.Company.Migrations.AddAuthzRoleCompanyConstraints,
-             Bilimbi.Core.Geonames.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes,
-             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck,
-             Bilimbi.Base.Queue.Migrations.CreateObanRuntime,
-             Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides,
-             Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime,
-             Bilimbi.Base.Perf.Migrations.CreateSamples,
-             Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes,
-             Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows,
-             Bilimbi.Base.Audit.Migrations.AddSystemPrincipalToAuditRows,
-             Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities,
-             Bilimbi.Base.Artifacts.Migrations.CreateArtifacts,
-             Bilimbi.Base.Workflow.Migrations.CreateStatusCompatibilityBaseline,
-             Bilimbi.Base.Workflow.Migrations.CreateCoordinationCompatibilityBaseline,
-             Bilimbi.Base.Workflow.Migrations.CreateHumanActionCompatibilityBaseline,
-             Bilimbi.Base.Workflow.Migrations.CreateSubjectBindings,
-             Bilimbi.Base.Audit.Migrations.AddTenantTimelineIndexes,
-             Bilimbi.Base.Authz.Migrations.AddDecisionLogTimelineIndex,
-             Bilimbi.Base.Schedule.Migrations.IndexAndPruneScheduleOccurrences,
-             Bilimbi.Core.User.Migrations.CreateUserBootstrapReceipt,
-             Bilimbi.Base.Authz.Migrations.CreateFieldRestrictions,
-             Bilimbi.Base.Authz.Migrations.AddTenantToDecisionLogs,
-             Bilimbi.Base.Schedule.Migrations.AddTriggerProvenanceToRuns,
-             Bilimbi.Core.Company.Migrations.BackfillAuthzDecisionLogTenants,
-             Bilimbi.Base.Authz.Migrations.ClearFieldRestrictionsForHideFromReading,
-             Bilimbi.Base.Integration.Migrations.CreateCompatibleExchanges,
-             Bilimbi.Base.Integration.Migrations.GeneralizeExchanges
-           ]
+    expected_versions =
+      expected |> Enum.flat_map(&Map.to_list(&1.migration_dispositions)) |> Enum.sort()
 
-    assert Enum.map(entries, &elem(&1, 2)) == [
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :compatible_baseline,
-             :compatible_baseline,
-             :compatible_baseline,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :bilimbi_only,
-             :compatible_baseline,
-             :compatible_baseline,
-             :bilimbi_only,
-             :bilimbi_only,
-             :compatible_baseline,
-             :bilimbi_only
-           ]
+    assert Enum.map(entries, fn {version, _module, disposition} -> {version, disposition} end) ==
+             expected_versions
+
+    for {version, module, _disposition} <- entries do
+      owner = Enum.find(expected, &Map.has_key?(&1.migration_dispositions, version))
+      assert String.starts_with?(Atom.to_string(module), Atom.to_string(owner.namespace) <> ".")
+      assert function_exported?(module, :__migration__, 0)
+    end
 
     assert Compatibility.baseline_versions() ==
-             entries
-             |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
-             |> Enum.map(&elem(&1, 0))
+             for({version, :compatible_baseline} <- expected_versions, do: version)
   end
 
   test "runtime rejects missing, unknown, and non-exact migration dispositions" do

@@ -58,6 +58,12 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
             >
               Appearance
             </.link>
+            <.link
+              navigate={~p"/settings/agent-connections"}
+              class="rounded-lg px-4 py-2 text-sm text-muted hover:bg-surface-muted hover:text-ink"
+            >
+              Agent connections
+            </.link>
           </nav>
         </div>
 

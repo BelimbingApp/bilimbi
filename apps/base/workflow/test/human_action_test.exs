@@ -29,6 +29,16 @@ defmodule Bilimbi.Base.Workflow.HumanActionTest do
     %{scope: scope, subject: subject!(), system: system}
   end
 
+  test "a connected agent cannot perform human actions", c do
+    facet =
+      Authentication.sign_in(c.system, 7, 10,
+        agent: %{type: :agent, connection_id: 1, agent_id: "codex/model-high"}
+      )
+
+    assert {:error, :human_actor_required} = Workflow.available_actions(facet, c.subject)
+    assert {:error, :human_actor_required} = Workflow.execute_action(facet, c.subject, %{})
+  end
+
   test "availability lists permitted actions and due work with the tokens a page echoes back",
        c do
     assert {:ok, %{subject_version: version, actions: [approve]}} =

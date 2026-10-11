@@ -494,6 +494,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     actual.type == "numeric" and actual.precision == precision and actual.scale == scale
   end
 
+  defp type_matches?(:bytea, actual), do: actual.type == "bytea"
   defp type_matches?(:bigint, actual), do: actual.type == "bigint"
   defp type_matches?(:boolean, actual), do: actual.type == "boolean"
   defp type_matches?(:date, actual), do: actual.type == "date"

@@ -76,6 +76,9 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
     with {:ok, _person} <- person(scope) do
       case Authz.can(scope, capability) do
         %Decision{allowed: true} -> :ok
+        # The read-only bearer edge's global write refusal retains the API's
+        # documented stage result rather than presenting it as a missing grant.
+        %Decision{reason: :denied_agent_writes_off} -> {:error, :writes_not_enabled}
         %Decision{} -> {:error, {:forbidden, :missing_capability}}
       end
     end

@@ -27,6 +27,7 @@
     "base/tiling",
     "base/grid",
     "base/audit",
+    "core/agent_access",
     "core/company",
     "core/geonames",
     "core/address",

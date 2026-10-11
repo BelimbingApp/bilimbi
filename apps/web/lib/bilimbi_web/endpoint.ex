@@ -58,6 +58,8 @@ defmodule BilimbiWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
+  plug BilimbiWeb.IncomingApi
+
   plug BilimbiWeb.WebhookParsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],

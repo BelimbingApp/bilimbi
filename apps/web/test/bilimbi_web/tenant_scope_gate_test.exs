@@ -42,6 +42,12 @@ defmodule BilimbiWeb.TenantScopeGateTest do
   # {path relative to the workspace root, "function/arity", schema or table}
   # => the reason this read may span tenants.
   @allowed %{
+    {"apps/core/agent_access/lib/agent_access.ex", "lockedless_connection/1",
+     "Bilimbi.Core.AgentAccess.Connection"} =>
+      "Bounded OAuth credential resolution before a tenant is known; live identity is re-proven before use.",
+    {"apps/core/agent_access/lib/agent_access.ex", "locked_connection/1",
+     "Bilimbi.Core.AgentAccess.Connection"} =>
+      "Owner-local grant lock after a device or refresh hash resolves the immutable connection; serializes rotation, replay and revocation.",
     {"apps/base/integration/lib/integration.ex", "prune_payloads/1",
      "Bilimbi.Base.Integration.Exchange"} =>
       "Installation-wide scheduled payload retention; clears only Integration previews by age and returns a count.",

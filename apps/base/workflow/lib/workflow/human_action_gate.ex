@@ -264,7 +264,7 @@ defmodule Bilimbi.Base.Workflow.HumanActionGate do
 
   defp human(scope) do
     case Scope.actor(scope) do
-      %{type: :user} -> :ok
+      %{type: :user, facet: nil} -> :ok
       _ -> {:error, :human_actor_required}
     end
   end

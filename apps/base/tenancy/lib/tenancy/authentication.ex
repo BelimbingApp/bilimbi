@@ -6,13 +6,13 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
   actor with `Bilimbi.Base.Tenancy.Scope.actor/1`; it never calls this module.
 
   `sign_in/4` and `resume/2` are the two ways a scope gets a user actor, and
-  `resume_system/2` is the one way it gets a named system principal. Each has
-  exactly one caller:
+  `resume_system/2` is the one way it gets a named system principal. Their approved callers are:
 
     * `sign_in/4` — `BilimbiWeb.UserAuth`, after it has proven the durable
       session, the user, the company, and the tenant for this request or
       LiveView process. Nothing here re-checks those facts; the caller is the
-      proof.
+      proof. `BilimbiWeb.AgentAuth` is the second caller (ADR 0021), proving
+      a hashed OAuth grant and live identity before attaching an agent facet.
     * `resume/2` — `Bilimbi.Base.Queue.Worker`, when a job enqueued with
       `Bilimbi.Base.Queue.enqueue_for/3` runs. The job carries a token that
       `delegate/1` signed from a scope that already held the actor, and the
@@ -45,6 +45,10 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
 
   Options, given together or not at all:
 
+    * `:agent` — `%{type: :agent, connection_id: id, agent_id: stated_id}`
+      (`stated_id` is `nil` when the request stated none),
+      only at the bearer edge. Sealed with the actor; cannot be impersonated
+      or delegated to a queue.
     * `:impersonator_id` — the operator behind an impersonated session. The
       user is the account acted as; the impersonator is who acted.
     * `:impersonation_session_id` — the borrowed durable session, so work
@@ -63,13 +67,19 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
         raise ArgumentError, "a scope's actor is set once; this scope runs as #{name}"
 
       %Actor{type: :system} ->
+        facet = Keyword.get(opts, :agent)
+
+        if not is_nil(facet) and (not valid_facet?(facet) or Keyword.get(opts, :impersonator_id)),
+          do: raise(ArgumentError, "invalid agent facet")
+
         actor =
           ActorSeal.user(
             tenant,
             user_id,
             company_id,
             Keyword.get(opts, :impersonator_id),
-            Keyword.get(opts, :impersonation_session_id)
+            Keyword.get(opts, :impersonation_session_id),
+            facet
           )
 
         %Scope{tenant: tenant, actor: actor}
@@ -86,9 +96,13 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
   A system scope has no user to delegate. A job runs as a named system
   principal through `delegate_system/3` instead.
   """
-  @spec delegate(Scope.t()) :: {:ok, binary()} | {:error, :no_authenticated_actor}
+  @spec delegate(Scope.t()) ::
+          {:ok, binary()} | {:error, :no_authenticated_actor | :agent_delegation_not_enabled}
   def delegate(%Scope{} = scope) do
     case Scope.actor(scope) do
+      %Actor{facet: facet} when not is_nil(facet) ->
+        {:error, :agent_delegation_not_enabled}
+
       %Actor{type: :user} = actor ->
         {:ok, ActorSeal.sign_delegation(Scope.tenant_id(scope), actor)}
 
@@ -180,6 +194,13 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
       {:ok, %Scope{tenant: tenant, actor: ActorSeal.system_principal(tenant, name, company_id)}}
     end
   end
+
+  defp valid_facet?(%{type: :agent, connection_id: id, agent_id: agent} = facet),
+    do:
+      map_size(facet) == 3 and is_integer(id) and id > 0 and
+        (is_nil(agent) or (is_binary(agent) and byte_size(agent) in 1..255))
+
+  defp valid_facet?(_), do: false
 
   defp verify_actor(scope) do
     case ContributionRegistry.consumer!(:actor_verifier) do
