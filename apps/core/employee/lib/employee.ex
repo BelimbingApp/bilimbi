@@ -353,12 +353,31 @@ defmodule Bilimbi.Core.Employee do
           {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
     with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
-      company_id
-      |> Schema.creation_changeset(attributes)
-      |> reject_reserved_orchestrator_number()
-      |> validate_references(scope, company_id, nil)
-      |> persist_insert()
+      scope |> creation_changeset(company_id, attributes) |> persist_insert()
     end
+  end
+
+  @doc "Validates the same employment fields and references as create, without writing."
+  @spec preview_create_employee(Scope.t(), pos_integer(), map()) ::
+          {:ok, Summary.t()} | {:error, term()}
+  def preview_create_employee(%Scope{} = scope, company_id, attributes) do
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
+      scope
+      |> creation_changeset(company_id, attributes)
+      |> Changeset.unsafe_validate_unique([:company_id, :employee_number], Repo)
+      |> Changeset.apply_action(:insert)
+      |> case do
+        {:ok, employee} -> {:ok, Summary.from_schema(employee)}
+        {:error, changeset} -> {:error, changeset}
+      end
+    end
+  end
+
+  defp creation_changeset(scope, company_id, attributes) do
+    company_id
+    |> Schema.creation_changeset(attributes)
+    |> reject_reserved_orchestrator_number()
+    |> validate_references(scope, company_id, nil)
   end
 
   @spec update_employee(Scope.t(), pos_integer(), pos_integer(), map()) ::

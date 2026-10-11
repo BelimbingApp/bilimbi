@@ -69,7 +69,40 @@ defmodule Bilimbi.Core.Employee.Contributions do
         Bilimbi.Core.Employee.EmployeeDirectoryProvider
       ],
       grid: Bilimbi.Core.Employee.GridTables.tables(),
-      agent_api: %{operations: Bilimbi.Core.Employee.AgentOperations.declarations()},
+      agent_api: %{
+        operations: Bilimbi.Core.Employee.AgentOperations.declarations(),
+        guides: [
+          %{
+            key: "core.employee",
+            title: "People at companies",
+            summary:
+              "Record a namecard person as an employee of their own employer, including external companies.",
+            keywords: ["person", "namecard", "contact", "supplier", "customer"],
+            capability: "admin.employee.list",
+            body: """
+            An employee is a person employed by a company. It is separate from a
+            login account. A namecard person belongs to their own employer, not to
+            the company where you signed in. Search `core.company.list` first and
+            reuse an existing employer. If missing, create the employer through a
+            reviewed plan and use its returned id in the person's next plan.
+
+            Search `core.employee.list` by name, email or employee number with
+            `employer_company_id` before creating a person. Omit the target only
+            when searching your signed-in company. Work at another company requires
+            the same tenant-wide company permission as the form's selector.
+
+            `core.employee.create` needs the employer id, full name and an employee
+            number unique within that employer. Ask for the company's numbering
+            convention when it is unknown. Do not use SYS-001, the platform's
+            reserved identity. Designation, email and mobile number are optional;
+            send only facts the source supports. Employee type defaults to full_time
+            and status to active, as shown in the preview. Neither creates a login.
+            Review the dry run with the person and commit its exact plan code;
+            company approval workflows and the agent-write switch still apply.
+            """
+          }
+        ]
+      },
       authz: %{
         capabilities: @owned_capabilities,
         roles: %{

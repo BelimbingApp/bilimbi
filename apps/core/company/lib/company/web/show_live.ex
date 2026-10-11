@@ -119,7 +119,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     "parent_id" => :parent_id
   }
 
-  @choice_facts Map.keys(@choice_fields) ++ ["timezone"]
+  @choice_facts Map.keys(@choice_fields) ++ ["timezone", "agent_writes"]
 
   @forbidden "You do not have permission to change company administration data."
 
@@ -148,7 +148,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     "parent_id" => "Parent Company",
     "activities" => "Business Activities",
     "metadata" => "Metadata",
-    "timezone" => "Default Timezone"
+    "timezone" => "Default Timezone",
+    "agent_writes" => "Agent writes"
   }
 
   # The lifecycle dialog's copy per operation: the consequence sentence is
@@ -333,6 +334,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
          |> assign_timezone(company)
+         |> assign_agent_writes(company)
          |> assign(:pending_lifecycle, nil)
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
@@ -393,6 +395,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     socket
     |> assign(:company_timezone, explicit)
     |> assign(:resolved_timezone, Bilimbi.Base.DateTime.company_timezone(scope))
+  end
+
+  defp assign_agent_writes(socket, company) do
+    {:ok, enabled?} =
+      Company.agent_writes_enabled?(socket.assigns.current_scope.scope, company.id)
+
+    assign(socket, :agent_writes_enabled?, enabled?)
   end
 
   # ============================================================================
@@ -477,6 +486,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     edit_metadata
     save_metadata
     save_timezone
+    save_agent_writes
   )
 
   # A lifecycle operation is judged against the company it acts on, as the
@@ -701,6 +711,25 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   defp write_event("save_metadata", _params, socket), do: {:noreply, socket}
+
+  defp write_event("save_agent_writes", %{"agent_writes" => value}, socket)
+       when value in ["true", "false"] do
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+    result = Company.set_agent_writes_enabled(scope, company.id, value == "true")
+    socket = assign(socket, :editing_field, nil)
+
+    {:noreply,
+     CommitStatus.commit(socket, "agent_writes", result,
+       on_ok: fn socket, _ -> assign_agent_writes(socket, company) end,
+       failures: @failures,
+       label: "Agent writes",
+       field: :value,
+       submitted: value
+     )}
+  end
+
+  defp write_event("save_agent_writes", _, socket), do: {:noreply, socket}
 
   # The default timezone is a company setting, not a column: it commits
   # through Base Settings and reports on its own fact like the rest.
@@ -1382,6 +1411,36 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           current_scope={@current_scope}
           opts={%{company_id: @company.id}}
         />
+
+        <.card
+          id="company-agent-writes-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-agent-writes-heading"
+        >
+          <.section_heading id="company-agent-writes-heading" title="Agent access">
+            <:description>
+              Agents use the person's permissions. Writes require a reviewed plan and follow company workflows.
+            </:description>
+          </.section_heading>
+          <.list id="company-agent-writes-facts">
+            <:item title="Agent writes" id="detail-agent-writes">
+              <.choice_fact
+                id="company-agent-writes"
+                name="agent_writes"
+                value={to_string(@agent_writes_enabled?)}
+                options={[{"Allowed", "true"}, {"Off", "false"}]}
+                save_event="save_agent_writes"
+                editing?={@editing_field == "agent_writes"}
+                can_update?={@can_update?}
+                status={@field_status["agent_writes"]}
+              >
+                {if @agent_writes_enabled?, do: "Allowed", else: "Off"}
+              </.choice_fact>
+            </:item>
+          </.list>
+        </.card>
 
         <%!-- Section 3: Timezone. A company setting rather than a column,
              presented as one choice fact of its own section: Belimbing keeps

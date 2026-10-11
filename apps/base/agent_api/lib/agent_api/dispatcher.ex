@@ -10,8 +10,8 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
     3. the scope names a person, and `Bilimbi.Base.Authz.can/4` allows the
        operation's capability: the same key the screen's route or event
        asks, judged on the sealed person and read afresh;
-    4. a write is not run: writes are not enabled yet, so every write
-       answers `{:error, :writes_not_enabled}`;
+    4. `call/3` refuses writes. Plans alone call supported preview/commit
+       handlers, checking the company switch and a bound, unused plan code;
     5. the handler calls its own facade with the scope, so the facade's
        changesets, field restrictions and internal checks apply unchanged;
     6. the result is made JSON-ready by `Bilimbi.Base.AgentApi.Json`.
@@ -60,6 +60,37 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
     end
   end
 
+  @doc "Validates and authorizes a supported write before calling its preview facade."
+  def preview(nil, %Scope{}, _input), do: {:error, :unknown_operation}
+
+  def preview(%Definition{} = operation, %Scope{} = scope, input) do
+    with :ok <- check_input(operation, input),
+         :ok <- authorize(operation, scope),
+         :ok <- safe_write(operation),
+         :ok <- writes_enabled(scope) do
+      operation.handler.preview(operation.key, scope, input) |> normalize()
+    end
+  end
+
+  @doc "Commit is called only by Plans after its binding and preview checks."
+  def commit(%Definition{} = operation, %Scope{} = scope, input) do
+    with :ok <- check_input(operation, input),
+         :ok <- authorize(operation, scope),
+         :ok <- safe_write(operation),
+         :ok <- writes_enabled(scope) do
+      operation.handler.commit(operation.key, scope, input) |> normalize()
+    end
+  end
+
+  defp safe_write(%Definition{kind: :write, safe_write: true}), do: :ok
+  defp safe_write(_), do: {:error, :writes_not_enabled}
+
+  defp writes_enabled(scope) do
+    if Bilimbi.Base.Authz.AgentPolicy.writes_enabled?(scope),
+      do: :ok,
+      else: {:error, :writes_not_enabled}
+  end
+
   defp check_input(%Definition{input: schema}, input) do
     case InputSchema.validate(schema, input) do
       :ok -> check_page_size(input)
@@ -76,8 +107,8 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
     with {:ok, _person} <- person(scope) do
       case Authz.can(scope, capability) do
         %Decision{allowed: true} -> :ok
-        # The read-only bearer edge's global write refusal retains the API's
-        # documented stage result rather than presenting it as a missing grant.
+        # A company's write switch is a policy refusal, distinct from a
+        # missing personal grant.
         %Decision{reason: :denied_agent_writes_off} -> {:error, :writes_not_enabled}
         %Decision{} -> {:error, {:forbidden, :missing_capability}}
       end
@@ -97,20 +128,16 @@ defmodule Bilimbi.Base.AgentApi.Dispatcher do
   defp runnable(%Definition{kind: :write}), do: {:error, :writes_not_enabled}
 
   defp run(%Definition{handler: handler, key: key}, scope, input) do
-    case handler.call(key, scope, input) do
-      {:ok, result} ->
-        {:ok, result}
-
-      {:error, :not_found} ->
-        {:error, :not_found}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, {:invalid_input, changeset_errors(changeset)}}
-
-      {:error, reason} ->
-        {:error, {:rejected, reason}}
-    end
+    handler.call(key, scope, input) |> normalize()
   end
+
+  defp normalize({:ok, result}), do: {:ok, result}
+  defp normalize({:error, :not_found}), do: {:error, :not_found}
+
+  defp normalize({:error, %Ecto.Changeset{} = changeset}),
+    do: {:error, {:invalid_input, changeset_errors(changeset)}}
+
+  defp normalize({:error, reason}), do: {:error, {:rejected, reason}}
 
   defp envelope(operation, %Page{} = page) do
     %{

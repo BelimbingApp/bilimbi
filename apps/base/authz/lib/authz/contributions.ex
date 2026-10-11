@@ -108,6 +108,16 @@ defmodule Bilimbi.Base.Authz.Contributions do
       ],
       settings: %{
         definitions: %{
+          "authz.agent_writes_enabled" => %{
+            type: :boolean,
+            scopes: [:company],
+            default: true,
+            label: "Allow agent writes",
+            help:
+              "Allow agents signed in at this company to submit reviewed write plans. Company workflows and permissions still apply.",
+            editable: "operator",
+            capability: "admin.company.update"
+          },
           "authz.decision_log_retention_days" => %{
             type: :integer,
             scopes: [:global],

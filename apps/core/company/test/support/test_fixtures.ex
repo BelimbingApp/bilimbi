@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         parent_id bigint,
         tenant_id bigint NOT NULL,
         name varchar(255) NOT NULL,
-        code varchar(255) NOT NULL UNIQUE,
+        code varchar(255) NOT NULL CONSTRAINT companies_code_unique UNIQUE,
         status varchar(255) NOT NULL DEFAULT 'active',
         legal_name varchar(255),
         registration_number varchar(255),

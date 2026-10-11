@@ -4,8 +4,9 @@ defmodule Bilimbi.Base.AgentApi.Operation do
 
   A handler is a thin adapter over its own module's facade: it reads the
   validated input, calls the facade with the scope it is given, and returns
-  the facade's read model. It never takes an actor, tenant or company id
-  from input, so the person the scope names is the person who did it, and
+  the facade's read model. It never takes an actor or tenant id from input.
+  An employer target is authorized through the Company facade; it never
+  replaces the signed-in company. The scope names who did it, and
   the facade's own changesets, field restrictions and checks apply exactly
   as they do for the screen.
 
@@ -17,9 +18,11 @@ defmodule Bilimbi.Base.AgentApi.Operation do
   %Ecto.Changeset{}}`, or a domain refusal the dispatcher reports as
   rejected.
 
-  A write operation also exports `preview/3`, which renders what the write
-  would change from server data, so the person approving it sees the
-  record's real before and after rather than the agent's account of it.
+  A supported write declares `safe_write: true`, implements `preview/3`
+  without mutation, and implements `commit/3` returning the domain record
+  and its host-relative Bilimbi path. The person reviews validated changes,
+  including domain defaults. Plans alone calls commit after checking the
+  bound code. Commit calls the ordinary facade; it never skips a workflow.
   """
 
   alias Bilimbi.Base.Tenancy.Scope
@@ -32,5 +35,8 @@ defmodule Bilimbi.Base.AgentApi.Operation do
   @callback preview(key :: String.t(), Scope.t(), input :: map()) ::
               {:ok, %{summary: String.t(), changes: [change()]}} | {:error, term()}
 
-  @optional_callbacks preview: 3
+  @callback commit(key :: String.t(), Scope.t(), input :: map()) ::
+              {:ok, %{record: term(), path: String.t()}} | {:error, term()}
+
+  @optional_callbacks preview: 3, commit: 3
 end

@@ -222,10 +222,12 @@ Each job is its own change.
   text.
 - Domain and Extension operations use meta-terms in keys, titles and
   guides; company wording belongs in configurable keywords.
-- The first job's validator still accepts an `approval` field on write
-  operations, from an earlier draft of this record. The safe-writes job
-  replaces it with the plan code.
-- Bilimbi cannot tell whether the person really gave the go. It relies on
+- Supported writes declare `safe_write: true` and implement preview/commit.
+  The earlier `approval` contribution field is retired; a bound, expiring,
+  single-use plan code gates every write. The native client refuses to commit
+  a plan the person has not approved in its local review.
+- Bilimbi cannot tell whether the person really gave the go; only the native
+  client enforces it, locally. It relies on
   the person's own permissions, the plan code and the request log.
 
 ## Alternatives considered

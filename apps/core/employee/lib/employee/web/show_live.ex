@@ -57,7 +57,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.LiveAuthorization
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.DiscoveredPanels
@@ -125,11 +124,17 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   }
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     scope = socket.assigns.current_scope.scope
-    company_id = socket.assigns.current_scope.user["company_id"]
+    signed_in_company_id = socket.assigns.current_scope.actor.company_id
+
+    company_id =
+      Bilimbi.Base.UI.Params.positive_integer(
+        Map.get(params, "employer_company_id", signed_in_company_id)
+      )
 
     with {employee_id, ""} <- Integer.parse(id),
+         :ok <- authorize_employer(scope, company_id, signed_in_company_id),
          {:ok, employee} <- Employee.get_employee(scope, company_id, employee_id) do
       socket =
         socket
@@ -139,13 +144,62 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         |> CommitStatus.init()
         |> init_ui_state()
         |> load_data(employee)
+        |> attach_hook(:employee_employer_access, :handle_event, &authorize_employer_event/3)
+        |> attach_hook(:employee_employer_access, :handle_info, &employer_access_lost/2)
         |> Workspace.announce(%{kind: "core/employee", id: employee.id})
+
+      Bilimbi.Base.UI.EventAuthorization.constrain(fn component_socket ->
+        current_scope = component_socket.assigns.current_scope
+
+        case authorize_employer(
+               current_scope.scope,
+               employee.company_id,
+               current_scope.actor.company_id
+             ) do
+          :ok ->
+            {:cont, component_socket}
+
+          _ ->
+            send(self(), :employee_employer_access_lost)
+            {:halt, component_socket}
+        end
+      end)
 
       {:ok, socket}
     else
       _ -> {:ok, not_found(socket)}
     end
   end
+
+  # A report may link to employment at another company. Its target is subject
+  # to the form selector's tenant-wide reach; it never changes the signed-in
+  # identity. The host already checks view access for the signed-in company.
+  defp authorize_employer(_scope, company_id, company_id), do: :ok
+
+  defp authorize_employer(scope, company_id, _signed_in_company_id) do
+    with {:ok, _} <- Company.authorize_company_target(scope, company_id, "admin.employee.view"),
+         do: :ok
+  end
+
+  # An open external record loses access when tenant-wide reach is revoked.
+  # EventAuthorization applies the same requirement to contributed panels.
+  defp authorize_employer_event(_event, _params, socket) do
+    current_scope = socket.assigns.current_scope
+
+    case authorize_employer(
+           current_scope.scope,
+           socket.assigns.employee.company_id,
+           current_scope.actor.company_id
+         ) do
+      :ok -> {:cont, socket}
+      _ -> {:halt, not_found(socket)}
+    end
+  end
+
+  defp employer_access_lost(:employee_employer_access_lost, socket),
+    do: {:halt, not_found(socket)}
+
+  defp employer_access_lost(_message, socket), do: {:cont, socket}
 
   defp init_ui_state(socket) do
     socket
@@ -165,8 +219,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     current_scope = socket.assigns.current_scope
     company_id = employee.company_id
     company_archived? = archived_company?(scope, company_id)
-    can_manage? = allowed?(current_scope, @manage_capability) and not company_archived?
-    can_delete? = allowed?(current_scope, "admin.employee.delete") and not company_archived?
+
+    can_manage? =
+      target_allowed?(current_scope, company_id, @manage_capability) and not company_archived?
+
+    can_delete? =
+      target_allowed?(current_scope, company_id, @delete_capability) and not company_archived?
 
     # Company info
     company_name =
@@ -519,7 +577,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   def handle_event("delete", _params, socket) do
     scope = socket.assigns.current_scope.scope
     employee = socket.assigns.employee
-    company_id = socket.assigns.current_scope.user["company_id"]
+    company_id = employee.company_id
 
     case authorize_delete(socket) do
       {:denied, socket} ->
@@ -1365,7 +1423,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # revoked grant must not keep working until remount (#609, the #482/#541
   # pattern).
   defp can_manage?(socket) do
-    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed and
+    target_allowed?(
+      socket.assigns.current_scope,
+      socket.assigns.employee.company_id,
+      @manage_capability
+    ) and
       not archived_company?(
         socket.assigns.current_scope.scope,
         socket.assigns.employee.company_id
@@ -1382,10 +1444,44 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # `can_delete?` only decides whether the danger zone is shown. The event
   # re-asks, and a refusal drops the key from the scope the zone reads.
   defp authorize_delete(socket) do
-    LiveAuthorization.authorize_event(socket, @delete_capability)
+    case LiveAuthorization.authorize_event(socket, @delete_capability) do
+      {:ok, socket} ->
+        if target_allowed?(
+             socket.assigns.current_scope,
+             socket.assigns.employee.company_id,
+             @delete_capability
+           ),
+           do: {:ok, socket},
+           else: {:denied, put_flash(socket, :error, LiveAuthorization.denied_message())}
+
+      denied ->
+        denied
+    end
   end
 
   defp present_delete(socket) do
-    assign(socket, :can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
+    assign(
+      socket,
+      :can_delete?,
+      target_allowed?(
+        socket.assigns.current_scope,
+        socket.assigns.employee.company_id,
+        @delete_capability
+      ) and
+        not archived_company?(
+          socket.assigns.current_scope.scope,
+          socket.assigns.employee.company_id
+        )
+    )
+  end
+
+  defp target_allowed?(current_scope, company_id, capability) do
+    if company_id == current_scope.actor.company_id,
+      do: LiveAuthorization.allowed_now?(current_scope, capability),
+      else:
+        match?(
+          {:ok, _},
+          Company.authorize_company_target(current_scope.scope, company_id, capability)
+        )
   end
 end

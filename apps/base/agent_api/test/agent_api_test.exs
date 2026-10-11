@@ -96,7 +96,6 @@ defmodule Bilimbi.Base.AgentApiTest do
                key: "base.agent_api.record.get",
                kind: :read,
                capability: "admin.test.record.view",
-               approval: nil,
                disposition: :call,
                output: %{"type" => "object"},
                guides: [%{key: "base.agent_api.record", title: "Records"}]
