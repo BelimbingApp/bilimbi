@@ -144,3 +144,8 @@ config :bilimbi_base_ui, :app_version, Mix.Project.config()[:version]
 config :web, :mix_env, config_env()
 
 import_config "#{config_env()}.exs"
+
+# OAuth credentials and consent codes must never appear in Phoenix parameter logs.
+config :phoenix,
+       :filter_parameters,
+       ~w(password token access_token refresh_token device_code user_code)

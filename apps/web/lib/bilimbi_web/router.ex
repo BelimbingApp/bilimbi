@@ -71,6 +71,35 @@ defmodule BilimbiWeb.Router do
     plug :fetch_current_scope
   end
 
+  pipeline :agent_api do
+    plug :accepts, ["json"]
+    plug BilimbiWeb.AgentAuth
+  end
+
+  pipeline :oauth do
+    plug :accepts, ["json"]
+  end
+
+  scope "/.well-known", BilimbiWeb do
+    pipe_through :oauth
+    get "/oauth-authorization-server", OAuthController, :metadata
+    get "/bilimbi", OAuthController, :descriptor
+  end
+
+  scope "/oauth", BilimbiWeb do
+    pipe_through :oauth
+    post "/device_authorization", OAuthController, :device
+    post "/token", OAuthController, :token
+  end
+
+  scope "/api/v1", BilimbiWeb do
+    pipe_through :agent_api
+    get "/search", AgentApiController, :search
+    get "/operations/:key", AgentApiController, :describe
+    get "/guides/:key", AgentApiController, :guide
+    post "/operations/:key/call", AgentApiController, :invoke
+  end
+
   # Signed machine traffic uses only this reserved scope. Browser routes keep
   # their CSRF and session checks, including discovered :none routes.
   scope "/webhooks", BilimbiWeb do

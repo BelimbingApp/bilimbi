@@ -51,6 +51,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"
 
       run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+      assert :ok =
+               Bilimbi.Base.Database.SchemaVerifier.verify(
+                 PlatformBaselineTestRepo,
+                 Bilimbi.Core.AgentAccess.SchemaContract.storage_tables()
+               )
+
       run_mix!("app.start", [], env)
 
       assert relation("oban_jobs") == "oban_jobs"

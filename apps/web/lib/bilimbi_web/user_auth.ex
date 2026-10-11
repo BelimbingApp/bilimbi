@@ -621,7 +621,7 @@ defmodule BilimbiWeb.UserAuth do
 
       # Every fact above is proven, so this edge is where the scope learns who
       # is signed in. Module code reads that from `Scope.actor/1` and cannot
-      # assert it; this is one of the seam's two callers.
+      # assert it; this browser edge is an approved caller (ADRs 0016 and 0021).
       scope =
         Authentication.sign_in(
           tenant_scope,

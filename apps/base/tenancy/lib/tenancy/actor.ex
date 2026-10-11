@@ -27,6 +27,10 @@ defmodule Bilimbi.Base.Tenancy.Actor do
       is still never a person: it has no `user_id`, cannot be impersonated,
       and cannot approve.
 
+  An OAuth connection adds a sealed `facet` naming its connection and stated
+  agent ID. The actor stays the person (`:user`); Authz applies the agent
+  restrictions and workflow human actions refuse the facet.
+
   The actor is an identity, not a permission. Ask Base Authz whether it may do
   something: `Bilimbi.Base.Authz.can/4` accepts the scope itself.
   """
@@ -34,6 +38,7 @@ defmodule Bilimbi.Base.Tenancy.Actor do
   @enforce_keys [:type, :seal]
   @derive {Inspect, except: [:seal, :impersonation_session_id]}
   defstruct [
+    :facet,
     :type,
     :user_id,
     :company_id,
@@ -45,6 +50,7 @@ defmodule Bilimbi.Base.Tenancy.Actor do
 
   @type t ::
           %__MODULE__{
+            facet: %{type: :agent, connection_id: pos_integer(), agent_id: String.t()} | nil,
             type: :user,
             user_id: pos_integer(),
             company_id: pos_integer(),

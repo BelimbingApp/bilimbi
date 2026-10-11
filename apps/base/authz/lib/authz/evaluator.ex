@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Authz.Evaluator do
   @moduledoc false
 
+  alias Bilimbi.Base.Authz.AgentPolicy
   alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.Authz.EffectivePermissions
@@ -46,6 +47,9 @@ defmodule Bilimbi.Base.Authz.Evaluator do
           :denied_company_scope,
           policies ++ ["capability_registry", "tenant_scope", "company_scope"]
         )
+
+      reason = AgentPolicy.refusal(actor.scope, capability, registry.platform_capabilities) ->
+        Decision.deny(reason, policies)
 
       true ->
         {:ok, company_id, roles} = proved

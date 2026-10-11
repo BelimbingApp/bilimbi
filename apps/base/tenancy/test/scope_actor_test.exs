@@ -34,6 +34,16 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
     end
   end
 
+  test "an invalid agent facet is refused at issuance", %{operator: scope} do
+    assert_raise ArgumentError, fn -> Authentication.sign_in(scope, 7, 10, agent: false) end
+
+    assert_raise ArgumentError, fn ->
+      Authentication.sign_in(scope, 7, 10,
+        agent: %{type: :agent, connection_id: 0, agent_id: "codex/model-high"}
+      )
+    end
+  end
+
   describe "a tenant-only scope" do
     test "is performed by the explicit system actor", %{operator: scope} do
       assert %Actor{type: :system, user_id: nil, company_id: nil, impersonator_id: nil} =
