@@ -3,9 +3,9 @@ defmodule Bilimbi.Core.User.ActorVerifier do
   Core User's answer to whether a queued job may still act for its user.
 
   The account must still exist in the actor's company, and that company must
-  not be archived, as the request edge requires. A job queued under impersonation also needs the borrowed durable
-  session to still belong to the impersonated account: leaving impersonation
-  or signing out ends it. A job the user queued for themselves outlives their
+  not be archived, as the request edge requires. A job queued under
+  impersonation also needs the borrowed durable session to still belong to the
+  impersonated account: leaving impersonation or signing out ends it. A job the user queued for themselves outlives their
   own sign-out.
   """
 
