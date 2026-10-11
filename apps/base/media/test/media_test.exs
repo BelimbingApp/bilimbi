@@ -422,6 +422,43 @@ defmodule Bilimbi.Base.MediaTest do
            )
   end
 
+  test "plain system cleanup is recorded as console, not a guest", c do
+    {:ok, draft} = Media.upload_attachment(c.scope, {"test.record", "1"}, c.upload)
+    row = Repo.get_by!(AttachmentSchema, public_id: draft.public_id)
+
+    assert {:ok, 1} =
+             Media.cleanup_drafts_before(
+               c.system,
+               NaiveDateTime.add(NaiveDateTime.utc_now(), 60)
+             )
+
+    {:ok, mutations} = Bilimbi.Base.Audit.list_mutations(c.system)
+
+    deletes =
+      Enum.filter(
+        mutations,
+        &(&1.event == "deleted" and
+            &1.auditable_type == "App\\Base\\Media\\Models\\MediaAttachment" and
+            &1.auditable_id == to_string(row.id))
+      )
+
+    assert [_ | _] = deletes
+    assert Enum.all?(deletes, &(&1.actor_type == "console" and &1.actor_id == 0))
+  end
+
+  test "deleting a file whose directory is already gone counts as absent", c do
+    {:ok, draft} = Media.upload_attachment(c.scope, {"test.record", "1"}, c.upload)
+    row = Repo.get_by!(AttachmentSchema, public_id: draft.public_id)
+    asset = Repo.get!(AssetSchema, row.media_asset_id)
+    File.rm_rf!(Path.join(c.root, Path.dirname(asset.storage_key)))
+
+    assert {:ok, :deleted} = Media.discard_draft(c.scope, draft.public_id)
+    assert Repo.get(AttachmentSchema, row.id) == nil
+
+    File.ln_s!(System.tmp_dir!(), Path.join(c.root, "linked"))
+    assert {:error, :unsafe_storage_key} = Storage.delete("local", "linked/file")
+  end
+
   test "failed file cleanup reports failure after removing the draft reference", c do
     {:ok, draft} = Media.upload_attachment(c.scope, {"test.record", "1"}, c.upload)
     row = Repo.get_by!(AttachmentSchema, public_id: draft.public_id)

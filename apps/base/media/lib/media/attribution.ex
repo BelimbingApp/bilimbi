@@ -25,6 +25,6 @@ defmodule Bilimbi.Base.Media.Attribution do
   end
 
   defp actor_type(%{type: :user}), do: "user"
-  defp actor_type(%{system_principal: nil}), do: "guest"
+  defp actor_type(%{system_principal: nil}), do: "console"
   defp actor_type(_actor), do: "system"
 end

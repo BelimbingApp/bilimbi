@@ -56,11 +56,20 @@ defmodule Bilimbi.Base.Media.Storage do
   def delete("external", _key), do: :ok
 
   def delete(disk, key) do
-    with {:ok, path} <- location(disk, key), :ok <- directory_chain(Path.dirname(path)) do
-      case File.lstat(path) do
-        {:error, :enoent} -> :ok
-        {:ok, %{type: :regular}} -> File.rm(path)
-        _ -> {:error, :unsafe_storage_key}
+    with {:ok, path} <- location(disk, key) do
+      case existing_directory_chain(Path.dirname(path)) do
+        :ok ->
+          case File.lstat(path) do
+            {:error, :enoent} -> :ok
+            {:ok, %{type: :regular}} -> File.rm(path)
+            _ -> {:error, :unsafe_storage_key}
+          end
+
+        :missing ->
+          :ok
+
+        error ->
+          error
       end
     end
   end
@@ -96,6 +105,18 @@ defmodule Bilimbi.Base.Media.Storage do
 
         _ ->
           {:error, :unsafe_storage_key}
+      end
+    end
+  end
+
+  defp existing_directory_chain("/"), do: :ok
+
+  defp existing_directory_chain(path) do
+    with :ok <- existing_directory_chain(Path.dirname(path)) do
+      case File.lstat(path) do
+        {:ok, %{type: :directory}} -> :ok
+        {:error, :enoent} -> :missing
+        _ -> {:error, :unsafe_storage_key}
       end
     end
   end

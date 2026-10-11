@@ -22,16 +22,11 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
     {:ok, modules} = :application.get_key(:bilimbi_core_compatibility, :modules)
     Enum.each(modules, &Code.ensure_loaded!/1)
 
-    # The dump holds Platform tables only. Remove the throwaway fixture from
-    # prior runs; real optional Domains may remain installed, and adoption
-    # leaves their baselines pending when their structure is absent.
+    # The dump holds the Platform's tables only: a mounted Domain's baseline
+    # would be reported as missing, which is the documented refusal.
     MountedDomainFixture.unmount!()
 
-    %{
-      base_env: [],
-      migration_entries: workspace_migration_entries([]),
-      platform_entries: workspace_migration_entries([], [:base, :core])
-    }
+    %{base_env: [], migration_entries: workspace_migration_entries([])}
   end
 
   setup context, do: setup_databases(context)
@@ -41,7 +36,7 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
   end
 
   test "verify, adopt and migrate a database Belimbing's own migrations created",
-       %{env: env, migration_entries: entries, platform_entries: platform_entries} = context do
+       %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
       BelimbingSchemaFixture.load!(PlatformBaselineTestRepo.config())
 
@@ -63,11 +58,7 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
       assert run_mix!("bilimbi.schema.adopt", [], env) =~
                "Existing Belimbing schema verified and adopted by Bilimbi."
 
-      # This fixture contains Platform tables only. An installed optional
-      # Domain absent from it correctly leaves its baseline pending at adoption.
-      baseline_versions =
-        for {version, _module, :compatible_baseline} <- platform_entries, do: version
-
+      baseline_versions = for {version, _module, :compatible_baseline} <- entries, do: version
       assert recorded_versions() == baseline_versions
 
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"

@@ -94,7 +94,8 @@ These operations refuse system actors. Impersonated actors are refused because
 the compatible attachment row has no impersonator field. The submitted reference
 is immutable through this API; PostgreSQL's asset FK also restricts deleting its
 bytes through an asset-row cascade. All row writes pass through the audited Repo.
-Scope operations attribute mutations to the sealed user or maintenance actor.
+Scope operations attribute mutations to the sealed user, to the named system
+principal, or to `console` for a plain system scope such as the cleanup task.
 
 Submit and retain may compose inside the owner's business transaction; rollback
 rolls back evidence binding. Upload, discard and asset file operations require
