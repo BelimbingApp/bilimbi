@@ -110,16 +110,17 @@ for duplicates. Run `bilimbi plan --input operations.json > plan.json`, then
 `bilimbi review --input plan.json --session review-session.json` and wait for
 its submission. The page shows the server's validated changes, defaults and
 expiry as saved when `plan` ran, found by the plan code; results carried in the
-review input are ignored. Those evidence cells are read-only; changes belong in the comments,
-followed by a new plan and review. Ordinary local presentation documents retain
-editable cells. No business write happens until commit.
+review input are ignored. Those evidence cells are read-only; changes belong in
+the comments, followed by a new plan and review. Ordinary local presentation
+documents retain editable cells. No business write happens until commit.
 
 The client enforces the person's go locally; Bilimbi does not verify it. When
 `review` receives the plan output from `plan` and the person approves, it writes
-an approval marker for that plan code beside the saved plan file. `bilimbi commit --plan <code> >
-report.json` refuses without that marker, so a review of one plan never unlocks
-another, a later review that requests changes withdraws the marker, and a successful commit deletes the plan file and its marker. It sends
-the exact saved operations to the same server. Plans are private files below the
+an approval marker for that plan code beside the saved plan file.
+`bilimbi commit --plan <code> > report.json` refuses without that marker, so a
+review of one plan never unlocks another, a later review that requests changes
+withdraws the marker, and a successful commit deletes the plan file and its
+marker. It sends the exact saved operations to the same server. Plans are private files below the
 OS configuration directory's `bilimbi/plans`, bound to their server origin;
 credentials remain separate. Any `plan`, `review` approval or `commit` first
 deletes plans that have expired. Commit requires a locally available code and
@@ -179,9 +180,10 @@ The one-session path and descriptor are access capabilities: keep them local.
 Host/origin checks refuse cross-site submissions and DNS rebinding. HTML is
 escaped, no external assets load, and forms work without JavaScript.
 
-This document is deliberately independent of a Bilimbi plan. Job 4 supplies
-server previews and plan codes, checks edited input again, performs the write
-and fills the report. Local approval currently performs no mutation.
+This document is independent of a Bilimbi plan: `review` and `report` only
+present it, and a local approval alone performs no mutation. For a plan, the
+safe write loop above builds the document from the saved server results, and
+only `commit` writes.
 
 ## Build and verify
 

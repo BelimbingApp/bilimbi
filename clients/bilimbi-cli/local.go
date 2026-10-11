@@ -29,7 +29,7 @@ type link struct {
 }
 
 // This document is local presentation data, not a server plan or proof of go.
-// Job 4 can carry a validated API plan in rows without changing the lifecycle.
+// An API plan's rows are built from its saved server results (plans.go).
 type document struct {
 	ReadOnly bool             `json:"read_only,omitempty"`
 	Title    string           `json:"title"`
