@@ -29,6 +29,28 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     },
     %{id: "updated_at", label: "Updated", sort: "updated_at", sort_id: "postcodes-sort-updated"}
   ]
+  @summary_builtins [
+    %{
+      id: "country_name",
+      label: "Country",
+      sort: "country_name",
+      sort_id: "postcodes-summary-sort-country"
+    },
+    %{
+      id: "country_iso",
+      label: "ISO",
+      sort: "country_iso",
+      sort_id: "postcodes-summary-sort-iso"
+    },
+    %{
+      id: "record_count",
+      label: "Records",
+      type: :integer,
+      sort: "record_count",
+      sort_id: "postcodes-summary-sort-count",
+      align: :right
+    }
+  ]
   @list ListState.spec!(
           sortable: %{
             country_name: :asc,
@@ -63,6 +85,10 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     {:ok,
      socket
      |> assign(:columns, ListColumns.mount("postcodes-table", @builtins))
+     |> assign(
+       :summary_columns,
+       ListColumns.mount("postcodes-country-summary-rows", @summary_builtins)
+     )
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
      |> assign(:modal_action, nil)
      |> assign(:editing_postcode_id, nil)
@@ -91,6 +117,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     case ListColumns.handle(socket.assigns.columns, params) do
       {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
       {:sort, sort_by} -> handle_event("sort", %{"sort" => sort_by}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("summary_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.summary_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :summary_columns, columns)}
+      {:sort, sort_by} -> handle_event("sort-summary", %{"sort" => sort_by}, socket)
       :noop -> {:noreply, socket}
     end
   end
@@ -230,38 +264,33 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
           <div class="border-b border-line px-4 py-3">
             <h2 class="text-sm font-semibold text-ink">Postcodes by country</h2>
           </div>
-          <.table
+          <.flex_table
             id="postcodes-country-summary-rows"
-            rows={@postcode_country_summaries}
-            row_id={fn summary -> "postcode-country-#{summary.country_iso}" end}
+            columns={@summary_columns.column_views}
+            rows={@summary_columns.rows}
+            mode={@summary_columns.mode}
+            zoom={@summary_columns.zoom}
+            suggestions={@summary_columns.suggestions}
+            add_query={@summary_columns.add_query}
+            row_id={&"postcode-country-#{&1}"}
+            event="summary_grid"
             sort_by={@summary_state.sort_by}
             sort_dir={@summary_state.sort_dir}
-            sort_event="sort-summary"
             framed={false}
+            caption="Postcodes by country"
           >
-            <:col
-              :let={summary}
-              label="Country"
-              sort="country_name"
-              sort_id="postcodes-summary-sort-country"
-            >
+            <:col :let={%{record: summary}} id="country_name">
               <span class="whitespace-nowrap text-ink">{summary.country_name}</span>
             </:col>
-            <:col :let={summary} label="ISO" sort="country_iso" sort_id="postcodes-summary-sort-iso">
+            <:col :let={%{record: summary}} id="country_iso">
               <span class="whitespace-nowrap font-mono text-xs text-ink-muted">{summary.country_iso}</span>
             </:col>
-            <:col
-              :let={summary}
-              label="Records"
-              sort="record_count"
-              sort_id="postcodes-summary-sort-count"
-              align={:right}
-            >
+            <:col :let={%{record: summary}} id="record_count">
               <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(
                 summary.record_count
               )}</span>
             </:col>
-          </.table>
+          </.flex_table>
         </.card>
 
         <.filter_toolbar id="postcodes-filters" form={@filters_form} event="filters">
@@ -481,6 +510,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     |> assign(:index_state, state)
     |> assign(:summary_state, summary)
     |> assign(:columns, ListColumns.load(socket.assigns.columns, postcodes_page.entries, & &1.id))
+    |> assign(
+      :summary_columns,
+      ListColumns.load(
+        socket.assigns.summary_columns,
+        postcode_country_summaries,
+        & &1.country_iso
+      )
+    )
   end
 
   defp save_postcode(socket, params) do

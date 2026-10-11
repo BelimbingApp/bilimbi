@@ -45,6 +45,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -69,6 +70,52 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
           page_size_param: "per_page",
           filters: [result: {:one_of, ~w(allowed denied), ""}]
         )
+  @builtins [
+    %{
+      id: "principal_name",
+      label: "Principal",
+      type: :string,
+      sort: "principal_name",
+      sort_id: "grants-sort-principal_name"
+    },
+    %{
+      id: "principal_type",
+      label: "Type",
+      type: :string,
+      sort: "principal_type",
+      sort_id: "grants-sort-principal_type"
+    },
+    %{
+      id: "capability",
+      label: "Capability",
+      type: :string,
+      sort: "capability",
+      sort_id: "grants-sort-capability"
+    },
+    %{
+      id: "allowed",
+      label: "Effect",
+      type: :string,
+      sort: "allowed",
+      sort_id: "grants-sort-allowed"
+    },
+    %{
+      id: "company_name",
+      label: "Company",
+      type: :string,
+      sort: "company_name",
+      sort_id: "grants-sort-company_name"
+    },
+    %{
+      id: "created_at",
+      label: "Granted",
+      type: :datetime,
+      sort: "created_at",
+      sort_id: "grants-sort-created_at"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -83,7 +130,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
      |> assign(:page_title, "Principal Capabilities")
      |> assign(:reach_caution?, reach_caution?(socket))
      |> assign(:company_names, Map.new(companies, &{&1.id, &1.name}))
-     |> assign(:company_order, Enum.map(companies, & &1.id))}
+     |> assign(:company_order, Enum.map(companies, & &1.id))
+     |> assign(:columns, ListColumns.mount("principal-capabilities", @builtins))}
   end
 
   @impl true
@@ -96,9 +144,9 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     {:noreply, push_state(socket, ListState.apply_filters(socket.assigns.state, filters(params)))}
   end
 
-  # The shared `<.table>` pushes the column as `phx-value-sort`, so the param is
-  # "sort" rather than the "column" this screen used while it hand-rolled its
-  # own header buttons.
+  # The flexible table's headings push the column as `phx-value-sort`, and the
+  # `grid` event hands it on here, so the param is "sort" rather than the
+  # "column" this screen used while it hand-rolled its own header buttons.
   @impl true
   def handle_event("sort", %{"sort" => column}, socket) do
     state = socket.assigns.state
@@ -110,6 +158,14 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -146,7 +202,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       |> assign(:state, state)
       |> assign(:page, page)
       |> assign(:filters_form, ListState.filters_form(state))
-      |> stream(:grants, page.entries, reset: true)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
     end
   end
 

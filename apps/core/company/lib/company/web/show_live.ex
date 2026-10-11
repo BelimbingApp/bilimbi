@@ -69,8 +69,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   `<.section_heading>` — the one heading treatment a detail page has — and
   the Company Details facts are the shared `<.list>`, with Business
   Activities and Metadata as rows of that same list, as Belimbing's
-  company-details partial keeps them. Section tables sit unframed inside
-  their card. Subsidiaries, departments, relationships and external accesses
+  company-details partial keeps them. Section tables are unframed
+  `<.flex_table>`s with the customization notch, filling a card that has no
+  padding of its own. Subsidiaries, departments, relationships and external accesses
   are relations with workflows of their own, and whether the company is its
   tenant's primary company is Core Company's own assignment, so those stay
   read-only here.
@@ -84,6 +85,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.UI.CommitStatus
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Workspace
   alias Bilimbi.Core.Company
@@ -190,6 +192,38 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   @page_sizes [25, 50, 100, 300]
 
+  @write_guard_opt_out ~w(children_grid departments_grid relationships_grid accesses_grid)
+
+  @children_builtins [
+    %{id: "name", label: "Name", type: :string},
+    %{id: "status", label: "Status", type: :string},
+    %{id: "legal_entity_type", label: "Legal Entity Type", type: :string},
+    %{id: "jurisdiction", label: "Jurisdiction", type: :string}
+  ]
+
+  @departments_builtins [
+    %{id: "type", label: "Department Type", type: :string},
+    %{id: "category", label: "Category", type: :string},
+    %{id: "head", label: "Head", type: :string},
+    %{id: "status", label: "Status", type: :string}
+  ]
+
+  @relationships_builtins [
+    %{id: "company", label: "Company", type: :string},
+    %{id: "type", label: "Relationship Type", type: :string},
+    %{id: "direction", label: "Direction", type: :string},
+    %{id: "effective", label: "Effective", type: :string},
+    %{id: "status", label: "Status", type: :string}
+  ]
+
+  @accesses_builtins [
+    %{id: "user", label: "User", type: :string},
+    %{id: "permissions", label: "Permissions", type: :string},
+    %{id: "status", label: "Status", type: :string},
+    %{id: "granted_at", label: "Granted At", type: :string},
+    %{id: "expires_at", label: "Expires At", type: :string}
+  ]
+
   # The embedded Users and Employees tables each keep their state in this
   # page's URL under a prefix (`users_search`, `employees_page`, ...). The
   # panels receive the parsed `ListState` and do not parse it again.
@@ -270,10 +304,26 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:country_options, Geonames.country_options())
          |> assign(:parent_companies, parent_companies)
          |> assign(:children, children)
+         |> assign(
+           :children_columns,
+           load_columns("company-subsidiaries-table", @children_builtins, children)
+         )
          |> assign(:departments, departments)
+         |> assign(
+           :departments_columns,
+           load_columns("company-departments-table", @departments_builtins, departments)
+         )
          |> assign(:department_head_names, department_head_names)
          |> assign(:relationships, relationships)
+         |> assign(
+           :relationships_columns,
+           load_columns("company-relationships-table", @relationships_builtins, relationships)
+         )
          |> assign(:external_accesses, external_accesses)
+         |> assign(
+           :accesses_columns,
+           load_columns("company-external-accesses-table", @accesses_builtins, external_accesses)
+         )
          |> assign(:external_access_names, external_access_names)
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
@@ -290,6 +340,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         {:ok, not_found(socket)}
     end
   end
+
+  defp load_columns(id, builtins, rows),
+    do: ListColumns.load(ListColumns.mount(id, builtins), rows, & &1.id)
 
   defp load_parent_companies(scope, company_id) do
     case Company.list_companies(scope) do
@@ -479,6 +532,25 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   def handle_event("employees_page", %{"page" => page}, socket),
     do: apply_table_page(socket, :employees, page)
+
+  def handle_event("children_grid", params, socket),
+    do: update_columns(socket, :children_columns, params)
+
+  def handle_event("departments_grid", params, socket),
+    do: update_columns(socket, :departments_columns, params)
+
+  def handle_event("relationships_grid", params, socket),
+    do: update_columns(socket, :relationships_columns, params)
+
+  def handle_event("accesses_grid", params, socket),
+    do: update_columns(socket, :accesses_columns, params)
+
+  defp update_columns(socket, key, params) do
+    case ListColumns.handle(Map.fetch!(socket.assigns, key), params) do
+      {:update, columns} -> {:noreply, assign(socket, key, columns)}
+      _unchanged -> {:noreply, socket}
+    end
+  end
 
   # A text fact: the hook pushes `%{"id" => _, <name> => value}`, and only a
   # declared name is written.
@@ -1322,25 +1394,32 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           :if={@children != []}
           id="company-subsidiaries-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-subsidiaries-heading"
         >
-          <.section_heading
-            id="company-subsidiaries-heading"
-            title="Subsidiaries"
-            count={length(@children)}
-          />
+          <div class="px-5 pb-4 pt-5 sm:px-6">
+            <.section_heading
+              id="company-subsidiaries-heading"
+              title="Subsidiaries"
+              count={length(@children)}
+            />
+          </div>
 
-          <.table
+          <.flex_table
             id="company-subsidiaries-table"
-            rows={@children}
-            row_id={fn child -> "child-company-#{child.id}" end}
-            row_item={fn child -> child end}
-            caption="Subsidiaries"
             framed={false}
+            columns={@children_columns.column_views}
+            rows={@children_columns.rows}
+            mode={@children_columns.mode}
+            zoom={@children_columns.zoom}
+            suggestions={@children_columns.suggestions}
+            add_query={@children_columns.add_query}
+            event="children_grid"
+            row_id={&"child-company-#{&1}"}
+            caption="Subsidiaries"
           >
-            <:col :let={child} label="Name">
+            <:col :let={%{record: child}} id="name">
               <.link
                 navigate={~p"/companies/#{child.id}"}
                 class="font-medium text-action hover:underline"
@@ -1348,15 +1427,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 {child.name}
               </.link>
             </:col>
-            <:col :let={child} label="Status">
+            <:col :let={%{record: child}} id="status">
               <.status_badge status={child.status} />
             </:col>
-            <:col :let={child} label="Legal Entity Type">
+            <:col :let={%{record: child}} id="legal_entity_type">
               <span class="text-sm text-ink-subtle">
                 {legal_entity_type_name(child.legal_entity_type_id, @legal_entity_types) || "—"}
               </span>
             </:col>
-            <:col :let={child} label="Jurisdiction">
+            <:col :let={%{record: child}} id="jurisdiction">
               <.restricted
                 :if={Restricted.restricted?(child.jurisdiction)}
                 id={"child-#{child.id}-jurisdiction-restricted"}
@@ -1369,98 +1448,112 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 {child.jurisdiction || "—"}
               </span>
             </:col>
-          </.table>
+          </.flex_table>
         </.card>
 
         <%!-- Section 5: Departments --%>
         <.card
           id="company-departments-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-departments-heading"
         >
-          <.section_heading
-            id="company-departments-heading"
-            title="Departments"
-            count={length(@departments)}
-          >
-            <:actions>
-              <.action_link
-                id="company-departments-manage"
-                icon="manage"
-                navigate={~p"/companies/#{@company.id}/departments"}
-                title="Manage departments"
-              >
-                Manage
-              </.action_link>
-            </:actions>
-          </.section_heading>
+          <div class="px-5 pb-4 pt-5 sm:px-6">
+            <.section_heading
+              id="company-departments-heading"
+              title="Departments"
+              count={length(@departments)}
+            >
+              <:actions>
+                <.action_link
+                  id="company-departments-manage"
+                  icon="manage"
+                  navigate={~p"/companies/#{@company.id}/departments"}
+                  title="Manage departments"
+                >
+                  Manage
+                </.action_link>
+              </:actions>
+            </.section_heading>
+          </div>
 
-          <.table
+          <.flex_table
             id="company-departments-table"
-            rows={@departments}
-            row_id={fn dept -> "department-#{dept.id}" end}
-            row_item={fn dept -> dept end}
-            caption="Departments"
             framed={false}
+            columns={@departments_columns.column_views}
+            rows={@departments_columns.rows}
+            mode={@departments_columns.mode}
+            zoom={@departments_columns.zoom}
+            suggestions={@departments_columns.suggestions}
+            add_query={@departments_columns.add_query}
+            event="departments_grid"
+            row_id={&"department-#{&1}"}
+            caption="Departments"
           >
-            <:col :let={dept} label="Department Type">
+            <:col :let={%{record: dept}} id="type">
               <span class="font-medium text-ink-strong">{dept.type.name}</span>
             </:col>
-            <:col :let={dept} label="Category">
+            <:col :let={%{record: dept}} id="category">
               <span class="text-sm text-ink-subtle">{dept.type.category || "—"}</span>
             </:col>
-            <:col :let={dept} label="Head">
+            <:col :let={%{record: dept}} id="head">
               <span class="text-sm text-ink-subtle">
                 {@department_head_names[dept.head_id] || "—"}
               </span>
             </:col>
-            <:col :let={dept} label="Status">
+            <:col :let={%{record: dept}} id="status">
               <.badge kind={if dept.status == "active", do: :success, else: :warning}>
                 {String.capitalize(dept.status)}
               </.badge>
             </:col>
-            <:empty :if={@departments == []}>
+            <:empty>
               No departments configured.
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <%!-- Section 6: Relationships --%>
         <.card
           id="company-relationships-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-relationships-heading"
         >
-          <.section_heading
-            id="company-relationships-heading"
-            title="Relationships"
-            count={length(@relationships)}
-          >
-            <:actions>
-              <.action_link
-                id="company-relationships-manage"
-                icon="manage"
-                navigate={~p"/companies/#{@company.id}/relationships"}
-                title="Manage relationships"
-              >
-                Manage
-              </.action_link>
-            </:actions>
-          </.section_heading>
+          <div class="px-5 pb-4 pt-5 sm:px-6">
+            <.section_heading
+              id="company-relationships-heading"
+              title="Relationships"
+              count={length(@relationships)}
+            >
+              <:actions>
+                <.action_link
+                  id="company-relationships-manage"
+                  icon="manage"
+                  navigate={~p"/companies/#{@company.id}/relationships"}
+                  title="Manage relationships"
+                >
+                  Manage
+                </.action_link>
+              </:actions>
+            </.section_heading>
+          </div>
 
-          <.table
+          <.flex_table
             id="company-relationships-table"
-            rows={@relationships}
-            row_id={fn rel -> "rel-#{rel.id}" end}
-            row_item={fn rel -> rel end}
-            caption="Relationships"
             framed={false}
+            columns={@relationships_columns.column_views}
+            rows={@relationships_columns.rows}
+            mode={@relationships_columns.mode}
+            zoom={@relationships_columns.zoom}
+            suggestions={@relationships_columns.suggestions}
+            add_query={@relationships_columns.add_query}
+            event="relationships_grid"
+            row_id={&"rel-#{&1}"}
+            caption="Relationships"
           >
-            <:col :let={rel} label="Company">
+            <:col :let={%{record: rel}} id="company">
               <.link
                 navigate={~p"/companies/#{rel.other_company.id}"}
                 class="font-medium text-action hover:underline"
@@ -1468,28 +1561,28 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 {rel.other_company.name}
               </.link>
             </:col>
-            <:col :let={rel} label="Relationship Type">
+            <:col :let={%{record: rel}} id="type">
               <span class="text-sm text-ink">{rel.type.name}</span>
             </:col>
-            <:col :let={rel} label="Direction">
+            <:col :let={%{record: rel}} id="direction">
               <.badge kind={:neutral}>
                 {if rel.direction == :outgoing, do: "Outgoing", else: "Incoming"}
               </.badge>
             </:col>
-            <:col :let={rel} label="Effective">
+            <:col :let={%{record: rel}} id="effective">
               <span class="text-xs tabular-nums text-ink-subtle">
                 {rel.effective_from || "Always"} → {rel.effective_to || "Present"}
               </span>
             </:col>
-            <:col :let={rel} label="Status">
+            <:col :let={%{record: rel}} id="status">
               <.badge kind={if rel.is_active, do: :success, else: :neutral}>
                 {if rel.is_active, do: "Active", else: "Inactive"}
               </.badge>
             </:col>
-            <:empty :if={@relationships == []}>
+            <:empty>
               No relationships defined.
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <%!-- Section 7: External Accesses --%>
@@ -1501,25 +1594,32 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         <.card
           id="company-external-accesses-card"
           class="mt-6"
-          inner_class="p-5 sm:p-6"
+          inner_class="p-0"
           role="region"
           aria-labelledby="company-external-accesses-heading"
         >
-          <.section_heading
-            id="company-external-accesses-heading"
-            title="External Accesses"
-            count={length(@external_accesses)}
-          />
+          <div class="px-5 pb-4 pt-5 sm:px-6">
+            <.section_heading
+              id="company-external-accesses-heading"
+              title="External Accesses"
+              count={length(@external_accesses)}
+            />
+          </div>
 
-          <.table
+          <.flex_table
             id="company-external-accesses-table"
-            rows={@external_accesses}
-            row_id={fn access -> "access-#{access.id}" end}
-            row_item={fn access -> access end}
-            caption="External Accesses"
             framed={false}
+            columns={@accesses_columns.column_views}
+            rows={@accesses_columns.rows}
+            mode={@accesses_columns.mode}
+            zoom={@accesses_columns.zoom}
+            suggestions={@accesses_columns.suggestions}
+            add_query={@accesses_columns.add_query}
+            event="accesses_grid"
+            row_id={&"access-#{&1}"}
+            caption="External Accesses"
           >
-            <:col :let={access} label="User">
+            <:col :let={%{record: access}} id="user">
               <%= if name = @external_access_names[access.user_id] do %>
                 <.link
                   navigate={~p"/users/#{access.user_id}"}
@@ -1531,7 +1631,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 <span class="text-ink-subtle">—</span>
               <% end %>
             </:col>
-            <:col :let={access} label="Permissions">
+            <:col :let={%{record: access}} id="permissions">
               <div
                 :if={is_list(access.permissions) and access.permissions != []}
                 class="flex flex-wrap gap-1"
@@ -1545,22 +1645,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 —
               </span>
             </:col>
-            <:col :let={access} label="Status">
+            <:col :let={%{record: access}} id="status">
               <.badge kind={if access.is_active, do: :success, else: :danger}>
                 {if access.is_active, do: "Active", else: "Inactive"}
               </.badge>
             </:col>
-            <:col :let={access} label="Granted At">
+            <:col :let={%{record: access}} id="granted_at">
               <span class="tabular-nums text-xs text-ink-subtle">{access.access_granted_at || "—"}</span>
             </:col>
-            <:col :let={access} label="Expires At">
+            <:col :let={%{record: access}} id="expires_at">
               <span class="tabular-nums text-xs text-ink-subtle">{access.access_expires_at || "—"}</span>
             </:col>
 
-            <:empty :if={@external_accesses == []}>
+            <:empty>
               No external accesses.
             </:empty>
-          </.table>
+          </.flex_table>
         </.card>
 
         <%!-- Section 8: Users — core/user-owned discovered embed (#595). Core User

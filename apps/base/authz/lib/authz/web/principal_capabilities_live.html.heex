@@ -51,55 +51,49 @@
     </p>
 
     <.card id="principal-capabilities-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="principal-capabilities"
-        rows={@streams.grants}
-        row_id={fn {dom_id, _grant} -> dom_id end}
-        row_item={fn {_dom_id, grant} -> grant end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"grants-#{&1}"}
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
-        framed={false}
       >
-        <:col
-          :let={grant}
-          label="Principal"
-          sort="principal_name"
-          sort_id="grants-sort-principal_name"
-        >
+        <:col :let={%{record: grant}} id="principal_name">
           <span class={["whitespace-nowrap text-ink", !grant.principal_name && "tabular-nums"]}>
             {principal_identity(grant)}
           </span>
         </:col>
 
-        <:col
-          :let={grant}
-          label="Type"
-          sort="principal_type"
-          sort_id="grants-sort-principal_type"
-        >
+        <:col :let={%{record: grant}} id="principal_type">
           <.badge>{principal_label(grant)}</.badge>
         </:col>
 
-        <:col :let={grant} label="Capability" sort="capability" sort_id="grants-sort-capability">
+        <:col :let={%{record: grant}} id="capability">
           <span class="font-mono text-xs text-ink">{grant.capability}</span>
           <.badge :if={unknown_capability?(grant)} kind={:warning} class="ml-1">
             Unknown
           </.badge>
         </:col>
 
-        <:col :let={grant} label="Effect" sort="allowed" sort_id="grants-sort-allowed">
+        <:col :let={%{record: grant}} id="allowed">
           <.badge kind={if grant.allowed, do: :success, else: :danger}>
             {if grant.allowed, do: "Granted", else: "Denied"}
           </.badge>
         </:col>
 
-        <:col :let={grant} label="Company" sort="company_name" sort_id="grants-sort-company_name">
+        <:col :let={%{record: grant}} id="company_name">
           <span class="whitespace-nowrap text-ink-muted">
             {company_name(@company_names, grant.company_id)}
           </span>
         </:col>
 
-        <:col :let={grant} label="Granted" sort="created_at" sort_id="grants-sort-created_at">
+        <:col :let={%{record: grant}} id="created_at">
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
             <.datetime id={"grant-created-#{grant.id}"} value={grant.created_at} />
           </span>
@@ -110,7 +104,7 @@
             do: "No capabilities have been granted directly in this tenant.",
             else: "No direct capabilities match these filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="grants-pagination"

@@ -44,21 +44,20 @@
     </p>
 
     <.card id="principal-roles-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="principal-roles"
-        rows={@streams.assignments}
-        row_id={fn {dom_id, _assignment} -> dom_id end}
-        row_item={fn {_dom_id, assignment} -> assignment end}
+        framed={false}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
+        row_id={&"assignments-#{&1}"}
         sort_by={@state.sort_by}
         sort_dir={@state.sort_dir}
-        framed={false}
       >
-        <:col
-          :let={assignment}
-          label="Principal"
-          sort="principal_name"
-          sort_id="assignments-sort-principal_name"
-        >
+        <:col :let={%{record: assignment}} id="principal_name">
           <span class={["whitespace-nowrap", !assignment.principal_name && "tabular-nums"]}>
             <.link
               :if={assignment.principal_type == "user"}
@@ -73,16 +72,11 @@
           </span>
         </:col>
 
-        <:col
-          :let={assignment}
-          label="Type"
-          sort="principal_type"
-          sort_id="assignments-sort-principal_type"
-        >
+        <:col :let={%{record: assignment}} id="principal_type">
           <.badge>{principal_label(assignment)}</.badge>
         </:col>
 
-        <:col :let={assignment} label="Role" sort="role_name" sort_id="assignments-sort-role_name">
+        <:col :let={%{record: assignment}} id="role_name">
           <.link
             navigate={~p"/authz/roles/#{assignment.role_id}"}
             class="text-sm font-medium text-action hover:underline"
@@ -91,23 +85,13 @@
           </.link>
         </:col>
 
-        <:col
-          :let={assignment}
-          label="Company"
-          sort="company_name"
-          sort_id="assignments-sort-company_name"
-        >
+        <:col :let={%{record: assignment}} id="company_name">
           <span class="whitespace-nowrap text-ink-muted">
             {company_name(@company_names, assignment.company_id)}
           </span>
         </:col>
 
-        <:col
-          :let={assignment}
-          label="Assigned At"
-          sort="created_at"
-          sort_id="assignments-sort-created_at"
-        >
+        <:col :let={%{record: assignment}} id="created_at">
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
             <.datetime id={"assignment-created-#{assignment.id}"} value={assignment.created_at} />
           </span>
@@ -118,7 +102,7 @@
             do: "No principal role assignments found.",
             else: "No principal role assignments match these filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="assignments-pagination"

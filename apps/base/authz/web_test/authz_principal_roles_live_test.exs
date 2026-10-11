@@ -151,8 +151,8 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
     {:ok, view, _html} =
       conn |> log_in_as() |> live(~p"/authz/principal-roles?sort_by=company_name")
 
-    assert has_element?(view, "#principal-roles > tr:nth-child(1)", "Aurora Works")
-    assert has_element?(view, "#principal-roles > tr:nth-child(2)", "Bilimbi Industries")
+    assert has_element?(view, "#principal-roles-rows > tr:nth-child(1)", "Aurora Works")
+    assert has_element?(view, "#principal-roles-rows > tr:nth-child(2)", "Bilimbi Industries")
   end
 
   test "names a principal inside the tenant and keeps the id outside it", %{
@@ -209,8 +209,8 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
       |> log_in_as()
       |> live(~p"/authz/principal-roles?sort_by=principal_name&sort_dir=asc")
 
-    assert has_element?(view, "#principal-roles > tr:nth-child(1)", "Ada Lovelace")
-    assert has_element?(view, "#principal-roles > tr:nth-child(2)", "Zoe Quinn")
+    assert has_element?(view, "#principal-roles-rows > tr:nth-child(1)", "Ada Lovelace")
+    assert has_element?(view, "#principal-roles-rows > tr:nth-child(2)", "Zoe Quinn")
 
     view |> element("#assignments-sort-principal_name") |> render_click()
     assert %{"sort_by" => "principal_name"} = patched_params(view)

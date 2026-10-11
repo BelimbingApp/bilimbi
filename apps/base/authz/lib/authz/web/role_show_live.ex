@@ -14,6 +14,15 @@ defmodule Bilimbi.Base.Authz.Web.RoleShowLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.ListColumns
+
+  @builtins [
+    %{id: "principal_type", label: "Type", type: :string},
+    %{id: "principal_id", label: "Principal", type: :integer},
+    %{id: "company_id", label: "Company", type: :integer}
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -31,10 +40,24 @@ defmodule Bilimbi.Base.Authz.Web.RoleShowLive do
          |> assign(:page_title, details.role.name)
          |> assign(:role, details.role)
          |> assign(:capabilities, Enum.sort(details.capabilities))
-         |> assign(:principal_roles, details.principal_roles)}
+         |> assign(:principal_roles, details.principal_roles)
+         |> assign(
+           :principal_columns,
+           "role-principals"
+           |> ListColumns.mount(@builtins)
+           |> ListColumns.load(details.principal_roles, & &1.id)
+         )}
 
       {:error, :not_found} ->
         {:ok, not_found(socket)}
+    end
+  end
+
+  @impl true
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.principal_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :principal_columns, columns)}
+      _other -> {:noreply, socket}
     end
   end
 

@@ -39,40 +39,44 @@
     </.filter_toolbar>
 
     <.card id="menu-inspector-card" inner_class="p-0">
-      <.table
+      <.flex_table
         id="menu-inspector"
-        rows={@streams.items}
-        row_id={fn {dom_id, _item} -> dom_id end}
-        row_item={fn {_dom_id, item} -> item end}
+        columns={@columns.column_views}
+        rows={@columns.rows}
+        mode={@columns.mode}
+        zoom={@columns.zoom}
+        suggestions={@columns.suggestions}
+        add_query={@columns.add_query}
         framed={false}
+        caption="Menu items"
       >
-        <:col :let={item} label="ID">
+        <:col :let={%{record: item}} id="id">
           <span class="font-mono text-xs text-ink">{item.id}</span>
         </:col>
-        <:col :let={item} label="Label">
+        <:col :let={%{record: item}} id="label">
           <span class="text-sm text-ink">{item.label}</span>
         </:col>
-        <:col :let={item} label="Parent">
+        <:col :let={%{record: item}} id="parent">
           <span class="font-mono text-xs text-ink-muted">{item.parent || "—"}</span>
         </:col>
-        <:col :let={item} label="Kind">
+        <:col :let={%{record: item}} id="kind">
           <.badge>{item.kind}</.badge>
         </:col>
-        <:col :let={item} label="Capability">
+        <:col :let={%{record: item}} id="capability">
           <span class="font-mono text-xs text-ink-muted">{item.capability || "—"}</span>
         </:col>
-        <:col :let={item} label="Route">
+        <:col :let={%{record: item}} id="route">
           <span class="font-mono text-xs text-ink-muted">{item.route || "—"}</span>
         </:col>
-        <:col :let={item} label="Served">
+        <:col :let={%{record: item}} id="served">
           <.badge :if={is_nil(item.route)} kind={:neutral}>—</.badge>
           <.badge :if={not is_nil(item.route) and item.served?} kind={:success}>yes</.badge>
           <.badge :if={not is_nil(item.route) and not item.served?} kind={:danger}>no</.badge>
         </:col>
-        <:col :let={item} label="Source">
+        <:col :let={%{record: item}} id="source">
           <span class="font-mono text-xs text-ink-muted">{item.source || "—"}</span>
         </:col>
-        <:col :let={item} label="Allowed">
+        <:col :let={%{record: item}} id="allowed">
           <.badge :if={item.allowed?} kind={:success}>yes</.badge>
           <.badge :if={not item.allowed?} kind={:danger}>no</.badge>
         </:col>
@@ -82,7 +86,7 @@
               do: "No menu items are registered.",
               else: "No menu items match the current filters."}
         </:empty>
-      </.table>
+      </.flex_table>
 
       <.pagination
         id="menu-inspector-pagination"

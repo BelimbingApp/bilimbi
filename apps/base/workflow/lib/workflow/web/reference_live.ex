@@ -2,12 +2,29 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
   @moduledoc "A generic Workflow action and history adapter used as an integration reference."
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.Workflow
 
   @capability "admin.reference.record.approve"
+  @work_builtins [
+    %{id: "label", label: "Work"},
+    %{id: "status", label: "Status"}
+  ]
+  @history_builtins [
+    %{id: "status", label: "Status"},
+    %{id: "transitioned_at", label: "When", type: :datetime}
+  ]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    socket =
+      socket
+      |> assign(:work_columns, ListColumns.mount("workflow-reference-work-rows", @work_builtins))
+      |> assign(
+        :history_columns,
+        ListColumns.mount("workflow-reference-history-rows", @history_builtins)
+      )
+
     case Integer.parse(id) do
       {parsed, ""} when parsed > 0 ->
         {:ok, load(socket, parsed)}
@@ -28,6 +45,20 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
 
   def handle_event("clear_failure", _params, socket) do
     {:noreply, assign(socket, :failure, nil)}
+  end
+
+  def handle_event("work_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.work_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :work_columns, columns)}
+      _other -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("history_grid", params, socket) do
+    case ListColumns.handle(socket.assigns.history_columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :history_columns, columns)}
+      _other -> {:noreply, socket}
+    end
   end
 
   defp execute(socket, key, raw_work_item_id) do
@@ -61,7 +92,8 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
            Workflow.available_actions(scope, subject),
          {:ok, %{entries: history}} <- Workflow.history(scope, subject),
          {:ok, work} <- Workflow.pending_work(scope, subject: subject) do
-      assign(socket,
+      socket
+      |> assign(
         subject: subject,
         subject_version: version,
         actions: actions,
@@ -69,13 +101,15 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
         work: work.entries,
         failure: nil
       )
+      |> load_columns(work.entries, history)
     else
       {:error, reason} -> empty(socket, subject, reason)
     end
   end
 
   defp empty(socket, subject, reason) do
-    assign(socket,
+    socket
+    |> assign(
       failure: failure_copy(reason),
       subject: subject,
       subject_version: nil,
@@ -83,6 +117,13 @@ defmodule Bilimbi.Base.Workflow.Web.ReferenceLive do
       history: [],
       work: []
     )
+    |> load_columns([], [])
+  end
+
+  defp load_columns(socket, work, history) do
+    socket
+    |> assign(:work_columns, ListColumns.load(socket.assigns.work_columns, work, & &1.id))
+    |> assign(:history_columns, ListColumns.load(socket.assigns.history_columns, history, & &1.id))
   end
 
   defp request(action, version) do

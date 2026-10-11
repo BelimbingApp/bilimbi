@@ -22,6 +22,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.ListColumns
   alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.UI.Params
 
@@ -42,6 +43,45 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
           default_page_size: 25,
           page_size_param: "per_page"
         )
+  @builtins [
+    %{
+      id: "principal_name",
+      label: "Principal",
+      type: :string,
+      sort: "principal_name",
+      sort_id: "assignments-sort-principal_name"
+    },
+    %{
+      id: "principal_type",
+      label: "Type",
+      type: :string,
+      sort: "principal_type",
+      sort_id: "assignments-sort-principal_type"
+    },
+    %{
+      id: "role_name",
+      label: "Role",
+      type: :string,
+      sort: "role_name",
+      sort_id: "assignments-sort-role_name"
+    },
+    %{
+      id: "company_name",
+      label: "Company",
+      type: :string,
+      sort: "company_name",
+      sort_id: "assignments-sort-company_name"
+    },
+    %{
+      id: "created_at",
+      label: "Assigned At",
+      type: :datetime,
+      sort: "created_at",
+      sort_id: "assignments-sort-created_at"
+    }
+  ]
+
+  @write_guard_opt_out ~w(grid)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -52,7 +92,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
      |> assign(:page_title, "Principal Roles")
      |> assign(:reach_caution?, reach_caution?(socket))
      |> assign(:company_names, Map.new(companies, &{&1.id, &1.name}))
-     |> assign(:company_order, Enum.map(companies, & &1.id))}
+     |> assign(:company_order, Enum.map(companies, & &1.id))
+     |> assign(:columns, ListColumns.mount("principal-roles", @builtins))}
   end
 
   @impl true
@@ -76,6 +117,14 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  def handle_event("grid", params, socket) do
+    case ListColumns.handle(socket.assigns.columns, params) do
+      {:update, columns} -> {:noreply, assign(socket, :columns, columns)}
+      {:sort, column} -> handle_event("sort", %{"sort" => column}, socket)
+      :noop -> {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
@@ -106,7 +155,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       |> assign(:state, state)
       |> assign(:page, page)
       |> assign(:filters_form, ListState.filters_form(state))
-      |> stream(:assignments, page.entries, reset: true)
+      |> assign(:columns, ListColumns.load(socket.assigns.columns, page.entries, & &1.id))
     end
   end
 
