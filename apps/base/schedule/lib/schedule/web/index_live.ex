@@ -660,6 +660,8 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     %RunPage{entries: [], page: 1, page_size: page_size, total_entries: 0, total_pages: 0}
   end
 
+  defp task_dom_id(task), do: "schedule-task-#{dom_key(task.key)}"
+  defp run_dom_id(run), do: "schedule-run-#{run.id}"
   defp dom_key(key), do: String.replace(key, ~r/[^a-zA-Z0-9_-]/, "-")
 
   defp error_message(:forbidden), do: LiveAuthorization.denied_message()
