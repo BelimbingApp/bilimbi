@@ -117,7 +117,7 @@ Both commands read a presentation document from `--input <file|->`:
 ```
 
 Column keys determine editable fields. Other row data is retained. Strings
-are plain text, numbers and booleans have typed controls, and structured/null
+are plain text (browser CRLF line endings return as `\n`), numbers and booleans have typed controls, and structured/null
 values use JSON. An empty row list is valid; the page reports no records.
 Links must be HTTP(S) and must come from verified record addresses.
 Documents and submissions are capped at 8 MiB. They are never sent to Bilimbi.
