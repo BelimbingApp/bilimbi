@@ -108,7 +108,7 @@ defmodule Bilimbi.Base.AgentApi.TestOperations do
            id: id,
            label: "Record #{id}",
            amount: Decimal.new("12.50"),
-           secret: %Restricted{table_id: "records", field_id: "secret", roles: ["Finance"]},
+           secret: %Restricted{table_id: "records", field_id: "secret"},
            placed_on: ~D[2026-10-11],
            status: :open,
            tenant_id: Scope.tenant_id(scope)

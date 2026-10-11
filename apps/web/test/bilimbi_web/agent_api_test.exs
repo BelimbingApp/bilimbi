@@ -117,8 +117,15 @@ defmodule BilimbiWeb.AgentApiTest do
   } do
     grant_capabilities!("admin.authz.field.manage", user_id: 92)
     operator = sign_in(92)
-    {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
-    {:ok, _} = Authz.put_field_restriction(operator, "companies", "jurisdiction", [finance.id])
+    {:ok, contractor} = Authz.create_role(operator, 73, %{name: "Contractor", code: "contractor"})
+    {:ok, _} = Authz.put_field_restriction(operator, "companies", "jurisdiction", [contractor.id])
+
+    # A restriction withholds the field from the roles it names, so the
+    # reader sees it until they hold one.
+    assert {:ok, %{"result" => %{"jurisdiction" => "MY"}}} =
+             AgentApi.call(scope, "core.company.get", %{"company_id" => 73})
+
+    {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, contractor.id)
 
     assert {:ok, %{"result" => company}} =
              AgentApi.call(scope, "core.company.get", %{"company_id" => 73})
