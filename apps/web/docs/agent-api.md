@@ -16,6 +16,8 @@ The server name is that configured server's hostname.
    `authorization_pending` and the increasing interval on `slow_down`.
 4. Send the returned opaque access token as `Authorization: Bearer …`, plus
    `X-Bilimbi-Agent-Id` and `X-Bilimbi-Run-Id` on each API request.
+   A missing, repeated or malformed header never refuses the call: it is
+   recorded as not stated and flagged on the connection like a changed ID.
 5. Rotate credentials with `POST /oauth/token`, `grant_type=refresh_token`,
    `client_id` and `refresh_token`. Replace the stored refresh token on success.
    Reusing an old refresh token revokes the connection. Never retry rotation

@@ -50,7 +50,8 @@ defmodule Bilimbi.Base.Tenancy.Actor do
 
   @type t ::
           %__MODULE__{
-            facet: %{type: :agent, connection_id: pos_integer(), agent_id: String.t()} | nil,
+            facet:
+              %{type: :agent, connection_id: pos_integer(), agent_id: String.t() | nil} | nil,
             type: :user,
             user_id: pos_integer(),
             company_id: pos_integer(),

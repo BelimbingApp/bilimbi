@@ -45,7 +45,8 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
 
   Options, given together or not at all:
 
-    * `:agent` — `%{type: :agent, connection_id: id, agent_id: stated_id}`,
+    * `:agent` — `%{type: :agent, connection_id: id, agent_id: stated_id}`
+      (`stated_id` is `nil` when the request stated none),
       only at the bearer edge. Sealed with the actor; cannot be impersonated
       or delegated to a queue.
     * `:impersonator_id` — the operator behind an impersonated session. The
@@ -196,8 +197,8 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
 
   defp valid_facet?(%{type: :agent, connection_id: id, agent_id: agent} = facet),
     do:
-      map_size(facet) == 3 and is_integer(id) and id > 0 and is_binary(agent) and
-        byte_size(agent) in 1..255
+      map_size(facet) == 3 and is_integer(id) and id > 0 and
+        (is_nil(agent) or (is_binary(agent) and byte_size(agent) in 1..255))
 
   defp valid_facet?(_), do: false
 

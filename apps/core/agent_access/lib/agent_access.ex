@@ -14,6 +14,8 @@ defmodule Bilimbi.Core.AgentAccess do
   alias Bilimbi.Core.{Company, User}
 
   @client "bilimbi-native"
+  @unstated "(not stated)"
+  @seen_limit 20
   def client_id, do: @client
   def device_grant, do: "urn:ietf:params:oauth:grant-type:device_code"
 
@@ -50,7 +52,7 @@ defmodule Bilimbi.Core.AgentAccess do
   def device(%Scope{} = scope, code) when is_binary(code) do
     with :ok <- self_service(scope),
          %Device{status: "pending"} = device <-
-           Repo.one(from d in Device, where: d.user_hash == ^hash(code)),
+           Repo.one(from(d in Device, where: d.user_hash == ^hash(code))),
          true <- DateTime.compare(device.expires_at, now()) == :gt do
       {:ok, %{agent_id: device.agent_id, expires_at: device.expires_at}}
     else
@@ -63,7 +65,8 @@ defmodule Bilimbi.Core.AgentAccess do
     with :ok <- self_service(scope),
          true <- match?(%DateTime{}, expires_at) and DateTime.compare(expires_at, now()) == :gt do
       transaction(fn ->
-        device = Repo.one(from d in Device, where: d.user_hash == ^hash(code), lock: "FOR UPDATE")
+        device =
+          Repo.one(from(d in Device, where: d.user_hash == ^hash(code), lock: "FOR UPDATE"))
 
         cond do
           is_nil(device) or device.status != "pending" ->
@@ -107,7 +110,9 @@ defmodule Bilimbi.Core.AgentAccess do
 
   def exchange(@client, code) when is_binary(code) do
     transaction(fn ->
-      device = Repo.one(from d in Device, where: d.device_hash == ^hash(code), lock: "FOR UPDATE")
+      device =
+        Repo.one(from(d in Device, where: d.device_hash == ^hash(code), lock: "FOR UPDATE"))
+
       now = now()
 
       cond do
@@ -161,7 +166,7 @@ defmodule Bilimbi.Core.AgentAccess do
   def refresh(@client, value) when is_binary(value) do
     # First locate the immutable parent, then lock parent before token everywhere.
     # Otherwise concurrent refresh and device redemption could invert lock order.
-    case Repo.one(from t in Token, where: t.token_hash == ^hash(value) and t.kind == "refresh") do
+    case Repo.one(from(t in Token, where: t.token_hash == ^hash(value) and t.kind == "refresh")) do
       nil ->
         {:error, :invalid_grant}
 
@@ -193,7 +198,7 @@ defmodule Bilimbi.Core.AgentAccess do
 
   @doc "Opaque credential lookup before a tenant is known. Returns stable claims only."
   def authenticate(value) when is_binary(value) do
-    case Repo.one(from t in Token, where: t.token_hash == ^hash(value) and t.kind == "access") do
+    case Repo.one(from(t in Token, where: t.token_hash == ^hash(value) and t.kind == "access")) do
       %Token{} = token ->
         with true <- DateTime.compare(token.expires_at, now()) == :gt,
              connection when not is_nil(connection) <- lockedless_connection(token.connection_id),
@@ -208,33 +213,53 @@ defmodule Bilimbi.Core.AgentAccess do
     end
   end
 
-  @doc "Records the stated identity sealed on an authenticated agent scope."
+  @doc """
+  Records the stated identity sealed on an authenticated agent scope. A request
+  that stated none is recorded as `"(not stated)"`. A changed identity is flagged,
+  never refused; only the newest #{@seen_limit} distinct ones are kept.
+  """
   def observe(%Scope{} = scope) do
     case Scope.actor(scope).facet do
-      %{type: :agent, connection_id: id, agent_id: agent_id} ->
-        transaction(fn ->
-          connection =
-            own_query(scope) |> where([c], c.id == ^id) |> lock("FOR UPDATE") |> Repo.one()
+      %{type: :agent, connection_id: id, agent_id: stated} ->
+        label = stated || @unstated
 
-          with :ok <- live_grant(connection) do
-            if agent_id != connection.agent_id and
-                 not Map.has_key?(connection.seen_agent_ids, agent_id) do
-              {:ok, _} =
-                Repo.update(
-                  Ecto.Changeset.change(connection,
-                    seen_agent_ids:
-                      Map.put(connection.seen_agent_ids, agent_id, DateTime.to_iso8601(now()))
-                  )
-                )
-            end
-
-            :ok
-          end
-        end)
+        with %Connection{} = connection <- find_own(scope, id),
+             :ok <- live_grant(connection) do
+          if known?(connection, label), do: :ok, else: remember(scope, id, label)
+        else
+          _ -> {:error, :invalid_grant}
+        end
 
       _ ->
         {:error, :invalid_grant}
     end
+  end
+
+  defp find_own(scope, id), do: own_query(scope) |> where([c], c.id == ^id) |> Repo.one()
+
+  defp known?(connection, label),
+    do: label == connection.agent_id or Map.has_key?(connection.seen_agent_ids, label)
+
+  defp remember(scope, id, label) do
+    transaction(fn ->
+      connection =
+        own_query(scope) |> where([c], c.id == ^id) |> lock("FOR UPDATE") |> Repo.one()
+
+      with :ok <- live_grant(connection) do
+        unless known?(connection, label) do
+          seen =
+            connection.seen_agent_ids
+            |> Map.put(label, DateTime.to_iso8601(now()))
+            |> Enum.sort_by(fn {_, at} -> at end, :desc)
+            |> Enum.take(@seen_limit)
+            |> Map.new()
+
+          {:ok, _} = Repo.update(Ecto.Changeset.change(connection, seen_agent_ids: seen))
+        end
+
+        :ok
+      end
+    end)
   end
 
   def list_connections(%Scope{} = scope) do
@@ -279,10 +304,10 @@ defmodule Bilimbi.Core.AgentAccess do
 
   # A token/code proves which grant to look up before any tenant scope exists.
   # This bounded credential lookup is the only unscoped connection read.
-  defp lockedless_connection(id), do: Repo.one(from c in Connection, where: c.id == ^id)
+  defp lockedless_connection(id), do: Repo.one(from(c in Connection, where: c.id == ^id))
 
   defp locked_connection(id),
-    do: Repo.one(from c in Connection, where: c.id == ^id, lock: "FOR UPDATE")
+    do: Repo.one(from(c in Connection, where: c.id == ^id, lock: "FOR UPDATE"))
 
   defp live_grant(nil), do: {:error, :invalid_grant}
 

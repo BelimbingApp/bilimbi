@@ -9,6 +9,7 @@ defmodule BilimbiWeb.OAuthController do
       issuer: base,
       device_authorization_endpoint: url(~p"/oauth/device_authorization"),
       token_endpoint: url(~p"/oauth/token"),
+      response_types_supported: [],
       grant_types_supported: [AgentAccess.device_grant(), "refresh_token"],
       token_endpoint_auth_methods_supported: ["none"]
     })

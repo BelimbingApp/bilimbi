@@ -49,6 +49,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     metadata = conn |> get("/.well-known/oauth-authorization-server") |> json_response(200)
     assert metadata["grant_types_supported"] == [AgentAccess.device_grant(), "refresh_token"]
     assert metadata["token_endpoint_auth_methods_supported"] == ["none"]
+    assert metadata["response_types_supported"] == []
     descriptor = conn |> recycle() |> get("/.well-known/bilimbi") |> json_response(200)
     assert descriptor["api_version"] == "1"
     assert descriptor["client_id"] == AgentAccess.client_id()
@@ -145,7 +146,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
 
     row =
       Repo.one!(
-        from e in Bilimbi.Base.Integration.Exchange, where: e.operation == "core.company.list"
+        from(e in Bilimbi.Base.Integration.Exchange, where: e.operation == "core.company.list")
       )
 
     assert row.person_id == 91
@@ -171,7 +172,7 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     assert mutation.trace_id == row.correlation_id
   end
 
-  test "missing tokens and metadata fail without cookies supplying authority and still log", %{
+  test "missing tokens fail without cookies supplying authority and still log", %{
     conn: conn,
     scope: scope
   } do
@@ -183,11 +184,70 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
 
     assert conn
            |> recycle()
-           |> put_req_header("authorization", "Bearer " <> tokens.access_token)
+           |> put_req_header("authorization", "Bearer " <> tokens.access_token <> "x")
            |> get("/api/v1/search?q=company")
            |> json_response(401) == %{"error" => "invalid_token"}
 
     assert Repo.aggregate(Bilimbi.Base.Integration.Exchange, :count) == 2
+  end
+
+  test "a missing, repeated or malformed agent or run header is recorded as absent, never refused",
+       %{conn: conn, scope: scope} do
+    tokens = approved(scope)
+    authorized = put_req_header(conn, "authorization", "Bearer " <> tokens.access_token)
+
+    assert %{"result" => _} = authorized |> get("/api/v1/search?q=company") |> json_response(200)
+
+    assert %{"result" => _} =
+             authorized
+             |> recycle()
+             |> put_req_header("authorization", "Bearer " <> tokens.access_token)
+             |> put_req_header("x-bilimbi-agent-id", String.duplicate("a", 256))
+             |> put_req_header("x-bilimbi-run-id", "")
+             |> get("/api/v1/search?q=company")
+             |> json_response(200)
+
+    repeated = %{
+      authorized
+      | req_headers:
+          authorized.req_headers ++ [{"x-bilimbi-agent-id", "a/b"}, {"x-bilimbi-agent-id", "c/d"}]
+    }
+
+    assert %{"result" => _} = repeated |> get("/api/v1/search?q=company") |> json_response(200)
+
+    rows = Repo.all(Bilimbi.Base.Integration.Exchange)
+    assert length(rows) == 3
+
+    assert Enum.all?(
+             rows,
+             &(&1.response_status == 200 and is_nil(&1.agent_id) and is_nil(&1.run_id))
+           )
+
+    {:ok, [connection]} = AgentAccess.list_connections(scope)
+    assert Map.keys(connection.seen_agent_ids) == ["(not stated)"]
+  end
+
+  test "only the newest stated agent IDs are kept on a connection", %{scope: scope} do
+    tokens = approved(scope)
+    {:ok, claims} = AgentAccess.authenticate(tokens.access_token)
+
+    for n <- 1..25 do
+      agent = %{type: :agent, connection_id: claims.id, agent_id: "codex/model-#{n}"}
+      {:ok, tenant} = Tenancy.scope(41)
+      assert :ok = AgentAccess.observe(Authentication.sign_in(tenant, 91, 73, agent: agent))
+    end
+
+    {:ok, [connection]} = AgentAccess.list_connections(scope)
+    assert map_size(connection.seen_agent_ids) == 20
+  end
+
+  test "trailing slashes are logged like the exact path", %{conn: conn} do
+    conn |> post("/oauth/token/", %{}) |> response(400)
+    conn |> recycle() |> get("/.well-known/bilimbi/") |> response(200)
+
+    assert Repo.all(
+             from(e in Bilimbi.Base.Integration.Exchange, select: e.endpoint, order_by: e.id)
+           ) == ["/oauth/token", "/.well-known/bilimbi"]
   end
 
   test "refresh rotates and replay revokes all tokens", %{scope: scope} do
@@ -295,12 +355,12 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     body =
       "--boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"reference.png\"\r\nContent-Type: image/png\r\n\r\nimage\r\n--boundary--\r\n"
 
-    assert_error_sent 415, fn ->
+    assert_error_sent(415, fn ->
       conn
       |> bearer(tokens)
       |> put_req_header("content-type", "multipart/form-data; boundary=boundary")
       |> post("/api/v1/operations/core.company.list/call", body)
-    end
+    end)
 
     row = Repo.one!(Bilimbi.Base.Integration.Exchange)
     assert row.response_status == 415
@@ -313,12 +373,12 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
   } do
     tokens = approved(scope)
 
-    assert_error_sent 400, fn ->
+    assert_error_sent(400, fn ->
       conn
       |> bearer(tokens)
       |> put_req_header("content-type", "application/json")
       |> post("/api/v1/operations/core.company.list/call", "{")
-    end
+    end)
 
     row = Repo.one!(Bilimbi.Base.Integration.Exchange)
     assert row.response_status == 400

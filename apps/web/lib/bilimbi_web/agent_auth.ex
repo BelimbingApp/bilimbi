@@ -16,13 +16,10 @@ defmodule BilimbiWeb.AgentAuth do
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(claims.company_id),
          true <- tenant_id == claims.tenant_id,
          {:ok, tenant} <- Tenancy.scope(tenant_id),
-         {:ok, user} <- User.get_user(tenant, claims.company_id, claims.user_id),
-         [agent_id] <- get_req_header(conn, "x-bilimbi-agent-id"),
-         [run_id] <- get_req_header(conn, "x-bilimbi-run-id"),
-         true <- AgentAccess.valid_label?(agent_id) and AgentAccess.valid_label?(run_id) do
+         {:ok, user} <- User.get_user(tenant, claims.company_id, claims.user_id) do
       scope =
         Authentication.sign_in(tenant, user.id, claims.company_id,
-          agent: %{type: :agent, connection_id: claims.id, agent_id: agent_id}
+          agent: %{type: :agent, connection_id: claims.id, agent_id: stated_agent_id(conn)}
         )
 
       Bilimbi.Base.Audit.Context.put(%Bilimbi.Base.Audit.Context{
@@ -58,6 +55,13 @@ defmodule BilimbiWeb.AgentAuth do
       {:ok, token}
     else
       _ -> :error
+    end
+  end
+
+  defp stated_agent_id(conn) do
+    case get_req_header(conn, "x-bilimbi-agent-id") do
+      [value] -> if AgentAccess.valid_label?(value), do: value
+      _ -> nil
     end
   end
 
