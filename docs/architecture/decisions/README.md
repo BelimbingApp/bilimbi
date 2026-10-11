@@ -43,4 +43,5 @@ approval, and the PR must say so. Otherwise the record stays Proposed.
 | [0018 Workflow status definitions and owner adapters](./0018-workflow-status-contribution-consumer.md) | Accepted |
 | [0019 Grid table catalog as a contribution consumer](./0019-grid-contribution-consumer.md) | Accepted |
 | [0020 Per-owner migration ledger and absent optional structure at adoption](./0020-per-owner-ledger-and-absent-optional-structure.md) | Proposed |
+| [0021 External agents act for a person through granted connections and self-registered API operations](./0021-agent-access-and-api-operations.md) | Accepted |
 | [0022 Workflow transition events and maintenance](./0022-workflow-transition-event-delivery.md) | Proposed |

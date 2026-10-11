@@ -54,6 +54,32 @@ defmodule Bilimbi.Core.Company.Contributions do
       # through the public Settings API under its own capability.
       settings: %{definitions: %{}, runtime_claims: []},
       grid: Bilimbi.Core.Company.GridTables.tables(),
+      agent_api: %{
+        operations: Bilimbi.Core.Company.AgentOperations.declarations(),
+        guides: [
+          %{
+            key: "core.company",
+            title: "Companies",
+            summary: "What a company is in this tenant, and how to find and read one.",
+            keywords: ["organisation", "business", "firm", "status"],
+            capability: "admin.company.list",
+            body: """
+            A company is an organisation recorded in your tenant. A company may
+            have a parent company, and one company is the tenant's primary
+            company.
+
+            A company's status is one of pending, active, suspended or archived.
+            Status changes only through the lifecycle actions on the company's
+            page, never through an edit of its fields.
+
+            To find companies, call `core.company.list` with search words. To
+            read one, call `core.company.get` with its id. A field an
+            administrator restricted reads as `{"restricted": true}`: the
+            company has a value there, and you may not see it.
+            """
+          }
+        ]
+      },
       authz: %{
         domains: %{"core" => "Core platform modules"},
         capabilities: [
