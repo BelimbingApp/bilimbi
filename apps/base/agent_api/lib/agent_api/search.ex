@@ -5,8 +5,10 @@ defmodule Bilimbi.Base.AgentApi.Search do
   The ranking is deterministic and in memory over the validated registry:
   no model, no index, no call outside the process. Text is lowercased,
   split on anything that is not a letter or a digit, and each word loses a
-  simple plural or `-ing` ending, so "companies" finds "company" and
-  "listing" finds "list". A handful of filler words are dropped.
+  simple plural, then an `-ing` ending, then a final `e`, so "companies"
+  finds "company", "listing" finds "list" and "setting" and "settings",
+  "cache" and "caches" meet at one stem. A handful of filler words are
+  dropped.
 
   A word scores once for each place it appears: a key segment 3, the title
   3, a keyword 2, the summary 1, and a guide's body 0.5. An entry's score is
@@ -69,16 +71,15 @@ defmodule Bilimbi.Base.AgentApi.Search do
   defp body(%Guide{body: body}), do: [{MapSet.new(tokens(body)), 0.5}]
   defp body(%Definition{}), do: []
 
-  defp stem(word) do
+  defp stem(word), do: word |> singular() |> drop_ing() |> drop_final_e()
+
+  defp singular(word) do
     cond do
       String.length(word) > 4 and String.ends_with?(word, "ies") ->
         String.slice(word, 0..-4//1) <> "y"
 
       String.length(word) > 4 and String.ends_with?(word, ~w(sses uses xes ches shes)) ->
         String.slice(word, 0..-3//1)
-
-      String.length(word) > 5 and String.ends_with?(word, "ing") ->
-        String.slice(word, 0..-4//1)
 
       String.length(word) > 3 and String.ends_with?(word, "s") and
           not String.ends_with?(word, ["ss", "us"]) ->
@@ -87,5 +88,17 @@ defmodule Bilimbi.Base.AgentApi.Search do
       true ->
         word
     end
+  end
+
+  defp drop_ing(word) do
+    if String.length(word) > 5 and String.ends_with?(word, "ing"),
+      do: String.slice(word, 0..-4//1),
+      else: word
+  end
+
+  defp drop_final_e(word) do
+    if String.length(word) > 3 and String.ends_with?(word, "e"),
+      do: String.slice(word, 0..-2//1),
+      else: word
   end
 end
