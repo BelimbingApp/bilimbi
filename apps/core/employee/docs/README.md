@@ -42,11 +42,12 @@ any wait. The returned `%Bilimbi.Core.Employee.AffiliationProof{}` contains
 only the stable employee and company IDs, never an Employee schema or query.
 
 Employee rows do not have a `tenant_id`. Tenant ownership is therefore proven
-by Core Company's public `lock_live_company/2` contract rather than by copying
+by Core Company's public `lock_writable_company/2` contract rather than by copying
 Company's private query or inventing a second tenant predicate. Employees are
 hard-deleted in the compatible schema; the lock contract does not invent a
 soft-delete or employment-status definition of "live". Missing, cross-tenant,
-and company-mismatched identities deliberately collapse to `:not_found`. Only
+and company-mismatched identities deliberately collapse to `:not_found`; an
+archived company is `:company_archived`. Only
 the protected `SYS-001` plus `agent` platform-orchestrator pair fails closed
 through this generic affiliation seam with `:invariant_violation`; a non-agent
 legacy `SYS-001` row remains an ordinary affiliation under Employee's existing

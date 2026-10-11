@@ -5,7 +5,7 @@ defmodule Bilimbi.Core.Company.Summary do
   Every summary `Bilimbi.Core.Company` returns is built through
   `for_scope/2`, which applies the tenant's field access restrictions
   (`Bilimbi.Base.Authz.restricted_fields/2` for the `companies` catalog
-  table): a field an operator restricted to roles the reader lacks carries a
+  table): a field an operator restricted for a role the reader holds carries a
   `Bilimbi.Base.Authz.Restricted` marker instead of its value, and a
   template renders it with `<.restricted>` and offers no editor.
   """

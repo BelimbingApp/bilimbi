@@ -170,7 +170,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:registration_number in @restricted_fields}
                 id="company-registration-number-restricted"
                 label="Registration Number"
-                roles={@restricted_markers.registration_number.roles}
               />
               <.input
                 :if={:tax_id not in @restricted_fields}
@@ -183,7 +182,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:tax_id in @restricted_fields}
                 id="company-tax-id-restricted"
                 label="Tax ID"
-                roles={@restricted_markers.tax_id.roles}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
@@ -199,7 +197,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:jurisdiction in @restricted_fields}
                 id="company-jurisdiction-restricted"
                 label="Jurisdiction"
-                roles={@restricted_markers.jurisdiction.roles}
               />
               <.input
                 :if={:email not in @restricted_fields}
@@ -213,7 +210,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:email in @restricted_fields}
                 id="company-email-restricted"
                 label="Email"
-                roles={@restricted_markers.email.roles}
               />
               <.input
                 :if={:website not in @restricted_fields}
@@ -227,7 +223,6 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 :if={:website in @restricted_fields}
                 id="company-website-restricted"
                 label="Website"
-                roles={@restricted_markers.website.roles}
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-2">

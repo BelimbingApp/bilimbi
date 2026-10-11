@@ -95,6 +95,15 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
            |> Map.put(:action, :validate)
          )}
 
+      {:error, :company_archived} ->
+        {:noreply,
+         assign_form(
+           socket,
+           changeset
+           |> add_error(:company_id, "is archived and read-only; choose another company")
+           |> Map.put(:action, :validate)
+         )}
+
       {:error, %Changeset{} = domain} ->
         {:noreply,
          assign_form(

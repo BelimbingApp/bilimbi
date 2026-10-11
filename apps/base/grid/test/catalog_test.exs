@@ -68,27 +68,28 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
     assert Grid.catalog(TestFixtures.system_scope(1)).tables == %{}
   end
 
-  test "a field an operator restricted is in the catalog only for an account holding one of its roles" do
+  test "a field an operator restricted leaves the catalog of an account holding one of its roles" do
     # The restriction is tenant 1's, on orders.amount, for the Finance role.
     operator = TestFixtures.user_scope(~w(admin.authz.field.manage admin.test.order.view))
     {:ok, finance} = Authz.create_role(operator, 10, %{name: "Finance", code: "finance"})
     {:ok, _} = Authz.put_field_restriction(operator, "orders", "amount", [finance.id])
 
+    # Visible by default: the account holds no restricted role.
     without = Grid.catalog(operator)
     {:ok, orders} = Grid.fetch_table(without, "orders")
-    refute Map.has_key?(orders.fields, "amount")
-    assert orders.field_order == ~w(id label status placed_at customer_id)
-
-    assert {:error, {"amount", {:unknown_segment, "amount", "orders"}}} =
-             Grid.resolve(without, orders, ["amount"])
-
-    refute Enum.any?(Catalog.suggest(without, orders, "amount"), &(&1.spec == "amount"))
+    assert orders.field_order == ~w(id label amount status placed_at customer_id)
+    assert {:ok, [_amount]} = Grid.resolve(without, orders, ["amount"])
 
     {:ok, :assigned} = Authz.assign_role(operator, 10, :user, 7, finance.id)
     holder = Grid.catalog(operator)
     {:ok, orders} = Grid.fetch_table(holder, "orders")
-    assert orders.field_order == ~w(id label amount status placed_at customer_id)
-    assert {:ok, [_amount]} = Grid.resolve(holder, orders, ["amount"])
+    refute Map.has_key?(orders.fields, "amount")
+    assert orders.field_order == ~w(id label status placed_at customer_id)
+
+    assert {:error, {"amount", {:unknown_segment, "amount", "orders"}}} =
+             Grid.resolve(holder, orders, ["amount"])
+
+    refute Enum.any?(Catalog.suggest(holder, orders, "amount"), &(&1.spec == "amount"))
 
     # Another tenant's catalog is untouched by tenant 1's restriction.
     other = Grid.catalog(TestFixtures.other_tenant_scope(~w(admin.test.order.view)))

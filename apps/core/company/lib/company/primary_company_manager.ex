@@ -17,6 +17,9 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
   alias Bilimbi.Core.Company.Schema
   alias Bilimbi.Core.Company.Summary
   alias Bilimbi.Core.Company.TenantPrimaryCompany
+  alias Bilimbi.Core.Company.WritableCompany
+
+  @archived WritableCompany.archived_status()
 
   @spec platform_operator_company!() :: Summary.t()
   def platform_operator_company! do
@@ -83,6 +86,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
           | :tenant_soft_deleted
           | :company_not_found
           | :company_soft_deleted
+          | :company_archived
           | {:company_tenant_mismatch, pos_integer()}
           | {:company_already_primary, pos_integer()}
           | {:already_assigned, pos_integer()}
@@ -208,8 +212,11 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
   defp lock_company!(company_id) do
     query = from(company in Schema, where: company.id == ^company_id, lock: "FOR UPDATE")
 
+    # An archived company is read-only and cannot become what the tenant
+    # stands on; the status is judged under the same lock the lifecycle takes.
     case Repo.one(query) do
       nil -> Repo.rollback(:company_not_found)
+      %Schema{deleted_at: nil, status: @archived} -> Repo.rollback(:company_archived)
       %Schema{deleted_at: nil} = company -> company
       %Schema{} -> Repo.rollback(:company_soft_deleted)
     end

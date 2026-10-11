@@ -47,6 +47,8 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.LocationSuggestion
   alias Bilimbi.Core.Address.Web.LocationFields
+  alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Geonames
 
   import Ecto.Changeset, only: [cast: 3, validate_length: 3]
@@ -105,13 +107,36 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   @impl true
   def update(assigns, socket) do
     owner = owner_profile(assigns)
+    archived? = archived_owner?(assigns.current_scope.scope, owner)
 
     {:ok,
      socket
      |> assign(assigns)
      |> assign(:owner, owner)
-     |> assign(:can_manage?, allowed?(assigns.current_scope, owner.capability))
+     |> assign(:owner_archived?, archived?)
+     |> assign(:can_manage?, allowed?(assigns.current_scope, owner.capability) and not archived?)
      |> reload()}
+  end
+
+  # An archived company is read-only, and so are its employees' addresses:
+  # the panel offers no attach, create, edit or detach, and its empty state
+  # says why. Each write asks again, so a company archived under the page
+  # is refused in these words; Core Address refuses it either way.
+  defp archived_owner?(scope, %{kind: :company, id: company_id}) do
+    match?({:error, :company_archived}, Company.require_writable_company(scope, company_id))
+  end
+
+  defp archived_owner?(scope, %{kind: :employee, id: employee_id}) do
+    case Employee.get_employee(scope, employee_id) do
+      {:ok, employee} ->
+        match?(
+          {:error, :company_archived},
+          Company.require_writable_company(scope, employee.company_id)
+        )
+
+      {:error, _reason} ->
+        false
+    end
   end
 
   # --- Events (ported from the company page's address section) ---
@@ -559,7 +584,8 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
   end
 
   defp can_manage?(socket) do
-    Authz.can(socket.assigns.current_scope.actor, socket.assigns.owner.capability).allowed
+    Authz.can(socket.assigns.current_scope.actor, socket.assigns.owner.capability).allowed and
+      not archived_owner?(socket.assigns.current_scope.scope, socket.assigns.owner)
   end
 
   defp write_forbidden(socket) do
@@ -808,7 +834,13 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
           <:empty
             :if={@sorted_addresses == []}
             title="No addresses linked."
-            reason={if @can_manage?, do: @owner.empty_manage, else: @owner.empty_read}
+            reason={
+              cond do
+                @owner_archived? -> @owner.empty_archived
+                @can_manage? -> @owner.empty_manage
+                true -> @owner.empty_read
+              end
+            }
           />
         </.table>
       </.card>
@@ -1099,6 +1131,7 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
       forbidden: "You do not have permission to edit companies.",
       empty_manage: "Attach an existing address, or create one and attach it.",
       empty_read: "An operator who can edit companies can attach one.",
+      empty_archived: "This company is archived and read-only, so no address can be attached.",
       attach_description: "Select an address to attach to this company."
     }
   end
@@ -1116,6 +1149,8 @@ defmodule Bilimbi.Core.Address.Web.AddressesPanel do
       forbidden: "You do not have permission to edit employees.",
       empty_manage: "Attach one of the company's addresses to this employee.",
       empty_read: "An operator who can edit employees can attach one.",
+      empty_archived:
+        "This employee's company is archived and read-only, so no address can be attached.",
       attach_description: "Select an address from the company to attach to this employee."
     }
   end

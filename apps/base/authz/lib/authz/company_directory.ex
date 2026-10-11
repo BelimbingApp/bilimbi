@@ -25,6 +25,19 @@ defmodule Bilimbi.Base.Authz.CompanyDirectory do
   @callback company_in_scope?(Scope.t(), pos_integer()) :: boolean()
 
   @doc """
+  Whether a company in scope may be written, and if not, why.
+
+  A live company is `:ok`; one the scope cannot see is
+  `{:error, :company_not_found}`; one that is archived, and so read-only for
+  good, is `{:error, :company_archived}`. Every Base write scoped to a
+  company (a role, an assignment, a grant, a company-scoped setting) begins
+  with this, through `Bilimbi.Base.Authz.company_writable/2`. Reads keep
+  using `company_in_scope?/2`, so an archived company stays visible.
+  """
+  @callback company_writable(Scope.t(), pos_integer()) ::
+              :ok | {:error, :company_not_found | :company_archived}
+
+  @doc """
   Live company ids for this scope, as a query the caller embeds.
 
   Optional. When present, permission checks use it inside their own statement

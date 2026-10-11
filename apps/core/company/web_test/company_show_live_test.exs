@@ -977,6 +977,69 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#detail-email", "ops@bilimbi.test")
     end
 
+    test "an archived company reads with one notice, no editors, and refuses a forged commit",
+         %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      conn = log_in_as(conn)
+
+      {:ok, live_view, _html} = live(conn, ~p"/companies/74")
+      refute has_element?(live_view, "#company-archived")
+      assert has_element?(live_view, "#company-name[phx-hook='InlineEdit']")
+
+      # The viewer signs in at 73; an archived company's own accounts cannot.
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 74")
+
+      {:ok, view, _html} = live(conn, ~p"/companies/74")
+
+      assert has_element?(view, "#company-archived", "This company is archived and read-only.")
+      assert has_element?(view, "#detail-name", "Bilimbi Subsidiary")
+      refute has_element?(view, "#company-name[phx-hook='InlineEdit']")
+
+      render_hook(view, "save_field", %{"id" => "74", "name" => "Forged"})
+
+      # A forged commit reaches the domain, which refuses it; the page keeps
+      # the stored value and its notice.
+      assert has_element?(view, "#detail-name", "Bilimbi Subsidiary")
+      assert has_element?(view, "#company-archived")
+      assert {:ok, %{name: "Bilimbi Subsidiary"}} = Company.get_company(scope!(), 74)
+    end
+
+    test "an archived company's default timezone cannot be changed or cleared", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      settings_scope = SettingsScope.company(74, 41)
+      {:ok, _} = Settings.put("localization.timezone", "Asia/Kuala_Lumpur", settings_scope)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      assert has_element?(view, "#company-timezone-display", "Asia/Kuala_Lumpur")
+
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 74")
+
+      render_change(view, "save_timezone", %{"timezone" => "Asia/Tokyo"})
+
+      assert has_element?(
+               view,
+               "#company-timezone-status[role='alert']",
+               "This company is archived and read-only, so the change was not saved."
+             )
+
+      render_change(view, "save_timezone", %{"timezone" => ""})
+
+      assert has_element?(view, "#company-timezone-status[role='alert']")
+      assert Settings.get("localization.timezone", settings_scope) == "Asia/Kuala_Lumpur"
+    end
+
     test "refuses in-place writes once the update capability is gone", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)
@@ -1704,7 +1767,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
   describe "field access" do
     # An operator (user 92, holding admin.authz.field.manage) restricts the
-    # company email to a Finance role. The signed-in user 91 holds no role.
+    # company email for a Finance role, which the signed-in user 91 holds.
     setup do
       {:ok, scope} = Tenancy.scope(41)
       {:ok, _} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
@@ -1712,10 +1775,11 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       operator = Bilimbi.Base.Tenancy.Authentication.sign_in(scope, 92, 73)
       {:ok, finance} = Authz.create_role(operator, 73, %{name: "Finance", code: "finance"})
       {:ok, _} = Authz.put_field_restriction(operator, "companies", "email", [finance.id])
+      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
       %{operator: operator, finance: finance}
     end
 
-    test "a viewer without the role sees the fact as Restricted, never the value", %{conn: conn} do
+    test "a holder of the role sees the fact as Restricted, never the value", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies/73")
@@ -1724,7 +1788,7 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
       assert has_element?(
                view,
-               "#detail-email #company-email-restricted[data-restricted][title=\"You don't have access to this. Ask your administrator for the Finance role.\"]",
+               "#detail-email #company-email-restricted[data-restricted][title=\"You don't have access to this field.\"]",
                "Restricted"
              )
 
@@ -1749,17 +1813,19 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
 
       refute render(view) =~ "hq@bilimbi.test"
 
+      # The stored value is unchanged; a system scope holds no role and reads it.
       {:ok, scope} = Tenancy.scope(41)
-      assert {:ok, %{email: %Bilimbi.Base.Authz.Restricted{}}} = Company.get_company(scope, 73)
+      assert {:ok, %{email: "hq@bilimbi.test"}} = Company.get_company(scope, 73)
     end
 
-    test "a holder of the role sees and edits the value", %{
+    test "a viewer without the role sees and edits the value", %{
       conn: conn,
       operator: operator,
       finance: finance
     } do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
-      {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
+      %{entries: [assignment]} = Authz.list_principal_role_assignments(operator, :user, 91)
+      {:ok, :unassigned} = Authz.unassign_role(operator, finance.id, assignment.id)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
