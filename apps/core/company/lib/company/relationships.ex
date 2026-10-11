@@ -11,8 +11,8 @@ defmodule Bilimbi.Core.Company.Relationships do
   alias Bilimbi.Core.Company.Relationship
   alias Bilimbi.Core.Company.RelationshipType
   alias Bilimbi.Core.Company.Schema
-  alias Bilimbi.Core.Company.WritableCompany
   alias Bilimbi.Core.Company.Summary
+  alias Bilimbi.Core.Company.WritableCompany
 
   @update_capability "admin.company.update"
 
