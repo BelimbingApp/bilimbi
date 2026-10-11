@@ -1046,6 +1046,9 @@ Shipped:
   companies: this list also includes … attached to no company." A caption
   rather than a banner, following Belimbing's shape, because the widening is
   a standing property of the rows. The listings' queries are unchanged.
+  Principal Capabilities and Principal Roles were retired on 2026-10-10 (a
+  person's roles and grants are read and changed on their own page); Decision
+  Logs keeps the caption.
 - [x] The Roles listing's rows are not widened — every scope sees the same
   roles — but each row's Principals count is, so it carries the same caption
   reading "Beyond this tenant's companies: the Principals counts also include

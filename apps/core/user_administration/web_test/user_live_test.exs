@@ -287,6 +287,44 @@ defmodule BilimbiWeb.UserLiveTest do
     end
   end
 
+  test "the Roles column names each listed user's roles, and the role filter narrows the list",
+       %{conn: conn} do
+    # The tenant-wide Principal Roles listing is retired: who holds which role
+    # is read here, and a person's roles are changed on their own page.
+    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
+    insert_user!(%{id: 1, company_id: 73, name: "Ada Lovelace"})
+    insert_user!(%{id: 2, company_id: 73, name: "Grace Hopper"})
+    insert_user!(%{id: 3, company_id: 73, name: "Nobody Special"})
+
+    {:ok, reviewer} = Authz.create_role(scope!(), 73, %{name: "Reviewer", code: "reviewer"})
+    {:ok, approver} = Authz.create_role(scope!(), 73, %{name: "Approver", code: "approver"})
+    assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, 1, reviewer.id)
+    assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, 1, approver.id)
+    assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, 2, approver.id)
+
+    grant_capabilities!("admin.user.list")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    assert has_element?(view, "#users-head-roles", "Roles")
+    assert has_element?(view, "#user-1", "Reviewer")
+    assert has_element?(view, "#user-1", "Approver")
+    assert has_element?(view, "#user-2", "Approver")
+    refute has_element?(view, "#user-2", "Reviewer")
+    assert has_element?(view, "#user-3")
+    refute has_element?(view, "#user-3", "Approver")
+
+    view
+    |> form("#users-filters", filters: %{"roleIds" => [to_string(reviewer.id)]})
+    |> render_change()
+
+    assert has_element?(view, "#users-role-filter", "1 role selected")
+    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 1 of 1 results")
+    assert has_element?(view, "#user-1", "Ada Lovelace")
+    refute has_element?(view, "#user-2")
+    refute has_element?(view, "#user-3")
+    refute has_element?(view, "#user-91")
+  end
+
   test "filters by multiple roles with OR semantics before bounded pagination", %{conn: conn} do
     insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
 
