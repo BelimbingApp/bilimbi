@@ -79,7 +79,9 @@ OAuth grants. Endpoints must stay on the supplied origin; redirects are
 refused. Use the canonical server address rather than a redirecting alias.
 Access tokens expire after an hour. The client rotates the refresh token before
 expiry under a profile-store lock, persists the replacement, and never retries
-a failed rotation. Uncertainty is persisted before rotation, so a lost response
+a failed rotation. The lock is an operating-system file lock held only while
+the profile is read, refreshed and saved, never during the API request, so
+parallel commands do not block each other. Uncertainty is persisted before rotation, so a lost response
 or crash requires signing in again rather than retrying on the next command.
 
 Profiles live in the OS user configuration directory's `bilimbi/profiles.json`.
@@ -88,16 +90,17 @@ macOS uses the native Keychain API (built with cgo), Windows uses Credential
 Manager, and Linux uses Secret Service through D-Bus. The dependency is limited
 to those three backends; it cannot invoke password-manager shell commands.
 When the native store is unavailable, a private mode-600 credential
-file under `bilimbi/credentials` is the fallback. Profiles state which backend
+file under `bilimbi/credentials` is the fallback, and `login` prints a
+warning to stderr when it is used. Profiles state which backend
 was used. Windows enforces the equivalent protected, current-user-only ACL
 before writing bytes because Unix mode bits cannot restrict Windows access. A temporarily unavailable
 store holding an existing token is never silently replaced by a file.
 
 `logout` deletes credentials and all aliases for that server. It does not revoke
 the connection on the server; use Bilimbi's **Connected agents** page for that.
-A crash may leave `store.lock` in the configuration directory. Remove it only
-after every Bilimbi command has stopped; automatically breaking it could replay
-a rotating token. Do not run simultaneous sign-ins to the same server.
+The operating system releases the profile lock if a command is killed, so a
+crash never leaves it behind. Do not run simultaneous sign-ins to the same
+server.
 
 ## Local review and report contract
 

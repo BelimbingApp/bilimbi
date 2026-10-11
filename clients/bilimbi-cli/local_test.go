@@ -253,3 +253,25 @@ func TestReviewTimeoutCleansSession(t *testing.T) {
 		t.Fatal("listener not closed")
 	}
 }
+func TestReviewSubmitNormalizesLineEndings(t *testing.T) {
+	d := testDocument()
+	d.Rows[0]["name"] = "\nLine1\nLine2"
+	p, err := startLocal(d, "review")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.shutdown()
+	form := url.Values{"cell-0-0": {"\r\nLine1\r\nLine2"}, "cell-0-1": {"2"}, "cell-0-2": {"true"}, "decision": {"revise"}}
+	resp := localRequest(t, p, "/submit", "http://"+p.host, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	if resp.StatusCode != 303 {
+		t.Fatal("submission refused", resp.StatusCode)
+	}
+	select {
+	case result := <-p.submitted:
+		if result.Document.Rows[0]["name"] != "\nLine1\nLine2" {
+			t.Fatalf("line endings not normalized: %q", result.Document.Rows[0]["name"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("submission never delivered")
+	}
+}

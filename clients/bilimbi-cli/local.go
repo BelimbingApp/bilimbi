@@ -202,7 +202,7 @@ func (p *localPage) submit(w http.ResponseWriter, r *http.Request) {
 			var value any
 			switch row[col.Key].(type) {
 			case string:
-				value = raw
+				value = strings.ReplaceAll(raw, "\r\n", "\n")
 			default:
 				if readJSON(strings.NewReader(raw), "-", &value) != nil {
 					http.Error(w, "Invalid field value; return and correct it", 400)
@@ -264,7 +264,8 @@ var localTemplate = template.Must(template.New("local").Parse(`<!doctype html>
 {{range .Rows}}<tr>{{range .}}<td>{{if and (eq $.Mode "review") (not $.Received)}}
 {{if eq .Kind "boolean"}}<select name="{{.Name}}" aria-label="{{.Label}}"><option value="true" {{if eq .Value "true"}}selected{{end}}>Yes</option><option value="false" {{if eq .Value "false"}}selected{{end}}>No</option></select>
 {{else if eq .Kind "number"}}<input type="number" step="any" name="{{.Name}}" value="{{.Value}}" aria-label="{{.Label}}" required>
-{{else}}<textarea name="{{.Name}}" aria-label="{{.Label}}" rows="2">{{.Value}}</textarea>{{if eq .Kind "json"}}<small>JSON value</small>{{end}}{{end}}
+{{else}}<textarea name="{{.Name}}" aria-label="{{.Label}}" rows="2">
+{{.Value}}</textarea>{{if eq .Kind "json"}}<small>JSON value</small>{{end}}{{end}}
 {{else}}<div class="value">{{.Value}}</div>{{end}}</td>{{end}}</tr>{{else}}<tr><td colspan="{{len .Document.Columns}}">No records.</td></tr>{{end}}</tbody></table></div>
 {{if and (eq .Mode "review") (not .Received)}}<label for="comment">Comments or questions</label><textarea id="comment" name="comment" rows="3"></textarea><button class="primary" name="decision" value="approve">Approve review</button><button name="decision" value="revise">Request changes</button>{{end}}</form>
 {{if .Document.Links}}<h2>Verify in Bilimbi</h2><ul>{{range .Document.Links}}<li><a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Label}}</a></li>{{end}}</ul>{{end}}

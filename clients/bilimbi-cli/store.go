@@ -118,26 +118,37 @@ func writeJSON(path string, value any) error {
 	return nil
 }
 
-// One exclusive lock covers read/rotate/persist. A stale lock is deliberately
-// not reclaimed: deleting a live lock could replay a rotated refresh token.
+// An OS advisory lock covers read/rotate/persist and is released by the
+// operating system if the process dies, so a crash never leaves it behind.
 func (s *profileStore) lock(ctx context.Context) (func(), error) {
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
 		return nil, errors.New("cannot create profile directory")
 	}
+	f, err := os.OpenFile(filepath.Join(s.dir, "store.lock"), os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return nil, errors.New("cannot lock profile store")
+	}
 	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	path := filepath.Join(s.dir, "store.lock")
 	for {
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if err == nil {
+		held, err := tryLockFile(f)
+		if err != nil {
 			f.Close()
-			return func() { _ = os.Remove(path) }, nil
-		}
-		if !os.IsExist(err) {
 			return nil, errors.New("cannot lock profile store")
 		}
+		if held {
+			released := false
+			return func() {
+				if !released {
+					released = true
+					unlockFile(f)
+					f.Close()
+				}
+			}, nil
+		}
 		if waitContext(lockCtx, 50*time.Millisecond) != nil {
-			return nil, errors.New("profile store busy; if a client crashed, remove store.lock only after all Bilimbi commands have stopped")
+			f.Close()
+			return nil, errors.New("profile store busy")
 		}
 	}
 }

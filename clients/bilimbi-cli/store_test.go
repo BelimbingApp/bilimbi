@@ -228,3 +228,35 @@ func TestFailedRefreshRequiresLoginOnLaterCommands(t *testing.T) {
 		t.Fatal("rotation uncertainty not retained across aliases")
 	}
 }
+func TestProfileLockIsFreeDuringAPIRequest(t *testing.T) {
+	s, _ := testStore(t)
+	freed := false
+	server := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		unlock, err := s.lock(ctx)
+		if err != nil {
+			t.Error("profile lock held during API request", err)
+		} else {
+			freed = true
+			unlock()
+		}
+		_ = outputJSON(w, map[string]any{"result": []any{}})
+	})
+	d := exampleDiscovery(server.URL)
+	if _, err := s.put(d.Server, credentials{Access: "access", Refresh: "refresh", Expires: time.Now().Add(time.Hour)}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.save(profiles{Active: "test", Items: map[string]profile{"test": {Discovery: d, Backend: "native"}}}); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"search", "company", "--agent-id", "codex/test-high", "--run-id", "run-1"}
+	if err := run(context.Background(), args, nil, &bytes.Buffer{}, &bytes.Buffer{}, s); err != nil || !freed {
+		t.Fatal("search failed or lock was held", err)
+	}
+	unlock, err := s.lock(context.Background())
+	if err != nil {
+		t.Fatal("lock left held after command", err)
+	}
+	unlock()
+}

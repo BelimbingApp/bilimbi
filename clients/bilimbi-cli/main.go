@@ -137,6 +137,9 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		if err != nil {
 			return err
 		}
+		if backend == "file" {
+			fmt.Fprintln(errout, "The operating system credential store is unavailable; tokens are stored in a private file in the Bilimbi configuration directory instead.")
+		}
 		// Credentials are keyed by server. All aliases must agree on its backend.
 		for key, p := range ps.Items {
 			if p.Discovery.Server == d.Server {
@@ -254,6 +257,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 			return err
 		}
 	}
+	unlock()
 	var path, method string
 	var body any
 	method = "GET"
