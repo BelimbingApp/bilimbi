@@ -1,9 +1,9 @@
 defmodule Bilimbi.Base.Media.TestFixtures do
   @moduledoc false
-  alias Bilimbi.Base.Media.{ContributionValidator, Contributions, TestAuthorizer}
+  alias Bilimbi.Base.Database.SchemaVerifier
+  alias Bilimbi.Base.Media.{Contributions, ContributionValidator, TestAuthorizer}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Base.Database.SchemaVerifier
   @ddl Path.expand("../fixtures/legacy_media.sql", __DIR__)
 
   # Independent upstream DDL, not a production migration replay. The excerpt

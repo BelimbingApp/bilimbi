@@ -17,8 +17,8 @@ defmodule Bilimbi.Base.Media do
   removing files; filesystem failures are reported as `:cleanup_failed`.
   """
   alias Bilimbi.Base.Media.{AssetStore, Attribution, PrivateAttachmentStore, Storage, Upload}
-  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.{Repo, Settings}
+  alias Bilimbi.Base.Tenancy.Scope
 
   use Phoenix.VerifiedRoutes,
     router: Bilimbi.Base.UI.RouteContract,

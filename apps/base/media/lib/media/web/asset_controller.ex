@@ -6,9 +6,9 @@ defmodule Bilimbi.Base.Media.Web.AssetController do
 
   def show(conn, %{"id" => id} = params) do
     result =
-      with {id, ""} when id > 0 <- Integer.parse(id),
-           {:ok, file} <- Media.read_signed_asset(id, params["token"], conn.secret_key_base),
-           do: {:ok, file}
+      with {id, ""} when id > 0 <- Integer.parse(id) do
+        Media.read_signed_asset(id, params["token"], conn.secret_key_base)
+      end
 
     case result do
       {:ok, file} ->

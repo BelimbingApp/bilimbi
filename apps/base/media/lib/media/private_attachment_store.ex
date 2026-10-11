@@ -106,13 +106,9 @@ defmodule Bilimbi.Base.Media.PrivateAttachmentStore do
   def discard(scope, public_id) do
     with {:ok, actor} <- uploader(scope) do
       remove(scope, public_id, fn row ->
-        cond do
-          row.uploaded_by_type != "user" or row.uploaded_by_id != actor.user_id ->
-            {:error, :not_uploader}
-
-          true ->
-            :ok
-        end
+        if row.uploaded_by_type != "user" or row.uploaded_by_id != actor.user_id,
+          do: {:error, :not_uploader},
+          else: :ok
       end)
     end
   end

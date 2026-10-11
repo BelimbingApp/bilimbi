@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.Settings.ArrayFormTest do
   use Bilimbi.Base.Database.DataCase, async: false
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.{ContributionValidator, Form}
-  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
 
   setup do
     Bilimbi.Base.Settings.TestFixtures.create_settings_table!()
