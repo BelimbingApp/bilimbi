@@ -205,8 +205,8 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
 
       {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
 
-      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
-      refute html =~ "MY"
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
+      refute has_element?(view, "#companies", "MY")
       refute has_element?(view, "#companies-card th", "Jurisdiction")
       refute has_element?(view, "#companies-sort-jurisdiction")
       assert has_element?(view, "#companies tr:first-child td:first-child", "Bilimbi Industries")
