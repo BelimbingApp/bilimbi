@@ -14,6 +14,9 @@ defmodule Bilimbi.Base.Workflow.TestSubjectAdapter do
       nil ->
         {:error, :subject_not_found}
 
+      %{marker: "explode"} ->
+        raise "subject adapter failed"
+
       row ->
         {:ok,
          %Subject{
