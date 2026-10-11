@@ -225,7 +225,7 @@ defmodule Bilimbi.Base.Integration do
            |> select([e], map(e, ^@payload_fields))
            |> Repo.one() do
         nil -> {:error, :not_found}
-        row -> {:ok, Redaction.redact(row)}
+        row -> {:ok, Map.new(row, fn {key, value} -> {key, Redaction.inspect_stored(value)} end)}
       end
     end
   end

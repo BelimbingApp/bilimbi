@@ -39,6 +39,17 @@ defmodule Bilimbi.Base.Integration.Redaction do
 
   def structured(_value), do: %{"kind" => "omitted", "reason" => "unstructured"}
 
+  @omission_reasons ~w(unstructured size_limit)
+
+  def inspect_stored(%{"kind" => "omitted", "reason" => reason} = marker)
+      when map_size(marker) == 2 and reason in @omission_reasons,
+      do: marker
+
+  def inspect_stored(%{"kind" => "json", "value" => value} = wrapper) when map_size(wrapper) == 2,
+    do: %{"kind" => "json", "value" => redact(value)}
+
+  def inspect_stored(value), do: redact(value)
+
   def endpoint(url) when is_binary(url) do
     uri = URI.parse(url)
     %{uri | userinfo: nil, query: nil, fragment: nil} |> URI.to_string()

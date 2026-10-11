@@ -245,6 +245,37 @@ defmodule Bilimbi.Base.IntegrationTest do
     assert Redaction.structured(Enum.to_list(1..20_000))["reason"] == "size_limit"
     assert {:ok, payload} = Integration.payload(scope, id)
     refute Jason.encode!(payload) =~ ":secret"
+    assert payload.response_body == %{"kind" => "omitted", "reason" => "unstructured"}
+    assert %{"kind" => "json", "value" => %{"nested" => [nested]}} = payload.request_body
+
+    assert nested == %{
+             "refresh_token" => "[redacted]",
+             "clientSecret" => "[redacted]",
+             "count" => 3
+           }
+
+    assert payload.request_headers["kind"] == "json"
+    assert payload.request_headers["value"]["AUTHORIZATION"] == "[redacted]"
+    assert payload.metadata == nil
+  end
+
+  test "stored payloads keep trusted markers and re-redact everything else" do
+    size_limit = %{"kind" => "omitted", "reason" => "size_limit"}
+    assert Redaction.inspect_stored(size_limit) == size_limit
+
+    assert Redaction.inspect_stored(%{"kind" => "json", "value" => %{"token" => "x", "n" => 1}}) ==
+             %{"kind" => "json", "value" => %{"token" => "[redacted]", "n" => 1}}
+
+    assert Redaction.inspect_stored(%{"kind" => "omitted", "reason" => "Bearer abc"}) ==
+             %{"kind" => "[omitted]", "reason" => "[omitted]"}
+
+    assert Redaction.inspect_stored(%{"kind" => "json", "value" => 1, "token" => "x"}) ==
+             %{"kind" => "[omitted]", "value" => 1, "token" => "[redacted]"}
+
+    assert Redaction.inspect_stored(%{"password" => "x", "note" => "raw"}) ==
+             %{"password" => "[redacted]", "note" => "[omitted]"}
+
+    assert Redaction.inspect_stored(nil) == nil
   end
 
   test "configured retention clears previews and leaves recent payloads and all metadata", %{
