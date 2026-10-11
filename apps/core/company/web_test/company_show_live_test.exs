@@ -977,6 +977,69 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       assert has_element?(view, "#detail-email", "ops@bilimbi.test")
     end
 
+    test "an archived company reads with one notice, no editors, and refuses a forged commit",
+         %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      conn = log_in_as(conn)
+
+      {:ok, live_view, _html} = live(conn, ~p"/companies/74")
+      refute has_element?(live_view, "#company-archived")
+      assert has_element?(live_view, "#company-name[phx-hook='InlineEdit']")
+
+      # The viewer signs in at 73; an archived company's own accounts cannot.
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 74")
+
+      {:ok, view, _html} = live(conn, ~p"/companies/74")
+
+      assert has_element?(view, "#company-archived", "This company is archived and read-only.")
+      assert has_element?(view, "#detail-name", "Bilimbi Subsidiary")
+      refute has_element?(view, "#company-name[phx-hook='InlineEdit']")
+
+      render_hook(view, "save_field", %{"id" => "74", "name" => "Forged"})
+
+      # A forged commit reaches the domain, which refuses it; the page keeps
+      # the stored value and its notice.
+      assert has_element?(view, "#detail-name", "Bilimbi Subsidiary")
+      assert has_element?(view, "#company-archived")
+      assert {:ok, %{name: "Bilimbi Subsidiary"}} = Company.get_company(scope!(), 74)
+    end
+
+    test "an archived company's default timezone cannot be changed or cleared", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      settings_scope = SettingsScope.company(74, 41)
+      {:ok, _} = Settings.put("localization.timezone", "Asia/Kuala_Lumpur", settings_scope)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/74")
+      assert has_element?(view, "#company-timezone-display", "Asia/Kuala_Lumpur")
+
+      Ecto.Adapters.SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 74")
+
+      render_change(view, "save_timezone", %{"timezone" => "Asia/Tokyo"})
+
+      assert has_element?(
+               view,
+               "#company-timezone-status[role='alert']",
+               "This company is archived and read-only, so the change was not saved."
+             )
+
+      render_change(view, "save_timezone", %{"timezone" => ""})
+
+      assert has_element?(view, "#company-timezone-status[role='alert']")
+      assert Settings.get("localization.timezone", settings_scope) == "Asia/Kuala_Lumpur"
+    end
+
     test "refuses in-place writes once the update capability is gone", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

@@ -23,4 +23,11 @@ defmodule BilimbiWeb.SettingsCompanyScope do
       {:ok, SettingScope.company(company.id, Scope.tenant_id(scope))}
     end
   end
+
+  # The same guard every Core write begins with: an archived company's
+  # settings are read-only (`Company.require_writable_company/2`).
+  @impl true
+  def writable(%{scope: %Scope{} = scope}, id) do
+    with {:ok, _id} <- Company.require_writable_company(scope, id), do: :ok
+  end
 end

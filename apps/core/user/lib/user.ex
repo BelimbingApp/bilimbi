@@ -64,6 +64,7 @@ defmodule Bilimbi.Core.User do
 
   @type lookup_error ::
           :company_not_found
+          | :company_archived
           | :user_not_found
           | :employee_not_found
           | :unauthorized
@@ -286,9 +287,9 @@ defmodule Bilimbi.Core.User do
 
   @doc "Creates an unverified account and hashes its plaintext `:password` with Argon2id."
   @spec register_user(Scope.t(), pos_integer(), map()) ::
-          {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
+          {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def register_user(%Scope{} = scope, company_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)) do
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
       company_id
       |> Schema.creation_changeset(attributes)
       |> validate_employee(scope, company_id)
@@ -296,7 +297,12 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Authenticates the globally unique email and upgrades legacy bcrypt on success."
+  @doc """
+  Authenticates the globally unique email and upgrades legacy bcrypt on success.
+
+  The stored hash of an archived company's account is never rewritten; the
+  host refuses its sign-in.
+  """
   @spec authenticate(String.t(), String.t()) ::
           {:ok, Summary.t()} | {:error, credential_error()}
   def authenticate(email, password) when is_binary(email) and is_binary(password) do
@@ -344,8 +350,8 @@ defmodule Bilimbi.Core.User do
   @doc """
   Stores a one-time reset token and passes its plaintext only to `deliver_fun`.
 
-  Unknown accounts and throttled requests both return `:ok`, so a public
-  caller can always give the same response. Delivery receives a safe
+  Unknown accounts, accounts of an archived company, and throttled requests
+  all return `:ok`, so a public caller can always give the same response. Delivery receives a safe
   `Summary` and the plaintext token; the database stores only its hash.
   """
   @spec request_password_reset(
@@ -359,7 +365,7 @@ defmodule Bilimbi.Core.User do
     throttle_seconds = non_negative_seconds!(opts[:throttle_seconds], :throttle_seconds)
     email = Schema.normalize_email(email)
 
-    case Repo.get_by(Schema, email: email) do
+    case unfrozen_user(Repo.get_by(Schema, email: email)) do
       nil ->
         random_token() |> Password.hash()
         :ok
@@ -373,7 +379,12 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Consumes a valid reset token, replaces the password, and rotates `remember_token`."
+  @doc """
+  Consumes a valid reset token, replaces the password, and rotates `remember_token`.
+
+  An account of an archived company is frozen and answers
+  `{:error, :invalid_or_expired_token}` like an unknown one.
+  """
   @spec reset_password(String.t(), String.t(), String.t(), keyword()) ::
           {:ok, Summary.t()} | {:error, :invalid_or_expired_token | Changeset.t()}
   def reset_password(email, token, new_password, opts \\ [])
@@ -429,10 +440,11 @@ defmodule Bilimbi.Core.User do
   @doc "Verifies a signed token and marks the unchanged email address as verified."
   @spec verify_email(Scope.t(), pos_integer(), String.t(), String.t(), keyword()) ::
           {:ok, :verified | :already_verified, Summary.t()}
-          | {:error, :company_not_found | :invalid_or_expired_token | Changeset.t()}
+          | {:error,
+             :company_not_found | :company_archived | :invalid_or_expired_token | Changeset.t()}
   def verify_email(%Scope{} = scope, company_id, token, secret, opts \\ []) do
     with {:ok, {user_id, email}} <- EmailVerification.verify(token, secret, opts),
-         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id),
          true <- Plug.Crypto.secure_compare(user.email, email) do
       if user.email_verified_at do
@@ -444,7 +456,7 @@ defmodule Bilimbi.Core.User do
         end
       end
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       _invalid -> {:error, :invalid_or_expired_token}
     end
   end
@@ -603,14 +615,14 @@ defmodule Bilimbi.Core.User do
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
   def update_user(%Scope{} = scope, company_id, user_id, attributes) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       user
       |> Schema.update_changeset(attributes)
       |> validate_employee(scope, company_id)
       |> persist_update()
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :user_not_found}
     end
   end
@@ -682,13 +694,13 @@ defmodule Bilimbi.Core.User do
           :ok | {:error, lookup_error() | :forbidden}
   def delete_user(%Scope{} = scope, company_id, user_id) do
     with :ok <- authorize_delete(scope),
-         {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+         {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, _} = Repo.delete(user)
       :ok
     else
       {:error, :forbidden} = error -> error
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :user_not_found}
     end
   end
@@ -915,17 +927,28 @@ defmodule Bilimbi.Core.User do
   def notifiable_identity, do: "App\\Core\\User\\Models\\User"
 
   defp scoped_user(scope, company_id, user_id) do
-    with {:ok, _company} <- normalize_company(Company.require_live_company(scope, company_id)),
+    with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)),
          %Schema{} = user <- user_schema(company_id, user_id) do
       {:ok, user}
     else
-      {:error, :company_not_found} = error -> error
+      {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :user_not_found}
     end
   end
 
+  # An archived company's accounts are frozen: their stored credential never
+  # changes, and a public caller sees them as it sees an unknown email.
+  defp unfrozen_user(nil), do: nil
+
+  defp unfrozen_user(%Schema{company_id: company_id} = user) do
+    case Company.fetch_tenant_id_for_company(company_id) do
+      {:error, :company_archived} -> nil
+      _live_or_absent -> user
+    end
+  end
+
   defp maybe_upgrade_credential(%Schema{password_hash: hash} = user, password) do
-    if Password.legacy?(hash) do
+    if Password.legacy?(hash) and unfrozen_user(user) do
       user
       |> Schema.credential_upgrade_changeset(Password.hash(password))
       |> Repo.update()
@@ -974,7 +997,7 @@ defmodule Bilimbi.Core.User do
   end
 
   defp valid_password_reset(email, token, max_age) do
-    user = Repo.get_by(Schema, email: email)
+    user = unfrozen_user(Repo.get_by(Schema, email: email))
     reset = Repo.get(PasswordResetToken, email)
 
     if is_nil(user) or is_nil(reset) do
@@ -1177,9 +1200,12 @@ defmodule Bilimbi.Core.User do
     authorize_company_user(scope, company_id, user_id, "admin.user.update")
   end
 
+  # A write into a company begins with Core Company's writable lock: an
+  # archived company refuses every account change (`:company_archived`).
   defp lock_target_company(scope, company_id) do
-    case Company.lock_live_company(scope, company_id) do
+    case Company.lock_writable_company(scope, company_id) do
       {:ok, proof} -> {:ok, proof}
+      {:error, :company_archived} -> {:error, :company_archived}
       {:error, _reason} -> {:error, :company_not_found}
     end
   end
@@ -1235,6 +1261,7 @@ defmodule Bilimbi.Core.User do
 
   defp normalize_company({:ok, company}), do: {:ok, company}
   defp normalize_company({:error, :not_found}), do: {:error, :company_not_found}
+  defp normalize_company({:error, :company_archived}), do: {:error, :company_archived}
 
   @doc """
   Lists saved database queries owned by the signed-in user.

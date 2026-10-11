@@ -15,7 +15,8 @@ defmodule Bilimbi.Core.Employee.AffiliationLock do
 
   @spec lock(Scope.t(), term(), term()) ::
           {:ok, AffiliationProof.t()}
-          | {:error, :invariant_violation | :not_found | :transaction_required}
+          | {:error,
+             :invariant_violation | :not_found | :company_archived | :transaction_required}
   def lock(%Scope{} = scope, company_id, employee_id) do
     cond do
       not Repo.in_transaction?() ->
@@ -31,7 +32,7 @@ defmodule Bilimbi.Core.Employee.AffiliationLock do
 
   defp lock_in_transaction(scope, company_id, employee_id) do
     with {:ok, %LiveCompanyProof{id: ^company_id}} <-
-           Company.lock_live_company(scope, company_id),
+           Company.lock_writable_company(scope, company_id),
          %Schema{} = employee <- lock_employee(company_id, employee_id),
          {:ok, proof} <- reprove_affiliation(employee, company_id, employee_id) do
       {:ok, proof}
@@ -40,7 +41,7 @@ defmodule Bilimbi.Core.Employee.AffiliationLock do
         {:error, :not_found}
 
       {:error, reason}
-      when reason in [:invariant_violation, :not_found, :transaction_required] ->
+      when reason in [:invariant_violation, :not_found, :company_archived, :transaction_required] ->
         {:error, reason}
     end
   end

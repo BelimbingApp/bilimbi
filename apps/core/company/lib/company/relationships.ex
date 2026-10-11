@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.Company.Relationships do
   alias Bilimbi.Core.Company.Relationship
   alias Bilimbi.Core.Company.RelationshipType
   alias Bilimbi.Core.Company.Schema
+  alias Bilimbi.Core.Company.WritableCompany
   alias Bilimbi.Core.Company.Summary
 
   @update_capability "admin.company.update"
@@ -84,6 +85,7 @@ defmodule Bilimbi.Core.Company.Relationships do
         companies =
           from(c in Tenancy.scope_query(Schema, scope),
             where: c.id != ^company_id and is_nil(c.deleted_at),
+            where: c.status != ^WritableCompany.archived_status(),
             order_by: c.name
           )
           |> Repo.all()
@@ -105,10 +107,18 @@ defmodule Bilimbi.Core.Company.Relationships do
     {:ok, types}
   end
 
+  # A relationship names two companies, and an archived one is read-only on
+  # either side: creating refuses an archived owner (`:company_archived`) and
+  # an archived related company (`:related_company_archived`), and updating or
+  # deleting refuses either side being archived the same way.
   @spec create_relationship(Scope.t(), pos_integer(), map()) ::
           {:ok, Relationship.t()}
           | {:error,
-             :forbidden | :company_not_found | :related_company_not_found | Ecto.Changeset.t()}
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | Ecto.Changeset.t()}
   def create_relationship(%Scope{} = scope, company_id, attrs) do
     raw_related_id =
       Map.get(attrs, :related_company_id) || Map.get(attrs, "related_company_id")
@@ -129,9 +139,9 @@ defmodule Bilimbi.Core.Company.Relationships do
       end
 
     with :ok <- authorize(scope, @update_capability),
-         {:ok, _company} <- live_company(scope, company_id) do
+         {:ok, _company} <- WritableCompany.fetch_parent(scope, company_id) do
       if related_id != nil do
-        case live_company(scope, related_id) do
+        case WritableCompany.fetch_parent(scope, related_id) do
           {:ok, _related} ->
             %Relationship{company_id: company_id}
             |> Relationship.changeset(attrs)
@@ -141,8 +151,11 @@ defmodule Bilimbi.Core.Company.Relationships do
               {:error, changeset} -> {:error, changeset}
             end
 
-          {:error, :company_not_found} ->
-            {:error, :company_not_found}
+          {:error, :company_not_found} = error ->
+            error
+
+          {:error, :company_archived} ->
+            {:error, :related_company_archived}
         end
       else
         %Relationship{company_id: company_id}
@@ -154,7 +167,13 @@ defmodule Bilimbi.Core.Company.Relationships do
 
   @spec update_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Relationship.t()}
-          | {:error, :forbidden | :company_not_found | :not_found | Ecto.Changeset.t()}
+          | {:error,
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | :not_found
+             | Ecto.Changeset.t()}
   def update_relationship(%Scope{} = scope, company_id, relationship_id, attrs) do
     with :ok <- authorize(scope, @update_capability) do
       update_relationship_record(scope, company_id, relationship_id, attrs)
@@ -162,9 +181,9 @@ defmodule Bilimbi.Core.Company.Relationships do
   end
 
   defp update_relationship_record(%Scope{} = scope, company_id, relationship_id, attrs) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         query =
@@ -181,15 +200,23 @@ defmodule Bilimbi.Core.Company.Relationships do
             {:error, :not_found}
 
           rel ->
-            rel
-            |> Relationship.update_changeset(attrs)
-            |> Repo.update()
+            with :ok <- other_side_writable(scope, rel, company_id) do
+              rel
+              |> Relationship.update_changeset(attrs)
+              |> Repo.update()
+            end
         end
     end
   end
 
   @spec delete_relationship(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :forbidden | :company_not_found | :not_found}
+          :ok
+          | {:error,
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | :not_found}
   def delete_relationship(%Scope{} = scope, company_id, relationship_id) do
     with :ok <- authorize(scope, @update_capability) do
       delete_relationship_record(scope, company_id, relationship_id)
@@ -197,9 +224,9 @@ defmodule Bilimbi.Core.Company.Relationships do
   end
 
   defp delete_relationship_record(%Scope{} = scope, company_id, relationship_id) do
-    case live_company(scope, company_id) do
-      {:error, :company_not_found} ->
-        {:error, :company_not_found}
+    case WritableCompany.fetch_parent(scope, company_id) do
+      {:error, reason} ->
+        {:error, reason}
 
       {:ok, _company} ->
         query =
@@ -215,11 +242,24 @@ defmodule Bilimbi.Core.Company.Relationships do
             {:error, :not_found}
 
           rel ->
-            case Repo.update(Ecto.Changeset.change(rel, %{deleted_at: now()})) do
-              {:ok, _} -> :ok
-              {:error, _} -> {:error, :not_found}
+            with :ok <- other_side_writable(scope, rel, company_id) do
+              case Repo.update(Ecto.Changeset.change(rel, %{deleted_at: now()})) do
+                {:ok, _} -> :ok
+                {:error, _} -> {:error, :not_found}
+              end
             end
         end
+    end
+  end
+
+  # The relationship is the other company's record too. A soft-deleted other
+  # side no longer has a record to protect; an archived one does.
+  defp other_side_writable(scope, %Relationship{} = rel, company_id) do
+    other_id = if rel.company_id == company_id, do: rel.related_company_id, else: rel.company_id
+
+    case WritableCompany.fetch_parent(scope, other_id) do
+      {:error, :company_archived} -> {:error, :related_company_archived}
+      _live_or_gone -> :ok
     end
   end
 

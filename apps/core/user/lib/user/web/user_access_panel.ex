@@ -743,8 +743,8 @@ defmodule Bilimbi.Core.User.Web.UserAccessPanel do
     scope = socket.assigns.current_scope.scope
 
     match?(
-      {:error, :not_found},
-      Company.require_live_company(scope, socket.assigns.user.company_id)
+      {:error, _reason},
+      Company.require_writable_company(scope, socket.assigns.user.company_id)
     )
   end
 

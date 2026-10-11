@@ -25,7 +25,12 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              socket
              |> assign(:page_title, "#{company.display_name} — Relationships")
              |> assign(:active_nav, "admin.company")
-             |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+             |> assign(
+               :can_update?,
+               allowed?(socket.assigns.current_scope, @update_capability) and
+                 not archived_company?(scope, company_id)
+             )
+             |> assign(:company_archived?, archived_company?(scope, company_id))
              |> assign(:company, company)
              |> assign(:relationships_count, length(relationships))
              |> assign(:modal_action, nil)
@@ -53,19 +58,11 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
   @impl true
   def handle_event("new", _params, socket) do
-    if permit?(socket) do
-      open_new_relationship(socket)
-    else
-      write_forbidden(socket)
-    end
+    write(socket, fn -> open_new_relationship(socket) end)
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
-    if permit?(socket) do
-      open_relationship(socket, id)
-    else
-      write_forbidden(socket)
-    end
+    write(socket, fn -> open_relationship(socket, id) end)
   end
 
   def handle_event("close_modal", _params, socket) do
@@ -94,11 +91,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   end
 
   def handle_event("save", %{"relationship" => params}, socket) do
-    if permit?(socket) do
-      save_relationship(socket, params)
-    else
-      write_forbidden(socket)
-    end
+    write(socket, fn -> save_relationship(socket, params) end)
   end
 
   # Removing confirms through the shared dialog: the request holds the
@@ -106,11 +99,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   # held relationship rather than on a client-supplied id, so what was
   # confirmed is what runs.
   def handle_event("request_delete", %{"id" => id}, socket) do
-    if permit?(socket) do
-      request_relationship_delete(socket, id)
-    else
-      write_forbidden(socket)
-    end
+    write(socket, fn -> request_relationship_delete(socket, id) end)
   end
 
   def handle_event("cancel_delete", _params, socket) do
@@ -121,11 +110,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     do: {:noreply, socket}
 
   def handle_event("delete", _params, %{assigns: %{pending_delete: item}} = socket) do
-    if permit?(socket) do
-      delete_held_relationship(socket, item)
-    else
-      write_forbidden(assign(socket, :pending_delete, nil))
-    end
+    write(assign(socket, :pending_delete, item), fn -> delete_held_relationship(socket, item) end)
   end
 
   defp open_new_relationship(socket) do
@@ -209,6 +194,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
           {:error, :forbidden} ->
             write_forbidden(socket)
 
+          {:error, reason} when reason in [:company_archived, :related_company_archived] ->
+            archived_refused(socket, reason)
+
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not create relationship.")}
         end
@@ -233,6 +221,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
           {:error, :forbidden} ->
             write_forbidden(socket)
+
+          {:error, reason} when reason in [:company_archived, :related_company_archived] ->
+            archived_refused(socket, reason)
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not update relationship.")}
@@ -275,6 +266,9 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
       {:error, :forbidden} ->
         write_forbidden(socket)
 
+      {:error, reason} when reason in [:company_archived, :related_company_archived] ->
+        archived_refused(socket, reason)
+
       {:error, :not_found} ->
         {:ok, relationships} = Company.list_relationships(scope, company_id)
 
@@ -300,8 +294,45 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     Authz.can(socket.assigns.current_scope.scope, @update_capability).allowed
   end
 
+  # Every write passes two fresh checks: the capability, and whether the
+  # company may be written at all. A refusal clears a held delete.
+  defp write(socket, fun) do
+    cond do
+      not permit?(socket) ->
+        write_forbidden(assign(socket, :pending_delete, nil))
+
+      archived_company?(socket.assigns.current_scope.scope, socket.assigns.company.id) ->
+        archived_refused(assign(socket, :pending_delete, nil), :company_archived)
+
+      true ->
+        fun.()
+    end
+  end
+
   defp write_forbidden(socket) do
     {:noreply, write_forbidden_socket(socket)}
+  end
+
+  # The mount-time `company_archived?` assign hides the controls; each write
+  # asks Core Company again so a company archived under the page is refused
+  # in these words. An archived company is read-only for good.
+  defp archived_company?(scope, company_id) do
+    match?({:error, :company_archived}, Company.require_writable_company(scope, company_id))
+  end
+
+  defp archived_refused(socket, :company_archived) do
+    {:noreply,
+     put_flash(socket, :error, "This company is archived and read-only, so nothing was changed.")}
+  end
+
+  # A relationship is the other company's record too.
+  defp archived_refused(socket, :related_company_archived) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "The other company is archived and read-only, so the relationship was not changed."
+     )}
   end
 
   defp write_forbidden_socket(socket) do
@@ -353,6 +384,10 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             />
           </:actions>
         </.header>
+
+        <.alert :if={@company_archived?} id="company-archived" kind={:warning} class="mt-4">
+          This company is archived and read-only.
+        </.alert>
 
         <.card
           id="company-relationships-card"

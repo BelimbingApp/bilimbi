@@ -40,9 +40,12 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Core.Company.Schema
   alias Bilimbi.Core.Company.Summary
   alias Bilimbi.Core.Company.TenantPrimaryCompany
+  alias Bilimbi.Core.Company.WritableCompany
 
+  @type writable_error :: WritableCompany.error()
   @type lookup_error :: :not_provisioned | :invariant_violation | :database_unavailable
-  @type access_lookup_error :: :not_found | :company_not_found | :relationship_not_found
+  @type access_lookup_error ::
+          :not_found | :company_not_found | :company_archived | :relationship_not_found
   @type lifecycle_operation :: Lifecycle.operation()
   @type lifecycle_error :: Lifecycle.error()
   @manage_across_tenant_capability "admin.company.tenant-wide.manage"
@@ -91,7 +94,7 @@ defmodule Bilimbi.Core.Company do
   def get_company(%Scope{}, _company_id), do: {:error, :not_found}
 
   @doc """
-  Locks one live Company row for a sibling workflow already inside the shared Repo transaction.
+  Locks one writable Company row for a sibling workflow already inside the shared Repo transaction.
 
   The result proves only the Company identity. It is schema-free and valid only
   until the current `Bilimbi.Base.Repo` transaction commits or rolls back.
@@ -99,15 +102,20 @@ defmodule Bilimbi.Core.Company do
   first, then Employee rows, then User rows; within each kind, acquire ids in
   ascending order. Do not call this after taking an Employee or User row lock.
 
-  Returns `{:error, :transaction_required}` when called outside an explicit
-  shared Repo transaction. Missing, deleted, cross-tenant, and malformed
-  Company identities all return the generic `{:error, :not_found}` outcome.
+  A lock is only ever taken to write, so an archived company is refused here
+  with `{:error, :company_archived}` (`require_writable_company/2` is the
+  same rule without the lock). Returns `{:error, :transaction_required}` when
+  called outside an explicit shared Repo transaction. Missing, deleted,
+  cross-tenant, and malformed Company identities all return the generic
+  `{:error, :not_found}` outcome.
   """
-  @spec lock_live_company(Scope.t(), term()) ::
-          {:ok, LiveCompanyProof.t()} | {:error, :not_found | :transaction_required}
-  def lock_live_company(%Scope{} = scope, company_id) do
+  @spec lock_writable_company(Scope.t(), term()) ::
+          {:ok, LiveCompanyProof.t()} | {:error, writable_error() | :transaction_required}
+  def lock_writable_company(%Scope{} = scope, company_id) do
     if Repo.in_transaction?() do
-      lock_scoped_live_company(scope, company_id)
+      with {:ok, company} <- WritableCompany.fetch(scope, company_id, lock: true) do
+        {:ok, LiveCompanyProof.from_id(company.id)}
+      end
     else
       {:error, :transaction_required}
     end
@@ -120,18 +128,27 @@ defmodule Bilimbi.Core.Company do
   authenticated the user associated with `company_id`, then prove the returned
   tenant through `Bilimbi.Base.Tenancy.scope/1`. Ordinary Company reads remain
   scope-required through `get_company/2` and `list_companies/1`.
+
+  A company whose status is `archived` holds no sessions: its accounts cannot
+  sign in, be impersonated, or keep a session they opened before, so it is
+  `{:error, :company_archived}`. The answer is read from the status on every
+  call, so nothing is stored that would outlive a change of that status.
   """
-  @spec fetch_tenant_id_for_company(term()) :: {:ok, pos_integer()} | {:error, :not_found}
+  @spec fetch_tenant_id_for_company(term()) ::
+          {:ok, pos_integer()} | {:error, :not_found | :company_archived}
   def fetch_tenant_id_for_company(company_id) when is_integer(company_id) and company_id > 0 do
     query =
       from(company in Schema,
         where: company.id == ^company_id and is_nil(company.deleted_at),
-        select: company.tenant_id
+        select: {company.tenant_id, company.status}
       )
+
+    archived = WritableCompany.archived_status()
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      tenant_id -> {:ok, tenant_id}
+      {_tenant_id, ^archived} -> {:error, :company_archived}
+      {tenant_id, _status} -> {:ok, tenant_id}
     end
   end
 
@@ -386,6 +403,32 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
+  Confirms one company may be written, returning its id.
+
+  The guard every company-scoped write begins with. A live company whose
+  status is `archived` is `{:error, :company_archived}`: archiving is final
+  and freezes the company and everything it owns, in this module and in
+  Core User, Core Employee, Core Address and Base Authz alike. A missing,
+  soft-deleted or other-tenant id is `{:error, :not_found}`, as
+  `require_live_company/2` answers. Reads never ask this; they use the
+  live-company reads above, so an archived company stays viewable.
+  """
+  @spec require_writable_company(Scope.t(), term()) ::
+          {:ok, pos_integer()} | {:error, writable_error()}
+  def require_writable_company(%Scope{} = scope, company_id) do
+    with {:ok, company} <- WritableCompany.fetch(scope, company_id), do: {:ok, company.id}
+  end
+
+  @doc """
+  Whether a company summary is archived, and so read-only.
+
+  A page uses this to withhold its edit, create and delete controls and say
+  why; the domain refuses the write either way.
+  """
+  @spec archived?(Summary.t()) :: boolean()
+  def archived?(%Summary{status: status}), do: status == WritableCompany.archived_status()
+
+  @doc """
   The identity of one live company in this tenant: its id, its code and the
   name a header or workspace strip shows (the legal name when there is one,
   otherwise the name, as `Summary.display_name/1` reads it).
@@ -575,6 +618,10 @@ defmodule Bilimbi.Core.Company do
   refused with an error on that field, whatever value they carry, and
   nothing is written.
 
+  An archived company is read-only: the write is refused with
+  `{:error, :company_archived}` before anything is judged
+  (`require_writable_company/2`).
+
   `status` is not an attribute this path writes. A status change is one of
   the lifecycle operations below (`archive_company/3`, `suspend_company/3`,
   `activate_company/3`, `reactivate_company/3`); an attribute map that
@@ -582,27 +629,18 @@ defmodule Bilimbi.Core.Company do
   than silently dropped.
   """
   @spec update_company(Scope.t(), pos_integer(), map()) ::
-          {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
+          {:ok, Summary.t()} | {:error, writable_error() | Ecto.Changeset.t()}
   def update_company(%Scope{} = scope, company_id, attributes)
       when is_integer(company_id) and company_id > 0 and is_map(attributes) do
-    query =
-      from(company in Tenancy.scope_query(Schema, scope),
-        where: company.id == ^company_id and is_nil(company.deleted_at)
-      )
-
-    case Repo.one(query) do
-      nil ->
-        {:error, :not_found}
-
-      company ->
-        company
-        |> Schema.update_changeset(attributes)
-        |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
-        |> Repo.update()
-        |> case do
-          {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}
-          {:error, changeset} -> {:error, changeset}
-        end
+    with {:ok, company} <- WritableCompany.fetch(scope, company_id) do
+      company
+      |> Schema.update_changeset(attributes)
+      |> Authz.refuse_restricted_attempts(scope, Summary.table_id(), attributes)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {:ok, Summary.for_scope(updated, scope)}
+        {:error, changeset} -> {:error, changeset}
+      end
     end
   end
 
@@ -788,11 +826,13 @@ defmodule Bilimbi.Core.Company do
   defdelegate list_available_department_types(scope, company_id), to: Departments
 
   @spec create_department(Scope.t(), pos_integer(), map()) ::
-          {:ok, Department.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | Ecto.Changeset.t()}
   defdelegate create_department(scope, company_id, attrs), to: Departments
 
   @spec update_department_status(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
-          {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | :not_found | Ecto.Changeset.t()}
   defdelegate update_department_status(scope, company_id, department_id, status), to: Departments
 
   @doc """
@@ -803,11 +843,12 @@ defmodule Bilimbi.Core.Company do
   The department must belong to `company_id`.
   """
   @spec update_department_head(Scope.t(), pos_integer(), pos_integer(), pos_integer() | nil) ::
-          {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+          {:ok, Department.t()}
+          | {:error, :company_not_found | :company_archived | :not_found | Ecto.Changeset.t()}
   defdelegate update_department_head(scope, company_id, department_id, head_id), to: Departments
 
   @spec delete_department(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :company_not_found | :not_found}
+          :ok | {:error, :company_not_found | :company_archived | :not_found}
   defdelegate delete_department(scope, company_id, department_id), to: Departments
 
   # Relationships. The public names stay here; the bodies live in `Relationships`.
@@ -826,16 +867,32 @@ defmodule Bilimbi.Core.Company do
   @spec create_relationship(Scope.t(), pos_integer(), map()) ::
           {:ok, Relationship.t()}
           | {:error,
-             :forbidden | :company_not_found | :related_company_not_found | Ecto.Changeset.t()}
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | Ecto.Changeset.t()}
   defdelegate create_relationship(scope, company_id, attrs), to: Relationships
 
   @spec update_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, Relationship.t()}
-          | {:error, :forbidden | :company_not_found | :not_found | Ecto.Changeset.t()}
+          | {:error,
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | :not_found
+             | Ecto.Changeset.t()}
   defdelegate update_relationship(scope, company_id, relationship_id, attrs), to: Relationships
 
   @spec delete_relationship(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok | {:error, :forbidden | :company_not_found | :not_found}
+          :ok
+          | {:error,
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | :not_found}
   defdelegate delete_relationship(scope, company_id, relationship_id), to: Relationships
 
   # External accesses. The public names stay here; the bodies live in `ExternalAccesses`.
@@ -891,28 +948,6 @@ defmodule Bilimbi.Core.Company do
   @spec delete_external_access(Scope.t(), pos_integer(), pos_integer()) ::
           :ok | {:error, access_lookup_error() | Ecto.Changeset.t()}
   defdelegate delete_external_access(scope, company_id, access_id), to: ExternalAccesses
-
-  defp lock_scoped_live_company(_scope, company_id)
-       when not (is_integer(company_id) and company_id > 0),
-       do: {:error, :not_found}
-
-  defp lock_scoped_live_company(%Scope{} = scope, company_id) do
-    tenant_id = Scope.tenant_id(scope)
-
-    query =
-      from(company in Tenancy.scope_query(Schema, scope),
-        where: company.id == ^company_id and is_nil(company.deleted_at),
-        lock: "FOR UPDATE"
-      )
-
-    case Repo.one(query) do
-      %Schema{tenant_id: ^tenant_id, deleted_at: nil, id: ^company_id} ->
-        {:ok, LiveCompanyProof.from_id(company_id)}
-
-      _company ->
-        {:error, :not_found}
-    end
-  end
 
   defp unwrap_mutation({:ok, result}), do: {:ok, result}
   defp unwrap_mutation({:error, reason}), do: {:error, reason}

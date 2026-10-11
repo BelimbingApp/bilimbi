@@ -79,11 +79,48 @@ those controls. The company page offers them beside the status badge and
 commits each through one dialog that names the consequence and takes the
 reason (`Bilimbi.Core.Company.Web.ShowLive`).
 
+### An archived company is read-only
+
+An archived company is read-only for good, and so is every record it owns.
+Every write to the company or into it begins with one guard,
+`Bilimbi.Core.Company.WritableCompany`, reached through
+`require_writable_company/2` (or `lock_writable_company/2` for a sibling
+workflow that takes the company row lock first) and refused with
+`{:error, :company_archived}`. Base modules reach the same answer through
+`Bilimbi.Base.Authz.company_writable/2`, which the Authz company directory
+answers from that guard. Reads never ask it: an archived company and its
+records stay listed, viewable and auditable.
+
+| Write | Guarded in |
+|---|---|
+| `update_company/3`; moving the tenant's primary company onto it | `company.ex`, `primary_company_manager.ex` |
+| Departments: create, status, head, delete | `departments.ex` |
+| Relationships: create, update, delete, on either side; an archived company is not offered as a related company | `relationships.ex` (`:related_company_archived` for the other side) |
+| External accesses: create, update, grant, revoke, delete | `external_accesses.ex` |
+| Address attachments to the company or its employees; an address such a company or employee links to | Core Address |
+| Employees and employee types: create, update, delete, subordinates, affiliation lock | Core Employee |
+| User accounts: create, update, delete, employee link, moving an account into it | Core User |
+| Roles, role capabilities, role assignments, direct and system-principal grants | Base Authz |
+| Company-scoped settings and shared workspace layouts; the company page's default timezone | Base Settings (through the host's `SettingsCompanyScope.writable/2`), Base Tiling, `web/show_live.ex` |
+
+The lifecycle table above already ends at `archived`. Pages withhold their
+edit, create and delete controls and show one "archived and read-only"
+notice, but the refusal lives in the domain, so a stale or forged commit is
+refused too.
+
+An archived company's accounts cannot sign in, be impersonated, or keep a
+session. `fetch_tenant_id_for_company/1`, the Web login edge's one company
+read, answers `{:error, :company_archived}`, so the login form says so and
+every request or LiveView event of a session opened before is refused.
+Nothing stores the refusal: it is read from the status on every request, so
+sign-in follows the status if it ever changes back. The public password
+reset treats such an account as an unknown email (nothing is delivered, no
+token redeems) and a sign-in never rewrites its stored hash.
+
 Soft deletion (`deleted_at`) is a separate fact from the `archived` status,
 as it is in Belimbing, where `archive()` sets the status and `delete()`
-retires the row. The frozen-account behaviour on a user page and the Authz
-company-scope denial follow `deleted_at`; a status of `archived` does not
-yet freeze anything. There is no `delete_company` in this API today.
+retires the row. A soft-deleted company is not found at all. There is no
+`delete_company` in this API today.
 
 ## Tenant-wide reads
 
@@ -103,8 +140,8 @@ returns the summary: a caller that shows the company to a reader uses it. A
 caller that needs only existence or the id uses `require_live_company/2`,
 and one that needs only the id, code and name uses `identity/2`.
 `authorize_company_target/3` answers the authorized company's summary, so a
-page that authorizes a target can name it. Core Employee, Core User and Core Address check existence
-through `require_live_company/2`; `BilimbiWeb.UserAuth`, the employee page
+page that authorizes a target can name it. Core Employee, Core User and Core Address check a
+company before a write through `require_writable_company/2`; `BilimbiWeb.UserAuth`, the employee page
 and the Departments and Relationships pages read the name through
 `identity/2`; `Company.Web.ShowLive` reads the summary.
 
@@ -151,17 +188,18 @@ operator tenant marker.
 
 ## Transactional live-company proof
 
-`lock_live_company/2` is the Company collaboration seam for a sibling workflow
+`lock_writable_company/2` is the Company collaboration seam for a sibling workflow
 that already holds an explicit shared `Bilimbi.Base.Repo` transaction. It locks
-one live Company row through the supplied `%Bilimbi.Base.Tenancy.Scope{}` and
+one live, writable Company row through the supplied `%Bilimbi.Base.Tenancy.Scope{}` and
 returns `LiveCompanyProof`, a schema-free value containing only its id. Missing,
-cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`;
+cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`; an
+archived company is read-only and returns `{:error, :company_archived}`;
 calling outside an explicit transaction returns `{:error, :transaction_required}`.
 
 The proof remains valid only until that transaction commits or rolls back. A
 cross-module workflow acquires locks in this order: Company, then Employee,
 then User; within each record kind, ids ascend. It must not take an Employee or
-User lock before calling `lock_live_company/2`.
+User lock before calling `lock_writable_company/2`.
 
 ## External access
 

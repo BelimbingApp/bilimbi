@@ -31,6 +31,9 @@
         options={[{"Global", "global"} | Enum.map(@companies, &{&1.name, to_string(&1.id)})]}
       />
     </.form>
+    <.alert :if={@scope_archived?} id="settings-company-archived" kind={:warning} class="mt-4">
+      This company is archived and read-only.
+    </.alert>
     <.empty_state
       :if={!@can_manage_company}
       id="company-settings-withheld"
@@ -128,7 +131,7 @@
               {if @setting_scope, do: "Company override", else: "Set here"}
             </.badge>
             <.button
-              :if={@setting_scope && field.overridden?}
+              :if={@setting_scope && field.overridden? && !@scope_archived?}
               type="button"
               id={"clear-#{String.replace(field.key, ".", "-")}"}
               phx-click="request_clear"
@@ -165,7 +168,7 @@
         <p class="text-xs text-ink-faint">
           Clearing a field removes this override, so the value returns to what it inherits.
         </p>
-        <div class="flex gap-2">
+        <div :if={!@scope_archived?} class="flex gap-2">
           <.button id="settings-restore" type="button" phx-click="request_restore">
             {if @setting_scope, do: "Clear overrides", else: "Restore Defaults"}
           </.button>

@@ -49,6 +49,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
      |> assign(:pending_restore, nil)
      |> assign(:pending_reveal, nil)
      |> assign(:setting_scope, nil)
+     |> assign(:scope_archived?, false)
      |> assign(:scope_form, scope_form(nil))
      |> assign(
        :can_manage_company,
@@ -160,11 +161,12 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
   @impl true
   def handle_event("save", params, socket) do
-    if scope_authorized?(socket) do
-      save(params, load_fields(socket))
-    else
-      {:noreply,
-       put_flash(socket, :error, "You do not have permission to manage this company's settings.")}
+    case scope_writable(socket) do
+      :ok ->
+        save(params, load_fields(socket))
+
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
     end
   end
 
@@ -193,13 +195,15 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     do: {:noreply, socket}
 
   def handle_event("restore_defaults", _params, socket) do
-    if scope_authorized?(socket) do
-      restore(socket)
-    else
-      {:noreply,
-       socket
-       |> assign(:pending_restore, nil)
-       |> put_flash(:error, "You do not have permission to manage this company's settings.")}
+    case scope_writable(socket) do
+      :ok ->
+        restore(socket)
+
+      {:error, message} ->
+        {:noreply,
+         socket
+         |> assign(:pending_restore, nil)
+         |> put_flash(:error, message)}
     end
   end
 
@@ -216,6 +220,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
     socket
     |> assign(:setting_scope, scope)
+    |> assign(:scope_archived?, scope_archived?(socket, scope))
     |> assign(:scope_form, scope_form(scope))
     |> assign(:page, %{socket.assigns.page | groups: groups})
     |> assign(:active_tab, List.first(groups))
@@ -315,6 +320,31 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp scope_authorized?(socket) do
     match?({:ok, _}, company_service().authorize(socket.assigns.current_scope, scope(socket).id))
   end
+
+  # A write asks twice: may the person manage this company's settings, and
+  # may the company be written at all. An archived company is read-only, and
+  # the page says that rather than blaming a permission.
+  defp scope_writable(%{assigns: %{setting_scope: nil}}), do: :ok
+
+  defp scope_writable(socket) do
+    cond do
+      not scope_authorized?(socket) ->
+        {:error, "You do not have permission to manage this company's settings."}
+
+      company_service().writable(socket.assigns.current_scope, scope(socket).id) != :ok ->
+        {:error, "This company is archived and read-only, so its settings were not changed."}
+
+      true ->
+        :ok
+    end
+  end
+
+  # Presentation only: the page hides its save and clear controls and says
+  # why. Each write still asks `scope_writable/1`.
+  defp scope_archived?(_socket, nil), do: false
+
+  defp scope_archived?(socket, scope),
+    do: company_service().writable(socket.assigns.current_scope, scope.id) != :ok
 
   defp company_service do
     Application.fetch_env!(:bilimbi_base_settings, :company_scope_service)

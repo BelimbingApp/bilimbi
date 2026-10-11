@@ -111,6 +111,13 @@ defmodule BilimbiWeb.LoginLive do
 
       {:error, :tenant_unavailable} ->
         {:noreply, put_form_error(socket, "This account is not attached to an active workspace.")}
+
+      {:error, :company_archived} ->
+        {:noreply,
+         put_form_error(
+           socket,
+           "This account's company is archived, so it can no longer sign in."
+         )}
     end
   end
 

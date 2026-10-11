@@ -36,29 +36,29 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
     {:final_query, :from, :total, {:literal, "user_total"}, 34},
     {:final_query, :left_join, :user, {:literal, "page_users"}, 35},
     {:final_query, :left_join, :roles, {:literal, "page_roles"}, 37},
-    {:tenant_companies, :from, :company, {:scope_query, "companies", :scope}, 68},
-    {:live_companies, :from, :company, {:literal, "tenant_companies"}, 79},
-    {:visible_role_assignments, :from, :assignment, {:literal, "base_authz_principal_roles"}, 88},
-    {:visible_role_assignments, :join, :role, {:literal, "base_authz_roles"}, 89},
+    {:tenant_companies, :from, :company, {:scope_query, "companies", :scope}, 69},
+    {:live_companies, :from, :company, {:literal, "tenant_companies"}, 81},
+    {:visible_role_assignments, :from, :assignment, {:literal, "base_authz_principal_roles"}, 90},
+    {:visible_role_assignments, :join, :role, {:literal, "base_authz_roles"}, 91},
     {:visible_role_assignments, :left_join, :assignment_company, {:literal, "live_companies"},
-     91},
-    {:visible_role_assignments, :left_join, :role_company, {:literal, "live_companies"}, 93},
-    {:filtered_users, :from, :user, {:literal, "users"}, 130},
-    {:filtered_users, :join, :company, {:literal, "tenant_companies"}, 132},
-    {:role_filter, :join, :assignment, {:literal, "visible_role_assignments"}, 159},
-    {:user_total, :from, :user, {:literal, "filtered_users"}, 166},
-    {:page_users, :from, :user, {:literal, "filtered_users"}, 172},
-    {:page_role_rows, :from, :user, {:literal, "page_users"}, 189},
-    {:page_role_rows, :join, :role, {:literal, "visible_role_assignments"}, 190},
-    {:page_roles, :from, :role, {:literal, "page_role_rows"}, 204}
+     93},
+    {:visible_role_assignments, :left_join, :role_company, {:literal, "live_companies"}, 95},
+    {:filtered_users, :from, :user, {:literal, "users"}, 132},
+    {:filtered_users, :join, :company, {:literal, "tenant_companies"}, 134},
+    {:role_filter, :join, :assignment, {:literal, "visible_role_assignments"}, 162},
+    {:user_total, :from, :user, {:literal, "filtered_users"}, 169},
+    {:page_users, :from, :user, {:literal, "filtered_users"}, 175},
+    {:page_role_rows, :from, :user, {:literal, "page_users"}, 193},
+    {:page_role_rows, :join, :role, {:literal, "visible_role_assignments"}, 194},
+    {:page_roles, :from, :role, {:literal, "page_role_rows"}, 208}
   ]
 
   @approved_fragment_sql "array_agg(? ORDER BY ?, ?, ?)"
   @approved_fragment_sites [
-    {:page_roles, 209, [:role_id, :role_name, :role_code, :role_id]},
-    {:page_roles, 217, [:role_name, :role_name, :role_code, :role_id]},
-    {:page_roles, 225, [:role_code, :role_name, :role_code, :role_id]},
-    {:page_roles, 233, [:role_is_system, :role_name, :role_code, :role_id]}
+    {:page_roles, 213, [:role_id, :role_name, :role_code, :role_id]},
+    {:page_roles, 221, [:role_name, :role_name, :role_code, :role_id]},
+    {:page_roles, 229, [:role_code, :role_name, :role_code, :role_id]},
+    {:page_roles, 237, [:role_is_system, :role_name, :role_code, :role_id]}
   ]
 
   @physical_bindings %{

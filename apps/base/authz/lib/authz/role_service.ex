@@ -106,7 +106,7 @@ defmodule Bilimbi.Base.Authz.RoleService do
   @spec create_role(Scope.t(), pos_integer(), map(), map()) ::
           {:ok, RoleSummary.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes, registry) when is_map(attributes) do
-    if directory!(registry).company_in_scope?(scope, company_id) do
+    with :ok <- writable_company(scope, company_id, registry) do
       company_id
       |> Role.custom_changeset(attributes)
       |> Repo.insert()
@@ -114,8 +114,6 @@ defmodule Bilimbi.Base.Authz.RoleService do
         {:ok, role} -> {:ok, RoleSummary.from_schema(role)}
         {:error, changeset} -> {:error, changeset}
       end
-    else
-      {:error, :company_not_found}
     end
   end
 
@@ -125,6 +123,7 @@ defmodule Bilimbi.Base.Authz.RoleService do
              :role_not_found
              | :system_role
              | :company_not_found
+             | :company_archived
              | :role_has_principals
              | :invalid_company_id
              | Ecto.Changeset.t()}
@@ -137,7 +136,8 @@ defmodule Bilimbi.Base.Authz.RoleService do
         {:error, :system_role}
 
       %Role{} = role ->
-        with {:ok, company_id} <- requested_company_id(attributes, role.company_id),
+        with :ok <- writable_role_company(scope, role, registry),
+             {:ok, company_id} <- requested_company_id(attributes, role.company_id),
              :ok <- validate_target_company(scope, company_id, registry),
              :ok <- validate_scope_change(role, company_id) do
           role
@@ -152,7 +152,8 @@ defmodule Bilimbi.Base.Authz.RoleService do
   end
 
   @spec delete_role(Scope.t(), pos_integer(), map()) ::
-          {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
+          {:ok, :deleted}
+          | {:error, :role_not_found | :system_role | :company_archived | Ecto.Changeset.t()}
   def delete_role(%Scope{} = scope, role_id, registry) do
     case eligible_role(scope, role_id, registry) do
       nil ->
@@ -162,16 +163,22 @@ defmodule Bilimbi.Base.Authz.RoleService do
         {:error, :system_role}
 
       %Role{} = role ->
-        case Repo.delete(role) do
-          {:ok, _role} -> {:ok, :deleted}
-          {:error, changeset} -> {:error, changeset}
+        with :ok <- writable_role_company(scope, role, registry) do
+          case Repo.delete(role) do
+            {:ok, _role} -> {:ok, :deleted}
+            {:error, changeset} -> {:error, changeset}
+          end
         end
     end
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()], map()) ::
           {:ok, non_neg_integer()}
-          | {:error, :role_not_found | :system_role | {:unknown_capabilities, [String.t()]}}
+          | {:error,
+             :role_not_found
+             | :system_role
+             | :company_archived
+             | {:unknown_capabilities, [String.t()]}}
   def replace_role_capabilities(%Scope{} = scope, role_id, capabilities, registry)
       when is_list(capabilities) do
     with {:ok, capabilities} <- validate_capabilities(capabilities, registry) do
@@ -182,26 +189,28 @@ defmodule Bilimbi.Base.Authz.RoleService do
         %Role{is_system: true} ->
           {:error, :system_role}
 
-        %Role{} ->
-          Repo.transaction(fn ->
-            from(grant in RoleCapability, where: grant.role_id == ^role_id)
-            |> Repo.delete_all()
+        %Role{} = role ->
+          with :ok <- writable_role_company(scope, role, registry) do
+            Repo.transaction(fn ->
+              from(grant in RoleCapability, where: grant.role_id == ^role_id)
+              |> Repo.delete_all()
 
-            now = now()
+              now = now()
 
-            rows =
-              Enum.map(capabilities, fn capability ->
-                %{
-                  role_id: role_id,
-                  capability_key: capability,
-                  created_at: now,
-                  updated_at: now
-                }
-              end)
+              rows =
+                Enum.map(capabilities, fn capability ->
+                  %{
+                    role_id: role_id,
+                    capability_key: capability,
+                    created_at: now,
+                    updated_at: now
+                  }
+                end)
 
-            if rows != [], do: Repo.insert_all(RoleCapability, rows)
-            length(rows)
-          end)
+              if rows != [], do: Repo.insert_all(RoleCapability, rows)
+              length(rows)
+            end)
+          end
       end
     end
   end
@@ -213,52 +222,47 @@ defmodule Bilimbi.Base.Authz.RoleService do
           pos_integer(),
           pos_integer(),
           map()
-        ) :: {:ok, :assigned | :existing} | {:error, :company_not_found | :role_not_found}
+        ) ::
+          {:ok, :assigned | :existing}
+          | {:error, :company_not_found | :company_archived | :role_not_found}
   def assign_role(%Scope{} = scope, company_id, principal_type, principal_id, role_id, registry) do
     validate_principal!(principal_type, principal_id)
-    directory = directory!(registry)
 
-    cond do
-      not directory.company_in_scope?(scope, company_id) ->
-        {:error, :company_not_found}
+    with :ok <- writable_company(scope, company_id, registry),
+         %Role{} <- eligible_role(scope, role_id, registry) || {:error, :role_not_found} do
+      now = now()
 
-      is_nil(eligible_role(scope, role_id, registry)) ->
-        {:error, :role_not_found}
+      {count, _rows} =
+        Repo.insert_all(
+          PrincipalRole,
+          [
+            %{
+              company_id: company_id,
+              principal_type: Atom.to_string(principal_type),
+              principal_id: principal_id,
+              role_id: role_id,
+              created_at: now,
+              updated_at: now
+            }
+          ],
+          on_conflict: :nothing,
+          conflict_target: [:company_id, :principal_type, :principal_id, :role_id]
+        )
 
-      true ->
-        now = now()
-
-        {count, _rows} =
-          Repo.insert_all(
-            PrincipalRole,
-            [
-              %{
-                company_id: company_id,
-                principal_type: Atom.to_string(principal_type),
-                principal_id: principal_id,
-                role_id: role_id,
-                created_at: now,
-                updated_at: now
-              }
-            ],
-            on_conflict: :nothing,
-            conflict_target: [:company_id, :principal_type, :principal_id, :role_id]
-          )
-
-        {:ok, if(count == 1, do: :assigned, else: :existing)}
+      {:ok, if(count == 1, do: :assigned, else: :existing)}
     end
   end
 
   @spec unassign_role(Scope.t(), pos_integer(), pos_integer(), map()) ::
-          {:ok, :unassigned | :not_found} | {:error, :role_not_found}
+          {:ok, :unassigned | :not_found} | {:error, :role_not_found | :company_archived}
   def unassign_role(%Scope{} = scope, role_id, assignment_id, registry)
       when is_integer(role_id) and role_id > 0 and is_integer(assignment_id) and
              assignment_id > 0 do
     if eligible_role(scope, role_id, registry) do
       visibility = company_visibility(scope, registry)
 
-      {count, _rows} =
-        Repo.delete_all(
+      assignment =
+        Repo.one(
           from(assignment in PrincipalRole,
             where: assignment.id == ^assignment_id,
             where: assignment.role_id == ^role_id,
@@ -266,7 +270,15 @@ defmodule Bilimbi.Base.Authz.RoleService do
           )
         )
 
-      {:ok, if(count == 1, do: :unassigned, else: :not_found)}
+      # The row names the company the assignment lives in; an archived
+      # company keeps its assignments as they are.
+      with %PrincipalRole{} = assignment <- assignment || {:ok, :not_found},
+           :ok <- writable_assignment_company(scope, assignment, registry) do
+        {count, _rows} =
+          Repo.delete_all(from(row in PrincipalRole, where: row.id == ^assignment.id))
+
+        {:ok, if(count == 1, do: :unassigned, else: :not_found)}
+      end
     else
       {:error, :role_not_found}
     end
@@ -282,7 +294,8 @@ defmodule Bilimbi.Base.Authz.RoleService do
           map()
         ) ::
           {:ok, :stored}
-          | {:error, :company_not_found | {:unknown_capabilities, [String.t()]}}
+          | {:error,
+             :company_not_found | :company_archived | {:unknown_capabilities, [String.t()]}}
   def put_principal_capability(
         %Scope{} = scope,
         company_id,
@@ -295,31 +308,28 @@ defmodule Bilimbi.Base.Authz.RoleService do
       when is_binary(capability) and is_boolean(allowed?) do
     validate_principal!(principal_type, principal_id)
 
-    with {:ok, [capability]} <- validate_capabilities([capability], registry) do
-      if directory!(registry).company_in_scope?(scope, company_id) do
-        now = now()
+    with {:ok, [capability]} <- validate_capabilities([capability], registry),
+         :ok <- writable_company(scope, company_id, registry) do
+      now = now()
 
-        Repo.insert_all(
-          PrincipalCapability,
-          [
-            %{
-              company_id: company_id,
-              principal_type: Atom.to_string(principal_type),
-              principal_id: principal_id,
-              capability_key: capability,
-              is_allowed: allowed?,
-              created_at: now,
-              updated_at: now
-            }
-          ],
-          on_conflict: {:replace, [:is_allowed, :updated_at]},
-          conflict_target: [:company_id, :principal_type, :principal_id, :capability_key]
-        )
+      Repo.insert_all(
+        PrincipalCapability,
+        [
+          %{
+            company_id: company_id,
+            principal_type: Atom.to_string(principal_type),
+            principal_id: principal_id,
+            capability_key: capability,
+            is_allowed: allowed?,
+            created_at: now,
+            updated_at: now
+          }
+        ],
+        on_conflict: {:replace, [:is_allowed, :updated_at]},
+        conflict_target: [:company_id, :principal_type, :principal_id, :capability_key]
+      )
 
-        {:ok, :stored}
-      else
-        {:error, :company_not_found}
-      end
+      {:ok, :stored}
     end
   end
 
@@ -327,20 +337,26 @@ defmodule Bilimbi.Base.Authz.RoleService do
           Scope.t(),
           pos_integer(),
           map()
-        ) :: {:ok, :removed | :not_found}
+        ) :: {:ok, :removed | :not_found} | {:error, :company_archived}
   def remove_principal_capability(%Scope{} = scope, grant_id, registry)
       when is_integer(grant_id) and grant_id > 0 do
     visibility = company_visibility(scope, registry)
 
-    {count, _rows} =
-      Repo.delete_all(
+    grant =
+      Repo.one(
         from(grant in PrincipalCapability,
           where: grant.id == ^grant_id,
           where: ^visibility
         )
       )
 
-    {:ok, if(count == 1, do: :removed, else: :not_found)}
+    with %PrincipalCapability{} = grant <- grant || {:ok, :not_found},
+         :ok <- writable_grant_company(scope, grant, registry) do
+      {count, _rows} =
+        Repo.delete_all(from(row in PrincipalCapability, where: row.id == ^grant.id))
+
+      {:ok, if(count == 1, do: :removed, else: :not_found)}
+    end
   end
 
   defp eligible_role(scope, role_id, registry) do
@@ -387,11 +403,31 @@ defmodule Bilimbi.Base.Authz.RoleService do
 
   defp normalize_company_id(_value), do: {:error, :invalid_company_id}
 
-  defp validate_target_company(scope, company_id, registry) do
-    if directory!(registry).company_in_scope?(scope, company_id),
-      do: :ok,
-      else: {:error, :company_not_found}
-  end
+  defp validate_target_company(scope, company_id, registry),
+    do: writable_company(scope, company_id, registry)
+
+  # Every write that lands in a company asks the directory whether that
+  # company may be written. A custom role lives in its company; a system role
+  # lives in none and is never archived with one.
+  defp writable_company(scope, company_id, registry),
+    do: directory!(registry).company_writable(scope, company_id)
+
+  # A global assignment or grant (no company) belongs to no company that could
+  # be archived.
+  defp writable_assignment_company(_scope, %PrincipalRole{company_id: nil}, _registry), do: :ok
+
+  defp writable_assignment_company(scope, %PrincipalRole{company_id: company_id}, registry),
+    do: writable_company(scope, company_id, registry)
+
+  defp writable_grant_company(_scope, %PrincipalCapability{company_id: nil}, _registry), do: :ok
+
+  defp writable_grant_company(scope, %PrincipalCapability{company_id: company_id}, registry),
+    do: writable_company(scope, company_id, registry)
+
+  defp writable_role_company(_scope, %Role{company_id: nil}, _registry), do: :ok
+
+  defp writable_role_company(scope, %Role{company_id: company_id}, registry),
+    do: writable_company(scope, company_id, registry)
 
   defp validate_scope_change(%Role{company_id: company_id}, company_id), do: :ok
 

@@ -265,6 +265,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
     unless CompanyDirectory in behaviours and
              function_exported?(directory, :company_ids, 1) and
              function_exported?(directory, :company_in_scope?, 2) and
+             function_exported?(directory, :company_writable, 2) and
              function_exported?(directory, :companies_in_scope, 1) do
       invalid!(descriptor.id, "company directory #{inspect(directory)} has the wrong contract")
     end

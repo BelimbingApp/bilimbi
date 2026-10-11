@@ -12,4 +12,13 @@ defmodule Bilimbi.Base.Settings.CompanyScopeService do
 
   @callback companies(map()) :: [%{id: pos_integer(), name: String.t()}]
   @callback authorize(map(), pos_integer()) :: {:ok, Scope.t()} | {:error, atom()}
+
+  @doc """
+  Whether the authorized company may take a settings write.
+
+  `authorize/2` admits a reader to a company's settings; this is asked again
+  before each save or restore. An archived company is read-only for good:
+  `{:error, :company_archived}`, which the editor reports in those words.
+  """
+  @callback writable(map(), pos_integer()) :: :ok | {:error, atom()}
 end

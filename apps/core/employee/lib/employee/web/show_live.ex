@@ -153,9 +153,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   defp load_data(socket, employee) do
     scope = socket.assigns.current_scope.scope
     current_scope = socket.assigns.current_scope
-    can_manage? = allowed?(current_scope, @manage_capability)
-    can_delete? = allowed?(current_scope, "admin.employee.delete")
     company_id = employee.company_id
+    company_archived? = archived_company?(scope, company_id)
+    can_manage? = allowed?(current_scope, @manage_capability) and not company_archived?
+    can_delete? = allowed?(current_scope, "admin.employee.delete") and not company_archived?
 
     # Company info
     company_name =
@@ -212,6 +213,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:page_title, Employee.Summary.display_name(employee))
     |> assign(:can_manage?, can_manage?)
     |> assign(:can_delete?, can_delete?)
+    |> assign(:company_archived?, company_archived?)
     |> assign(:company_name, company_name)
     |> assign(:departments, departments)
     |> assign(:department_map, department_map)
@@ -595,6 +597,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         "This employee no longer exists. Return to the list to find their replacement.",
       company_not_found:
         "The change was not saved because this employee's company could not be found.",
+      company_archived:
+        "The change was not saved: this employee's company is archived and read-only.",
       # The domain refuses the change outright for the platform orchestrator
       # (`SYS-001` / `agent`); the fact says so rather than a generic sentence.
       invariant_violation:
@@ -834,6 +838,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             </div>
           </:actions>
         </.header>
+
+        <.alert :if={@company_archived?} id="employee-archived-company" kind={:warning} class="mt-4">
+          This employee's company is archived and read-only.
+        </.alert>
 
         <div class="mt-6 space-y-6">
           <%!-- Section 1: Employee Details. The facts are the shared `<.list>`
@@ -1333,7 +1341,18 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # revoked grant must not keep working until remount (#609, the #482/#541
   # pattern).
   defp can_manage?(socket) do
-    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed and
+      not archived_company?(
+        socket.assigns.current_scope.scope,
+        socket.assigns.employee.company_id
+      )
+  end
+
+  # An employee of an archived company is read-only: the mount-time assign
+  # hides every control, and each write asks Core Company again. The domain
+  # refuses the write either way; `failures/1` carries its sentence.
+  defp archived_company?(scope, company_id) do
+    match?({:error, :company_archived}, Company.require_writable_company(scope, company_id))
   end
 
   # `can_delete?` only decides whether the danger zone is shown. The event
