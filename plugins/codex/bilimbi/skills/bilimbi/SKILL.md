@@ -60,7 +60,8 @@ requires the person's normal company permissions.
    changes, revise the operation inputs, create a new plan and review it again;
    editing an evidence table cannot change an API plan.
 4. Only on `approved: true` for that unchanged plan, run
-   `commit --plan <plan_code>` and save its JSON output. The program carries
+   `commit --plan <plan_code>` and save its JSON output. The program refuses
+   unless that review approved this plan. It carries
    the exact stored operations; the API refuses a mismatch, expired or reused
    code, changed preview, revoked permission or company write switch.
 5. Run `report --input <commit-output-file> --session <session-file>` to replace

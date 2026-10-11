@@ -9,7 +9,9 @@ defmodule Bilimbi.Base.AgentApi.Plans do
   facade and consumes the code in one transaction. A failed operation rolls back
   all records, audits and code consumption. Changed defaults or reference data
   require a fresh plan. A code proves what was reviewed, not the person's go:
-  the native client's review loop obtains that go (ADR 0021).
+  the native client enforces that go locally before it commits (ADR 0021), and
+  Bilimbi does not verify it. A new preview also deletes this tenant's plans
+  that expired more than a day ago, used or not, so rows do not accumulate.
   """
   import Ecto.Query
   alias Bilimbi.Base.AgentApi.{Dispatcher, Json, Plan}
@@ -23,6 +25,7 @@ defmodule Bilimbi.Base.AgentApi.Plans do
       valid? = Enum.all?(results, & &1["valid"])
 
       if valid? do
+        prune_stale(scope)
         code = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
         expires = DateTime.add(now(), Settings.get("agent_api.plan_expiry_seconds"), :second)
 
@@ -56,14 +59,23 @@ defmodule Bilimbi.Base.AgentApi.Plans do
     end
   end
 
+  defp prune_stale(scope) do
+    cutoff = DateTime.add(now(), -86_400, :second)
+
+    Tenancy.scope_query(Plan, scope)
+    |> where([p], p.expires_at < ^cutoff)
+    |> Repo.delete_all()
+  end
+
   def commit(%Scope{} = scope, code, operations) when is_binary(code) and byte_size(code) == 43 do
     with :ok <- shape(operations) do
       Repo.transaction(fn ->
         plan =
           Repo.one(
-            from p in Tenancy.scope_query(Plan, scope),
+            from(p in Tenancy.scope_query(Plan, scope),
               where: p.id == ^code_id(code),
               lock: "FOR UPDATE"
+            )
           )
 
         check_plan!(plan, scope, operations)

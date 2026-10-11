@@ -50,6 +50,8 @@ is deferred. This is an intentional departure from the RFC transport requirement
   failures return 422 `plan_rejected` with per-operation errors. Re-plan and
   obtain a fresh review when inputs or the preview change. On a lost commit
   response, verify records through read operations before attempting new writes.
+  Bilimbi does not verify the person's go; the native client enforces it locally.
+  A dry run also deletes this tenant's plan rows that expired over a day ago.
 
 Errors carry `error`; invalid input also carries field errors (422), capability
 refusals return 403, missing operations/records return 404, unauthenticated

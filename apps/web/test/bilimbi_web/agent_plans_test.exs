@@ -176,6 +176,33 @@ defmodule BilimbiWeb.AgentPlansTest do
            }
   end
 
+  test "a new dry run deletes plans that expired more than a day ago", %{
+    conn: conn,
+    tokens: tokens
+  } do
+    old = preview(conn, tokens, [company("Old supplier")])
+    recent = preview(conn, tokens, [company("Recent supplier")])
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    for {plan, offset} <- [{old, -90_000}, {recent, -3_600}] do
+      id =
+        :crypto.hash(:sha256, :erlang.term_to_binary(plan["plan_code"]))
+        |> Base.encode16(case: :lower)
+
+      Repo.get!(Plan, id)
+      |> Ecto.Changeset.change(expires_at: DateTime.add(now, offset))
+      |> Repo.update!()
+    end
+
+    fresh = preview(conn, tokens, [company("Fresh supplier")])
+    assert Repo.aggregate(Plan, :count) == 2
+
+    assert commit(conn, tokens, old["plan_code"], [company("Old supplier")]) |> json_response(409) ==
+             %{"error" => "invalid_plan_code"}
+
+    assert fresh["plan_code"] != recent["plan_code"]
+  end
+
   test "another person cannot use a plan", %{scope: scope} do
     Bilimbi.Core.User.TestFixtures.insert_user!(%{
       id: 92,

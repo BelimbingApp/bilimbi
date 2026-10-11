@@ -276,7 +276,7 @@ var localTemplate = template.Must(template.New("local").Parse(`<!doctype html>
 {{if eq .Mode "report"}}<form method="post" action="{{.Path}}/close"><button class="primary">Close report</button></form>{{end}}
 </main></body></html>`))
 
-func localCommand(ctx context.Context, command string, args []string, input io.Reader, out, errout io.Writer) error {
+func localCommand(ctx context.Context, command string, args []string, input io.Reader, out, errout io.Writer, store *profileStore) error {
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	file := flags.String("input", "-", "JSON document")
@@ -340,6 +340,11 @@ func localCommand(ctx context.Context, command string, args []string, input io.R
 	if command == "review" {
 		select {
 		case result := <-p.submitted:
+			if result.Approved {
+				if err = approvePlan(store, raw); err != nil {
+					return err
+				}
+			}
 			if err = outputJSON(out, result); err != nil {
 				return err
 			}

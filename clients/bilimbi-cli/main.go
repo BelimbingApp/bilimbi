@@ -91,7 +91,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 	}
 	command, tail := args[0], args[1:]
 	if command == "review" || command == "report" {
-		return localCommand(ctx, command, tail, input, out, errout)
+		return localCommand(ctx, command, tail, input, out, errout, store)
 	}
 	client := newClient(agent, runID)
 	if command == "login" {
@@ -258,7 +258,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		}
 	}
 	unlock()
-	var path, method string
+	var path, method, committed string
 	var body any
 	method = "GET"
 	switch command {
@@ -290,6 +290,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		if len(request.Operations) == 0 {
 			return errors.New("plan needs operations")
 		}
+		prunePlans(store)
 		body, path, method = request, "/plans", "POST"
 	case "commit":
 		flags := flag.NewFlagSet("commit", flag.ContinueOnError)
@@ -298,6 +299,7 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		if flags.Parse(tail) != nil || flags.NArg() != 0 || !validPlanCode(*code) {
 			return errors.New("usage: commit --plan <code>")
 		}
+		prunePlans(store)
 		var saved savedPlan
 		if err = readJSON(nil, planPath(store, *code), &saved); err != nil {
 			return errors.New("plan is unavailable locally; create a new plan")
@@ -305,6 +307,10 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 		if saved.Server != p.Discovery.Server || saved.Code != *code {
 			return errors.New("plan belongs to a different server; select its profile")
 		}
+		if _, statErr := os.Stat(approvalPath(store, *code)); statErr != nil {
+			return errors.New("plan has no approved review; review it with the person and approve before committing")
+		}
+		committed = *code
 		body = map[string]any{"plan_code": *code, "operations": saved.Operations}
 		path, method = "/plans/commit", "POST"
 	case "call":
@@ -354,13 +360,16 @@ func run(ctx context.Context, args []string, input io.Reader, out, errout io.Wri
 			return errors.New("invalid plan response")
 		}
 		if response.Valid {
-			if !validPlanCode(response.Code) {
-				return errors.New("invalid plan code from server")
+			if _, expiry := time.Parse(time.RFC3339, response.Expires); !validPlanCode(response.Code) || expiry != nil {
+				return errors.New("invalid plan code or expiry from server")
 			}
-			if err = writeJSON(planPath(store, response.Code), savedPlan{Server: p.Discovery.Server, Code: response.Code, Operations: body.(planRequest).Operations}); err != nil {
+			if err = writeJSON(planPath(store, response.Code), savedPlan{Server: p.Discovery.Server, Code: response.Code, Expires: response.Expires, Operations: body.(planRequest).Operations}); err != nil {
 				return err
 			}
 		}
+	}
+	if command == "commit" {
+		discardPlan(store, committed)
 	}
 	return outputJSON(out, result)
 }

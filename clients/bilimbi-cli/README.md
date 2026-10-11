@@ -113,13 +113,20 @@ expiry. Those evidence cells are read-only; changes belong in the comments,
 followed by a new plan and review. Ordinary local presentation documents retain
 editable cells. No business write happens until commit.
 
-After the person's go, `bilimbi commit --plan <code> > report.json` sends the
-exact saved operations to the same server. Plans are private files below the
+The client enforces the person's go locally; Bilimbi does not verify it. When
+`review` receives the plan output unchanged from `plan` and the person approves,
+it writes an approval marker for that plan code beside the plan file, only if the
+reviewed operations match the saved ones. `bilimbi commit --plan <code> >
+report.json` refuses without that marker, so a review of one plan never unlocks
+another, and a successful commit deletes the plan file and its marker. It sends
+the exact saved operations to the same server. Plans are private files below the
 OS configuration directory's `bilimbi/plans`, bound to their server origin;
-credentials remain separate. Commit requires a locally available code and the
-matching active server. There is no automatic write retry. Expired or changed
-plans require a fresh dry run and go. If a commit response is lost, search or
-read the records to establish what happened before making another plan.
+credentials remain separate. Any `plan`, `review` approval or `commit` first
+deletes plans that have expired. Commit requires a locally available code and
+the matching active server. There is no automatic write retry. Expired or
+changed plans require a fresh dry run and go. If a commit response fails, the
+plan and marker remain until expiry: search or read the records to establish
+what happened before making another plan.
 
 `bilimbi report --input report.json --session review-session.json` shows the
 committed records and server-supplied verification links in the same tab.

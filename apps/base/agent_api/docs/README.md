@@ -70,7 +70,8 @@ operator settings `agent_api.plan_expiry_seconds` and
 for each company. It is checked for the signed-in company and an employee's
 employer. Company managers change it on the company page; turning it off stops
 existing uncommitted plans too. The code proves the reviewed data, not human
-consent; the local client obtains the person's go (ADR 0021).
+consent; the native client refuses to commit without a local approval of that
+plan, and Bilimbi does not verify it (ADR 0021).
 
 The host serves the HTTP endpoints, connection authentication and the general
 API request log; see `apps/web/docs/agent-api.md`. Client files stay in the

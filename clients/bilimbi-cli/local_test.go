@@ -172,7 +172,7 @@ func TestReviewCommandSamePageReportAndSessionCleanup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go func() {
-		finished <- localCommand(ctx, "review", []string{"--session", session}, bytes.NewReader(data), stdout, stderr)
+		finished <- localCommand(ctx, "review", []string{"--session", session}, bytes.NewReader(data), stdout, stderr, nil)
 	}()
 	var address string
 	select {
@@ -202,7 +202,7 @@ func TestReviewCommandSamePageReportAndSessionCleanup(t *testing.T) {
 		t.Fatal("submission not printed")
 	}
 	var reportOut bytes.Buffer
-	if err := localCommand(ctx, "report", []string{"--session", session}, bytes.NewReader(data), &reportOut, io.Discard); err != nil {
+	if err := localCommand(ctx, "report", []string{"--session", session}, bytes.NewReader(data), &reportOut, io.Discard, nil); err != nil {
 		t.Fatal(err)
 	}
 	resp = localRequest(t, p, "/close", "http://"+p.host, "application/x-www-form-urlencoded", nil)
@@ -228,7 +228,7 @@ func TestReviewTimeoutCleansSession(t *testing.T) {
 	finished := make(chan error, 1)
 	stderr := notifyWriter{make(chan string, 1)}
 	go func() {
-		finished <- localCommand(ctx, "review", []string{"--session", session}, bytes.NewReader(data), io.Discard, stderr)
+		finished <- localCommand(ctx, "review", []string{"--session", session}, bytes.NewReader(data), io.Discard, stderr, nil)
 	}()
 	var address string
 	select {

@@ -30,7 +30,7 @@ func TestPlanAndCommitPreserveInputsAndServerBinding(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/plans":
 			planned = append(json.RawMessage(nil), body.Operations...)
-			_ = outputJSON(w, map[string]any{"valid": true, "plan_code": code, "results": []any{}})
+			_ = outputJSON(w, map[string]any{"valid": true, "plan_code": code, "expires_at": time.Now().Add(10 * time.Minute).UTC().Format(time.RFC3339), "operations": planned, "results": []any{}})
 		case "/api/v1/plans/commit":
 			committed++
 			if body.Code != code || !bytes.Equal(planned, body.Operations) {
@@ -62,14 +62,31 @@ func TestPlanAndCommitPreserveInputsAndServerBinding(t *testing.T) {
 	}
 	args = []string{"commit", "--plan", code, "--agent-id", "codex/test-high", "--run-id", "task"}
 	out.Reset()
+	if err = run(context.Background(), args, nil, &out, &stderr, store); err == nil || committed != 0 {
+		t.Fatal("commit without an approved review was sent", err)
+	}
+	if err = approvePlan(store, json.RawMessage(reviewedPlanJSON(t, code, planned))); err != nil {
+		t.Fatal(err)
+	}
 	if err = run(context.Background(), args, nil, &out, &stderr, store); err != nil {
 		t.Fatal(err)
 	}
 	if committed != 1 || !strings.Contains(string(planned), "9223372036854775807") {
 		t.Fatal("lost exact integer")
 	}
+	for _, leftover := range []string{planPath(store, code), approvalPath(store, code)} {
+		if _, statErr := os.Stat(leftover); statErr == nil {
+			t.Fatal("committed plan left on disk")
+		}
+	}
+	if err = run(context.Background(), args, nil, &out, &stderr, store); err == nil || committed != 1 {
+		t.Fatal("approval was not consumed")
+	}
 	saved := savedPlan{Server: "http://other.test", Code: code}
 	if err = writeJSON(planPath(store, code), saved); err != nil {
+		t.Fatal(err)
+	}
+	if err = writeJSON(approvalPath(store, code), map[string]string{"plan_code": code}); err != nil {
 		t.Fatal(err)
 	}
 	if err = run(context.Background(), args, nil, &out, &stderr, store); err == nil {
@@ -144,5 +161,65 @@ func TestCommitRefusalPreservesStructuredEvidenceAndNeverReportsSuccess(t *testi
 	doc, err := localDocument(result, "report")
 	if err != nil || doc.Title != "Changes were refused" || len(doc.Links) != 0 || len(doc.Rows) != 1 {
 		t.Fatal("refusal presented as a success", err)
+	}
+}
+
+func reviewedPlanJSON(t *testing.T, code string, operations json.RawMessage) string {
+	t.Helper()
+	return `{"valid":true,"plan_code":"` + code + `","operations":` + string(operations) + `,"results":[{"key":"core.employee.create","valid":true,"preview":{"changes":[]}}]}`
+}
+
+func TestApprovalIsBoundToTheReviewedPlanAndExpiredPlansArePruned(t *testing.T) {
+	store, _ := testStore(t)
+	codeA, codeB := strings.Repeat("a", 43), strings.Repeat("b", 43)
+	operationsA := []plannedOperation{{Key: "core.company.create", Input: map[string]any{"name": "A"}}}
+	operationsB := []plannedOperation{{Key: "core.company.create", Input: map[string]any{"name": "B"}}}
+	soon := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	for code, operations := range map[string][]plannedOperation{codeA: operationsA, codeB: operationsB} {
+		if err := writeJSON(planPath(store, code), savedPlan{Server: "s", Code: code, Expires: soon, Operations: operations}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	review := func(code string, operations []plannedOperation) json.RawMessage {
+		raw, _ := json.Marshal(map[string]any{"valid": true, "plan_code": code, "operations": operations, "results": []any{}})
+		return raw
+	}
+	if approvePlan(store, review(codeA, operationsB)) == nil {
+		t.Fatal("review of other operations unlocked a plan")
+	}
+	if approvePlan(store, review(strings.Repeat("c", 43), operationsA)) == nil {
+		t.Fatal("review of an unknown plan accepted")
+	}
+	if err := approvePlan(store, review(codeA, operationsA)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(approvalPath(store, codeA)); err != nil {
+		t.Fatal("approval marker missing")
+	}
+	if _, err := os.Stat(approvalPath(store, codeB)); err == nil {
+		t.Fatal("review of plan A unlocked plan B")
+	}
+	custom, _ := json.Marshal(map[string]any{"plan_code": codeB, "columns": []any{}, "rows": []any{}, "title": "x"})
+	if err := approvePlan(store, custom); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(approvalPath(store, codeB)); err == nil {
+		t.Fatal("custom document unlocked a plan")
+	}
+	past := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
+	if err := writeJSON(planPath(store, codeB), savedPlan{Server: "s", Code: codeB, Expires: past, Operations: operationsB}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(approvalPath(store, codeB), map[string]string{"plan_code": codeB}); err != nil {
+		t.Fatal(err)
+	}
+	prunePlans(store)
+	for _, gone := range []string{planPath(store, codeB), approvalPath(store, codeB)} {
+		if _, err := os.Stat(gone); err == nil {
+			t.Fatal("expired plan kept")
+		}
+	}
+	if _, err := os.Stat(planPath(store, codeA)); err != nil {
+		t.Fatal("live plan pruned")
 	}
 }
