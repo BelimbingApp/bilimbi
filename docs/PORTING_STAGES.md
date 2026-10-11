@@ -120,8 +120,8 @@ and identifies its proper Base/Core owner.
 - operational setup and failure recovery are documented.
 
 **State:** Shipped: Datetime and Locale, Menu, Queue, Schedule, Dashboard,
-Workflow, and telemetry/performance (Perf), plus System, Tiling, and Artifacts.
-Media, Cache, and Integration have no module. The exit-gate bullets are open
+Workflow, and telemetry/performance (Perf), plus System, Tiling, Artifacts, and
+Media. Cache and Integration have no module. The exit-gate bullets are open
 until the steward confirms each against the tree.
 
 ## S4 — AI and workflow runtime
