@@ -98,19 +98,32 @@ bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
 refuses inline style; the `FlexTable` hook writes the bar width). It is
 one real table at every zoom: do not add a canvas, and do not offer a row
 height that looks like its neighbour (`Bilimbi.Base.UI.FlexTable` owns the
-steps). Its chips, add box, zoom and reset live in table customization,
-the bar the lip on the table's top-left edge opens; do not put a toolbar
+steps). A compact row is as short as 18px, so a `<.badge>` in one gives up
+its vertical padding through the `data-badge` rule in
+`apps/web/assets/css/app.css` and a row action takes 16px; do not hand-shrink
+either in a page. Its chips, add box, zoom and reset live in table
+customization, the bar the notch on the table's top-left edge opens; do not put a toolbar
 or an icon group back above the table or in its heading row. A zoom
 control carries `data-zoom-op` and no `phx-click`: LiveView drops a click
 on a control still waiting for its last reply, which is how the first
 density toggle came to look stuck, so the hook pushes each press. A page
 that draws a second line or an avatar in a `<:col>` leaves it out when the
-mode is `:compact`. See the component comment in
+mode is `:compact`. In a `p-0` card the flexible table is `framed={false}`,
+as `table/1` is `framed={false}` there, so the card is the one frame;
+`class="p-2"` drew a second frame 8px inside the card's. The notch then
+rises out of the card, and the card's headroom for it is the `data-unframed`
+rule in `apps/web/assets/css/app.css`: do not add a margin or padding for
+it at a call site. See the component comment in
 `lib/ui/components/flex_table.ex` and `Bilimbi.Base.UI.FlexTable`.
 
 ## Summaries
 
 A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip: the section uses `<.card>`, `<.section_heading>` and `<.empty_state>`, and the entry rows stay local, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
+
+## Badges, rows and buttons
+
+A badge that names a type, role, category or kind is `<.badge dot={false}>`; the dot belongs to a status badge only (`badge/1`). A list row whose name is a `<.record_link>` carries no view eye or edit pencil that leads to the same page; keep only actions that do something else, such as delete. A destructive icon button is `<.icon_button kind={:danger}>`, which is grey at rest and red on hover and focus; do not colour it red with a class.
+A list page's header create action is `<.create_button noun="Company">` ("+ Company", no verb); do not hand-write a primary `<.button>` with its own verb and plus icon (`create_button/1`).
 
 ## Maintaining this file
 

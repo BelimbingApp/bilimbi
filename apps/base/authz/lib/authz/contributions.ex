@@ -46,9 +46,7 @@ defmodule Bilimbi.Base.Authz.Contributions do
     "admin.authz.role.create",
     "admin.authz.role.update",
     "admin.authz.role.delete",
-    "admin.authz.principal-role.list",
     "admin.authz.capability.list",
-    "admin.authz.principal-capability.list",
     "admin.authz.decision-log.list",
     "admin.authz.system-principal.list",
     "admin.authz.system-principal.grant",
@@ -88,24 +86,6 @@ defmodule Bilimbi.Base.Authz.Contributions do
           route: "/authz/roles",
           capability: "admin.authz.role.list",
           order: 20
-        },
-        %{
-          id: "admin.authz.principal-role",
-          label: "Principal Roles",
-          icon: "user-circle",
-          parent: "admin.authz",
-          route: "/authz/principal-roles",
-          capability: "admin.authz.principal-role.list",
-          order: 30
-        },
-        %{
-          id: "admin.authz.principal-capability",
-          label: "Principal Capabilities",
-          icon: "key",
-          parent: "admin.authz",
-          route: "/authz/principal-capabilities",
-          capability: "admin.authz.principal-capability.list",
-          order: 40
         },
         %{
           id: "admin.authz.decision-log",

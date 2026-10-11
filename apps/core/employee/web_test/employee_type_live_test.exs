@@ -70,7 +70,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert Enum.any?(types, &(&1.code == "seasonal" and not &1.is_system))
   end
 
-  test "the list's Edit action opens the type's read-first record page", %{conn: conn} do
+  test "the type's label opens its read-first record page", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, type} =
@@ -83,18 +83,13 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    # The action keeps its capability gate and its glyph; it leads to the
-    # record page, where the label edits in place, not to a separate form.
-    assert has_element?(
-             view,
-             "a#employee-type-edit-#{type.id}[href='/employee-types/#{type.id}']"
-           )
-
+    # The label link is the way in; there is no separate row edit action.
+    refute has_element?(view, "#employee-type-edit-#{type.id}")
     refute has_element?(view, "a[href$='/edit']")
 
     {:ok, show, _html} =
       view
-      |> element("#employee-type-edit-#{type.id}")
+      |> element("a#employee-type-#{type.id}-link[href='/employee-types/#{type.id}']")
       |> render_click()
       |> follow_redirect(conn |> log_in_as(), ~p"/employee-types/#{type.id}")
 
@@ -637,7 +632,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     # contribution to derive from -- the nav owns page names, nothing owns
     # action names. #292 fixed the titles and left this one behind, so it is
     # pinned rather than trusted (#296).
-    assert has_element?(view, "#employee-type-new", "New Type")
+    assert has_element?(view, "#employee-type-new", "New Employee Type")
   end
 
   # Pause the delete task after its initial company lookup has returned the

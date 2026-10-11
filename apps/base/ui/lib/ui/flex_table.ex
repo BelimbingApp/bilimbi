@@ -54,15 +54,17 @@ defmodule Bilimbi.Base.UI.FlexTable do
   jumps between.
   """
 
-  # A compact row holds one line of small text, twenty pixels at its
-  # shortest. A normal row holds what a page draws at full size, an avatar
-  # or a second line, thirty-six at its shortest. Nothing between twenty-
-  # eight and thirty-six is offered: the row would be drawn as one or the
-  # other and look the same as its neighbour.
-  @compact_steps [20, 24, 28]
-  @normal_steps [36, 40, 44]
+  # A row height is the rendered height of the row. A compact row holds one
+  # line of small text, eighteen pixels at its shortest, which is Compact. A
+  # normal row holds what a page draws at full size, an avatar or a second
+  # line, thirty-two at its shortest, which is Normal, and forty is the
+  # tallest offered. Nothing between twenty-six and thirty-two is offered:
+  # the row would be drawn as one or the other and look the same as its
+  # neighbour.
+  @compact_steps [18, 22, 26]
+  @normal_steps [32, 36, 40]
   @zoom_steps @compact_steps ++ @normal_steps
-  @presets [compact: 24, normal: 36]
+  @presets [compact: 18, normal: 32]
 
   @doc "The row heights a table takes, shortest first."
   @spec zoom_steps() :: [pos_integer()]
@@ -109,12 +111,12 @@ defmodule Bilimbi.Base.UI.FlexTable do
   @spec row_class(pos_integer()) :: String.t()
   def row_class(zoom) do
     case normalize_zoom(zoom) do
-      20 -> "h-5"
-      24 -> "h-6"
-      28 -> "h-7"
+      18 -> "h-4.5"
+      22 -> "h-5.5"
+      26 -> "h-6.5"
+      32 -> "h-8"
       36 -> "h-9"
       40 -> "h-10"
-      44 -> "h-11"
     end
   end
 

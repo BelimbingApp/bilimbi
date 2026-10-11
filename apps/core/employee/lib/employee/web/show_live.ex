@@ -1028,7 +1028,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   <:display>
                     <%!-- Neutral for every type, matching the index table
                          (same thing, same look); status alone carries color. --%>
-                    <.badge kind={:neutral}>
+                    <.badge kind={:neutral} dot={false}>
                       {employee_type_label(@employee_types, @employee.employee_type)}
                     </.badge>
                   </:display>

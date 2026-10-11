@@ -112,6 +112,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   def handle_params(params, _uri, socket) do
     state = ListState.parse(list_params(params), @list)
     columns = PageColumns.from_params(socket.assigns.columns, params)
+
     {:noreply, socket |> assign(:columns, columns) |> load_page(state)}
   end
 
@@ -353,14 +354,12 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           <:subtitle>Every live company in this tenant</:subtitle>
           <:actions>
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-              <.button
+              <.create_button
                 :if={allowed?(@current_scope, "admin.company.create")}
                 id="companies-add"
-                variant="primary"
+                noun="Company"
                 navigate={~p"/companies/create"}
-              >
-                <.icon name="create" class="size-4" /> Add Company
-              </.button>
+              />
               <.action_link
                 id="companies-department-types"
                 icon="manage"
@@ -408,7 +407,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
 
           <.flex_table
-            class="p-2"
+            framed={false}
             id="companies"
             columns={@columns.column_views}
             rows={@columns.rows}
@@ -481,11 +480,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               <% company = listed(@companies_page, id) %>
               <div class="flex items-center justify-end gap-3">
                 <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
-                <.icon_button
-                  icon="view"
-                  label={"Open #{company.name}"}
-                  navigate={~p"/companies/#{company.id}"}
-                />
               </div>
             </:action>
             <%!-- Two different absences, two different sentences: a search or

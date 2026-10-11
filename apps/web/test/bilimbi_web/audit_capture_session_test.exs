@@ -223,8 +223,10 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
       # statement's own result cannot tell a replacement from a creation.
       assert replaced.event == "updated"
       assert replaced.auditable_id == created.auditable_id
-      assert replaced.old_values == %{"is_allowed" => true}
-      assert replaced.new_values == %{"is_allowed" => false}
+      # `updated_at` joins the diff when the two writes land in different
+      # seconds, so the clock must not decide this assertion.
+      assert Map.take(replaced.old_values, ["is_allowed"]) == %{"is_allowed" => true}
+      assert Map.take(replaced.new_values, ["is_allowed"]) == %{"is_allowed" => false}
     end
 
     test "an excluded schema leaves no row for a bulk write" do

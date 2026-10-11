@@ -38,7 +38,10 @@ defmodule Bilimbi.Base.UI.Components.SortHeading do
       {@col[:label]}
       <.icon
         name={table_sort_icon(@col[:sort], @sort_by, @sort_dir)}
-        class={["size-3.5", table_sort_active?(@col[:sort], @sort_by) && "text-action"]}
+        class={[
+          "size-3.5",
+          if(table_sort_active?(@col[:sort], @sort_by), do: "text-action", else: "text-ink-faint")
+        ]}
       />
     </button>
     """

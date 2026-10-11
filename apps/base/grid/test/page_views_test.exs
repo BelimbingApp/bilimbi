@@ -38,7 +38,7 @@ defmodule Bilimbi.Base.Grid.PageViewsTest do
         table: table,
         columns: ~w(name company.name employees:count),
         lenses: %{"employees:count" => "bar"},
-        zoom: 24,
+        zoom: 22,
         since: ~D[2026-08-01]
       },
       overrides

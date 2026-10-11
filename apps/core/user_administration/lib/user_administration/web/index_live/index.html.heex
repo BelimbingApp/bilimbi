@@ -12,16 +12,13 @@
           aria-pressed="false"
         />
       </:title_actions>
-      <:subtitle>Search, filter, and manage the accounts in this workspace.</:subtitle>
       <:actions>
-        <.button
+        <.create_button
           :if={allowed?(@current_scope, "admin.user.create")}
           id="user-new"
+          noun="User"
           navigate={~p"/users/new"}
-          variant="primary"
-        >
-          <.icon name="create" /> Create User
-        </.button>
+        />
       </:actions>
     </.header>
 
@@ -48,7 +45,7 @@
       <h2 id="users-table-title" class="sr-only">Workspace users</h2>
 
       <.flex_table
-        class="p-2"
+        framed={false}
         id="users"
         columns={@columns.column_views}
         rows={@columns.rows}
@@ -126,6 +123,7 @@
           <div class="flex flex-wrap gap-1.5">
             <.badge
               :for={role <- user.roles}
+              dot={false}
               kind={if role.is_system, do: :success, else: :neutral}
             >
               {role.name}

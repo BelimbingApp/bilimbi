@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Grid.View do
 
       cols=name,company.name,employees:count
       lens=employees:count|bar
-      z=24  since=2026-01-01
+      z=18  since=2026-01-01
 
   An address that carries any of those keys says what to show. One that
   carries none leaves it to what the account last arranged
@@ -27,7 +27,7 @@ defmodule Bilimbi.Base.Grid.View do
   defstruct table: nil,
             columns: [],
             lenses: %{},
-            zoom: 36,
+            zoom: FlexTable.default_zoom(),
             since: nil
 
   @type t :: %__MODULE__{

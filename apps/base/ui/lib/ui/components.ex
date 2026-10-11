@@ -345,25 +345,52 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders the primary create button of a page header: the plus icon and the
+  record noun, no verb ("+ Company", "+ User"). The accessible name is
+  "New <noun>", so the visible text stays inside it. Use it for every
+  list-page header create action instead of a hand-written
+  `<.button variant="primary">` with its own verb and icon. It accepts the
+  attributes `button/1` does (`navigate`, `phx-click`, `type`, `id`, `class`).
+  """
+  attr(:noun, :string, required: true, doc: "the record type, such as \"Company\"")
+  attr(:rest, :global, include: ~w(href navigate patch type))
+  attr(:class, :any, default: nil)
+
+  def create_button(assigns) do
+    ~H"""
+    <.button variant="primary" class={@class} {@rest}>
+      <.icon name="create" class="size-4" /><span class="sr-only">New </span>{@noun}
+    </.button>
+    """
+  end
+
+  @doc """
   Renders a compact status badge with a state dot, for entity statuses such
   as `"active"` or `"archived"`. Neutral by default; pass `kind` for a
   status color.
+
+  The dot marks a status. A badge that names a type, role, category or kind
+  passes `dot={false}`: it classifies the row, it does not report a state.
   """
   attr(:kind, :atom, values: [:neutral, :success, :warning, :danger], default: :neutral)
+  attr(:dot, :boolean, default: true)
   attr(:class, :any, default: nil)
   slot(:inner_block, required: true)
 
   def badge(assigns) do
     ~H"""
-    <span class={[
-      "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-      @kind == :neutral && "bg-surface-muted text-ink-muted",
-      @kind == :success && "bg-success-surface text-success-ink",
-      @kind == :warning && "bg-warning-surface text-warning-ink",
-      @kind == :danger && "bg-danger-surface text-danger-ink",
-      @class
-    ]}>
-      <span class="size-1.5 rounded-full bg-current opacity-70"></span>
+    <span
+      data-badge
+      class={[
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+        @kind == :neutral && "bg-surface-muted text-ink-muted",
+        @kind == :success && "bg-success-surface text-success-ink",
+        @kind == :warning && "bg-warning-surface text-warning-ink",
+        @kind == :danger && "bg-danger-surface text-danger-ink",
+        @class
+      ]}
+    >
+      <span :if={@dot} class="size-1.5 rounded-full bg-current opacity-70"></span>
       {render_slot(@inner_block)}
     </span>
     """
@@ -474,6 +501,15 @@ defmodule Bilimbi.Base.UI.Components do
       <.button navigate={~p"/"}>Home</.button>
       <.button type="submit" busy={@saving}>Saving…</.button>
 
+  ## Geometry
+
+  A button is a control, so it wears the ledger geometry every other control
+  wears: `rounded-md`, one input tall (`py-1.5 text-sm` plus a border), and a
+  medium weight. Every variant carries the border, transparent on the filled
+  ones, so a primary and a secondary button side by side are the same height
+  and line up with the fields beside them; the old `rounded-xl px-4 py-2
+  font-semibold` was a 36px block that outweighed its page header.
+
   ## In-flight state
 
   A control that has been activated and is waiting for its outcome is
@@ -516,12 +552,12 @@ defmodule Bilimbi.Base.UI.Components do
     # stylesheet order, not by this list's order (#619's invisible button).
     variants = %{
       "primary" =>
-        "bg-action text-action-ink hover:bg-action-hover shadow-sm focus-visible:ring-brand-strong/30",
+        "border-transparent bg-action text-action-ink hover:bg-action-hover shadow-xs focus-visible:ring-brand-strong/30",
       "danger" =>
-        "text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
+        "border-transparent text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
           "focus-visible:ring-brand-strong/30",
       nil =>
-        "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-sm " <>
+        "border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-xs " <>
           "focus-visible:ring-brand-strong/30"
     }
 
@@ -531,7 +567,7 @@ defmodule Bilimbi.Base.UI.Components do
     assigns =
       assigns
       |> assign(:class, [
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
+        "inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium",
         "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         if(assigns.busy,
@@ -678,7 +714,8 @@ defmodule Bilimbi.Base.UI.Components do
       assigns.context == :inline && "size-6 rounded-sm",
       assigns.context == :table && "size-7 rounded-md",
       assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
-      assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+      assigns.kind == :danger &&
+        "text-ink-muted hover:bg-danger-surface hover:text-danger focus-visible:bg-danger-surface focus-visible:text-danger",
       if(assigns.busy,
         do: "cursor-progress bg-surface-sunken ring-1 ring-line",
         else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"

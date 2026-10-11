@@ -19,6 +19,11 @@ Three Base screens identify people by database id where Belimbing shows a name:
 | `/authz/principal-capabilities` | `base/authz` | principal kind + id |
 | `/authz/principal-roles` | `base/authz` | principal kind + id |
 
+The two Base Authz listings were retired on 2026-10-10: who holds a role is
+read on that role's page and on the Users list, and a person's roles and direct
+grants are changed on their own page. The seam, and the single-principal reads
+and `list_principal_capabilities/2` that use it, stay.
+
 Belimbing joins `users` directly. Bilimbi cannot: Base must not depend on Core
 (ADR 0003; AGENTS.md). #439 attempted `Code.ensure_loaded?/1` plus `apply/3` from
 `base/session` and was rejected — from the owning package

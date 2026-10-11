@@ -197,7 +197,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeShowLive do
                 </div>
               </:item>
               <:item title={fact_label("kind")} id="employee-type-view-kind">
-                <.badge kind={if @type.is_system, do: :neutral, else: :success}>
+                <.badge kind={if @type.is_system, do: :neutral, else: :success} dot={false}>
                   {if @type.is_system, do: "system", else: "custom"}
                 </.badge>
               </:item>

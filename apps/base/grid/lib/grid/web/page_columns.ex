@@ -57,7 +57,7 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
             builtins: [],
             view: %View{},
             account: nil,
-            zoom: 36,
+            zoom: FlexTable.default_zoom(),
             cost: nil,
             since: nil,
             extras: [],

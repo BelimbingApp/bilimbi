@@ -116,7 +116,8 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "inspect" => "hero-document-magnifying-glass",
              "zoom-in" => "hero-plus",
              "zoom-out" => "hero-minus",
-             "customize" => "hero-adjustments-horizontal",
+             "customize" => "hero-chevron-double-up-micro",
+             "customizing" => "hero-chevron-double-down-micro",
              "dashboard" => "hero-squares-2x2",
              "status" => "hero-signal"
            }
