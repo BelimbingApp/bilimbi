@@ -135,7 +135,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "time_field" => "14:30",
       "datetime_field" => "2026-08-17T14:30",
       "month_field" => "2026-08",
-      "week_field" => "2026-W34"
+      "week_field" => "2026-W34",
+      "chip_roles" => ["admin", "reviewer"],
+      "example_teams_chips" => ["platform"]
     }
 
     error_data = %{
@@ -244,6 +246,19 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+  end
+
+  # A chip's remove button names the input and the value; the owner of the
+  # form drops that value, which is all the multi-select asks of its caller.
+  def handle_event(
+        "sample_chip_remove",
+        %{"name" => "sample[" <> rest, "option" => value},
+        socket
+      ) do
+    key = String.trim_trailing(rest, "][]")
+    params = socket.assigns.sample_form.params
+    chosen = params |> Map.get(key, []) |> List.wrap() |> List.delete(value)
+    {:noreply, assign(socket, :sample_form, to_form(Map.put(params, key, chosen), as: :sample))}
   end
 
   def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do

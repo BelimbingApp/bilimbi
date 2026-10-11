@@ -25,18 +25,6 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     """
   end
 
-  defp marker_with_role(assigns) do
-    ~H"""
-    <.restricted id="salary-restricted" roles={["Payroll"]} />
-    """
-  end
-
-  defp marker_with_roles(assigns) do
-    ~H"""
-    <.restricted id="salary-restricted" roles={["Audit", "Payroll"]} />
-    """
-  end
-
   defp marker_with_reason(assigns) do
     ~H"""
     <.restricted id="salary-restricted" reason="Salaries are shown to payroll only." />
@@ -46,16 +34,12 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
   defp field(assigns) do
     ~H"""
     <form id="payee-form">
-      <.restricted_field
-        id="payee-bank-account"
-        label="Bank account"
-        roles={["Payroll"]}
-      />
+      <.restricted_field id="payee-bank-account" label="Bank account" />
     </form>
     """
   end
 
-  test "reads Restricted with a lock and tells the person what to do" do
+  test "reads Restricted with a lock and says plainly that the person has no access" do
     html = render_component(&marker/1, %{})
 
     assert text(html) == "Restricted"
@@ -63,31 +47,17 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     assert html =~ "hero-lock-closed"
     refute html =~ "hero-eye"
 
-    assert html =~ ~s(title="You don&#39;t have access to this. Ask your administrator.")
-
-    assert html =~
-             ~s(aria-description="You don&#39;t have access to this. Ask your administrator.")
-  end
-
-  test "names the role to ask for when the page knows it" do
-    html = render_component(&marker_with_role/1, %{})
-
-    assert html =~
-             ~s(title="You don&#39;t have access to this. Ask your administrator for the Payroll role.")
-  end
-
-  test "names every role when several see the field" do
-    html = render_component(&marker_with_roles/1, %{})
-
-    assert html =~
-             ~s(title="You don&#39;t have access to this. Ask your administrator for one of the roles Audit, Payroll.")
+    # No role is named: the field is restricted for a role the person holds.
+    assert html =~ ~s(title="You don&#39;t have access to this field.")
+    assert html =~ ~s(aria-description="You don&#39;t have access to this field.")
+    refute html =~ "Ask your administrator"
   end
 
   test "a page's own reason replaces the default sentence" do
     html = render_component(&marker_with_reason/1, %{})
 
     assert html =~ ~s(title="Salaries are shown to payroll only.")
-    refute html =~ "Ask your administrator"
+    refute html =~ "You don&#39;t have access"
   end
 
   test "a restricted form row keeps its label, is read-only and submits nothing" do
@@ -97,7 +67,7 @@ defmodule Bilimbi.Base.UI.ComponentsRestrictedTest do
     assert html =~ ~s(data-restricted-field)
     assert html =~ ~s(aria-readonly="true")
     assert html =~ ~s(aria-labelledby="payee-bank-account-label")
-    assert html =~ ~s(for the Payroll role.)
+    assert html =~ ~s(title="You don&#39;t have access to this field.")
     refute html =~ "<input"
     refute html =~ "<select"
     refute html =~ "<textarea"
