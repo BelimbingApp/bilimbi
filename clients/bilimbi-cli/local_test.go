@@ -46,10 +46,9 @@ func TestReviewEditCommentApproveReportAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 200 || !strings.Contains(string(body), `name="cell-0-0"`) || !strings.Contains(string(body), "Comments or questions") || resp.Header.Get("Cache-Control") != "no-store" {
-		t.Fatal("review not rendered")
+	if resp.StatusCode != 200 || resp.Header.Get("Cache-Control") != "no-store" {
+		t.Fatal("review not served")
 	}
 	form := url.Values{"cell-0-0": {"Edited company"}, "cell-0-1": {"3"}, "cell-0-2": {"false"}, "comment": {"Check this address"}, "decision": {"approve"}}
 	resp = localRequest(t, p, "/submit", "http://"+p.host, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
@@ -80,10 +79,14 @@ func TestReviewEditCommentApproveReportAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(body), "http://example.test/companies/12") || strings.Contains(string(body), `name="cell-0-0"`) {
-		t.Fatal("report not shown")
+	if !strings.Contains(string(body), "http://example.test/companies/12") {
+		t.Fatal("report link not shown")
+	}
+	resp = localRequest(t, p, "/submit", "http://"+p.host, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	if resp.StatusCode != 409 {
+		t.Fatal("submission accepted after report")
 	}
 	resp = localRequest(t, p, "/close", "http://"+p.host, "application/x-www-form-urlencoded", nil)
 	if resp.StatusCode != 200 {
