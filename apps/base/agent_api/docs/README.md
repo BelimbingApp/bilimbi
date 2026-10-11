@@ -44,8 +44,9 @@ management).
 ## What is not here yet
 
 Only reads run; every write answers `{:error, :writes_not_enabled}`. There
-is no HTTP surface, connection, token or agent identity on the scope, and
-no audit row per call. ADR 0021 describes how each of those arrives.
+is no HTTP surface, connection, token or agent identity on the scope, no
+API request log, and no preview, plan token or write. ADR 0021 describes
+how each of those arrives.
 
 ## Tests
 
