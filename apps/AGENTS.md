@@ -85,6 +85,8 @@ A query over a tenant-owned table begins with `Tenancy.scope_query/2`; `BilimbiW
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
 
+Use `Bilimbi.Base.Artifacts.put/6` for private uploads and `Bilimbi.Base.Artifacts.PDF` for HTML rendering, signed render URLs, queued PDFs and password protection, rather than module-local storage, browser commands or qpdf invocations. The authorization and private byte lifecycle are owned by `apps/base/artifacts/docs/README.md` and the PDF contract in `apps/base/artifacts/lib/artifacts/pdf.ex`.
+
 ## Composition lock
 
 Use `Bilimbi.CompositionLock.lockfile!/1` from `mix/composition_lock.exs` for every Mix project. A mounted optional repository resolves into the composition overlay; a literal root `mix.lock` path lets `deps.get` or `deps.unlock --unused` rewrite the Platform's tracked lock. The publish and pinned CI sequence is in `docs/architecture/0010_composition-model.md`.

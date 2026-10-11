@@ -12,6 +12,86 @@ defmodule Bilimbi.Base.Artifacts.Contributions do
 
   defp definitions do
     %{
+      "pdf.node_binary" =>
+        setting(
+          :string,
+          "node",
+          "PDF Node.js executable",
+          "Node.js 22 or newer for isolated PDF tool execution."
+        ),
+      "pdf.chromium.binary" =>
+        setting(
+          :string,
+          "chromium",
+          "PDF Chromium executable",
+          "Sandboxed Chromium executable for HTML printing."
+        ),
+      "pdf.qpdf.binary" =>
+        setting(
+          :string,
+          "qpdf",
+          "PDF qpdf executable",
+          "qpdf 10.6 or newer for AES-256 protection."
+        ),
+      "pdf.qpdf.timeout_seconds" =>
+        setting(
+          :integer,
+          60,
+          "PDF encryption timeout (seconds)",
+          "Maximum runtime of one qpdf process.",
+          minimum: 1,
+          maximum: 600
+        ),
+      "pdf.render_timeout_seconds" =>
+        setting(
+          :integer,
+          30,
+          "PDF render timeout (seconds)",
+          "Maximum runtime of one Chromium render.",
+          minimum: 1,
+          maximum: 600
+        ),
+      "pdf.render_origin" =>
+        setting(
+          :string,
+          "",
+          "PDF render origin",
+          "Application origin reachable from Chromium; signed render requests must reach the issuing node.",
+          validator:
+            {Bilimbi.Base.Artifacts.PDF, :valid_origin_setting?,
+             "must be empty or an HTTP(S) origin without a path"}
+        ),
+      "pdf.signed_url_ttl_seconds" =>
+        setting(
+          :integer,
+          60,
+          "PDF render token lifetime (seconds)",
+          "Expiry of single-use signed render URLs.",
+          minimum: 1,
+          maximum: 600
+        ),
+      "pdf.max_render_tokens" =>
+        setting(
+          :integer,
+          100,
+          "Maximum pending PDF render tokens",
+          "Maximum sensitive render requests held in memory on each node.",
+          minimum: 1,
+          maximum: 10_000
+        ),
+      "pdf.paper.format" =>
+        setting(:string, "A4", "PDF paper format", "A4, A3, A5, Letter, Legal or Tabloid.",
+          validator:
+            {Bilimbi.Base.Artifacts.PDF.Engine, :valid_format?,
+             "must be a supported paper format"}
+        ),
+      "pdf.paper.print_background" =>
+        setting(
+          :boolean,
+          true,
+          "Print PDF backgrounds",
+          "Include template background graphics in HTML PDFs."
+        ),
       "artifacts.storage_root" =>
         setting(
           :string,

@@ -56,7 +56,10 @@ defmodule BilimbiWeb.Endpoint do
 
   plug BilimbiWeb.ForwardedFor
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: {__MODULE__, :request_log_level, []}
 
   plug BilimbiWeb.IncomingApi
 
@@ -69,4 +72,15 @@ defmodule BilimbiWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
   plug BilimbiWeb.Router
+
+  # A controller's contributed log: false protects bearer tokens in its path.
+  # Router logging alone starts too late: endpoint telemetry logs the full URL
+  # first. Read Phoenix's compiled route, never a second private-path registry.
+  @doc false
+  def request_log_level(conn) do
+    case Phoenix.Router.route_info(BilimbiWeb.Router, conn.method, conn.path_info, conn.host) do
+      %{log: false} -> false
+      _ -> :info
+    end
+  end
 end

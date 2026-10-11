@@ -15,17 +15,27 @@ defmodule Bilimbi.Base.Artifacts.MixProject do
   end
 
   def application do
-    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__)
+    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__,
+      mod: {Bilimbi.Base.Artifacts.Application, []}
+    )
   end
 
   defp deps do
     [
       {:ecto_sql, "~> 3.14"},
-      {:postgrex, "~> 0.22"}
+      {:postgrex, "~> 0.22"},
+      {:phoenix, "~> 1.8"},
+      {:jason, "~> 1.4"}
     ]
   end
 
   defp aliases do
-    [test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"]]
+    [
+      test: [
+        "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "run --no-start -e Bilimbi.Base.Queue.TestFixtures.ensure_runtime_tables!()",
+        "test"
+      ]
+    ]
   end
 end

@@ -114,6 +114,7 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                   unquote(route.path),
                   unquote(route.controller),
                   unquote(route.action),
+                  log: unquote(Map.get(route, :log, :debug)),
                   metadata: %{bilimbi_route_owner: unquote({route.layer, route.source})}
           end
         end
@@ -133,6 +134,7 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                   unquote(route.path),
                   unquote(route.controller),
                   unquote(route.action),
+                  log: unquote(Map.get(route, :log, :debug)),
                   metadata: %{bilimbi_route_owner: unquote({route.layer, route.source})}
           end
         end
