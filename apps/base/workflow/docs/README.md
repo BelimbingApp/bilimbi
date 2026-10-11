@@ -5,7 +5,8 @@ Workflow owns status configuration and history. Its public facade accepts a
 queries an owner's subject table. The status kernel, durable coordinator and
 human action gate share this boundary. The module-owned reference adapter
 exercises these contracts; it is an integration specimen, not an administration
-UI. External/outbox dispatch remains a later slice.
+UI. Committed transitions reach other modules through the durable transition
+events described below.
 
 An owner declares `base/workflow` and contributes immutable defaults:
 
@@ -34,8 +35,9 @@ subject with `FOR UPDATE` for `:lock`. It returns `Workflow.Subject` containing
 only proven identity, tenant/company, current status and plain owner facts.
 `authorize/3` enforces owner policy for every operation, including null-capability
 edges and adoption. `persist/4` writes the proven status on the shared Repo.
-Guards and actions perform database work within that same transaction; external
-effects need the later durable-dispatch slice.
+Guards and actions perform database work within that same transaction; an
+effect outside the database belongs in a transition listener (see "Transition
+events").
 
 Call `transition(scope, ref, "review", %{comment: "Ready", input: %{}})`.
 Allowed context keys are `:comment`, `:comment_tag`, `:assignees`, `:attachments`,
@@ -65,7 +67,8 @@ Fresh databases use umbrella-root `mix bilimbi.migrate`. Existing databases use
 checks exact types, indexes, constraints, sequence ownership/state and triggers.
 The compatible baseline includes kanban rows even though no UI ships here.
 The coordination baseline also owns the six compatible process/outbox tables;
-source outbox rows are preserved, with dispatch deferred to its delivery slice.
+retained outbox rows are delivered once their subject is adopted (see
+"Transition events").
 
 After migration, an installed owner calls `adopt_subject/2` under its explicit
 adoption policy. This locks/proves the subject and binds existing history without
@@ -291,3 +294,62 @@ re-executed.
 The human request baseline is the third compatible migration. Adoption keeps
 every row, hash, alias, actor type and result JSON; `actor_type` values other
 than `user` are history, not runtime authority.
+
+## Transition events
+
+An owner reacts to a committed transition, its own subject's or another
+module's, by contributing a listener under `workflow.transition_listeners`:
+
+```elixir
+%{key: "owner.notify_reviewer", adapter: Owner.NotifyReviewer,
+  subjects: ["owner.record", "other.record"]}
+```
+
+The adapter implements `Bilimbi.Base.Workflow.TransitionListener`; its
+moduledoc is the event-map and return contract. Keys are unique, every subject
+must be registered, and the adapter must belong to the contributing
+descriptor. A listener never runs inside the transition, so it cannot refuse
+or roll one back.
+
+Every successful `transition/4` writes one row to Belimbing's
+`base_workflow_transition_outbox` in its own transaction, keyed
+`workflow.transition.completed:<history id>`, with Belimbing's payload shape
+(model, transition and history snapshots, actor context and the transition
+payload facts), and enqueues an immediate delivery job in that same
+transaction. A refused or rolled-back transition leaves neither. Delivery
+claims the row under a five-minute lease and calls every listener registered
+for the subject, in key order, under the subject tenant's system scope. When
+all return `:ok` the row is delivered and never delivered again. An error, a
+raise, an exit or any other return defers the whole event with Belimbing's
+backoff (`min(3600, 2^min(10, attempts))` seconds) and keeps the reason in
+`last_error`; the next delivery calls every listener again. Delivery is at
+least once: make the effect idempotent on `event_key` or `history.id`.
+
+The row's own tenant, subject and class claims are never believed. Delivery
+resolves the `(flow, flow_id)` through the proven subject binding, so a
+retained Belimbing row is delivered under the right tenant once
+`adopt_subject/2` has bound its subject, and is deferred as
+`subject_unbound` until then. Retained snapshots are passed to listeners
+unchanged, with their JSON string keys.
+
+## Maintenance
+
+Belimbing's every-minute `blb:workflow:reconcile` is the `base/workflow-maintenance`
+schedule definition this module contributes. Like every contributed
+definition it does nothing until an operator reviews it on the Schedule
+board. Each pass calls `reconcile_running_runs/1`, which settles every
+running tenant-scoped run of every live tenant on its saved graph (expired
+leases, due timers, satisfied dependencies) under that tenant's system scope,
+paging by id until none remain and skipping runs whose definition, subject or
+tenant cannot be proved or whose owner code raises (logged, left unchanged).
+It then calls `deliver_transition_events/1`, which delivers up to 100 due
+outbox rows in id order, even if the sweep itself failed.
+`mix bilimbi.workflow.reconcile [--outbox-limit N]` runs the same pass by
+hand, for a backlog or before the definition is reviewed.
+
+Writes made by maintenance, and by listeners during delivery, are audited.
+Nobody signed in for them and they name no system principal, so their audit
+rows record the guest default, as `apps/base/audit/AGENTS.md` requires.
+
+The delivery and maintenance decisions are recorded in
+[ADR 0022](../../../../docs/architecture/decisions/0022-workflow-transition-event-delivery.md) (Proposed).

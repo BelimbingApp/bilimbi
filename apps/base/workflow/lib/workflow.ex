@@ -19,7 +19,15 @@ defmodule Bilimbi.Base.Workflow do
   and keeps one result per tenant and idempotency key with an intent digest.
   """
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Base.Workflow.{Coordination, Definitions, Engine, HumanActionGate, PendingWork}
+
+  alias Bilimbi.Base.Workflow.{
+    Coordination,
+    Definitions,
+    Engine,
+    HumanActionGate,
+    PendingWork,
+    TransitionOutbox
+  }
 
   @type subject_ref :: %{type: String.t(), id: pos_integer() | String.t()}
   @spec transition(Scope.t(), subject_ref(), String.t(), map()) :: {:ok, map()} | {:error, term()}
@@ -149,6 +157,31 @@ defmodule Bilimbi.Base.Workflow do
   @doc "Bounded due work ordered by item priority descending, availability and ID. Cursor advances over scanned candidates."
   @spec pending_work(Scope.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def pending_work(%Scope{} = scope, opts \\ []), do: PendingWork.list(scope, opts)
+
+  @doc """
+  Delivers due transition events from the durable outbox, at most `:limit`
+  (default 100) rows in id order, and returns `%{delivered, deferred, skipped}`.
+
+  Installation-wide maintenance, not a tenant's read: each event is
+  delivered under its own subject's tenant scope, resolved from the proven
+  subject binding. The maintenance schedule calls this every minute; call it
+  to drain a backlog or when that definition is not yet reviewed.
+  """
+  @spec deliver_transition_events(keyword()) :: {:ok, map()}
+  def deliver_transition_events(opts \\ []), do: TransitionOutbox.deliver_due(opts)
+
+  @doc """
+  Locks and settles every running, tenant-scoped process run of every live
+  tenant, paged by id in batches of `:limit` (default 500), and returns
+  `%{reconciled, skipped}`. Expired leases are repaired and due timers and
+  satisfied dependencies released on the saved graph, as `reconcile_run/2`
+  does for one run. Owner `:reconcile` authority is not asked: this is Base's
+  own lease hygiene under each tenant's system scope, and a run whose
+  definition, subject or tenant cannot be proved, or whose owner code raises,
+  is logged and skipped unchanged.
+  """
+  @spec reconcile_running_runs(keyword()) :: {:ok, map()}
+  def reconcile_running_runs(opts \\ []), do: Coordination.sweep(opts)
 
   @doc "Bounded retained process event facts, ordered by run sequence; :after is the last sequence."
   @spec run_events(Scope.t(), pos_integer(), keyword()) :: {:ok, map()} | {:error, term()}

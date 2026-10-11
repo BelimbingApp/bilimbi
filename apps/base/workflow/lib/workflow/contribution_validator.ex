@@ -15,7 +15,8 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
     JSON,
     ProcessAdapter,
     ProcessDefinition,
-    SubjectAdapter
+    SubjectAdapter,
+    TransitionListener
   }
 
   @impl true
@@ -27,11 +28,20 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
       flows: %{},
       processes: %{},
       human_actions: %{},
+      transition_listeners: %{},
       aliases: %{}
     }
 
     registry = Enum.reduce(entries, registry, &collect!/2)
     Enum.each(registry.flows, fn {_key, flow} -> validate_flow_links!(registry, flow) end)
+
+    # A listener may react to any registered subject, its owner's or another's:
+    # a transition is a published fact. The subject must exist, though.
+    Enum.each(registry.transition_listeners, fn {_key, listener} ->
+      for subject <- listener.subjects,
+          not Map.has_key?(registry.subjects, subject),
+          do: invalid!("listener #{listener.key} names unknown subject #{subject}")
+    end)
 
     Enum.each(registry.processes, fn {_identity, process} ->
       owned!(registry.subjects, process.subject, process.owner)
@@ -48,7 +58,15 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
     unless "base/workflow" in Map.get(descriptor, :dependencies, []),
       do: invalid!("#{descriptor.id} must declare base/workflow")
 
-    keys!(payload, [:subjects, :guards, :actions, :flows, :processes, :human_actions])
+    keys!(payload, [
+      :subjects,
+      :guards,
+      :actions,
+      :flows,
+      :processes,
+      :human_actions,
+      :transition_listeners
+    ])
 
     registry =
       Enum.reduce(
@@ -95,10 +113,26 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
       end)
 
     # A human action key is stable per subject, as Belimbing registered them.
-    Enum.reduce(list!(payload, :human_actions), registry, fn action, acc ->
-      action = human_action!(action, descriptor)
-      unique_put!(acc, :human_actions, {action.subject, action.key}, action)
+    registry =
+      Enum.reduce(list!(payload, :human_actions), registry, fn action, acc ->
+        action = human_action!(action, descriptor)
+        unique_put!(acc, :human_actions, {action.subject, action.key}, action)
+      end)
+
+    Enum.reduce(list!(payload, :transition_listeners), registry, fn listener, acc ->
+      listener = listener!(listener, descriptor)
+      unique_put!(acc, :transition_listeners, listener.key, listener)
     end)
+  end
+
+  defp listener!(listener, descriptor) do
+    keys!(listener, [:key, :adapter, :subjects])
+    adapter!(Map.take(listener, [:key, :adapter]), descriptor, TransitionListener)
+    subjects = list!(listener, :subjects)
+    unless subjects != [], do: invalid!("listener #{listener.key} needs subjects")
+    Enum.each(subjects, &key!/1)
+    distinct!(subjects, & &1)
+    Map.merge(listener, %{subjects: subjects, owner: descriptor.id})
   end
 
   defp human_action!(action, descriptor) do

@@ -12,7 +12,8 @@ defmodule Bilimbi.Base.Workflow.Engine do
     Definitions,
     HistorySchema,
     JSON,
-    Subject
+    Subject,
+    TransitionOutbox
   }
 
   def transition(scope, ref, to, context) do
@@ -23,8 +24,8 @@ defmodule Bilimbi.Base.Workflow.Engine do
       attributed(scope, fn ->
         with :ok <- writer(scope),
              {:ok, subject} <- load(scope, ref, :lock, :transition),
-             {:ok, _flow} <- Definitions.flow(ref, :lock),
-             {:ok, edge} <- edge(ref, subject.status, to),
+             {:ok, flow} <- Definitions.flow(ref, :lock),
+             {:ok, edge, stored} <- edge(ref, subject.status, to),
              :ok <- capability(scope, ref, subject, edge.capability),
              :ok <- hook(:guards, edge.guard, scope, subject, edge, context),
              :ok <- bind(scope, ref),
@@ -33,7 +34,9 @@ defmodule Bilimbi.Base.Workflow.Engine do
              {:ok, persisted} <- load(scope, ref, :read, :transition),
              true <- persisted.status == to,
              {:ok, history} <- append(scope, ref, subject, to, :transition, context),
-             {:ok, _action} <- audit(scope, ref, subject, to, history.id, :transition) do
+             {:ok, _action} <- audit(scope, ref, subject, to, history.id, :transition),
+             {:ok, _event} <-
+               TransitionOutbox.enqueue(scope, ref, flow, subject, stored, history, context) do
           {:ok,
            %{
              subject: %{type: ref.type, id: ref.id},
@@ -180,7 +183,7 @@ defmodule Bilimbi.Base.Workflow.Engine do
          true <-
            Definitions.status?(ref.flow, from, :lock) and Definitions.status?(ref.flow, to, :lock),
          {:ok, edge} <- normalize_edge(ref, stored) do
-      {:ok, edge}
+      {:ok, edge, stored}
     else
       false -> {:error, :invalid_edge}
       {:error, _} = error -> error
@@ -325,13 +328,13 @@ defmodule Bilimbi.Base.Workflow.Engine do
   end
 
   defp audit(scope, ref, subject, to, history_id, kind) do
-    actor = Scope.actor(scope)
+    actor = Attribution.audit_actor(Scope.actor(scope))
 
     Audit.record_action(scope, %{
       event: event(kind),
       occurred_at: now(),
-      actor_type: Atom.to_string(actor.type),
-      actor_id: actor.user_id || 0,
+      actor_type: actor.actor_type,
+      actor_id: actor.actor_id,
       company_id: subject.company_id,
       impersonator_id: actor.impersonator_id,
       system_principal: actor.system_principal,

@@ -121,10 +121,10 @@ defmodule Bilimbi.Base.Workflow.Definitions do
     )
   end
 
-  defp numeric_id(id) when is_integer(id) and id > 0 and id <= 9_223_372_036_854_775_807,
+  def numeric_id(id) when is_integer(id) and id > 0 and id <= 9_223_372_036_854_775_807,
     do: {:ok, id}
 
-  defp numeric_id(id) when is_binary(id) do
+  def numeric_id(id) when is_binary(id) do
     case Integer.parse(id) do
       {number, ""} when number > 0 ->
         if Integer.to_string(number) == id, do: numeric_id(number), else: :error
@@ -134,5 +134,5 @@ defmodule Bilimbi.Base.Workflow.Definitions do
     end
   end
 
-  defp numeric_id(_id), do: :error
+  def numeric_id(_id), do: :error
 end
