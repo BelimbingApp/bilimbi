@@ -71,15 +71,17 @@ verify it runs.
    the server you have. Use the same value in every later shell.
 5. Setup: run `mix setup`. It fetches dependencies, creates the database,
    runs every installed migration, and builds the web assets.
-6. Run: start `mix bilimbi.server` in the background and wait until it logs
-   `Bilimbi is running at <url>` (port 4000, or the next free port when
-   another dev server holds it). On the way up it migrates the
+6. Run: start `mix bilimbi.server` and wait until it reports
+   its local HTTPS address ready (normally `https://bilimbi.localhost`).
+   Other checkouts get their own hostname and a free backend port automatically.
+   Install `caddy`, `mkcert` and
+   `libnss3-tools` and start the shared Caddy service first; see
+   [local HTTPS](docs/development.md#local-https). On the way up it migrates the
    database, seeds system roles, creates the platform tenant/company and
    bootstraps the initial administrator `ai@agent.my` / `bilimbi-dev`; later
    starts leave an existing login and its revoked roles alone.
-7. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
-   (use the URL from step 6 if it differs) must print 200. Then open that URL
-   in a browser, sign in with
+7. Verify the printed HTTPS address, or run `python3 scripts/test-local-https.py`.
+   The smoke check must pass. Then open the printed HTTPS address in a browser, sign in with
    the login from step 6, and confirm the workspace loads. Report the result
    and how to stop the server.
 ```
@@ -115,7 +117,8 @@ For people installing by hand. Requirements are in the next section.
    mix setup
    ```
 
-5. Start the server and open [http://localhost:4000](http://localhost:4000).
+5. Install `caddy`, `mkcert` and `libnss3-tools`, start the shared Caddy service,
+   then start the server and open its printed HTTPS address.
    The first start migrates the database and seeds the development login;
    sign in with `ai@agent.my` and `bilimbi-dev`.
 

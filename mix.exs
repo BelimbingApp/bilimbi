@@ -65,7 +65,11 @@ defmodule Bilimbi.Umbrella.MixProject do
         "cmd --app web mix assets.setup",
         "cmd --app web mix assets.build"
       ],
-      "bilimbi.server": [&prepare_bilimbi_server/1, "bilimbi.server"],
+      "bilimbi.server": [
+        &prepare_bilimbi_server/1,
+        "bilimbi.server",
+        &verify_local_https/1
+      ],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
       precommit: [
@@ -84,6 +88,8 @@ defmodule Bilimbi.Umbrella.MixProject do
   end
 
   defp prepare_bilimbi_server(_args) do
+    local_https("--prepare")
+
     # Resolving a task from a dependency can compile that dependency closure
     # before the task runs. Load recovery from source so its graph preflight
     # also protects the first compile after a pull.
@@ -102,6 +108,73 @@ defmodule Bilimbi.Umbrella.MixProject do
 
     Mix.shell().info("Checking and fetching locked dependencies before starting Bilimbi.")
     Mix.Task.run("deps.get")
+  end
+
+  defp verify_local_https(_args), do: local_https("--verify")
+
+  # Shared ingress is host bootstrap, not ModuleRegistry graph recovery. Keep
+  # it in the umbrella entry point; module tests and production never touch
+  # a developer's Caddy service or trust stores.
+  defp local_https(mode) do
+    if Mix.env() == :dev do
+      endpoint = Application.fetch_env!(:web, BilimbiWeb.Endpoint)
+      host = Keyword.fetch!(Keyword.fetch!(endpoint, :url), :host)
+      port = to_string(Keyword.fetch!(Keyword.fetch!(endpoint, :http), :port))
+
+      {_output, status} =
+        System.cmd("bash", [Path.join(__DIR__, "scripts/local-https.sh"), mode, host, port],
+          cd: __DIR__,
+          env: [
+            {"BILIMBI_ELIXIR", System.find_executable("elixir")},
+            {"BILIMBI_HOST_PINNED", if(System.get_env("BILIMBI_DEV_HOST"), do: "1", else: "0")},
+            {"BILIMBI_PORT_PINNED", if(System.get_env("PORT"), do: "1", else: "0")}
+          ],
+          into: IO.stream(:stdio, :line),
+          stderr_to_stdout: true
+        )
+
+      if status == 10, do: System.halt(0)
+      if status != 0, do: Mix.raise("Local HTTPS #{mode} failed; see the diagnostic above.")
+
+      if mode == "--prepare" do
+        instance = Bilimbi.LocalConfig.load(__DIR__)["https"]
+        System.put_env("BILIMBI_DEV_HOST", instance["host"])
+        System.put_env("PORT", to_string(instance["port"]))
+        lock_local_startup(instance["host"])
+      end
+    end
+  end
+
+  # The Caddy reservation protects different checkouts. Hold a kernel lock
+  # through this CLI's startup as well, so two terminals in the same checkout
+  # cannot race while the first VM is compiling and has no HTTP listener yet.
+  defp lock_local_startup(host) do
+    lock = Path.join(__DIR__, ".local/https/#{host}.startup.lock")
+    flock = System.find_executable("flock") || Mix.raise("flock is required for local startup")
+
+    port =
+      Port.open({:spawn_executable, flock}, [
+        :binary,
+        :exit_status,
+        {:line, 1024},
+        {:args, ["-n", "-E", "10", lock, "bash", "-c", "printf 'locked\\n'; cat >/dev/null"]}
+      ])
+
+    receive do
+      {^port, {:data, {:eol, "locked"}}} ->
+        :ok
+
+      {^port, {:exit_status, 10}} ->
+        Mix.shell().info("This Bilimbi instance is already starting: https://#{host}")
+        System.halt(0)
+
+      {^port, {:exit_status, status}} ->
+        Mix.raise("Could not lock local startup (exit #{status})")
+    after
+      5_000 ->
+        Port.close(port)
+        Mix.raise("Timed out locking local startup")
+    end
   end
 
   defp precommit_test(args) do
