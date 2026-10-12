@@ -39,6 +39,9 @@ end
 config :web, BilimbiWeb.Endpoint, http: [port: http_port]
 
 if config_env() == :dev do
+  # mix bilimbi.server repeats this address once startup output is done.
+  config :bilimbi_base_module_registry, :dev_url, "http://localhost:#{http_port}"
+
   config :web, BilimbiWeb.Endpoint,
     live_reload: [
       web_console_logger: true,

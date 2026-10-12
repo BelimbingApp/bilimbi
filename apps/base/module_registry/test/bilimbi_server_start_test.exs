@@ -87,4 +87,30 @@ defmodule Mix.Tasks.Bilimbi.ServerStartTest do
       refute_received {:seed, _}
     end
   end
+
+  describe "dev URL" do
+    setup do
+      Application.put_env(:bilimbi_base_module_registry, :dev_url, "http://localhost:4001")
+      on_exit(fn -> Application.delete_env(:bilimbi_base_module_registry, :dev_url) end)
+    end
+
+    test "development repeats the address as the last start-up output" do
+      Server.start([], :dev)
+
+      assert_received {:seed, ["--at-startup"]}
+      assert_received {:mix_shell, :info, ["Migrating the development database" <> _]}
+      assert_received {:mix_shell, :info, [line]}
+      assert line =~ "Bilimbi is running at http://localhost:4001"
+      refute_received {:mix_shell, :info, _}
+    end
+
+    test "other environments do not print it" do
+      for env <- [:test, :prod] do
+        reenable_tasks()
+        Server.start([], env)
+
+        refute_received {:mix_shell, :info, _}
+      end
+    end
+  end
 end
