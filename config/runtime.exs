@@ -32,7 +32,7 @@ http_port =
     String.to_integer(env_port || "4000")
   end
 
-if config_env() == :dev and http_port != 4000 do
+if is_nil(env_port) and config_env() == :dev and http_port != 4000 do
   IO.puts("Port 4000 is in use; the dev endpoint is configured for http://127.0.0.1:#{http_port}")
 end
 
