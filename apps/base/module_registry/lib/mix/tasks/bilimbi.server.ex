@@ -17,7 +17,10 @@ defmodule Mix.Tasks.Bilimbi.Server do
   whose identities carry no bootstrap receipt is reported in one line and
   left alone. The seed runs after `phx.server` because that task is what
   starts the application; a seed failure still stops the server with its
-  message. Pass `--no-migrate` to skip both steps, for example to see the
+  message. Last of all, in development, it repeats the address the endpoint
+  was configured for (`:dev_url`, set in `config/runtime.exs`) in one
+  highlighted line, so a fallback port is not lost in the startup output.
+  Pass `--no-migrate` to skip both steps, for example to see the
   pending-migrations page (`BilimbiWeb.CheckPendingMigrations`) on purpose.
   Any other environment never migrates or seeds here: production uses its
   release commands.
@@ -89,6 +92,11 @@ defmodule Mix.Tasks.Bilimbi.Server do
     Mix.Task.run("phx.server", server_args)
 
     if prepare?, do: Mix.Task.run("bilimbi.dev.seed", ["--at-startup"])
+
+    with :dev <- env,
+         url when is_binary(url) <- Application.get_env(:bilimbi_base_module_registry, :dev_url) do
+      Mix.shell().info([:bright, :green, "\nBilimbi is running at #{url}\n", :reset])
+    end
   end
 
   @doc false

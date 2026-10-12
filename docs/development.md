@@ -22,7 +22,11 @@ mix setup
 mix bilimbi.server
 ```
 
-Open [http://localhost:4000](http://localhost:4000).
+Open [http://localhost:4000](http://localhost:4000). If another dev server
+already holds port 4000, `mix bilimbi.server` takes the next free port up to
+4019 and repeats the address it chose as its last output
+(`Bilimbi is running at ...`). Setting `PORT` skips this and uses that port as
+given.
 
 `mix setup` fetches dependencies, creates the database, runs every installed
 migration through `mix bilimbi.migrate`, and builds the web assets.

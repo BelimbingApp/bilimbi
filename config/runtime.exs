@@ -16,9 +16,32 @@ if trusted_proxies = System.get_env("TRUSTED_PROXIES") do
   config :web, :trusted_proxies, BilimbiWeb.ForwardedFor.parse!(trusted_proxies)
 end
 
-config :web, BilimbiWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+env_port = System.get_env("PORT")
+
+http_port =
+  if is_nil(env_port) and config_env() == :dev do
+    # Another dev server may already hold 4000; take the next free port.
+    # reuseaddr matches Bandit's bind, so a port in TIME_WAIT is not reported busy.
+    Enum.find(4000..4019, 4000, fn port ->
+      case :gen_tcp.listen(port, ip: {127, 0, 0, 1}, reuseaddr: true) do
+        {:ok, socket} -> :gen_tcp.close(socket) == :ok
+        {:error, _} -> false
+      end
+    end)
+  else
+    String.to_integer(env_port || "4000")
+  end
+
+if is_nil(env_port) and config_env() == :dev and http_port != 4000 do
+  IO.puts("Port 4000 is in use; the dev endpoint is configured for http://127.0.0.1:#{http_port}")
+end
+
+config :web, BilimbiWeb.Endpoint, http: [port: http_port]
 
 if config_env() == :dev do
+  # mix bilimbi.server repeats this address once startup output is done.
+  config :bilimbi_base_module_registry, :dev_url, "http://localhost:#{http_port}"
+
   config :web, BilimbiWeb.Endpoint,
     live_reload: [
       web_console_logger: true,
