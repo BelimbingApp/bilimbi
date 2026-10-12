@@ -76,8 +76,8 @@ defmodule Bilimbi.Core.Employee.Contributions do
             key: "core.employee",
             title: "People at companies",
             summary:
-              "Record a namecard person as an employee of their own employer, including external companies.",
-            keywords: ["person", "namecard", "contact", "supplier", "customer"],
+              "Record a person as an employee of an existing employer company, including external companies.",
+            keywords: ["person", "employer", "employee"],
             capability: "admin.employee.list",
             body: """
             An employee is a person employed by a company. It is separate from a

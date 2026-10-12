@@ -71,7 +71,7 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
       title: "Create a person at a company",
       summary:
         "Record a person as an employee of their employer, including an external company. Search first.",
-      keywords: ["add", "namecard", "contact", "person", "people"],
+      keywords: ["add", "person", "people", "employer"],
       kind: :write,
       safe_write: true,
       capability: "admin.employee.create",
