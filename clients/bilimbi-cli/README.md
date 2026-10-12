@@ -44,7 +44,8 @@ server deployment is separately deferred by ADR 0021. This client accepts the
 server's HTTP or HTTPS address and uses the OS trust store for HTTPS.
 
 Packaging follows the [official OpenAI plugin documentation](https://developers.openai.com/plugins/build/plugins):
-a portable root manifest, a discoverable skill and a local marketplace. No
+a `.codex-plugin/plugin.json` manifest that declares its skills directory, a
+discoverable skill and a local marketplace. No
 MCP, hooks, app registration or automatic companion-runtime installer is used.
 The repository marketplace can also be registered with
 `codex plugin marketplace add <repository-root>` after building its binary.
