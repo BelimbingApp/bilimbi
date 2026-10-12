@@ -42,8 +42,10 @@ Four facts shaped the decision.
 ## Decision
 
 **Everything happens in the harness; Bilimbi is the API.** A person asks
-their agent for any task, such as entering a namecard or adding people from
-a spreadsheet, and the agent does it through the API.
+their agent for any task, and the agent discovers the available operations,
+schemas and business guides to carry it out through the API. The plugin
+teaches connection, discovery and safe execution; task planning belongs to
+the agent.
 
 - Files stay in the harness, for example photos taken on a phone and handed
   to the agent. Bilimbi never receives files.
@@ -201,7 +203,7 @@ Each job is its own change.
    and the skill.
 4. Safe writes on the API: dry run and plan code, creating a company and a
    person, and their guides.
-5. A namecard, end to end, from a phone photo to records in Bilimbi.
+5. End-to-end verification of discovery, local review, API writes and reports.
 
 ## Consequences
 

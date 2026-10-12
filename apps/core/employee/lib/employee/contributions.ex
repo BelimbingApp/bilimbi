@@ -76,13 +76,15 @@ defmodule Bilimbi.Core.Employee.Contributions do
             key: "core.employee",
             title: "People at companies",
             summary:
-              "Record a namecard person as an employee of their own employer, including external companies.",
-            keywords: ["person", "namecard", "contact", "supplier", "customer"],
+              "Record a person as an employee of an existing employer company, including external companies.",
+            keywords: ["person", "employer", "employee"],
             capability: "admin.employee.list",
             body: """
             An employee is a person employed by a company. It is separate from a
-            login account. A namecard person belongs to their own employer, not to
-            the company where you signed in. Search `core.company.list` first and
+            login account. Confirm that an employee record matches the intended
+            relationship; source contact details alone do not establish employment.
+            A person belongs to their own employer, not to the company where you
+            signed in. Search `core.company.list` first and
             reuse an existing employer. If missing, create the employer through a
             reviewed plan and use its returned id in the person's next plan.
 
