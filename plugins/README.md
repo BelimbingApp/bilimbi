@@ -4,9 +4,7 @@
 the repository's plugin catalog, named `bilimbi-local` and displayed as
 **Bilimbi**. It points to `./plugins/bilimbi`, relative to the repository
 root. That plugin holds `.codex-plugin/plugin.json`, `skills/`, and an ignored
-`bin/` directory for the built native program. Another harness's manifest,
-such as `.claude-plugin/`, could sit beside `.codex-plugin/` and share the
-same skills and program.
+`bin/` directory for the built native program.
 
 ## With a Bilimbi checkout
 
