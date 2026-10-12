@@ -93,7 +93,8 @@ defmodule Mix.Tasks.Bilimbi.Server do
 
     if prepare?, do: Mix.Task.run("bilimbi.dev.seed", ["--at-startup"])
 
-    if url = env == :dev && Application.get_env(:bilimbi_base_module_registry, :dev_url) do
+    with :dev <- env,
+         url when is_binary(url) <- Application.get_env(:bilimbi_base_module_registry, :dev_url) do
       Mix.shell().info([:bright, :green, "\nBilimbi is running at #{url}\n", :reset])
     end
   end
