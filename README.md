@@ -72,12 +72,14 @@ verify it runs.
 5. Setup: run `mix setup`. It fetches dependencies, creates the database,
    runs every installed migration, and builds the web assets.
 6. Run: start `mix bilimbi.server` in the background and wait until it logs
-   that the endpoint is running on port 4000. On the way up it migrates the
+   `Bilimbi is running at <url>` (port 4000, or the next free port when
+   another dev server holds it). On the way up it migrates the
    database, seeds system roles, creates the platform tenant/company and
    bootstraps the initial administrator `ai@agent.my` / `bilimbi-dev`; later
    starts leave an existing login and its revoked roles alone.
 7. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
-   must print 200. Then open http://localhost:4000 in a browser, sign in with
+   (use the URL from step 6 if it differs) must print 200. Then open that URL
+   in a browser, sign in with
    the login from step 6, and confirm the workspace loads. Report the result
    and how to stop the server.
 ```
