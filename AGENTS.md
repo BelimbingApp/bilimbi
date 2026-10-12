@@ -51,7 +51,7 @@ records the baseline and adoption decision.
 Bilimbi is built with:
 
 - Elixir 1.20.3 on Erlang/OTP 28.5, pinned in `.mise.toml`;
-- Phoenix 1.8.10 and Phoenix LiveView 1.2.9;
+- Phoenix 1.8.10 and Phoenix LiveView 1.2.12;
 - Ecto 3.14.1, Ecto SQL 3.14.0, Postgrex 0.22.4, and PostgreSQL 18;
 - HEEx, Phoenix components, Tailwind CSS 4.3.0, and esbuild 0.25.4;
 - ExUnit and `Phoenix.LiveViewTest`;
@@ -465,7 +465,7 @@ Files a library ships, such as `deps/phoenix/usage-rules/*.md` and
 folder guides win where they disagree; do not copy those files into a guide.
 Known disagreements:
 
-- `liveview.md` says a stream prepend uses `at: -1`. LiveView 1.2.9 appends
+- `liveview.md` says a stream prepend uses `at: -1`. LiveView 1.2.12 appends
   at `-1` and prepends at `0` (the `:at` option of `stream/4`). Re-check on
   upgrade; delete this line once Phoenix corrects the file.
 - `ecto.md` generates a migration wherever `mix ecto.gen.migration` runs. A
