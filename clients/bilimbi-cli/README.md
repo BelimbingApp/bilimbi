@@ -48,8 +48,8 @@ a portable root manifest, a discoverable skill and a local marketplace. No
 MCP, hooks, app registration or automatic companion-runtime installer is used.
 The repository marketplace can also be registered with
 `codex plugin marketplace add <repository-root>` after building its binary.
-Release archives relocate the plugin to `plugins/bilimbi` and ship a matching
-marketplace. The repository version lives at `plugins/codex/bilimbi`.
+Release archives ship the plugin at `plugins/bilimbi` with a matching
+marketplace. The repository uses the same layout.
 
 ## Commands
 
@@ -195,7 +195,7 @@ only `commit` writes.
 
 ## Namecard device test
 
-The [Codex skill](../../plugins/codex/bilimbi/skills/bilimbi/SKILL.md#namecards-from-codex-remote)
+The [Codex skill](../../plugins/bilimbi/skills/bilimbi/SKILL.md#namecards-from-codex-remote)
 contains the namecard recipe. Start on the desktop, attach photos in the same
 conversation through Codex Remote on the phone, and return to the desktop
 for the local draft and validated-plan reviews. Photos stay in the harness.
@@ -233,7 +233,7 @@ go run ./pack --root ../.. --binary /tmp/bilimbi --target linux-amd64 --output /
 Build macOS on macOS with cgo enabled so the credential backend is present;
 do not ship a Darwin cgo-disabled binary. Build Windows with
 `CGO_ENABLED=0 GOOS=windows GOARCH=amd64`, and Linux x64 similarly. To develop the
-repository plugin, put the local build in `plugins/codex/bilimbi/bin/` (ignored
+repository plugin, put the local build in `plugins/bilimbi/bin/` (ignored
 by Git). CI tests on Linux, macOS and Windows, builds all four targets, and
 uploads ZIP marketplaces plus SHA-256 files. No binaries are committed.
 

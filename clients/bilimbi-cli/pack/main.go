@@ -51,11 +51,11 @@ func pack(root, binary, target, output string) error {
 	}
 	z := zip.NewWriter(file)
 	sources := map[string]string{
-		"plugins/bilimbi/plugin.json":             filepath.Join(root, "plugins/codex/bilimbi/plugin.json"),
-		"plugins/bilimbi/skills/bilimbi/SKILL.md": filepath.Join(root, "plugins/codex/bilimbi/skills/bilimbi/SKILL.md"),
-		"plugins/bilimbi/bin/" + name:             binary,
-		"INSTALL.md":                              filepath.Join(root, "clients/bilimbi-cli/README.md"),
-		"LICENSE":                                 filepath.Join(root, "LICENSE"),
+		"plugins/bilimbi/.codex-plugin/plugin.json": filepath.Join(root, "plugins/bilimbi/.codex-plugin/plugin.json"),
+		"plugins/bilimbi/skills/bilimbi/SKILL.md":   filepath.Join(root, "plugins/bilimbi/skills/bilimbi/SKILL.md"),
+		"plugins/bilimbi/bin/" + name:               binary,
+		"INSTALL.md":                                filepath.Join(root, "clients/bilimbi-cli/README.md"),
+		"LICENSE":                                   filepath.Join(root, "LICENSE"),
 	}
 	destinations := make([]string, 0, len(sources))
 	for destination := range sources {

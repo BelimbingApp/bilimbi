@@ -1,0 +1,6 @@
+{
+  "name": "bilimbi",
+  "version": "0.1.1",
+  "description": "Read Bilimbi through its API and show local review and results pages.",
+  "skills": "./skills/"
+}

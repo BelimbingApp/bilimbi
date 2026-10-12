@@ -65,7 +65,8 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: ${{ matrix.cgo }}
         run: go build -trimpath -buildvcs=false -o "${RUNNER_TEMP}/${{ matrix.executable }}" .
-      - name: Package local marketplace
+      # The packager includes .codex-plugin/plugin.json and its declared skills.
+      - name: Package Codex local marketplace
         run: >-
           go run ./pack --root ../..
           --binary "${RUNNER_TEMP}/${{ matrix.executable }}"

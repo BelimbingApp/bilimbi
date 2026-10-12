@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 )
@@ -43,7 +44,7 @@ func TestPackExecutableAndMarketplace(t *testing.T) {
 			for _, f := range archive.File {
 				files[f.Name] = f
 			}
-			manifest := files["plugins/bilimbi/plugin.json"]
+			manifest := files["plugins/bilimbi/.codex-plugin/plugin.json"]
 			if manifest == nil {
 				t.Fatal("manifest missing")
 			}
@@ -51,11 +52,19 @@ func TestPackExecutableAndMarketplace(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var plugin struct{ Name string }
+			var plugin struct{ Name, Version, Skills string }
 			err = json.NewDecoder(reader).Decode(&plugin)
 			reader.Close()
-			if err != nil || plugin.Name != "bilimbi" {
+			if err != nil || plugin.Name != "bilimbi" || plugin.Version == "" || plugin.Skills != "./skills/" {
 				t.Fatal("invalid plugin")
+			}
+			// Codex resolves compatibility-manifest paths from the plugin root,
+			// not from .codex-plugin/. Prove that the declared skill ships there.
+			if files[path.Join("plugins/bilimbi", plugin.Skills, "bilimbi/SKILL.md")] == nil {
+				t.Fatal("manifest cannot resolve bundled skill")
+			}
+			if files["plugins/bilimbi/plugin.json"] != nil {
+				t.Fatal("unexpected portable manifest alongside compatibility manifest")
 			}
 			catalog := files[".agents/plugins/marketplace.json"]
 			if catalog == nil {
