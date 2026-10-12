@@ -114,10 +114,11 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   # Shared ingress is host bootstrap, not ModuleRegistry graph recovery. Keep
   # it in the umbrella entry point; module tests and production never touch
-  # a developer's Caddy service or trust stores.
+  # a developer's Caddy service or trust stores. Source-loaded graph workspaces
+  # can run this alias without configuring the Phoenix host.
   defp local_https(mode) do
-    if Mix.env() == :dev do
-      endpoint = Application.fetch_env!(:web, BilimbiWeb.Endpoint)
+    with :dev <- Mix.env(),
+         endpoint when is_list(endpoint) <- Application.get_env(:web, BilimbiWeb.Endpoint) do
       host = Keyword.fetch!(Keyword.fetch!(endpoint, :url), :host)
       port = to_string(Keyword.fetch!(Keyword.fetch!(endpoint, :http), :port))
 
