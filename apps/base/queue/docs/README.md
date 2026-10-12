@@ -1,7 +1,7 @@
 # base/queue
 
 Base Queue owns Bilimbi's durable background-work transport. It uses one named
-Oban 2.23 instance on `Bilimbi.Base.Repo`, but Oban schemas and changesets are
+Oban 2.24 instance on `Bilimbi.Base.Repo`, but Oban schemas and changesets are
 private implementation details.
 
 Capability modules own their worker logic, business idempotency records, and

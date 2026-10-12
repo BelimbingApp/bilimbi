@@ -8,7 +8,7 @@ defmodule BilimbiWeb.ModuleHooks do
   Import extracted hook files directly so duplicate names within a Phoenix
   manifest cannot be silently overwritten before we check them.
 
-  This adapter uses LiveView 1.2.9's ColocatedAssets.Entry metadata contract.
+  This adapter uses LiveView 1.2.12's ColocatedAssets.Entry metadata contract.
   Recheck it and the extraction path when upgrading LiveView. The hook name is
   Phoenix's declaring-module namespace plus the local dot-prefixed name; no
   second naming registry or runtime script installation is involved.

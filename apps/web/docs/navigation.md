@@ -51,7 +51,7 @@ integration tests. `live_redirect/2` proves that a destination can be mounted
 without a fresh HTTP request; tests also cover denied destinations, terminated
 sessions and same-view patches with different capabilities.
 
-The pinned LiveView 1.2.9 test client has a `Diff.drop_cids/2` failure when a
+The pinned LiveView 1.2.12 test client has a `Diff.drop_cids/2` failure when a
 live redirect removes the last stateful component (dashboard to a page without
 one). The navigation regression therefore runs module pages into the dashboard;
 check the reverse direction in a browser as well. Do not change production
