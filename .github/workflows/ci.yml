@@ -141,10 +141,8 @@ jobs:
           BILIMBI_DIALYZER_SCOPE: host
         run: mix dialyzer --format github
 
-      # The first full-package analysis exposes existing warning debt. Keep
-      # every finding visible while the legacy host check remains blocking.
-      - name: Report module-package Dialyzer warnings
-        continue-on-error: true
+      # The package analysis includes source-loaded composition helpers.
+      - name: Check module-package Dialyzer warnings
         env:
           BILIMBI_DIALYZER_SCOPE: packages
         run: mix dialyzer --format github

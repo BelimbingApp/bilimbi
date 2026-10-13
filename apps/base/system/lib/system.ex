@@ -156,7 +156,6 @@ defmodule Bilimbi.Base.System do
   defp hostname do
     case :inet.gethostname() do
       {:ok, name} -> to_string(name)
-      _other -> :unavailable
     end
   end
 

@@ -540,5 +540,4 @@ defmodule Bilimbi.Base.Schedule do
   defp unavailable_code(:unreviewed), do: :schedule_unreviewed
   defp unavailable_code(:changed), do: :schedule_changed
   defp unavailable_code(:not_found), do: :schedule_removed
-  defp unavailable_code(_reason), do: :schedule_unavailable
 end

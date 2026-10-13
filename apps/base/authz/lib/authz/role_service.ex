@@ -104,7 +104,8 @@ defmodule Bilimbi.Base.Authz.RoleService do
   end
 
   @spec create_role(Scope.t(), pos_integer(), map(), map()) ::
-          {:ok, RoleSummary.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+          {:ok, RoleSummary.t()}
+          | {:error, :company_not_found | :company_archived | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes, registry) when is_map(attributes) do
     with :ok <- writable_company(scope, company_id, registry) do
       company_id

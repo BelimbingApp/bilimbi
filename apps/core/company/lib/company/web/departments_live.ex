@@ -139,9 +139,6 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          |> assign(:available_types, available_types)
          |> assign_form(changeset)}
 
-      {:error, :company_archived} ->
-        archived_refused(socket)
-
       {:error, :company_not_found} ->
         {:noreply,
          socket

@@ -200,6 +200,7 @@ mix help bilimbi.platform.provision
 mix help bilimbi.tenant.provision
 mix help bilimbi.server
 mix precommit
+mix dialyzer
 ```
 
 `mix bilimbi.migrate` migrates without starting a server, which setup, tests
@@ -233,6 +234,14 @@ installed module's tests and the Web host's integration tests, and verifies
 module contributions.
 The hook tests need Node.js 22 or
 later, with npm, on the `PATH`; `.mise.toml` does not pin it.
+
+`mix dialyzer` checks the host and every discovered module package. The root
+alias also compiles the source-loaded composition helpers into a separate
+analysis directory, so the Mix tasks' calls to discovery are checked. CI runs
+the host and package checks separately; warnings in either fail the job.
+Known OTP set-opacity false positives have exact file, line, and warning
+exclusions in `.dialyzer_ignore.exs`; no file or warning category is excluded
+wholesale.
 
 `mix precommit.test` runs every discovered module's tests in its own Mix
 project, plus the Web host's integration tests. It reports each package's wall

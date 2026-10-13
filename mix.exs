@@ -86,6 +86,7 @@ defmodule Bilimbi.Umbrella.MixProject do
       "precommit.test.compatibility": &precommit_test_compatibility/1,
       "precommit.test.web": &precommit_test_web/1,
       "precommit.test.packages": &precommit_test_packages/1,
+      dialyzer: [&prepare_dialyzer_helpers/1, "dialyzer"],
       "compile.strict": &compile_strict/1,
       "assets.test": &assets_test/1
     ]
@@ -238,6 +239,32 @@ defmodule Bilimbi.Umbrella.MixProject do
     :ok
   end
 
+  # Mix loads composition helpers from source before dependency resolution,
+  # outside elixirc_paths. Give Dialyzer their actual code as well, so calls
+  # from compiled Mix tasks are checked against the same discovery contract.
+  defp prepare_dialyzer_helpers(_args) do
+    path = Path.join(Mix.Project.build_path(), "dialyzer_helpers")
+    File.mkdir_p!(path)
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+
+    try do
+      Code.put_compiler_option(:ignore_module_conflict, true)
+
+      sources = [
+        "mix/composition_lock.exs",
+        "apps/base/module_registry/mix/module_discovery.exs",
+        "apps/base/module_registry/mix/compile_bilimbi_graph.exs"
+      ]
+
+      for file <- sources,
+          {module, bytecode} <- Code.compile_file(Path.join(__DIR__, file)) do
+        File.write!(Path.join(path, Atom.to_string(module) <> ".beam"), bytecode)
+      end
+    after
+      Code.put_compiler_option(:ignore_module_conflict, previous)
+    end
+  end
+
   defp dialyzer_paths do
     workspace_root = __DIR__
     env = Atom.to_string(Mix.env())
@@ -255,8 +282,12 @@ defmodule Bilimbi.Umbrella.MixProject do
       end)
 
     case System.get_env("BILIMBI_DIALYZER_SCOPE") do
-      "host" -> host_paths
-      _all_applications -> host_paths ++ module_paths
+      "host" ->
+        host_paths
+
+      _all_applications ->
+        host_paths ++
+          module_paths ++ [Path.join([workspace_root, "_build", env, "dialyzer_helpers"])]
     end
   end
 
