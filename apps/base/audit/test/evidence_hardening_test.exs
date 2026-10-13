@@ -60,6 +60,22 @@ defmodule Bilimbi.Base.Audit.EvidenceHardeningTest do
     assert NaiveDateTime.compare(action.recorded_at, after_time) != :gt
   end
 
+  test "database-default event time is the recording time truncated to the second" do
+    assert {:ok, action} = Audit.record_action(:unscoped, %{event: "defaulted"})
+
+    Audit.with_actor("system", fn ->
+      Repo.insert!(%TenancyFixtures.ScopedRecord{label: "single", tenant_id: 41})
+      Repo.insert_all(TenancyFixtures.ScopedRecord, [%{label: "bulk", tenant_id: 41}])
+    end)
+
+    mutations = Repo.all(MutationSchema)
+    assert length(mutations) == 2
+
+    for row <- [Repo.get!(Audit.ActionSchema, action.id) | mutations] do
+      assert row.occurred_at == NaiveDateTime.truncate(row.recorded_at, :second)
+    end
+  end
+
   test "PostgreSQL rejects evidence updates, deletes and truncation" do
     {:ok, _} = Audit.record_action(:unscoped, %{event: "immutable"})
     Repo.insert!(%TenancyFixtures.ScopedRecord{label: "evidence", tenant_id: 41})

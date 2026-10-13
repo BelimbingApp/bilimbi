@@ -66,7 +66,7 @@ defmodule Bilimbi.Base.Audit.Migrations.HardenAuditEvidence do
         NEW.recorded_at := clock_timestamp() AT TIME ZONE 'UTC';
         IF TG_TABLE_NAME != 'base_audit_capture_failures' THEN
           IF NEW.occurred_at IS NULL THEN
-            NEW.occurred_at := NEW.recorded_at;
+            NEW.occurred_at := date_trunc('second', NEW.recorded_at);
           END IF;
         END IF;
         RETURN NEW;
