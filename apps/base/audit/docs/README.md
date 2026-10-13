@@ -117,15 +117,36 @@ sets it from recording time. Automatic capture uses database time only.
 
 Direct `record_action/2` and `record_mutation/2` calls inherit identity from
 Scope when attributes omit it. Explicit identity keys retain their contract.
-Use `Audit.with_scope(scope, fun)` for repo writes outside the web or queue
-edges: it reads the sealed actor, including impersonation, and restores context.
-Missing context is `unknown/0`; an explicitly supplied guest remains a guest.
-Anonymous system scopes need no named principal. Mutation strings are stored
-in full with NUL escaped as `␀`; secrets and protected blobs remain redacted.
+Use `Audit.with_scope(scope, fun)` for repo writes outside the web edge: it
+reads the sealed actor, including impersonation, and restores context. Base
+Queue runs every job under it with the job's resumed scope (the delegated user
+or the named system principal), and ordinary system jobs as actor `queue`. A
+job the Schedule recurrence enqueued runs as actor `scheduler`. Seeds and mix tasks that write run
+under `Audit.with_actor("system", fun)` (`"console"` for operator grants).
+Only a write with no edge at all is `unknown/0`; an explicitly supplied guest
+remains a guest. Mutation strings are stored in full, never truncated, with
+NUL escaped as `␀`.
+
+### Redacted fields
+
+The change to a redacted field is recorded; its value is not, because an audit
+log readable by many operators must not become a second copy of a credential.
+Two sets are replaced with `[redacted]` in `old_values` and `new_values`:
+
+- Globally, by field name on any captured schema: `password`, `password_hash`,
+  `remember_token`, `secret`, `api_key`, `token`, and `payload`. `payload` is
+  the durable session's opaque Laravel blob, which can hold a CSRF token or a
+  password hash that no field name reveals.
+- Per schema, through `__audit_redacted_fields__/0`: Integration exchanges,
+  Agent API plans, and Agent Access devices and tokens declare their hashes.
+
+A schema whose field is named `secret`, `token`, or `payload` but holds
+non-sensitive data must use another field name; widening the audit record means
+changing the list in `MutationCapture`, not working around it at a call site.
 
 Capture failures create append-only `base_audit_capture_failures` diagnostics
-under a savepoint, in the caller's transaction, and emit `capture_failure` and
-`capture_alert` telemetry with a `durable` flag. Messages and row values are
+under a savepoint, in the caller's transaction, and emit `capture_failure`
+telemetry with a `durable` flag. Messages and row values are
 never logged or stored in diagnostics. A rolled-back business transaction
 also rolls back diagnostics. If the diagnostics store itself is unavailable,
 telemetry reports `durable: false`; the default business write still succeeds.

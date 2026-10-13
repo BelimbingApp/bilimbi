@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.ScheduleTest do
   import Ecto.Query
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.ContributionValidator
@@ -754,6 +755,23 @@ defmodule Bilimbi.Base.ScheduleTest do
              )
 
     assert DateTime.compare(intended, ~U[2026-11-01 06:30:00Z]) == :eq
+  end
+
+  test "a scheduled run's writes are attributed to the scheduler, a manual run's to the queue", %{
+    definition: definition
+  } do
+    Application.put_env(:bilimbi_base_schedule, :test_recipient, self())
+    assert :ok = Schedule.review_definition(definition.key, true)
+
+    assert :ok = Scheduler.poll(~U[2026-11-01 07:00:00Z])
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert_received {:schedule_audit_context, %AuditContext{actor_type: "scheduler", actor_id: 0}}
+
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert_received {:schedule_audit_context, %AuditContext{actor_type: "queue", actor_id: 0}}
+
+    assert AuditContext.get() == %AuditContext{}
   end
 
   test "run-now fails closed when the contribution snapshot is unavailable" do

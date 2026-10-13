@@ -126,14 +126,31 @@ defmodule Bilimbi.Base.Audit.EvidenceHardeningTest do
     assert Enum.all?(rows, & &1.recorded_at)
   end
 
-  test "failure is durable and alerted while the business write survives" do
+  test "a named system actor attributes struct and bulk writes and is restored" do
+    Audit.with_actor("system", fn ->
+      Repo.insert!(%TenancyFixtures.ScopedRecord{label: "seed", tenant_id: 41})
+      Repo.insert_all(TenancyFixtures.ScopedRecord, [%{label: "bulk", tenant_id: 41}])
+    end)
+
+    assert [_, _] = rows = Repo.all(MutationSchema)
+    assert Enum.all?(rows, &match?(%{actor_type: "system", actor_id: 0}, &1))
+    assert Context.get() == %Context{}
+
+    assert_raise RuntimeError, "boom", fn ->
+      Audit.with_actor("console", fn -> raise "boom" end)
+    end
+
+    assert Context.get() == %Context{}
+  end
+
+  test "failure is durable and reported while the business write survives" do
     # A real database constraint refuses capture while its business write survives.
     handler = {__MODULE__, make_ref()}
     parent = self()
 
     :telemetry.attach(
       handler,
-      [:bilimbi, :base, :audit, :capture_alert],
+      [:bilimbi, :base, :audit, :capture_failure],
       fn _, _, metadata, _ -> send(parent, {:alert, metadata}) end,
       nil
     )

@@ -167,7 +167,7 @@ and with a silent-falsehood failure mode.
   schema lifecycle tasks run under it.
 - **Capture is best effort by default.** A raise is reported to the adapter's
   optional durable failure callback, logged by exception type without values,
-  and emits `capture_failure` plus `capture_alert` telemetry. The `durable`
+  and emits `capture_failure` telemetry. The `durable`
   flag says whether diagnostics were stored. `with_strict_capture/1` raises
   after reporting; callers needing rollback wrap their work in a transaction.
 - **Transactionality**: capture runs synchronously in the caller's process,

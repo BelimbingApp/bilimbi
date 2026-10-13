@@ -12,6 +12,7 @@ defmodule Mix.Tasks.Bilimbi.Tenant.Provision do
 
   use Mix.Task
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Core.Company
 
   @switches [tenant_name: :string, company_name: :string, company_code: :string]
@@ -30,10 +31,15 @@ defmodule Mix.Tasks.Bilimbi.Tenant.Provision do
 
     Mix.Task.run("app.start")
 
-    case Company.provision_tenant(
-           %{name: tenant_name},
-           %{name: company_name, code: company_code}
-         ) do
+    provisioned =
+      Audit.with_actor("system", fn ->
+        Company.provision_tenant(
+          %{name: tenant_name},
+          %{name: company_name, code: company_code}
+        )
+      end)
+
+    case provisioned do
       {:ok, result} ->
         Mix.shell().info(
           "Tenant ready: tenant #{result.tenant.id}, primary company #{result.company.id}."

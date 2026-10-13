@@ -157,16 +157,7 @@ defmodule Mix.Tasks.Bilimbi.Authz.SystemPrincipal do
   end
 
   # The captured grant-row write names the console too, not the guest default.
-  defp as_console(fun) do
-    previous = AuditContext.get()
-    AuditContext.put(%AuditContext{actor_type: "console", actor_id: 0})
-
-    try do
-      fun.()
-    after
-      AuditContext.put(previous)
-    end
-  end
+  defp as_console(fun), do: AuditContext.with_actor("console", fun)
 
   defp registry, do: ContributionRegistry.consumer!(:authz)
 end

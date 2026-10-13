@@ -26,10 +26,12 @@ defmodule Mix.Tasks.Bilimbi.Media.Attachments.Cleanup do
 
     with {:ok, scope} <- Bilimbi.Base.Tenancy.scope(tenant),
          {:ok, count} <-
-           Bilimbi.Base.Media.cleanup_drafts_before(
-             scope,
-             NaiveDateTime.add(NaiveDateTime.utc_now(), -hours * 3600, :second)
-           ) do
+           Bilimbi.Base.Audit.with_actor("system", fn ->
+             Bilimbi.Base.Media.cleanup_drafts_before(
+               scope,
+               NaiveDateTime.add(NaiveDateTime.utc_now(), -hours * 3600, :second)
+             )
+           end) do
       Mix.shell().info("Removed #{count} abandoned attachment draft(s).")
     else
       {:error, reason} -> Mix.raise("Attachment cleanup failed: #{inspect(reason)}")

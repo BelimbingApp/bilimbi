@@ -78,6 +78,26 @@ defmodule Bilimbi.Base.Audit.Context do
     }
   end
 
+  @system_actor_types ~w(console queue scheduler system)
+
+  @doc """
+  Runs work attributed to a named non-user actor — `"system"` for seeds and
+  tasks, `"scheduler"`, `"queue"`, or `"console"` — restoring prior context
+  even on failure.
+  """
+  @spec with_actor(String.t(), (-> result)) :: result when result: var
+  def with_actor(actor_type, fun)
+      when actor_type in @system_actor_types and is_function(fun, 0) do
+    previous = Process.get(@key)
+    put(%{get() | actor_type: actor_type, actor_id: 0})
+
+    try do
+      fun.()
+    after
+      put(previous)
+    end
+  end
+
   @doc "Runs work attributed to the scope, restoring prior context even on failure."
   def with_scope(scope, fun) when is_function(fun, 0) do
     context = from_scope(scope)

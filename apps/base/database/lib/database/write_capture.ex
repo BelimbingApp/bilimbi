@@ -181,7 +181,6 @@ defmodule Bilimbi.Base.Database.WriteCapture do
     durable = record_failure(capture, action, schema, error.__struct__)
     metadata = %{action: action, schema: schema, error_type: error.__struct__, durable: durable}
     :telemetry.execute([:bilimbi, :base, :audit, :capture_failure], %{count: 1}, metadata)
-    :telemetry.execute([:bilimbi, :base, :audit, :capture_alert], %{count: 1}, metadata)
 
     # Error messages/stacktraces can contain row values. Emit type and identity only.
     Logger.error(
