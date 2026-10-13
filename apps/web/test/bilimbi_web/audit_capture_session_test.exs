@@ -286,6 +286,25 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
       refute Enum.any?(rows, &(inspect({&1.old_values, &1.new_values}) =~ "csrf-secret"))
     end
 
+    test "an anonymous request is an explicit guest while a process with no edge stays unknown" do
+      conn = Phoenix.ConnTest.build_conn()
+      BilimbiWeb.RequestContext.apply(nil, conn)
+
+      assert %Audit.Context{actor_type: "guest", actor_id: 0, ip_address: "127.0.0.1"} =
+               Audit.Context.get()
+
+      {:ok, _entry} =
+        Session.put_session("anonymous-session", "payload", %{
+          user_id: nil,
+          last_activity: System.system_time(:second)
+        })
+
+      assert [%{actor_type: "guest", actor_id: 0}] = listener_rows("Bilimbi.Base.Session.Schema")
+
+      Audit.Context.put(nil)
+      assert %Audit.Context{actor_type: "unknown", actor_id: 0} = Audit.Context.get()
+    end
+
     test "provisioning the platform operator records absent attribution explicitly" do
       Audit.without_auditing(fn ->
         Repo.update_all(Bilimbi.Base.Tenancy.Tenant, set: [is_platform_operator: false])

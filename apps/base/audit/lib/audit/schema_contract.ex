@@ -46,11 +46,18 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
       ).rows == [[true]]
 
     if hardened? do
+      present =
+        sql.query!(
+          repo,
+          "SELECT table_name FROM information_schema.tables WHERE table_schema = $1",
+          [prefix]
+        ).rows
+        |> List.flatten()
+
       errors =
-        case Bilimbi.Base.Database.SchemaVerifier.verify(repo, evidence_tables(), opts) do
-          :ok -> []
-          {:error, errors} -> errors
-        end
+        for %{name: name} <- evidence_tables(),
+            name not in present,
+            do: "missing table #{prefix}.#{name}"
 
       recording_errors =
         case sql.query!(
