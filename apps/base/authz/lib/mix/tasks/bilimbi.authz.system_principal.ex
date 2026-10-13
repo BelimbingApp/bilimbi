@@ -156,7 +156,7 @@ defmodule Mix.Tasks.Bilimbi.Authz.SystemPrincipal do
     end
   end
 
-  # The captured grant-row write names the console too, not the guest default.
+  # The captured grant-row write names the console too, not `unknown`.
   defp as_console(fun), do: AuditContext.with_actor("console", fun)
 
   defp registry, do: ContributionRegistry.consumer!(:authz)
