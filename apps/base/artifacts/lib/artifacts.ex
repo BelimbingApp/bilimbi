@@ -148,17 +148,17 @@ defmodule Bilimbi.Base.Artifacts do
     outside_transaction!()
 
     with {:ok, reason} <- retention_reason(opts),
-         {:ok, _request} <- retention_request(retain_until: retain_until) do
+         {:ok, %{retain_until: until}} <- retention_request(retain_until: retain_until) do
       transaction(fn ->
         row = fetch_retainable!(scope, company, owner, id)
 
-        if row.retain_until && DateTime.compare(retain_until, row.retain_until) != :gt,
+        if row.retain_until && DateTime.compare(until, row.retain_until) != :gt,
           do: Repo.rollback(:retention_not_extended)
 
         event = if row.retain_until, do: "retention_extended", else: "retained"
 
         row
-        |> Ecto.Changeset.change(retain_until: retain_until, expires_at: nil)
+        |> Ecto.Changeset.change(retain_until: until, expires_at: nil)
         |> Repo.update!()
         |> record_retention!(scope, event, reason)
         |> metadata()
@@ -597,7 +597,10 @@ defmodule Bilimbi.Base.Artifacts do
         {nil, false} ->
           {:ok, nil}
 
-        {%DateTime{} = until, hold} when is_boolean(hold) ->
+        {%DateTime{time_zone: "Etc/UTC", microsecond: {micro, _}} = until, hold}
+        when is_boolean(hold) ->
+          until = %{until | microsecond: {micro, 6}}
+
           if DateTime.after?(until, DateTime.utc_now()),
             do: {:ok, %{retain_until: until, legal_hold: hold, reason: reason}},
             else: {:error, :invalid_retention}

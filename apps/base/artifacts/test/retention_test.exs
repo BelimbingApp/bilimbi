@@ -224,6 +224,40 @@ defmodule Bilimbi.Base.Artifacts.RetentionTest do
     assert Repo.aggregate(RetentionEvent, :count) == 0
   end
 
+  test "a second-precision retain-until is stored and a non-UTC one is refused whole", c do
+    whole_second = ~U[2033-10-13 23:59:59Z]
+    stored = ~U[2033-10-13 23:59:59.000000Z]
+
+    assert {:ok, doc} =
+             Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain",
+               retain_until: whole_second
+             )
+
+    assert doc.retain_until == stored
+    assert Repo.get!(Schema, doc.id).retain_until == stored
+
+    later = ~U[2034-10-13 23:59:59Z]
+    assert {:ok, extended} = Artifacts.retain(c.scope, 51, TestOwner, doc.id, later)
+    assert extended.retain_until == ~U[2034-10-13 23:59:59.000000Z]
+
+    shifted = %{@seven_years | time_zone: "Asia/Kuala_Lumpur", utc_offset: 28_800, zone_abbr: "+08"}
+
+    assert {:error, :invalid_retention} =
+             Artifacts.put(c.scope, 51, TestOwner, c.ref, "other", "text/plain",
+               retain_until: shifted
+             )
+
+    assert Repo.aggregate(Schema, :count) == 1
+    assert File.ls!(c.root) == [doc.id]
+
+    {:ok, plain} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "plain", "text/plain")
+
+    assert {:error, :invalid_retention} =
+             Artifacts.retain(c.scope, 51, TestOwner, plain.id, shifted)
+
+    assert Repo.get!(Schema, plain.id).retain_until == nil
+  end
+
   test "a document retained later loses its expiry and can only be extended", c do
     {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain")
     later = DateTime.add(@seven_years, 1, :day)
