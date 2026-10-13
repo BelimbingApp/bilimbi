@@ -397,6 +397,52 @@ jobs:
       - name: Verify the test suite made no changes
         run: git diff --exit-code
 
+  # Branch protection requires the check named `Elixir tests`. The test jobs
+  # above report under their own names, so this aggregate keeps that check.
+  # `always()` stops a skipped dependency from skipping this job, which would
+  # read as a green required check. A skip counts only when the path gate ran
+  # and said `run=false`; a failed or cancelled job always fails the gate.
+  tests:
+    name: Elixir tests
+    if: ${{ always() }}
+    needs: [compatibility_paths, compatibility, web_tests, package_tests]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Require each test job to pass or be skipped by its path gate
+        env:
+          GATE_RESULT: ${{ needs.compatibility_paths.result }}
+          GATE_RUN: ${{ needs.compatibility_paths.outputs.run }}
+          COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
+          WEB_TESTS_RESULT: ${{ needs.web_tests.result }}
+          PACKAGE_TESTS_RESULT: ${{ needs.package_tests.result }}
+        run: |
+          failed=0
+
+          case "$COMPATIBILITY_RESULT" in
+            success) ;;
+            skipped)
+              if [ "$GATE_RESULT" != success ] || [ "$GATE_RUN" != false ]; then
+                echo "::error::compatibility was skipped, but its path gate did not clear it"
+                failed=1
+              fi
+              ;;
+            *)
+              echo "::error::compatibility finished with result: $COMPATIBILITY_RESULT"
+              failed=1
+              ;;
+          esac
+
+          for entry in "web_tests=$WEB_TESTS_RESULT" "package_tests=$PACKAGE_TESTS_RESULT"; do
+            if [ "${entry#*=}" != success ]; then
+              echo "::error::${entry%%=*} finished with result: ${entry#*=}"
+              failed=1
+            fi
+          done
+
+          exit "$failed"
+
   first_build:
     name: Elixir first-build routes
     runs-on: ubuntu-26.04
