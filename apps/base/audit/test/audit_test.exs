@@ -237,7 +237,7 @@ defmodule Bilimbi.Base.AuditTest do
                Audit.record_action(:unscoped, action_attrs(%{actor_type: "system", actor_id: 0}))
     end
 
-    test "a principal names only a system actor, and a system actor needs one" do
+    test "a principal names only a system actor, and an anonymous system actor carries no user ID" do
       assert {:error, changeset} =
                Audit.record_action(
                  :unscoped,
@@ -249,7 +249,7 @@ defmodule Bilimbi.Base.AuditTest do
       assert {:error, changeset} =
                Audit.record_mutation(:unscoped, mutation_attrs(%{actor_type: "system"}))
 
-      assert %{system_principal: ["is required for a system actor"]} = errors_on(changeset)
+      assert %{actor_id: ["must be 0 for a system actor"]} = errors_on(changeset)
     end
   end
 
@@ -321,12 +321,9 @@ defmodule Bilimbi.Base.AuditTest do
     assert {:error, missing} = Audit.record_mutation(:unscoped, %{})
 
     assert %{
-             actor_type: ["can't be blank"],
-             actor_id: ["can't be blank"],
              auditable_type: ["can't be blank"],
              auditable_id: ["can't be blank"],
-             event: ["can't be blank"],
-             occurred_at: ["can't be blank"]
+             event: ["can't be blank"]
            } = errors_on(missing)
 
     assert {:error, nil_source} =

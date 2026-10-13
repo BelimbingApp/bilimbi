@@ -349,7 +349,7 @@ hand, for a backlog or before the definition is reviewed.
 
 Writes made by maintenance, and by listeners during delivery, are audited.
 Nobody signed in for them and they name no system principal, so their audit
-rows record the guest default, as `apps/base/audit/AGENTS.md` requires.
+rows record the anonymous `system` actor, never an invented guest.
 
 The delivery and maintenance decisions are recorded in
 [ADR 0022](../../../../docs/architecture/decisions/0022-workflow-transition-event-delivery.md) (Proposed).

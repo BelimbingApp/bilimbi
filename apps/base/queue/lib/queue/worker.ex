@@ -203,32 +203,11 @@ defmodule Bilimbi.Base.Queue.Worker do
     end
   end
 
-  # Writes a system principal's job makes are captured as that principal
-  # (ADR 0013, ADR 0017), not as the guest default.
-  defp with_audit_context(%Scope{} = scope, fun) do
-    case Scope.actor(scope) do
-      %Actor{type: :system, system_principal: name, company_id: company_id}
-      when is_binary(name) ->
-        AuditContext.put(%AuditContext{
-          actor_type: "system",
-          actor_id: 0,
-          system_principal: name,
-          company_id: company_id,
-          tenant_id: Scope.tenant_id(scope)
-        })
-
-        try do
-          fun.()
-        after
-          AuditContext.put(nil)
-        end
-
-      %Actor{} ->
-        fun.()
-    end
-  end
-
-  defp with_audit_context(nil, fun), do: fun.()
+  # A job's writes are captured as the actor it runs as (ADR 0013, ADR 0017):
+  # the delegated user, the named system principal, or the queue itself for
+  # ordinary system work, never the unknown default.
+  defp with_audit_context(%Scope{} = scope, fun), do: AuditContext.with_scope(scope, fun)
+  defp with_audit_context(nil, fun), do: AuditContext.with_actor("queue", fun)
 
   defp run(worker, job, execution) do
     case worker.validate_args(job.args) do

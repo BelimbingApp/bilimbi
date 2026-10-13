@@ -530,7 +530,7 @@ defmodule Bilimbi.Base.Artifacts.RetentionTest do
 
   test "an unavailable action audit prevents a retention change", c do
     {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain")
-    Ecto.Adapters.SQL.query!(Repo, "DROP TABLE base_audit_actions", [])
+    Bilimbi.Base.Audit.TestFixtures.make_actions_unavailable!()
 
     assert {:error, :audit_unavailable} =
              Artifacts.retain(c.scope, 51, TestOwner, doc.id, @seven_years)

@@ -106,6 +106,7 @@ defmodule Bilimbi.Base.Queue.TestWorkers.ActingFor do
   @impl true
   def handle_job(_args, execution) do
     send(self(), {:performed, execution})
+    send(self(), {:audit_context, Bilimbi.Base.Audit.Context.get()})
     :ok
   end
 end

@@ -336,7 +336,7 @@ defmodule Bilimbi.Base.ArtifactsTest do
 
   test "an unavailable action audit prevents bytes and deletion from being released", c do
     {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain")
-    Ecto.Adapters.SQL.query!(Repo, "DROP TABLE base_audit_actions", [])
+    Bilimbi.Base.Audit.TestFixtures.make_actions_unavailable!()
     assert {:error, :audit_unavailable} = Artifacts.read(c.scope, 51, TestOwner, doc.id)
     assert {:error, :audit_unavailable} = Artifacts.delete(c.scope, 51, TestOwner, doc.id)
     assert File.exists?(Path.join(c.root, doc.id))

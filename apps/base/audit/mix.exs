@@ -25,7 +25,8 @@ defmodule Bilimbi.Base.Audit.MixProject do
       {:jason, "~> 1.4"},
       {:lazy_html, "~> 0.1", only: :test},
       {:phoenix_live_view, "~> 1.2.0"},
-      {:postgrex, "~> 0.22"}
+      {:postgrex, "~> 0.22"},
+      {:telemetry, "~> 1.4"}
     ]
   end
 

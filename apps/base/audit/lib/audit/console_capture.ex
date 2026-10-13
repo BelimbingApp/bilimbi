@@ -16,8 +16,8 @@ defmodule Bilimbi.Base.Audit.ConsoleCapture do
     * the actor pair, role, company, tenant, `impersonator_id`, `system_principal`,
       `ip_address`, `url`, `user_agent`, and `trace_id` come from the
       per-process `Bilimbi.Base.Audit.Context`, which the web edge fills
-      per request and per LiveView mount. Absent context records the
-      guest default, never nothing;
+      per request and per LiveView mount. Absent context records
+      `unknown`, never nothing;
     * the event names the outcome: `database_query.executed` for a command
       that ran, `database_query.refused` for one a guard stopped,
       `database_query.failed` for one the database rejected;

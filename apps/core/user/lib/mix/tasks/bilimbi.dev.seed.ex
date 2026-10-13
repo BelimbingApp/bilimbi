@@ -35,6 +35,7 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
 
   use Mix.Task
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Tenancy
@@ -110,7 +111,9 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
   """
   @spec seed() ::
           {:ok, report()} | {:refused, %{reason: atom(), seeds: [map()]}} | {:error, String.t()}
-  def seed do
+  def seed, do: Audit.with_actor("system", &seed_as_system/0)
+
+  defp seed_as_system do
     with {:ok, seeds} <- production_seeds(),
          {:ok, status} <- bootstrap(seeds),
          {:ok, company} <- Company.platform_operator_company(),

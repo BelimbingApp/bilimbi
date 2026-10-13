@@ -81,8 +81,8 @@ defmodule Bilimbi.Base.Workflow.MaintenanceTest do
              )
            )
 
-    # Nobody signed in and no principal was named: the guest default records it.
-    assert [["guest", 0, 1]] =
+    # Nobody signed in and no principal was named: the anonymous system actor.
+    assert [["system", 0, 1]] =
              Ecto.Adapters.SQL.query!(
                Repo,
                "SELECT actor_type, actor_id, tenant_id FROM base_audit_actions WHERE event = 'workflow.work.lease_expired_requeued'",

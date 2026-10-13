@@ -675,13 +675,12 @@ defmodule Bilimbi.Base.Artifacts do
   end
 
   defp audit!(scope, row, event, details \\ %{}) do
-    attrs =
-      Map.merge(actor_attribution(scope), %{
-        company_id: row.company_id,
-        event: event,
-        payload: Map.merge(details, %{artifact_id: row.id, owner_id: row.owner_id}),
-        occurred_at: NaiveDateTime.utc_now()
-      })
+    attrs = %{
+      company_id: row.company_id,
+      event: event,
+      payload: Map.merge(details, %{artifact_id: row.id, owner_id: row.owner_id}),
+      occurred_at: NaiveDateTime.utc_now()
+    }
 
     case Audit.record_action(scope, attrs) do
       {:ok, _} -> :ok
@@ -694,17 +693,10 @@ defmodule Bilimbi.Base.Artifacts do
   # Who the scope says performed the operation, in the shape the audit action
   # and the retention event both record.
   defp actor_attribution(scope) do
-    actor = Scope.actor(scope)
-
-    attrs = %{
-      actor_type: if(actor.type == :user, do: "user", else: "guest"),
-      actor_id: actor.user_id || 0,
-      impersonator_id: actor.impersonator_id
-    }
-
-    if actor.system_principal,
-      do: Map.merge(attrs, %{actor_type: "system", system_principal: actor.system_principal}),
-      else: attrs
+    scope
+    |> Bilimbi.Base.Audit.Context.from_scope()
+    |> Map.from_struct()
+    |> Map.take([:actor_type, :actor_id, :impersonator_id, :system_principal])
   end
 
   defp metadata(row),

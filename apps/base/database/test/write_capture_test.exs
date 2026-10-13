@@ -63,6 +63,16 @@ defmodule Bilimbi.Base.Database.WriteCaptureTest do
     def capture_schema?(_schema), do: true
   end
 
+  defmodule FunctionClauseCapture do
+    @behaviour Bilimbi.Base.Database.WriteCapture
+    @impl true
+    def after_write(:update, _source, _result), do: :ok
+    @impl true
+    def after_bulk_write(_schema, _changes), do: :ok
+    @impl true
+    def capture_schema?(_schema), do: true
+  end
+
   setup do
     SQL.query!(
       Repo,
@@ -161,6 +171,29 @@ defmodule Bilimbi.Base.Database.WriteCaptureTest do
     assert log =~ "audit write capture failed"
     assert_receive {:capture_failure, %{count: 1}, %{action: :insert, schema: Row}}
     assert Repo.get_by(Row, name: "kept")
+  end
+
+  test "strict capture exceptions and stacktraces cannot expose failed row values" do
+    Application.put_env(:bilimbi_base_database, :write_capture, FunctionClauseCapture)
+    secret = "strict-row-secret"
+
+    ExUnit.CaptureLog.capture_log(fn ->
+      formatted =
+        try do
+          Repo.transact(fn ->
+            WriteCapture.with_strict_capture(fn ->
+              {:ok, Repo.insert!(Row.changeset(%Row{}, %{name: secret}))}
+            end)
+          end)
+        rescue
+          error in Bilimbi.Base.Database.CaptureError ->
+            assert error.error_type == FunctionClauseError
+            Exception.format(:error, error, __STACKTRACE__)
+        end
+
+      refute formatted =~ secret
+      refute Repo.get_by(Row, name: secret)
+    end)
   end
 
   test "dispatch itself runs with capture disabled, so a capture's own writes cannot recurse" do
@@ -280,7 +313,7 @@ defmodule Bilimbi.Base.Database.WriteCaptureTest do
                    )
         end)
 
-      assert log =~ "cannot be told from an insert"
+      assert log =~ "audit write capture failed"
       assert_receive {:capture_failure, %{count: 1}, %{action: :insert, schema: Row}}
       refute_receive {:captured_bulk, _schema, _changes}
       assert Repo.get_by(Row, name: "fragmented")

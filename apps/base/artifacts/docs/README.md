@@ -329,8 +329,8 @@ triggers are installed and enabled.
 Every change writes one row to `base_artifact_retention_events`: the event
 (`retained`, `retention_extended`, `hold_placed`, `hold_released`), the
 retain-until and hold state after it, the optional reason (at most 255
-characters; never document content), the scope actor (user, guest or system
-principal, with any impersonator) and `recorded_at`, which PostgreSQL stamps
+characters; never document content), the scope actor (user, or system with any
+principal, plus any impersonator) and `recorded_at`, which PostgreSQL stamps
 in the append-only trigger; the application cannot supply it, and updates,
 deletes and truncates of that table are refused. The same change also records
 an `artifacts.<event>` audit action, like every other artifact operation, and

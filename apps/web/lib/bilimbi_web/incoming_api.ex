@@ -19,7 +19,14 @@ defmodule BilimbiWeb.IncomingApi do
 
       started = System.monotonic_time(:millisecond)
       path = "/" <> Enum.join(path_info, "/")
-      Bilimbi.Base.Audit.Context.put(nil)
+
+      Bilimbi.Base.Audit.Context.put(%Bilimbi.Base.Audit.Context{
+        actor_type: "guest",
+        actor_id: 0,
+        trace_id: trace_id,
+        url: path,
+        ip_address: conn.remote_ip |> :inet.ntoa() |> to_string()
+      })
 
       register_before_send(conn, fn conn ->
         attrs = %{

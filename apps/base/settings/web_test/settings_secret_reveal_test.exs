@@ -132,11 +132,7 @@ defmodule BilimbiWeb.SettingsSecretRevealTest do
     {:ok, view, _html} = open(conn)
     view |> element("#input-tests-operator_api_key-show-stored") |> render_click()
 
-    # Remove only this sandbox connection's temporary fixture, and search only
-    # the temporary schema so the insert cannot fall through to a persistent
-    # `public.base_audit_actions`. Both are rolled back with the sandbox.
-    Ecto.Adapters.SQL.query!(Bilimbi.Base.Repo, "SET LOCAL search_path TO pg_temp", [])
-    Ecto.Adapters.SQL.query!(Bilimbi.Base.Repo, "DROP TABLE pg_temp.base_audit_actions", [])
+    Bilimbi.Base.Audit.TestFixtures.make_actions_unavailable!()
 
     view |> form("#secret-reveal-form", reveal: %{password: "password"}) |> render_submit()
 

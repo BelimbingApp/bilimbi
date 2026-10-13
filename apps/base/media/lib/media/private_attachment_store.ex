@@ -9,7 +9,6 @@ defmodule Bilimbi.Base.Media.PrivateAttachmentStore do
     AssetStore,
     AttachmentSchema,
     AttachmentSubjectAuthorizerRegistry,
-    Attribution,
     ULID,
     Upload
   }
@@ -23,7 +22,7 @@ defmodule Bilimbi.Base.Media.PrivateAttachmentStore do
       disk = Settings.get("media.attachment_disk")
       key = "tenants/#{Scope.tenant_id(scope)}/attachments/#{Ecto.UUID.generate()}"
 
-      Attribution.run(scope, fn ->
+      Bilimbi.Base.Audit.Context.with_scope(scope, fn ->
         AssetStore.put(disk, key, bytes, attrs, fn attrs ->
           Repo.transact(fn ->
             # Recheck after reading the upload and before publishing the binding.
@@ -57,7 +56,7 @@ defmodule Bilimbi.Base.Media.PrivateAttachmentStore do
     id = to_string(subject_id)
 
     with {:ok, _actor} <- uploader(scope) do
-      Attribution.run(scope, fn ->
+      Bilimbi.Base.Audit.Context.with_scope(scope, fn ->
         Repo.transact(fn ->
           rows =
             Repo.all(
@@ -156,7 +155,7 @@ defmodule Bilimbi.Base.Media.PrivateAttachmentStore do
 
   defp remove(scope, public_id, check) do
     with {:ok, assets} <-
-           Attribution.run(scope, fn ->
+           Bilimbi.Base.Audit.Context.with_scope(scope, fn ->
              Repo.transact(fn ->
                with {:ok, row} <- fetch(scope, public_id, true),
                     :ok <- draft(row),

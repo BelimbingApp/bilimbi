@@ -88,12 +88,11 @@ defmodule BilimbiWeb.RequestContext do
   # Captured mutations and recorded actions record who acted (ADR 0013), and
   # from where: the trail exists to tell a developer's own work from a
   # command run through their stolen or hijacked session. Resolved in the
-  # same per-process lifecycle as the locale; an anonymous request records
-  # the guest default rather than a stale actor from a previous request.
+  # same per-process lifecycle as the locale; an anonymous request is an
+  # explicit guest, with its request facts, never a stale actor from a
+  # previous request and never the unknown of a process with no edge at all.
   # Under impersonation the actor is the account acted as and the
   # impersonator is the operator behind the session, so every row names both.
-  defp put_audit_context(nil, _source), do: AuditContext.put(nil)
-
   defp put_audit_context(
          %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor} = current_scope,
          source
@@ -113,7 +112,18 @@ defmodule BilimbiWeb.RequestContext do
     )
   end
 
-  defp put_audit_context(_current_scope, _source), do: AuditContext.put(nil)
+  defp put_audit_context(_anonymous, source) do
+    AuditContext.put(
+      struct!(
+        %AuditContext{
+          actor_type: "guest",
+          actor_id: 0,
+          trace_id: Logger.metadata()[:request_id]
+        },
+        request_facts(source)
+      )
+    )
+  end
 
   defp request_facts(%Plug.Conn{} = conn) do
     %{

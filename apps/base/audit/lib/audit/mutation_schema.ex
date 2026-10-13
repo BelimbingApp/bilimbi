@@ -5,7 +5,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
 
   import Ecto.Changeset
 
-  @actor_types ~w(user agent guest console scheduler queue system)
+  @actor_types ~w(user agent guest console scheduler queue system unknown)
   @assigned [:company_id, :actor_type, :actor_id, :impersonator_id, :system_principal]
   @cast_fields [
     :actor_role,
@@ -30,8 +30,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     :auditable_type,
     :auditable_id,
     :source,
-    :event,
-    :occurred_at
+    :event
   ]
 
   @primary_key {:id, :id, autogenerate: true}
@@ -57,7 +56,8 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     field :old_values, Bilimbi.Base.Database.Json
     field :new_values, Bilimbi.Base.Database.Json
     field :trace_id, :string
-    field :occurred_at, :naive_datetime
+    field :occurred_at, :naive_datetime, read_after_writes: true
+    field :recorded_at, :naive_datetime_usec, read_after_writes: true
   end
 
   @type t :: %__MODULE__{}
@@ -77,6 +77,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     |> validate_number(:impersonator_id, greater_than: 0)
     |> validate_length(:system_principal, max: 100)
     |> validate_system_principal()
+    |> validate_system_actor()
     |> validate_length(:user_agent, max: 80)
     |> validate_length(:auditable_type, max: 255)
     |> validate_length(:auditable_id, max: 128)
@@ -110,10 +111,16 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
   defp validate_system_principal(changeset) do
     case {get_field(changeset, :actor_type), get_field(changeset, :system_principal)} do
       {"system", name} when is_binary(name) -> changeset
-      {"system", nil} -> add_error(changeset, :system_principal, "is required for a system actor")
+      {"system", nil} -> changeset
       {_type, nil} -> changeset
       {_type, _name} -> add_error(changeset, :system_principal, "names only a system actor")
     end
+  end
+
+  defp validate_system_actor(changeset) do
+    if get_field(changeset, :actor_type) == "system" and get_field(changeset, :actor_id) != 0,
+      do: add_error(changeset, :actor_id, "must be 0 for a system actor"),
+      else: changeset
   end
 
   defp truncate_occurred_at(%NaiveDateTime{} = datetime),

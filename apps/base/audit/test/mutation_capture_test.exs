@@ -57,13 +57,13 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     Repo.all(MutationSchema)
   end
 
-  test "an insert writes a canonical guest row with the row's own tenant" do
+  test "an insert writes a canonical unknown row with the row's own tenant" do
     Repo.insert!(Widget.changeset(%Widget{}, %{name: "First", tenant_id: 41}))
 
     assert [row] = mutations()
     assert row.event == "created"
     assert row.source == "listener"
-    assert row.actor_type == "guest"
+    assert row.actor_type == "unknown"
     assert row.actor_id == 0
     assert row.tenant_id == 41
     assert row.auditable_type == inspect(Widget)
@@ -186,7 +186,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     assert deleted.new_values == nil or deleted.new_values == %{}
   end
 
-  test "redacted fields record the change, never the value; long strings truncate" do
+  test "redacted fields record the change, never the value; long strings remain complete" do
     long = String.duplicate("x", 2100)
 
     widget =
@@ -198,8 +198,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
 
     assert [created, updated] = Enum.sort_by(mutations(), & &1.id)
     assert created.new_values["password"] == "[redacted]"
-    assert created.new_values["notes"] =~ "[truncated 2100 chars]"
-    refute created.new_values["notes"] =~ String.duplicate("x", 2001)
+    assert created.new_values["notes"] == long
     assert updated.old_values["password"] == "[redacted]"
     assert updated.new_values["password"] == "[redacted]"
   end
@@ -227,7 +226,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
   end
 
   @tag :without_audit_tables
-  test "a missing audit table is the silent pre-canonical state and never aborts the caller" do
+  test "a missing audit table is the reported pre-canonical state and never aborts the caller" do
     Repo.transaction(fn ->
       widget = Repo.insert!(Widget.changeset(%Widget{}, %{name: "Early", tenant_id: 41}))
       # The transaction stays healthy after the capture's savepoint rollback.
@@ -318,7 +317,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
       assert deleted.new_values == nil or deleted.new_values == %{}
     end
 
-    test "redaction and truncation are the same policy the struct path uses" do
+    test "redaction and complete text are the same policy the struct path uses" do
       long = String.duplicate("x", 2100)
 
       Repo.insert_all(Widget, [
@@ -327,8 +326,7 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
 
       assert [created] = mutations()
       assert created.new_values["password"] == "[redacted]"
-      assert created.new_values["notes"] =~ "[truncated 2100 chars]"
-      refute created.new_values["notes"] =~ String.duplicate("x", 2001)
+      assert created.new_values["notes"] == long
     end
 
     test "a bulk write past the bind-parameter ceiling records every affected row" do
@@ -341,11 +339,11 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
       assert Repo.aggregate(MutationSchema, :count) == 3500
     end
 
-    test "a bulk write with no actor is recorded as guest, never refused" do
+    test "a bulk write with no actor is recorded as unknown, never refused" do
       assert {1, nil} = Repo.insert_all(Widget, [%{name: "Anonymous", tenant_id: 41}])
 
       assert [row] = mutations()
-      assert row.actor_type == "guest"
+      assert row.actor_type == "unknown"
       assert row.actor_id == 0
       assert Repo.get_by(Widget, name: "Anonymous")
     end

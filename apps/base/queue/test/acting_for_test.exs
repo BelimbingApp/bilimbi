@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
 
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.Execution
@@ -45,6 +46,11 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
 
     assert Scope.tenant_id(scope) == 41
     assert %Actor{type: :user, user_id: 7, company_id: 10} = Scope.actor(scope)
+
+    assert_received {:audit_context,
+                     %AuditContext{actor_type: "user", actor_id: 7, company_id: 10, tenant_id: 41}}
+
+    assert AuditContext.get() == %AuditContext{}
   end
 
   test "an ordinary job is system work with no scope to act as", %{system_scope: system_scope} do
@@ -54,6 +60,8 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
     assert {:ok, %JobRef{id: id}} = Queue.enqueue(ActingFor, %{"value" => 1})
     assert :ok = id |> then(&Repo.get!(Oban.Job, &1)) |> perform()
     assert_received {:performed, %Execution{scope: nil}}
+    assert_received {:audit_context, %AuditContext{actor_type: "queue", actor_id: 0}}
+    assert AuditContext.get() == %AuditContext{}
   end
 
   test "arguments cannot carry an actor into the job", %{user_scope: user_scope} do
