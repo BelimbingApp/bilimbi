@@ -104,6 +104,7 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
     case DateTimePolicy.put_mode(settings_scope(current_scope), mode) do
       {:ok, _mode} -> :ok
       {:error, :invalid_mode} -> {:error, :invalid_preference}
+      {:error, _reason} = error -> error
     end
   end
 
