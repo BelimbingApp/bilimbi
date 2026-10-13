@@ -64,7 +64,7 @@ defmodule Bilimbi.Base.Audit do
   @doc "Runs repo writes with attribution from a verified scope."
   def with_scope(%Scope{} = scope, fun), do: Context.with_scope(scope, fun)
 
-  @doc "Runs repo writes attributed to a non-user actor (`\"system\"`, `\"scheduler\"`, `\"queue\"`, `\"console\"`)."
+  @doc "Runs repo writes attributed to a non-user actor: system, scheduler, queue or console."
   def with_actor(actor_type, fun), do: Context.with_actor(actor_type, fun)
 
   @doc "Runs work with strict capture; use a Repo transaction to roll back on failure."
