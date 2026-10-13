@@ -305,8 +305,9 @@ working until retain-until and after, and `purge_expired/3` never selects it.
 `:delete`-authorized call deletes it, and nothing deletes it automatically.
 `retain/6` makes an ordinary document records-grade (its expiry is gone for
 good) or moves retain-until later; an equal or earlier date is
-`{:error, :retention_not_extended}`, and a date that is not in the future is
-`{:error, :invalid_retention}`. A legal hold needs a retained document
+`{:error, :retention_not_extended}`. Retain-until is a `DateTime` in `Etc/UTC`
+(stored at microsecond precision); a date that is not in the future, not a
+`DateTime` or in another zone is `{:error, :invalid_retention}`. A legal hold needs a retained document
 (`{:error, :not_retained}`); placing one twice is `{:error, :already_on_hold}`
 and releasing one that is not there is `{:error, :not_on_hold}`. Retention at
 creation is applied in the publication transaction, so a failed upload stays

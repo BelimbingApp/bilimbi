@@ -240,7 +240,12 @@ defmodule Bilimbi.Base.Artifacts.RetentionTest do
     assert {:ok, extended} = Artifacts.retain(c.scope, 51, TestOwner, doc.id, later)
     assert extended.retain_until == ~U[2034-10-13 23:59:59.000000Z]
 
-    shifted = %{@seven_years | time_zone: "Asia/Kuala_Lumpur", utc_offset: 28_800, zone_abbr: "+08"}
+    shifted = %{
+      @seven_years
+      | time_zone: "Asia/Kuala_Lumpur",
+        utc_offset: 28_800,
+        zone_abbr: "+08"
+    }
 
     assert {:error, :invalid_retention} =
              Artifacts.put(c.scope, 51, TestOwner, c.ref, "other", "text/plain",
