@@ -113,8 +113,8 @@ identity or grant it anything.
    name goes in a Bilimbi-only `system_principal` column on
    `base_audit_mutations` and `base_audit_actions`, declared as an optional
    group in the Base Audit schema contract, as `impersonator_id` was. A row
-   with a principal must be a `"system"` row, and a `"system"` row must name
-   one.
+   with a principal must be a `"system"` row. An anonymous system actor (no
+   principal) is also a `"system"` row, with a null principal.
 
 ## Consequences
 

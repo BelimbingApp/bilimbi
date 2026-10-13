@@ -48,7 +48,8 @@ A job that runs as a named system principal (ADR 0017) records `actor_type`
 `system_principal` column on both tables. Base Queue sets that context for the
 job; captured mutations take it from `Bilimbi.Base.Audit.Context`, and explicit
 records inherit it unless they name the key. A row with a principal must be a
-`"system"` row, an anonymous system scope leaves the principal null. The column and its partial
+`"system"` row; an anonymous system actor (seeds, tasks, maintenance) is also
+`"system"` with a null principal. The column and its partial
 index are a second optional group in the schema contract, added by the
 Bilimbi-only migration `20260927090000`.
 

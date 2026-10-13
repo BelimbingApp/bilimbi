@@ -341,8 +341,6 @@ all-or-nothing grouping with other evolution in `verify_invariants/2`; Base
 Audit uses that to require evidence guards, recording columns, diagnostics,
 and metadata together after migration `20261013120000`.
 
-
-
 The same contract owns any live-data invariant understood by the module.
 Compatibility discovers contracts and aggregates their results; it must not
 learn tenant-, company-, address-, or future module-specific SQL.
