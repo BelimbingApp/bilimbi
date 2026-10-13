@@ -405,22 +405,12 @@ defmodule Bilimbi.Base.Artifacts do
   end
 
   defp audit!(scope, row, event, details \\ %{}) do
-    actor = Scope.actor(scope)
-
     attrs = %{
       company_id: row.company_id,
-      actor_type: if(actor.type == :user, do: "user", else: "guest"),
-      actor_id: actor.user_id || 0,
-      impersonator_id: actor.impersonator_id,
       event: event,
       payload: Map.merge(details, %{artifact_id: row.id, owner_id: row.owner_id}),
       occurred_at: NaiveDateTime.utc_now()
     }
-
-    attrs =
-      if actor.system_principal,
-        do: Map.merge(attrs, %{actor_type: "system", system_principal: actor.system_principal}),
-        else: attrs
 
     case Audit.record_action(scope, attrs) do
       {:ok, _} -> :ok

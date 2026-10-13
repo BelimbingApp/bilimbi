@@ -143,6 +143,55 @@ defmodule Bilimbi.Base.Audit.EvidenceHardeningTest do
     assert Context.get() == %Context{}
   end
 
+  test "a named actor drops outer identity but keeps request diagnostics, then restores it" do
+    scope =
+      TenancyFixtures.scope(41)
+      |> Authentication.sign_in(91, 73,
+        impersonator_id: 92,
+        impersonation_session_id: "borrowed-session"
+      )
+
+    Context.put(%Context{ip_address: "203.0.113.9", url: "/admin", trace_id: "trace-1"})
+
+    Audit.with_scope(scope, fn ->
+      outer = Context.get()
+      assert %Context{actor_type: "user", impersonator_id: 92, company_id: 73} = outer
+
+      Audit.with_actor("system", fn ->
+        assert %Context{
+                 actor_type: "system",
+                 actor_id: 0,
+                 impersonator_id: nil,
+                 company_id: nil,
+                 tenant_id: nil,
+                 system_principal: nil,
+                 ip_address: "203.0.113.9",
+                 url: "/admin",
+                 trace_id: "trace-1"
+               } = Context.get()
+
+        Repo.insert!(%TenancyFixtures.ScopedRecord{label: "nested", tenant_id: 41})
+      end)
+
+      assert Context.get() == outer
+    end)
+
+    assert %{actor_type: "system", impersonator_id: nil} = Repo.one!(MutationSchema)
+    assert %Context{ip_address: "203.0.113.9"} = Context.get()
+  end
+
+  test "an anonymous system scope is the system actor on every path" do
+    scope = TenancyFixtures.scope(41)
+
+    Audit.with_scope(scope, fn ->
+      Repo.insert!(%TenancyFixtures.ScopedRecord{label: "anon", tenant_id: 41})
+    end)
+
+    assert {:ok, _} = Audit.record_action(scope, %{event: "anon.fact"})
+    assert %{actor_type: "system", actor_id: 0} = Repo.one!(MutationSchema)
+    assert [%{actor_type: "system", actor_id: 0}] = Repo.all(Audit.ActionSchema)
+  end
+
   test "failure is durable and reported while the business write survives" do
     # A real database constraint refuses capture while its business write survives.
     handler = {__MODULE__, make_ref()}

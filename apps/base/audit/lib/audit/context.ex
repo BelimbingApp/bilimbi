@@ -83,13 +83,24 @@ defmodule Bilimbi.Base.Audit.Context do
   @doc """
   Runs work attributed to a named non-user actor — `"system"` for seeds and
   tasks, `"scheduler"`, `"queue"`, or `"console"` — restoring prior context
-  even on failure.
+  even on failure. Only request diagnostics (address, URL, agent, trace) carry
+  over; no user, company, tenant, or impersonation identity does.
   """
   @spec with_actor(String.t(), (-> result)) :: result when result: var
   def with_actor(actor_type, fun)
       when actor_type in @system_actor_types and is_function(fun, 0) do
     previous = Process.get(@key)
-    put(%{get() | actor_type: actor_type, actor_id: 0})
+
+    put(%{
+      get()
+      | actor_type: actor_type,
+        actor_id: 0,
+        actor_role: nil,
+        impersonator_id: nil,
+        system_principal: nil,
+        company_id: nil,
+        tenant_id: nil
+    })
 
     try do
       fun.()

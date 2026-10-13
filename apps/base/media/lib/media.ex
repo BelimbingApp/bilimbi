@@ -16,7 +16,7 @@ defmodule Bilimbi.Base.Media do
   can join a business transaction. Like Belimbing, row deletion commits before
   removing files; filesystem failures are reported as `:cleanup_failed`.
   """
-  alias Bilimbi.Base.Media.{AssetStore, Attribution, PrivateAttachmentStore, Storage, Upload}
+  alias Bilimbi.Base.Media.{AssetStore, PrivateAttachmentStore, Storage, Upload}
   alias Bilimbi.Base.{Repo, Settings}
   alias Bilimbi.Base.Tenancy.Scope
 
@@ -40,7 +40,7 @@ defmodule Bilimbi.Base.Media do
          {:ok, bytes, attrs} <- Upload.read(file) do
       key = "tenants/#{Scope.tenant_id(scope)}/#{directory}/#{Ecto.UUID.generate()}"
 
-      Attribution.run(scope, fn ->
+      Bilimbi.Base.Audit.Context.with_scope(scope, fn ->
         AssetStore.put(
           disk,
           key,

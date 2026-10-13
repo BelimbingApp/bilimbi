@@ -27,28 +27,15 @@ defmodule Bilimbi.Base.Artifacts.Web.RenderController do
          data: data
        }) do
     %Context{} = previous = Context.get()
-    actor = Scope.actor(scope)
     route = Phoenix.Router.route_info(router_module(conn), conn.method, conn.path_info, conn.host)
-
-    actor_type =
-      cond do
-        actor.type == :user -> "user"
-        is_binary(actor.system_principal) -> "system"
-        true -> "guest"
-      end
 
     # The signed scope, rather than an unrelated browser login, attributes any
     # authorization decisions or owner writes. Store the route pattern so the
     # bearer token cannot enter a captured mutation's URL; restore on all exits.
-    Context.put(%Context{
-      previous
-      | actor_type: actor_type,
-        actor_id: actor.user_id || 0,
-        actor_role: nil,
+    Context.put(%{
+      Context.from_scope(scope)
+      | actor_role: nil,
         company_id: company,
-        tenant_id: Scope.tenant_id(scope),
-        impersonator_id: actor.impersonator_id,
-        system_principal: actor.system_principal,
         url: route.route
     })
 
