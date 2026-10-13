@@ -201,12 +201,12 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
       assert has_element?(view, "#companies-card th", "Jurisdiction")
       assert has_element?(view, "#companies-sort-jurisdiction")
-      assert has_element?(view, "#companies", "MY")
+      assert has_element?(view, "#companies-73 td", ~r/^\s*MY\s*$/)
 
       {:ok, :assigned} = Authz.assign_role(operator, 73, :user, 91, finance.id)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
-      refute has_element?(view, "#companies", "MY")
+      refute has_element?(view, "#companies-73 td", ~r/^\s*MY\s*$/)
       refute has_element?(view, "#companies-card th", "Jurisdiction")
       refute has_element?(view, "#companies-sort-jurisdiction")
       assert has_element?(view, "#companies tr:first-child td:first-child", "Bilimbi Industries")
@@ -219,7 +219,7 @@ defmodule BilimbiWeb.CompanyIndexLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?sort=jurisdiction&dir=desc")
       assert has_element?(view, "#companies-card th", "Jurisdiction")
-      assert has_element?(view, "#companies", "MY")
+      assert has_element?(view, "#companies-73 td", ~r/^\s*MY\s*$/)
     end
 
     test "junk query parameters normalize to defaults", %{conn: conn} do
