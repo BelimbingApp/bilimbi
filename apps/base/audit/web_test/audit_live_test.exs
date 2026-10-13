@@ -482,6 +482,33 @@ defmodule BilimbiWeb.AuditLiveTest do
       refute has_element?(view, "#action-retain-#{action.id} .hero-bookmark-solid")
     end
 
+    test "unknown attribution is distinct from an explicit guest and can be filtered", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, unknown} =
+        Audit.record_action(scope, %{
+          actor_type: "unknown",
+          actor_id: 0,
+          event: "unknown_context"
+        })
+
+      {:ok, guest} =
+        Audit.record_action(scope, %{
+          actor_type: "guest",
+          actor_id: 0,
+          event: "guest_request"
+        })
+
+      {:ok, view, _} = conn |> log_in_as() |> live(~p"/audit/actions")
+      assert has_element?(view, "#actions-actor-type option[value='unknown']")
+      view |> form("#actions-filters", filters: %{"actor_type" => "unknown"}) |> render_change()
+      assert has_element?(view, "#actions-#{unknown.id}", "Unknown")
+      refute has_element?(view, "#actions-#{guest.id}")
+    end
+
     test "names a system principal and filters to system actors", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.audit.log.list")
 

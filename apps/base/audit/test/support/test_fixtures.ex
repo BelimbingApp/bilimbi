@@ -1,3 +1,7 @@
+Code.require_file(
+  Path.expand("../../priv/repo/migrations/20261013120000_harden_audit_evidence.exs", __DIR__)
+)
+
 defmodule Bilimbi.Base.Audit.TestFixtures do
   @moduledoc false
 
@@ -308,5 +312,34 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
       """,
       []
     )
+
+    # Apply the exact production evidence DDL to the owner's fixture tables.
+    # Each sandbox creates these tables once; persistent host fixtures do too.
+    unless SQL.query!(
+             Repo,
+             "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'base_audit_actions'::regclass AND attname = 'recorded_at')",
+             []
+           ).rows == [[true]] do
+      unless Code.ensure_loaded?(Bilimbi.Base.Audit.Migrations.HardenAuditEvidence) do
+        Code.require_file(
+          Application.app_dir(
+            :bilimbi_base_audit,
+            "priv/repo/migrations/20261013120000_harden_audit_evidence.exs"
+          )
+        )
+      end
+
+      prefix =
+        if persistent,
+          do: SQL.query!(Repo, "SELECT current_schema()", []).rows |> hd() |> hd(),
+          else: nil
+
+      Enum.each(
+        Bilimbi.Base.Audit.Migrations.HardenAuditEvidence.statements(not persistent, prefix),
+        fn statement ->
+          SQL.query!(Repo, statement, [])
+        end
+      )
+    end
   end
 end

@@ -24,6 +24,7 @@ defmodule Bilimbi.Base.Audit.Action do
     :payload,
     :trace_id,
     :is_retained,
+    :recorded_at,
     :occurred_at
   ]
 
@@ -43,6 +44,7 @@ defmodule Bilimbi.Base.Audit.Action do
           payload: map() | list() | nil,
           trace_id: String.t() | nil,
           is_retained: boolean(),
+          recorded_at: NaiveDateTime.t() | nil,
           occurred_at: NaiveDateTime.t()
         }
 
@@ -65,6 +67,7 @@ defmodule Bilimbi.Base.Audit.Action do
       payload: action.payload,
       trace_id: action.trace_id,
       is_retained: action.is_retained,
+      recorded_at: action.recorded_at,
       occurred_at: action.occurred_at
     }
   end

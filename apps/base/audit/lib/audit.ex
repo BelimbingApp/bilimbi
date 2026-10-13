@@ -5,7 +5,8 @@ defmodule Bilimbi.Base.Audit do
   Tenant identity is never taken from the attributes map. Scoped recording
   derives `tenant_id` from a `Bilimbi.Base.Tenancy.Scope`. Unscoped recording
   (`:unscoped`) forces `tenant_id` to null. `company_id` and the actor pair
-  are caller-assigned because rows outlive their subjects and have no foreign
+  may be caller-assigned for existing explicit records, otherwise inherited
+  from the scope or context. Rows outlive their subjects and have no foreign
   keys. Listing is tenant-scoped: a scope is required, and null-tenant rows
   are invisible to every tenant.
 
@@ -15,7 +16,8 @@ defmodule Bilimbi.Base.Audit do
   operator acts while impersonating another user, `impersonator_id` names the
   operator, on both mutations and actions. Captured mutations take it from
   the per-process `Bilimbi.Base.Audit.Context`; explicit `record_mutation/2`
-  and `record_action/2` calls inherit it from that same context unless the
+  and `record_action/2` calls inherit it from the sealed scope (or process
+  context for unscoped recording) unless the
   attributes carry an `impersonator_id` key themselves (an explicit nil
   records the actor acting as themselves).
 
@@ -59,10 +61,19 @@ defmodule Bilimbi.Base.Audit do
     Bilimbi.Base.Database.WriteCapture.without_capture(fun)
   end
 
+  @doc "Runs repo writes with attribution from a verified scope."
+  def with_scope(%Scope{} = scope, fun), do: Context.with_scope(scope, fun)
+
+  @doc "Runs work with strict capture; use a Repo transaction to roll back on failure."
+  def with_strict_capture(fun), do: Bilimbi.Base.Database.WriteCapture.with_strict_capture(fun)
+
   @spec record_mutation(Scope.t() | :unscoped, map()) ::
           {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
   def record_mutation(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_mutation(with_context_identity(attributes), Scope.tenant_id(scope))
+    persist_mutation(
+      with_context_identity(attributes, Context.from_scope(scope)),
+      Scope.tenant_id(scope)
+    )
   end
 
   def record_mutation(:unscoped, attributes) when is_map(attributes) do
@@ -72,24 +83,24 @@ defmodule Bilimbi.Base.Audit do
   @spec record_action(Scope.t() | :unscoped, map()) ::
           {:ok, Action.t()} | {:error, Ecto.Changeset.t()}
   def record_action(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_action(with_context_identity(attributes), Scope.tenant_id(scope))
+    persist_action(
+      with_context_identity(attributes, Context.from_scope(scope)),
+      Scope.tenant_id(scope)
+    )
   end
 
   def record_action(:unscoped, attributes) when is_map(attributes) do
     persist_action(with_context_identity(attributes), nil)
   end
 
-  # The impersonator is a property of the session, not of the caller's actor
-  # knowledge: a domain module recording an explicit row knows who it acts
-  # as, not who is behind the session. The process context does, and the same
-  # holds for the system principal a queued job runs as. A caller that names
-  # the key (even as nil) is believed; an absent key inherits. The key
-  # follows the attributes' own key style so a string-keyed map never reaches
-  # `cast/3` mixed.
-  defp with_context_identity(attributes) do
-    context = Context.get()
-
+  # Scoped facts inherit the sealed actor; unscoped facts inherit process context.
+  # Existing explicit identity keys (including nil) retain their meaning. Preserve
+  # the map's key style so string-keyed attributes never reach cast/3 mixed.
+  defp with_context_identity(attributes, context \\ Context.get()) do
     attributes
+    |> inherit(:actor_type, context.actor_type)
+    |> inherit(:actor_id, context.actor_id)
+    |> inherit(:company_id, context.company_id)
     |> inherit(:impersonator_id, context.impersonator_id)
     |> inherit(:system_principal, context.system_principal)
   end
@@ -201,7 +212,7 @@ defmodule Bilimbi.Base.Audit do
   @spec list_actions(Scope.t()) :: {:ok, [Action.t()]}
   def list_actions(%Scope{} = scope) do
     actions =
-      from(action in Tenancy.scope_query(ActionSchema, scope),
+      from(action in action_query(scope),
         order_by: [asc: action.occurred_at, asc: action.id]
       )
       |> Repo.all()
@@ -227,8 +238,7 @@ defmodule Bilimbi.Base.Audit do
       )
 
     base_query =
-      ActionSchema
-      |> Tenancy.scope_query(scope)
+      action_query(scope)
       |> maybe_search_actions(opts[:search])
       |> maybe_filter_action_actor_type(opts[:actor_type])
       |> maybe_filter_action_family(opts[:event_family])
@@ -260,22 +270,45 @@ defmodule Bilimbi.Base.Audit do
           {:ok, Action.t()} | {:error, :not_found | :forbidden}
   def toggle_retained(%Scope{} = scope, action_id) when is_integer(action_id) do
     with :ok <- authorize(scope) do
-      query =
-        from(a in Tenancy.scope_query(ActionSchema, scope),
-          where: a.id == ^action_id
-        )
+      Repo.transact(fn ->
+        query =
+          from(a in action_query(scope),
+            where: a.id == ^action_id,
+            lock: fragment("FOR UPDATE OF ?", a)
+          )
 
-      case Repo.one(query) do
-        nil ->
-          {:error, :not_found}
+        case Repo.one(query) do
+          nil ->
+            {:error, :not_found}
 
-        %ActionSchema{} = action ->
-          action
-          |> Ecto.Changeset.change(is_retained: not action.is_retained)
-          |> Repo.update()
-          |> map_action()
-      end
+          %ActionSchema{} = action ->
+            retention = %Bilimbi.Base.Audit.RetentionSchema{
+              action_id: action.id,
+              is_retained: not action.is_retained
+            }
+
+            case Repo.insert(retention,
+                   on_conflict: {:replace, [:is_retained]},
+                   conflict_target: [:action_id]
+                 ) do
+              {:ok, _} ->
+                {:ok, Action.from_schema(%{action | is_retained: retention.is_retained})}
+
+              {:error, changeset} ->
+                {:error, changeset}
+            end
+        end
+      end)
     end
+  end
+
+  # The immutable legacy bit is the initial value. Mutable bookmarks live separately.
+  defp action_query(scope) do
+    from(a in Tenancy.scope_query(ActionSchema, scope),
+      left_join: metadata in Bilimbi.Base.Audit.RetentionSchema,
+      on: metadata.action_id == a.id,
+      select: %{a | is_retained: coalesce(metadata.is_retained, a.is_retained)}
+    )
   end
 
   defp authorize(scope) do
@@ -444,7 +477,7 @@ defmodule Bilimbi.Base.Audit do
   defp maybe_filter_action_result(query, ""), do: query
 
   defp maybe_filter_action_result(query, "retained"),
-    do: from(a in query, where: a.is_retained == true)
+    do: from([a, metadata] in query, where: coalesce(metadata.is_retained, a.is_retained) == true)
 
   defp maybe_filter_action_result(query, "failure") do
     from(a in query,

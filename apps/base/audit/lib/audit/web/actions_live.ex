@@ -29,7 +29,8 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
           default_page_size: 25,
           page_size_param: "page_size",
           filters: [
-            actor_type: {:one_of, ~w(user agent guest console scheduler queue system), ""},
+            actor_type:
+              {:one_of, ~w(user agent guest console scheduler queue system unknown), ""},
             event_family: {:one_of, ~w(http auth console database queue domain), ""},
             result: {:one_of, ~w(failure retained), ""},
             diagnostics: {:one_of, ~w(hide show), "hide"}

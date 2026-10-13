@@ -320,10 +320,10 @@ foreign keys, and checks supported by the verifier. Index specs include an
 optional `:order` key: a boolean list aligned with `:columns` where `true`
 means descending and an absent or `nil` value means all columns ascend.
 
-A Domain or Extension contract's `tables/0` lists exactly the tables its
-compatible baselines create: whether the owner is absent from a database is
-judged on those tables, so a Bilimbi-only table listed there would make the
-owner partly present on every database that has its Belimbing module.
+A Domain or Extension contract's required `tables/0` specifications list the
+tables its compatible baselines create. Bilimbi-only tables must be optional
+or verified separately, so adoption does not mistake their expected absence
+for a partially installed baseline.
 
 Contracts may declare `optional_indexes` alongside the mandatory `indexes`.
 Optional indexes may be absent (an adopted Belimbing database without them
@@ -333,6 +333,15 @@ Bilimbi-only migrations have run out of `tables/0`, so baseline verification
 and adoption skip them, and expose its own post-migration check (Schedule's
 `SchemaContract.verify_runtime/2` is the one today); Compatibility does not
 call it.
+
+An owning schema contract may mark a Bilimbi-only table `optional: true` so
+an incoming compatible baseline can be adopted before its migration runs.
+Present optional tables are verified in full. The owner must verify any
+all-or-nothing grouping with other evolution in `verify_invariants/2`; Base
+Audit uses that to require evidence guards, recording columns, diagnostics,
+and metadata together after migration `20261013120000`.
+
+
 
 The same contract owns any live-data invariant understood by the module.
 Compatibility discovers contracts and aggregates their results; it must not

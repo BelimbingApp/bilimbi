@@ -14,6 +14,15 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     %{schema: schema}
   end
 
+  test "optional tables may be absent but present tables must match", %{schema: schema} do
+    optional = Map.put(widget_spec(), :optional, true)
+    assert :ok = SchemaVerifier.verify(Repo, [%{optional | name: "future_table"}], prefix: schema)
+    assert :ok = SchemaVerifier.verify(Repo, [optional], prefix: schema)
+    drifted = put_in(optional, [:columns, "name", :nullable], true)
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [drifted], prefix: schema)
+    assert "widgets.name: expected nullable=true, got false" in errors
+  end
+
   test "accepts an exact column, index, foreign-key, and check contract", %{schema: schema} do
     assert :ok = SchemaVerifier.verify(Repo, [widget_spec()], prefix: schema)
   end

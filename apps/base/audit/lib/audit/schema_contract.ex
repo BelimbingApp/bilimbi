@@ -25,7 +25,112 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
   def migration_version, do: @migration_version
 
   @impl true
-  def tables, do: [mutations(), actions()]
+  def tables,
+    do: [mutations(), actions()] ++ Enum.map(evidence_tables(), &Map.put(&1, :optional, true))
+
+  @impl true
+  def verify_invariants(repo, opts) do
+    prefix = Keyword.get(opts, :prefix, "public")
+    sql = Ecto.Adapters.SQL
+    # Optional Bilimbi-only evolution: the incoming Belimbing baseline has none.
+    hardened? =
+      sql.query!(
+        repo,
+        """
+        SELECT EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_schema = $1 AND (
+            (table_name IN ('base_audit_actions', 'base_audit_mutations') AND column_name = 'recorded_at')
+            OR table_name IN ('base_audit_action_metadata', 'base_audit_capture_failures')))
+        """,
+        [prefix]
+      ).rows == [[true]]
+
+    if hardened? do
+      errors =
+        case Bilimbi.Base.Database.SchemaVerifier.verify(repo, evidence_tables(), opts) do
+          :ok -> []
+          {:error, errors} -> errors
+        end
+
+      recording_errors =
+        case sql.query!(
+               repo,
+               """
+               SELECT count(*) FROM information_schema.columns
+               WHERE table_schema = $1 AND table_name IN ('base_audit_actions', 'base_audit_mutations')
+                 AND column_name = 'recorded_at'
+               """,
+               [prefix]
+             ).rows do
+          [[2]] -> []
+          _ -> ["base/audit: incomplete database recording clocks"]
+        end
+
+      trigger_errors =
+        for table <- ~w(base_audit_actions base_audit_mutations base_audit_capture_failures),
+            {suffix, type} <- [{"evidence_guard", 31}, {"truncate_guard", 34}],
+            sql.query!(
+              repo,
+              """
+              SELECT EXISTS (SELECT 1 FROM pg_trigger t
+                JOIN pg_class c ON c.oid = t.tgrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                JOIN pg_proc p ON p.oid = t.tgfoid
+                WHERE n.nspname = $1 AND c.relname = $2 AND t.tgname = $3
+                  AND t.tgtype = $4 AND t.tgenabled IN ('O', 'A')
+                  AND p.proname = 'base_audit_evidence_v1')
+              """,
+              [prefix, table, "#{table}_#{suffix}", type]
+            ).rows != [[true]],
+            do: "#{table}: missing or disabled #{suffix}"
+
+      case errors ++ recording_errors ++ trigger_errors do
+        [] -> :ok
+        errors -> {:error, errors}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp evidence_tables do
+    [
+      %{
+        name: "base_audit_action_metadata",
+        columns: %{
+          "action_id" => column(:bigint, false),
+          "is_retained" => column(:boolean, false, {:boolean, false})
+        },
+        indexes: %{"base_audit_action_metadata_pkey" => index(["action_id"], true)},
+        foreign_keys: %{
+          "base_audit_action_metadata_action_id_fkey" => %{
+            columns: ["action_id"],
+            references: {"base_audit_actions", ["id"]},
+            on_delete: :restrict
+          }
+        }
+      },
+      %{
+        name: "base_audit_capture_failures",
+        columns: %{
+          "id" => column(:bigint, false, {:sequence, "base_audit_capture_failures_id_seq"}),
+          "action" => column(:text, false),
+          "schema_name" => column(:text, false),
+          "error_type" => column(:text, false),
+          "trace_id" => column(:text),
+          "actor_type" => column({:varchar, 40}, false),
+          "actor_id" => column(:bigint, false),
+          "company_id" => column(:bigint),
+          "tenant_id" => column(:bigint),
+          "impersonator_id" => column(:bigint),
+          "system_principal" => column({:varchar, 100}),
+          "recorded_at" => column({:timestamp, 6}, false)
+        },
+        indexes: %{"base_audit_capture_failures_pkey" => index(["id"], true)},
+        foreign_keys: %{}
+      }
+    ]
+  end
 
   defp mutations do
     %{
@@ -76,6 +181,7 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
           )
       },
       optional_columns: %{
+        "recorded_at" => column({:timestamp, 6}),
         "impersonator_id" => column(:bigint),
         "system_principal" => column({:varchar, 100})
       },
@@ -128,6 +234,7 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
           index(["actor_type", "actor_id", "occurred_at"])
       },
       optional_columns: %{
+        "recorded_at" => column({:timestamp, 6}),
         "impersonator_id" => column(:bigint),
         "system_principal" => column({:varchar, 100})
       },

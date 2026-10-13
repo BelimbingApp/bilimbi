@@ -176,13 +176,13 @@ defmodule Bilimbi.Base.Audit.ConsoleCaptureTest do
            ] = Enum.map(console_rows(), & &1.event)
   end
 
-  test "a missing actor records the guest default, never nothing" do
+  test "a missing actor records the unknown default, never nothing" do
     Context.put(nil)
 
     assert {:ok, _} = run("SELECT 1")
 
     assert [row] = console_rows()
-    assert row.actor_type == "guest"
+    assert row.actor_type == "unknown"
     assert row.actor_id == 0
     assert row.tenant_id == nil
     assert row.ip_address == nil

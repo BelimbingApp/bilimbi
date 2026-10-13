@@ -10,9 +10,10 @@ defmodule Bilimbi.Base.Database.WriteCapture do
   seam and gains no dependency on whoever implements it, the same wiring
   shape as Core User's `:pubsub_server`.
 
-  Capture must never fail the business write: a raise inside the capture
-  module is rescued, logged without row values, and counted on the
-  `[:bilimbi, :base, :audit, :capture_failure]` telemetry event.
+  Capture is best effort by default. Failures reach the adapter's optional
+  durable diagnostics callback and alerting telemetry; unavailable diagnostics
+  are explicit in `durable: false`. Logs contain exception types, never values.
+  `with_strict_capture/1` raises after reporting; use a transaction for rollback.
 
   `without_capture/1` is the port of Belimbing's
   `MutationListener::withoutAuditing` — a process flag restored by
@@ -24,6 +25,7 @@ defmodule Bilimbi.Base.Database.WriteCapture do
   require Logger
 
   @capture_disabled_key __MODULE__
+  @strict_key {__MODULE__, :strict}
 
   @typedoc "The write that succeeded."
   @type action :: :insert | :update | :delete
@@ -65,12 +67,32 @@ defmodule Bilimbi.Base.Database.WriteCapture do
   """
   @callback capture_schema?(module()) :: boolean()
 
+  @doc "Records capture diagnostics without row values. Optional for existing adapters."
+  @callback capture_failure(atom(), module(), module()) :: :ok
+  @optional_callbacks capture_failure: 3
+
+  @doc """
+  Runs `fun` with strict capture. A failure raises after the write; wrap the
+  block in a Repo transaction when the business write must roll back too.
+  """
+  def with_strict_capture(fun) when is_function(fun, 0) do
+    previous = Process.put(@strict_key, true)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous),
+        do: Process.delete(@strict_key),
+        else: Process.put(@strict_key, previous)
+    end
+  end
+
   @doc """
   Runs `fun` with write capture disabled in this process.
 
   Call this only with a written reason for that table, at a machine-only
   site whose other writes stay captured. A missing actor is not a reason:
-  the audit policy records that write as guest. Schema-wide silence is
+  the audit policy records that write as unknown. Schema-wide silence is
   `:bilimbi_base_audit, :exclude_schemas`, not this function.
   """
   @spec without_capture((-> result)) :: result when result: var
@@ -155,18 +177,48 @@ defmodule Bilimbi.Base.Database.WriteCapture do
   @doc false
   @spec capture_failed(atom(), module() | atom(), Exception.t(), Exception.stacktrace()) :: :ok
   def capture_failed(action, schema, error, stacktrace) do
-    # Redacted: the schema module is diagnostic, row values never are.
-    :telemetry.execute([:bilimbi, :base, :audit, :capture_failure], %{count: 1}, %{
-      action: action,
-      schema: schema
-    })
+    capture = Application.get_env(:bilimbi_base_database, :write_capture)
+    durable = record_failure(capture, action, schema, error.__struct__)
+    metadata = %{action: action, schema: schema, error_type: error.__struct__, durable: durable}
+    :telemetry.execute([:bilimbi, :base, :audit, :capture_failure], %{count: 1}, metadata)
+    :telemetry.execute([:bilimbi, :base, :audit, :capture_alert], %{count: 1}, metadata)
 
+    # Error messages/stacktraces can contain row values. Emit type and identity only.
     Logger.error(
-      "audit write capture failed for #{inspect(schema)} #{action}: " <>
-        Exception.format(:error, error, stacktrace)
+      "audit write capture failed for #{inspect(schema)} #{action}: #{inspect(error.__struct__)} durable=#{durable}"
     )
 
+    if Process.get(@strict_key, false) do
+      # The exception can reach a host error logger: keep its message safe too.
+      failure = %Bilimbi.Base.Database.CaptureError{
+        action: action,
+        schema: schema,
+        error_type: error.__struct__
+      }
+
+      safe_stacktrace =
+        Enum.map(stacktrace, fn
+          {module, function, args, location} when is_list(args) ->
+            {module, function, length(args), location}
+
+          frame ->
+            frame
+        end)
+
+      reraise failure, safe_stacktrace
+    end
+
     :ok
+  end
+
+  defp record_failure(capture, action, schema, error_type) do
+    if loaded?(capture) and function_exported?(capture, :capture_failure, 3) do
+      without_capture(fn -> capture.capture_failure(action, schema, error_type) end) == :ok
+    else
+      false
+    end
+  rescue
+    _ -> false
   end
 
   defp schema_of(%Ecto.Changeset{data: %schema{}}), do: schema

@@ -9,6 +9,12 @@ Accepted
 Amended 2026-09-23 (#785): bulk writes are captured. The original decision
 excluded them and the Consequences below record what changed.
 
+Amended 2026-10-13: evidence tables are append-only at PostgreSQL, with
+separate mutable retention metadata and database-stamped recording time.
+Scope attribution, explicit unknown context, full mutation text, durable
+failure diagnostics, and opt-in strict capture replace the original policies.
+The mechanism and secret-redaction ownership remain unchanged.
+
 ## Context
 
 Belimbing audits **all** model mutations globally: a wildcard Eloquent
@@ -135,8 +141,8 @@ and with a silent-falsehood failure mode.
 - `Bilimbi.Base.Audit.MutationCapture` (Base Audit) implements the
   behaviour and owns the canonical row shape (§5 of the audit port):
   actor columns from the per-process `Bilimbi.Base.Audit.Context` (set at
-  the web edge in the same lifecycle as locale; `guest`/`0` fallback when
-  absent, exactly the source's `PrincipalType::GUEST` default), `tenant_id`
+  the web edge in the same lifecycle as locale; `unknown`/`0` fallback when
+  absent; scoped facade records derive identity from the sealed actor), `tenant_id`
   from the mutated row's own `tenant_id` attribute first and the context
   second (the source's ground-truth order), `auditable_type` defaulting to
   the Ecto schema module name with an optional `__audit_auditable_type__/0`
@@ -144,8 +150,7 @@ and with a silent-falsehood failure mode.
   for updates with originals, full attributes for create/delete, global
   redaction (`password`, `password_hash`, `remember_token`, `secret`,
   `api_key`, `token`, and `payload` — the durable session's opaque Laravel
-  blob) rendered as `[redacted]`, and string truncation at
-  2000 characters with an explicit truncation marker.
+  blob) rendered as `[redacted]`, and complete mutation strings, escaping NUL as `␀` for PostgreSQL JSON.
 - **Recursion and exclusion**: capture always skips Base Audit's own
   schemas; further schemas opt out via `:bilimbi_base_audit,
   :exclude_schemas` configuration — the port of `audit.exclude_models`,
@@ -160,21 +165,26 @@ and with a silent-falsehood failure mode.
   `WriteCapture.without_capture/1` — a process flag, restored by `after`,
   exactly the source's static-flag try/finally. Production seeding and
   schema lifecycle tasks run under it.
-- **Capture never fails the business write.** A raise inside capture is
-  rescued, logged (redacted — never row values), and counted via telemetry
-  `[:bilimbi, :base, :audit, :capture_failure]`. The source buffered writes
-  and could lose them silently; Bilimbi keeps the write-path guarantee but
-  makes the loss observable.
+- **Capture is best effort by default.** A raise is reported to the adapter's
+  optional durable failure callback, logged by exception type without values,
+  and emits `capture_failure` plus `capture_alert` telemetry. The `durable`
+  flag says whether diagnostics were stored. `with_strict_capture/1` raises
+  after reporting; callers needing rollback wrap their work in a transaction.
 - **Transactionality**: capture runs synchronously in the caller's process,
   inside any open transaction. A rolled-back business write rolls its audit
   row back with it — strictly stronger than the source's request-end buffer,
   which could persist mutations whose transaction died. Inside a caller's transaction the audit
   row is written under a **savepoint** (DBConnection's `mode: :savepoint`;
   Ecto's nested transactions flatten and would abort the caller), so a
-  capture failure rolls back only to its savepoint and can never abort the
-  business transaction. A missing `base_audit_mutations` table is the pre-canonical
-  state (fixture-built test databases, fresh checkouts before migration) and
-  is silently not captured — the Locale precedent for pre-canonical Settings.
+  capture failure rolls back only to its savepoint by default. Missing audit
+  tables are reported too. Failure diagnostics share the business transaction
+  and roll back with it. Unavailable diagnostics emit `durable: false`.
+- **Evidence integrity**: migration `20261013120000` rejects UPDATE, DELETE,
+  and TRUNCATE on evidence tables. `is_retained` remains an immutable initial
+  bit for compatibility; the facade resolves mutable bookmarks from separate
+  metadata. `recorded_at` is database time; historical rows leave it null.
+  Caller event time stays in `occurred_at`, defaulting to database time when
+  omitted. Database credential custody and DBA controls remain outside scope.
 
 ## Consequences
 
