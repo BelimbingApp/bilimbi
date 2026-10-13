@@ -180,6 +180,39 @@ defmodule Bilimbi.Base.Audit.EvidenceHardeningTest do
     assert %Context{ip_address: "203.0.113.9"} = Context.get()
   end
 
+  test "a scope's attribution never inherits the enclosing context's role or identity" do
+    user_scope = TenancyFixtures.scope(41) |> Authentication.sign_in(91, 73)
+    system_scope = TenancyFixtures.scope(41)
+
+    Context.put(%Context{
+      actor_type: "user",
+      actor_id: 5,
+      actor_role: "admin",
+      company_id: 9,
+      ip_address: "203.0.113.9"
+    })
+
+    Audit.with_scope(system_scope, fn ->
+      assert %Context{
+               actor_type: "system",
+               actor_id: 0,
+               actor_role: nil,
+               company_id: nil,
+               ip_address: "203.0.113.9"
+             } = Context.get()
+
+      Audit.with_scope(user_scope, fn ->
+        assert %Context{actor_type: "user", actor_id: 91, actor_role: nil, company_id: 73} =
+                 Context.get()
+      end)
+
+      assert %Context{actor_type: "system", actor_id: 0} = Context.get()
+    end)
+
+    assert %Context{actor_type: "user", actor_id: 5, actor_role: "admin", company_id: 9} =
+             Context.get()
+  end
+
   test "an anonymous system scope is the system actor on every path" do
     scope = TenancyFixtures.scope(41)
 

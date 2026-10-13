@@ -63,7 +63,8 @@ defmodule Bilimbi.Base.Audit.Context do
   @doc "The process context, or unknown attribution when none was set."
   @spec get() :: t()
   def get, do: Process.get(@key) || %__MODULE__{}
-  @doc "Derives attribution from a verified scope, preserving request diagnostics."
+
+  @doc "Derives attribution from a verified scope; only request diagnostics carry over, never a role."
   def from_scope(%Bilimbi.Base.Tenancy.Scope{} = scope) do
     actor = Bilimbi.Base.Tenancy.Scope.actor(scope)
 
@@ -71,6 +72,7 @@ defmodule Bilimbi.Base.Audit.Context do
       get()
       | actor_type: if(actor.type == :user, do: "user", else: "system"),
         actor_id: actor.user_id || 0,
+        actor_role: nil,
         company_id: actor.company_id,
         tenant_id: Bilimbi.Base.Tenancy.Scope.tenant_id(scope),
         impersonator_id: actor.impersonator_id,

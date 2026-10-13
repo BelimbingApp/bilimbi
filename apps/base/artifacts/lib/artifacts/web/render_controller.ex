@@ -32,12 +32,7 @@ defmodule Bilimbi.Base.Artifacts.Web.RenderController do
     # The signed scope, rather than an unrelated browser login, attributes any
     # authorization decisions or owner writes. Store the route pattern so the
     # bearer token cannot enter a captured mutation's URL; restore on all exits.
-    Context.put(%{
-      Context.from_scope(scope)
-      | actor_role: nil,
-        company_id: company,
-        url: route.route
-    })
+    Context.put(%{Context.from_scope(scope) | company_id: company, url: route.route})
 
     try do
       with {:ok, live_scope} <- Tenancy.scope(Scope.tenant_id(scope)),
