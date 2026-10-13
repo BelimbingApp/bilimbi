@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.CompanyIndexLiveTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Ecto.Query, only: [from: 2]
   import Phoenix.LiveViewTest

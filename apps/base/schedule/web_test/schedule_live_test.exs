@@ -11,6 +11,7 @@ Enum.each(
 )
 
 defmodule BilimbiWeb.ScheduleLiveTest do
+  # Stays `async: false`: swaps the node-wide contribution registry snapshot.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

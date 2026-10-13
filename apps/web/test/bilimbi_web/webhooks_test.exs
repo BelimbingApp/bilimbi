@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.WebhooksTest do
+  # Stays `async: false`: restarts the named `BilimbiWeb.WebhookRateLimit`
+  # process and counts against its node-wide window.
   use BilimbiWeb.ConnCase, async: false
   alias Bilimbi.Base.Settings
   alias BilimbiWeb.WebhookRateLimit

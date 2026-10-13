@@ -8,7 +8,7 @@ defmodule BilimbiWeb.LiveEventAuthorizationTest do
   through the discovered host routes.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Ecto.Query
   import Phoenix.LiveViewTest

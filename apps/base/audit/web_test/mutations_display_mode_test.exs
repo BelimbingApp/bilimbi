@@ -22,7 +22,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   different one.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

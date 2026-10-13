@@ -1,4 +1,5 @@
 defmodule Bilimbi.Base.Artifacts.Web.RenderControllerTest do
+  # Stays `async: false`: reconfigures the Logger level for every process.
   use BilimbiWeb.ConnCase, async: false
   import ExUnit.CaptureLog
   alias Bilimbi.Base.Artifacts.PDF.Tokens

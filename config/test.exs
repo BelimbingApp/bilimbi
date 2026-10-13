@@ -23,6 +23,10 @@ config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Test
 config :web, :mailer_sender, {"Bilimbi Test", "no-reply@bilimbi.test"}
 config :swoosh, :api_client, false
 config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
+# Settings reads go to the database. The node-local read cache cannot tell one
+# SQL sandbox connection from another, so under concurrent tests a value one
+# test stored would be served to another (`Bilimbi.Base.Settings.fetch_row/2`).
+config :bilimbi_base_settings, :read_cache, false
 
 config :bilimbi_base_queue, testing: :manual
 config :bilimbi_base_tenancy, :actor_secret, "test-actor-secret-ZbX2pQm9Lr4vT7wKc1Nd8Hs3Jf6Gy0Ue"

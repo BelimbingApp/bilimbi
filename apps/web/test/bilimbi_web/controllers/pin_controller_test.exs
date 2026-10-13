@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.PinControllerTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User

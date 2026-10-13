@@ -1,4 +1,6 @@
 defmodule Bilimbi.Core.User.DevSeedTaskTest do
+  # Stays `async: false`: runs a Mix task and swaps the node-wide contribution
+  # registry.
   use Bilimbi.Base.Database.DataCase, async: false
 
   import Bilimbi.Core.User.TestFixtures

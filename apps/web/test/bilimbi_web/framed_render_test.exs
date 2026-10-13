@@ -5,6 +5,8 @@ defmodule BilimbiWeb.FramedRenderTest do
   hook that reads it back. The flag never touches the cookie session.
   """
 
+  # Stays `async: false`: attaches a telemetry handler, which sees every test's
+  # events.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

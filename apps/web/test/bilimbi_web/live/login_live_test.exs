@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.LoginLiveTest do
+  # Stays `async: false`: resets the node-wide `BilimbiWeb.RateLimit` ETS table
+  # that throttles sign-in.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

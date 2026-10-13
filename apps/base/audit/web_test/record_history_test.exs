@@ -5,7 +5,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
   not denote an instant stay text.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

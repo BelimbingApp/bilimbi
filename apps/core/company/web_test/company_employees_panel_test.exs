@@ -5,7 +5,7 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
   covers the populated case the module boundary now owns. The empty case lives
   with the rest of the page in `company_show_live_test.exs`.
   """
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.UserShowAccessTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

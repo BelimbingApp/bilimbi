@@ -1,4 +1,6 @@
 defmodule Bilimbi.Base.Dashboard.Web.IndexLiveTest do
+  # Stays `async: false`: attaches a telemetry handler, which sees every test's
+  # events.
   use BilimbiWeb.ConnCase, async: false
 
   import Ecto.Query, only: [from: 2]

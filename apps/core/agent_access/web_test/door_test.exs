@@ -1,4 +1,6 @@
 defmodule Bilimbi.Core.AgentAccess.DoorTest do
+  # Stays `async: false`: swaps the node-wide contribution registry and drives
+  # the OAuth throttle.
   use BilimbiWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   alias Bilimbi.Base.{Repo, Tenancy}

@@ -1,5 +1,6 @@
 defmodule Bilimbi.Base.SessionTest do
-  use Bilimbi.Base.Database.DataCase, async: true
+  # Stays `async: false`: swaps the node-wide contribution registry snapshot.
+  use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
@@ -314,6 +315,17 @@ defmodule Bilimbi.Base.SessionTest do
       assert last_activity >= now - 60
       assert :ok = Session.touch_session("one-minute", now)
     end
+  end
+
+  test "touching an expired session does not revive it" do
+    assert {:ok, _} = Bilimbi.Base.Settings.put("session.lifetime_minutes", 2)
+    put_session!("lapsed", 100)
+
+    assert :ok = Session.touch_session("lapsed", 220)
+    assert {:ok, %Entry{last_activity: 220}} = Session.fetch_session("lapsed")
+
+    assert :ok = Session.touch_session("lapsed", 341)
+    assert {:ok, %Entry{last_activity: 220}} = Session.fetch_session("lapsed")
   end
 
   test "touching a missing session does not recreate it" do

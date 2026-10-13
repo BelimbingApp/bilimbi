@@ -5,7 +5,7 @@ defmodule BilimbiWeb.ArchivedCompanySessionTest do
   LiveView event, so the refusal follows the archive without anything stored.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

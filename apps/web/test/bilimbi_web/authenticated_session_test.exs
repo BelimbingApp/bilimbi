@@ -4,6 +4,8 @@ defmodule BilimbiWeb.AuthenticatedSessionTest do
   landing page every signed-in account can reach.
   """
 
+  # Stays `async: false`: attaches a telemetry handler, which sees every test's
+  # events.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
