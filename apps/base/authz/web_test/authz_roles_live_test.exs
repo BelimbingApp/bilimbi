@@ -7,7 +7,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
   it, because a leak would look like a perfectly ordinary list.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

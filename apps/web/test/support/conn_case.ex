@@ -4,8 +4,24 @@ defmodule BilimbiWeb.ConnCase do
 
   Every test gets, without asking:
 
-  - a sandbox owner (shared unless the test is `async: true`) and a fresh
-    `conn`;
+  - a sandbox owner and a fresh `conn`. A test is `async: true` unless it
+    touches state the whole node shares; then it stays `async: false` and
+    says which state in a comment above `use`: a named process or
+    supervisor child, application environment (`set_swoosh_global/0` is
+    one), the Logger configuration, an ETS table such as
+    `BilimbiWeb.RateLimit`, the contribution registry snapshot (its swap
+    raises from an async test), a telemetry handler (it sees every test's
+    events), a fixed PubSub topic (a workspace token comes from a unique
+    host id, never a literal), a Mix task, or a table or schema object every
+    connection shares. The temporary tables below, the sandboxed rows, and
+    settings (read past their node-local cache in this environment) are per
+    test and need no care. A test that broadcasts to its view and then
+    asserts on the view's reply calls `render/1` in between, so the view has
+    handled the message first. In async mode the owner's connection is
+    private, and the LiveView processes `Phoenix.LiveViewTest` starts reach
+    it through `$callers`, which the sandbox honours; do not add a
+    `Phoenix.Ecto.SQL.Sandbox` plug or an allowance `on_mount` for them,
+    those serve a browser outside the test VM;
   - the temporary tables the shell reads on every page: sessions, authz,
     settings, audit, perf, notifications, GeoNames and addresses. Do not
     create them again in a test; a missing table is a `42P01` that a
@@ -39,6 +55,8 @@ defmodule BilimbiWeb.ConnCase do
   end
 
   setup tags do
+    Bilimbi.Base.Database.DataCase.mark_async_test!(tags)
+
     owner =
       Ecto.Adapters.SQL.Sandbox.start_owner!(Bilimbi.Base.Repo,
         shared: not tags[:async]

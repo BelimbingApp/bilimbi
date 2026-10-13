@@ -12,6 +12,18 @@ defmodule Bilimbi.Base.SettingsTest do
   import Bilimbi.Base.Settings.TestFixtures
 
   setup do
+    # The test environment reads settings past the node-local cache
+    # (`config/test.exs`). This module proves the cache, so it turns it on.
+    previous_read_cache = Application.fetch_env(:bilimbi_base_settings, :read_cache)
+    Application.put_env(:bilimbi_base_settings, :read_cache, true)
+
+    on_exit(fn ->
+      case previous_read_cache do
+        {:ok, value} -> Application.put_env(:bilimbi_base_settings, :read_cache, value)
+        :error -> Application.delete_env(:bilimbi_base_settings, :read_cache)
+      end
+    end)
+
     create_settings_table!()
     install_test_registry!()
     on_exit(&ContributionRegistry.clear_for_test!/0)

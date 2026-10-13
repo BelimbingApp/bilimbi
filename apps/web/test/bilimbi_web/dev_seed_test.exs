@@ -4,6 +4,8 @@ defmodule BilimbiWeb.StartupDevSeedTest do
   # seeds are discovered from it), which only the host's closure has. The
   # tables are the ones the administrator bootstrap and the sample seeds
   # reach; ConnCase brings the shared ones.
+  # Stays `async: false`: runs a Mix task, and Mix's shell and environment are
+  # process-global.
   use BilimbiWeb.ConnCase, async: false
 
   import Ecto.Query, only: [from: 2]

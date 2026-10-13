@@ -111,6 +111,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     unless plain_term?(snapshot),
       do: raise(ArgumentError, "test snapshot must contain plain terms")
 
+    refuse_async_test!()
     publish!(snapshot)
   end
 
@@ -134,8 +135,21 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
 
   @doc false
   def clear_for_test! do
+    refuse_async_test!()
     :persistent_term.erase(@snapshot_key)
     :ok
+  end
+
+  # The snapshot is one `:persistent_term` for the whole node. A test that
+  # swaps it while other tests run hands them its partial registry, and their
+  # capability checks fail closed on keys that are no longer there. The sandbox
+  # cases (`Bilimbi.Base.Database.DataCase`, `BilimbiWeb.ConnCase`) mark the
+  # process of an `async: true` test so the swap can refuse it here.
+  defp refuse_async_test! do
+    if Process.get(:bilimbi_async_test) do
+      raise ArgumentError,
+            "the contribution registry is node-wide; swap it only from an `async: false` test"
+    end
   end
 
   defp publish!(snapshot) do

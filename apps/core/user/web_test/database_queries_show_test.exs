@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.DatabaseQueriesShowTest do
+  # Stays `async: false`: creates a sequence in the shared schema, so a
+  # concurrent copy would wait on its lock.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

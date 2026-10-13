@@ -5,7 +5,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
   Company list and record pages that announce inside a workspace.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
@@ -82,6 +82,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
 
     # A page joining the workspace learns that nothing is followed yet.
     :ok = Workspace.broadcast(topic, {:workspace_joined})
+    _ = render(view)
     assert_receive {:workspace_follows, []}
 
     render_hook(view, "follow-tile", %{"id" => "t2"})
@@ -97,6 +98,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
 
     # A company selected elsewhere moves the following tile there, once.
     :ok = Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/company", id: 74}})
+    _ = render(view)
     assert_push_event(view, "tile-navigate", %{id: "t2", path: path})
     assert path == "/companies/74?ws=#{token}"
 
@@ -148,7 +150,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
   test "a framed Company list opens a row alone and selects it once a tile follows companies", %{
     conn: conn
   } do
-    token = Workspace.host_token("phx-a-host")
+    token = Workspace.host_token("phx-#{System.unique_integer([:positive])}-host")
     topic = Workspace.topic(41, 91, token)
     :ok = Workspace.subscribe(topic)
 
@@ -179,7 +181,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
   end
 
   test "a framed Company page announces the record it shows", %{conn: conn} do
-    token = Workspace.host_token("phx-a-host")
+    token = Workspace.host_token("phx-#{System.unique_integer([:positive])}-host")
     topic = Workspace.topic(41, 91, token)
     :ok = Workspace.subscribe(topic)
 

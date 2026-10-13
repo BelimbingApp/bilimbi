@@ -5,7 +5,7 @@ defmodule BilimbiWeb.GridCatalogTest do
   the real Core tables with each owner's own boundary applied on every hop.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   alias Bilimbi.Base.Grid
   alias Bilimbi.Base.Tenancy

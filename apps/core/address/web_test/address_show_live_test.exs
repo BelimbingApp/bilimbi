@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.AddressShowLiveTest do
+  # Stays `async: false`: counts repo queries through a telemetry handler, which
+  # sees every test's events.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

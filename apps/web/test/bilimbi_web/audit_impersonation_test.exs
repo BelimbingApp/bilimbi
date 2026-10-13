@@ -6,7 +6,7 @@ defmodule BilimbiWeb.AuditImpersonationTest do
   captured mutation and on the retained impersonation transition actions.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Ecto.Query
   import Phoenix.LiveViewTest

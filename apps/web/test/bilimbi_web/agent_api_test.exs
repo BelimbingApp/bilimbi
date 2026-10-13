@@ -6,7 +6,7 @@ defmodule BilimbiWeb.AgentApiTest do
   checks and field restrictions the Companies and Employees pages apply.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   alias Bilimbi.Base.AgentApi
   alias Bilimbi.Base.Authz

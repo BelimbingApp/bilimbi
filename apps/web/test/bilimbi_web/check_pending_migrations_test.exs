@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.CheckPendingMigrationsTest do
+  # Stays `async: false`: edits the real `bilimbi_schema_migrations` ledger, a
+  # table every connection shares.
   use BilimbiWeb.ConnCase, async: false
 
   alias Bilimbi.Base.Repo

@@ -1,4 +1,6 @@
 defmodule Bilimbi.Base.Media.Web.MediaRoutesTest do
+  # Stays `async: false`: swaps the node-wide contribution registry and writes a
+  # disk root.
   use BilimbiWeb.ConnCase, async: false
   alias Bilimbi.Base.{Media, Settings, Tenancy}
   alias Bilimbi.Base.Media.{AssetSchema, AttachmentSchema, TestFixtures}
