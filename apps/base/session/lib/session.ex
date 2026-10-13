@@ -62,7 +62,10 @@ defmodule Bilimbi.Base.Session do
 
   Activity updates to `sessions` bypass audit capture: they are machine
   housekeeping, not changes to the user's identity or opaque payload.
-  A missing session is never recreated.
+  A missing session is never recreated, and a session whose lifetime has
+  already passed is never revived: the caller proved the session active
+  before touching it, but the row can expire, or be expired by another
+  process, between that proof and this write.
   """
   @spec touch_session(String.t(), non_neg_integer()) :: :ok
   def touch_session(id, now \\ System.system_time(:second))
@@ -70,11 +73,14 @@ defmodule Bilimbi.Base.Session do
     touch_minutes = Bilimbi.Base.Settings.get(@touch_interval_key)
     lifetime_minutes = Bilimbi.Base.Settings.get(@lifetime_key)
     cutoff = now - min(touch_minutes * 60, div(lifetime_minutes * 60, 2))
+    expired_before = now - lifetime_minutes * 60
 
     WriteCapture.without_capture(fn ->
       Repo.update_all(
         from(session in Schema,
-          where: session.id == ^id and session.last_activity < ^cutoff
+          where:
+            session.id == ^id and session.last_activity < ^cutoff and
+              session.last_activity >= ^expired_before
         ),
         set: [last_activity: now]
       )

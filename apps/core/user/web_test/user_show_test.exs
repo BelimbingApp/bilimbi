@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.UserShowTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
@@ -37,7 +37,7 @@ defmodule BilimbiWeb.UserShowTest do
     })
 
     grant_capabilities!(["admin.user.view"])
-    token = Bilimbi.Base.UI.Workspace.host_token("phx-a-host")
+    token = Bilimbi.Base.UI.Workspace.host_token("phx-#{System.unique_integer([:positive])}-host")
     :ok = Bilimbi.Base.UI.Workspace.subscribe(Bilimbi.Base.UI.Workspace.topic(41, 91, token))
 
     {:ok, _view, _html} =

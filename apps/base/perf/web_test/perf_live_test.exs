@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.PerfLiveTest do
+  # Stays `async: false`: changes application environment and drives the named
+  # `Bilimbi.Base.Perf.Reporter`.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

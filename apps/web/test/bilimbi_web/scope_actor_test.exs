@@ -6,7 +6,7 @@ defmodule BilimbiWeb.ScopeActorTest do
   authentication edge sealed, and an anonymous request carries none.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

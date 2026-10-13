@@ -63,6 +63,7 @@ defmodule Mix.Tasks.Bilimbi.Tenant.Provision do
     end
   end
 
+  @spec missing_option!(atom()) :: no_return()
   defp missing_option!(key) do
     option = key |> Atom.to_string() |> String.replace("_", "-")
     Mix.raise("--#{option} is required")

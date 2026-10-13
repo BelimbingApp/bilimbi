@@ -1,4 +1,6 @@
 defmodule BilimbiWeb.ThemeControllerTest do
+  # Stays `async: false`: attaches a telemetry handler, which sees every test's
+  # events.
   use BilimbiWeb.ConnCase, async: false
 
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures

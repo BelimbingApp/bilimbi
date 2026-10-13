@@ -60,7 +60,18 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           required(:indexes) => %{required(String.t()) => index_spec()},
           required(:foreign_keys) => %{required(String.t()) => foreign_key_spec()},
           optional(:checks) => %{required(String.t()) => check_spec()},
-          optional(:optional) => boolean()
+          optional(:optional) => boolean(),
+          optional(:optional_columns) => %{String.t() => column_spec()},
+          optional(:optional_indexes) => %{String.t() => index_spec()},
+          optional(:optional_checks) => %{String.t() => check_spec()},
+          optional(:optional_groups) => [optional_group_spec()]
+        }
+
+  @type optional_group_spec :: %{
+          required(:name) => String.t(),
+          required(:columns) => [String.t()],
+          required(:indexes) => [String.t()],
+          optional(:checks) => [String.t()]
         }
 
   @type table_contribution_spec :: %{

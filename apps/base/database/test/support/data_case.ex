@@ -19,12 +19,25 @@ defmodule Bilimbi.Base.Database.DataCase do
   end
 
   setup tags do
+    mark_async_test!(tags)
+
     owner =
       Ecto.Adapters.SQL.Sandbox.start_owner!(Bilimbi.Base.Repo,
         shared: not tags[:async]
       )
 
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(owner) end)
+    :ok
+  end
+
+  @doc """
+  Marks the process of an `async: true` test, so a node-wide swap such as
+  `ContributionRegistry.put_snapshot_for_test!/1` can refuse to run from one.
+  Every sandbox case calls it from `setup`; the marker lives only in the test
+  process, where those swaps are called.
+  """
+  def mark_async_test!(tags) do
+    if tags[:async], do: Process.put(:bilimbi_async_test, true)
     :ok
   end
 

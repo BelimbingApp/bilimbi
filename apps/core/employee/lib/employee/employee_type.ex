@@ -8,6 +8,16 @@ defmodule Bilimbi.Core.Employee.EmployeeType do
 
   @primary_key {:id, :id, autogenerate: true}
 
+  @type t :: %__MODULE__{
+          id: pos_integer() | nil,
+          code: String.t() | nil,
+          label: String.t() | nil,
+          is_system: boolean() | nil,
+          company_id: pos_integer() | nil,
+          created_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil
+        }
+
   schema "employee_types" do
     field :code, :string
     field :label, :string

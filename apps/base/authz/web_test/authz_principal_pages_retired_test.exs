@@ -7,7 +7,7 @@ defmodule BilimbiWeb.AuthzPrincipalPagesRetiredTest do
   Authorization keeps Capabilities, Roles, Decision Logs and Field Restrictions.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

@@ -55,10 +55,13 @@ defmodule Bilimbi.Core.Company.Summary do
 
   @doc """
   The name a header or workspace strip shows: the legal name when there is
-  one, otherwise the name. Takes the summary or any map carrying those two
-  keys, such as the row `Bilimbi.Core.Company.identity/2` selects.
+  one, otherwise the name. Takes the summary or the identity row
+  `Bilimbi.Core.Company.identity/2` selects.
   """
-  @spec display_name(%{legal_name: String.t() | nil, name: String.t()}) :: String.t()
+  @spec display_name(
+          t()
+          | %{id: pos_integer(), code: String.t(), legal_name: String.t() | nil, name: String.t()}
+        ) :: String.t()
   def display_name(%{legal_name: legal_name, name: name}) do
     if present?(legal_name), do: legal_name, else: name
   end

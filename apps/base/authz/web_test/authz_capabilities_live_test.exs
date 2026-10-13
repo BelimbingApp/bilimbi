@@ -3,7 +3,7 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
   Registered capabilities catalog page.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

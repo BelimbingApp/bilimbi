@@ -9,6 +9,15 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
+  # Simulate loss of the actions store on this sandbox connection only.
+  # Its mutable metadata has a foreign key, and a persistent audit table must
+  # never become a fallback when the temporary fixture is removed.
+  def make_actions_unavailable! do
+    SQL.query!(Repo, "SET LOCAL search_path TO pg_temp", [])
+    SQL.query!(Repo, "DROP TABLE pg_temp.base_audit_actions CASCADE", [])
+    :ok
+  end
+
   def action_payloads(event) do
     SQL.query!(Repo, "SELECT payload FROM base_audit_actions WHERE event = $1 ORDER BY id", [
       event

@@ -281,8 +281,18 @@ defmodule Bilimbi.Base.Settings do
       |> Repo.one()
     end
 
-    if Repo.in_transaction?(), do: loader.(), else: Cache.fetch(row_cache_key(key, scope), loader)
+    # A transaction reads past the cache so an uncommitted write is never
+    # published. The test environment reads past it too (`:read_cache` in
+    # `config/test.exs`): the cache is node-local and cannot tell one SQL
+    # sandbox connection from another, so under concurrent tests a value one
+    # test stored would be served to the next. `Bilimbi.Base.SettingsTest`
+    # turns it back on for the tests that prove the cache.
+    if Repo.in_transaction?() or not read_cache?(),
+      do: loader.(),
+      else: Cache.fetch(row_cache_key(key, scope), loader)
   end
+
+  defp read_cache?, do: Application.get_env(:bilimbi_base_settings, :read_cache, true)
 
   defp fetch_rows([]), do: %{}
 

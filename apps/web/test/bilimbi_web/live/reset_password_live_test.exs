@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.ResetPasswordLiveTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Swoosh.TestAssertions
@@ -9,7 +9,6 @@ defmodule BilimbiWeb.ResetPasswordLiveTest do
 
   setup do
     Bilimbi.Core.User.TestFixtures.create_user_tables!()
-    set_swoosh_global()
     register_user!()
     :ok
   end

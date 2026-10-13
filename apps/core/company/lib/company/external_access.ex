@@ -16,6 +16,21 @@ defmodule Bilimbi.Core.Company.ExternalAccess do
     :metadata
   ]
 
+  @type t :: %__MODULE__{
+          id: pos_integer() | nil,
+          company_id: pos_integer() | nil,
+          relationship_id: pos_integer() | nil,
+          user_id: pos_integer() | nil,
+          permissions: map() | list() | nil,
+          is_active: boolean() | nil,
+          access_granted_at: NaiveDateTime.t() | nil,
+          access_expires_at: NaiveDateTime.t() | nil,
+          metadata: map() | list() | nil,
+          created_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil,
+          deleted_at: NaiveDateTime.t() | nil
+        }
+
   schema "company_external_accesses" do
     field :company_id, :id
     field :relationship_id, :id

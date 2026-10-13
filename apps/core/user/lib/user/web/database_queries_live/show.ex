@@ -500,9 +500,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     ListColumns.load(state, Enum.with_index(results.rows), fn {_row, index} -> index end)
   end
 
-  defp format_db_error(%{message: msg}), do: msg
   defp format_db_error(msg) when is_binary(msg), do: msg
-  defp format_db_error(term), do: inspect(term)
 
   defp format_changeset_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

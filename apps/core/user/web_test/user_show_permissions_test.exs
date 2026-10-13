@@ -6,7 +6,7 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
   never left with a bare "No roles assigned.".
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
