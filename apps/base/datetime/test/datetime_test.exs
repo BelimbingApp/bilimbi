@@ -1,6 +1,8 @@
 defmodule Bilimbi.Base.DateTimeTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
+  import Bilimbi.Base.Database.TestHelpers, only: [errors_on: 1]
+
   alias Bilimbi.Base.DateTime, as: Policy
   alias Bilimbi.Base.DateTime.Contributions
   alias Bilimbi.Base.DateTime.Display
@@ -44,6 +46,13 @@ defmodule Bilimbi.Base.DateTimeTest do
              Map.new(definitions["localization.timezone"])
 
     assert %{scopes: [:user], default: "company"} = Map.new(definitions["ui.timezone.mode"])
+  end
+
+  test "put_mode returns the settings changeset error when the scope cannot be stored" do
+    scope = %Scope{type: :user, id: 0, company_id: 73, tenant_id: 41}
+
+    assert {:error, %Ecto.Changeset{} = changeset} = Policy.put_mode(scope, :utc)
+    assert %{scope_id: [_message]} = errors_on(changeset)
   end
 
   test "mode defaults to :company and persists only canonical values" do

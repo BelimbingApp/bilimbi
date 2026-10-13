@@ -3,6 +3,8 @@ defmodule Bilimbi.Core.User.Notifications do
 
   import Ecto.Query
 
+  alias Ecto.Changeset
+
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor

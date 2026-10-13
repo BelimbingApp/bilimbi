@@ -135,8 +135,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end)
   end
 
+  @type path_dependency :: {atom(), [{:path, String.t()} | {:env, :test}]}
+
   @doc "Returns local path dependencies for modules installed in a container."
-  @spec container_dependencies(String.t()) :: [Mix.Project.dependency()]
+  @spec container_dependencies(String.t()) :: [path_dependency()]
   def container_dependencies(container_root) do
     container_root = Path.expand(container_root)
     validate_container_root!(container_root)
@@ -159,7 +161,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   equal the mounted directory name; the container's `mix.exs` must declare the
   same `app:`. Paths are relative to `project_root`.
   """
-  @spec optional_container_dependencies(String.t()) :: [Mix.Project.dependency()]
+  @spec optional_container_dependencies(String.t()) :: [path_dependency()]
   def optional_container_dependencies(project_root) do
     project_root = Path.expand(project_root)
     workspace_root = workspace_root!(project_root)
@@ -283,7 +285,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   @doc "Resolves a module's declared dependencies to local Mix path dependencies."
-  @spec module_dependencies(String.t()) :: [Mix.Project.dependency()]
+  @spec module_dependencies(String.t()) :: [path_dependency()]
   def module_dependencies(module_root) do
     module_root = Path.expand(module_root)
     modules = module_root |> workspace_root!() |> discover_workspace!()

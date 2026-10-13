@@ -445,8 +445,6 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
-  defp normalize_bootstrap_country(_), do: nil
-
   @doc "Lists live tenant addresses not yet linked to the selected live Company."
   @spec list_available_company_addresses(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}

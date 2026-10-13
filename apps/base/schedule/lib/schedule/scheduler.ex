@@ -254,12 +254,9 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
       # runs on), or :unresolvable_time (a DST edge). Collapsing them to a
       # generic :time_resolution_failed threw away the actionable half at the
       # source, the same defect #682 fixes at the sink; pass the real reason
-      # through, keeping a generic fallback for any unexpected shape.
+      # through.
       {:error, reason} ->
         diagnostic(definition, reason)
-
-      _other ->
-        diagnostic(definition, :time_resolution_failed)
     end
   end
 

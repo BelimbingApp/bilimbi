@@ -72,7 +72,7 @@ defmodule Bilimbi.Base.DateTime do
   never name another user here. Only the three canonical modes persist.
   """
   @spec put_mode(SettingsScope.t(), mode() | String.t()) ::
-          {:ok, mode()} | {:error, :invalid_mode}
+          {:ok, mode()} | {:error, :invalid_mode | Ecto.Changeset.t()}
   def put_mode(%SettingsScope{type: :user} = scope, mode) do
     if valid_mode?(mode) do
       mode = parse_mode(mode)

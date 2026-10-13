@@ -10,6 +10,10 @@ defmodule Bilimbi.Base.Authz.Decision do
           | :denied_company_scope
           | :denied_missing_capability
           | :denied_explicitly
+          | :denied_platform_scope
+          | :denied_agent_platform
+          | :denied_agent_access_control
+          | :denied_agent_writes_off
           | :denied_policy_engine_error
 
   @enforce_keys [:allowed, :reason]
