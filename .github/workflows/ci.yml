@@ -100,9 +100,6 @@ jobs:
           elixir .github/scripts/graph_edges.exs --self-test
           elixir .github/scripts/graph_edges.exs
 
-      - name: Verify module contributions
-        run: mix bilimbi.contributions.verify
-
       - name: Scan Phoenix security across all applications
         run: .github/scripts/sobelow_modules.sh
 
@@ -331,6 +328,9 @@ jobs:
 
       - name: Run the Web tests
         run: mix precommit.test.web
+
+      - name: Verify module contributions
+        run: mix bilimbi.contributions.verify
 
       - name: Verify the test suite made no changes
         run: git diff --exit-code
