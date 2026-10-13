@@ -55,7 +55,13 @@ defmodule Bilimbi.Base.ArtifactsTest do
              Bilimbi.Base.Artifacts.SchemaContract.verify_invariants(Repo, prefix: prefix)
 
     assert Enum.any?(errors, &String.contains?(&1, "ready_at"))
-    Ecto.Adapters.SQL.query!(Repo, "DROP TABLE base_artifacts", [])
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "DROP TABLE base_artifact_retention_events, base_artifacts",
+      []
+    )
+
     assert :ok = Bilimbi.Base.Artifacts.SchemaContract.verify_invariants(Repo, prefix: prefix)
   end
 
