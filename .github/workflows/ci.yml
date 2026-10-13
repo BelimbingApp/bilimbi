@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+  schedule:
+    - cron: "17 18 * * *"
   push:
     branches:
       - main
@@ -9,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -97,10 +100,7 @@ jobs:
           elixir .github/scripts/graph_edges.exs --self-test
           elixir .github/scripts/graph_edges.exs
 
-      - name: Scan Phoenix security
-        run: mix sobelow --root apps/web --private --exit medium
-
-      - name: Scan module-owned web adapters
+      - name: Scan Phoenix security across all applications
         run: .github/scripts/sobelow_modules.sh
 
   types:
@@ -129,21 +129,60 @@ jobs:
             deps
             _build/dev
             ~/.mix
-          key: ${{ runner.os }}-beam-dialyzer-${{ hashFiles('mix.lock', 'mix.exs', 'apps/**/mix.exs', 'apps/**/lib/**/*.ex') }}
+          key: ${{ runner.os }}-beam-dialyzer-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-beam-dialyzer-
 
       - name: Install dependencies
         run: mix deps.get
 
-      - name: Run Dialyzer
+      - name: Run the existing host Dialyzer check
+        env:
+          BILIMBI_DIALYZER_SCOPE: host
         run: mix dialyzer --format github
 
-  tests:
-    name: Elixir tests
+      # The first full-package analysis exposes existing warning debt. Keep
+      # every finding visible while the legacy host check remains blocking.
+      - name: Report module-package Dialyzer warnings
+        continue-on-error: true
+        env:
+          BILIMBI_DIALYZER_SCOPE: packages
+        run: mix dialyzer --format github
+
+  compatibility_paths:
+    name: Check compatibility test paths
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-26.04
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check compatibility-sensitive paths
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -Eq '(^|/)priv/repo/migrations/|(^|/)bilimbi\.module\.exs$|^apps/core/compatibility/|^apps/base/module_registry/|^mix\.lock$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  compatibility:
+    name: Elixir compatibility tests
+    needs: compatibility_paths
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.compatibility_paths.outputs.run == 'true') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     env:
-      BILIMBI_E2E_PARENT_COMMAND: mix precommit
+      BILIMBI_E2E_PARENT_COMMAND: mix test
       PGHOST: localhost
       PGPASSWORD: bilimbi_dev_ca658ad7d8b5
       PGPORT: "5432"
@@ -181,45 +220,24 @@ jobs:
           path: |
             deps
             _build/test
-          key: ${{ runner.os }}-beam-tests-${{ hashFiles('mix.lock') }}
+          key: ${{ runner.os }}-beam-tests-compatibility-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-beam-tests-
 
       - name: Install dependencies
         run: mix deps.get
 
-      # Asset tools live beside _build/test, so the build cache above does not
-      # retain them. Keep their configured versions and npm's locked downloads
-      # in a separate cache; the install steps still verify/install as needed.
-      - name: Restore asset tool cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            _build/tailwind-*
-            _build/esbuild-*
-            ~/.npm
-          key: ${{ runner.os }}-${{ runner.arch }}-asset-tools-${{ hashFiles('config/config.exs', 'apps/web/assets/package-lock.json') }}
+      - name: Verify formatting
+        run: mix format --check-formatted
 
-      # The mounted Tailwind source test builds CSS with the pinned binary.
-      - name: Install Tailwind
-        run: (cd apps/web && mix tailwind.install --if-missing)
-
-      # The module hooks test bundles mounted hooks with the pinned esbuild binary.
-      - name: Install esbuild
-        run: (cd apps/web && mix esbuild.install --if-missing)
-
-      # `mix precommit` runs the LiveView hook tests in Node (`mix assets.test`).
-      - name: Install Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "24"
-
-      - name: Run the project precommit suite
-        id: precommit
+      - name: Run compatibility tests
+        id: compatibility
         env:
           BILIMBI_E2E_DIAGNOSTICS_DIR: ${{ runner.temp }}/bilimbi-e2e-diagnostics
-        run: mix precommit
+        run: mix precommit.test.compatibility
 
       - name: Upload PlatformBaseline failure diagnostics
-        if: ${{ failure() && steps.precommit.outcome == 'failure' }}
+        if: ${{ failure() && steps.compatibility.outcome == 'failure' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: platform-baseline-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -229,8 +247,201 @@ jobs:
           compression-level: 9
           include-hidden-files: false
 
-      - name: Verify the precommit suite made no changes
+      - name: Verify the test suite made no changes
         run: git diff --exit-code
+
+  web_tests:
+    name: Elixir Web tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+
+    env:
+      PGHOST: localhost
+      PGPASSWORD: bilimbi_dev_ca658ad7d8b5
+      PGPORT: "5432"
+      PGUSER: bilimbi
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: bilimbi_dev_ca658ad7d8b5
+          POSTGRES_USER: bilimbi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bilimbi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "28.5"
+          elixir-version: "1.20.3"
+          version-type: strict
+
+      - name: Restore build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            deps
+            _build/test
+          key: ${{ runner.os }}-beam-tests-web-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-beam-tests-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Verify formatting
+        run: mix format --check-formatted
+
+      - name: Restore asset tool cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            _build/tailwind-*
+            _build/esbuild-*
+            ~/.npm
+          key: ${{ runner.os }}-${{ runner.arch }}-asset-tools-${{ hashFiles('config/config.exs', 'apps/web/assets/package-lock.json') }}
+
+      - name: Install Tailwind
+        run: (cd apps/web && mix tailwind.install --if-missing)
+
+      - name: Install esbuild
+        run: (cd apps/web && mix esbuild.install --if-missing)
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Test mounted LiveView hooks
+        run: mix assets.test
+
+      - name: Run the Web tests
+        run: mix precommit.test.web
+
+      - name: Verify module contributions
+        run: mix bilimbi.contributions.verify
+
+      - name: Verify the test suite made no changes
+        run: git diff --exit-code
+
+  package_tests:
+    name: Elixir package tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+
+    env:
+      PGHOST: localhost
+      PGPASSWORD: bilimbi_dev_ca658ad7d8b5
+      PGPORT: "5432"
+      PGUSER: bilimbi
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: bilimbi_dev_ca658ad7d8b5
+          POSTGRES_USER: bilimbi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bilimbi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "28.5"
+          elixir-version: "1.20.3"
+          version-type: strict
+
+      - name: Restore build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            deps
+            _build/test
+          key: ${{ runner.os }}-beam-tests-packages-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-beam-tests-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Verify dependency lock is complete
+        run: mix deps.unlock --unused
+
+      - name: Verify formatting
+        run: mix format --check-formatted
+
+      - name: Run the package tests
+        run: mix precommit.test.packages
+
+      - name: Verify the test suite made no changes
+        run: git diff --exit-code
+
+  # Branch protection requires the check named `Elixir tests`. The test jobs
+  # above report under their own names, so this aggregate keeps that check.
+  # `always()` stops a skipped dependency from skipping this job, which would
+  # read as a green required check. A skip counts only when the path gate ran
+  # and said `run=false`; a failed or cancelled job always fails the gate.
+  tests:
+    name: Elixir tests
+    if: ${{ always() }}
+    needs: [compatibility_paths, compatibility, web_tests, package_tests]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Require each test job to pass or be skipped by its path gate
+        env:
+          GATE_RESULT: ${{ needs.compatibility_paths.result }}
+          GATE_RUN: ${{ needs.compatibility_paths.outputs.run }}
+          COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
+          WEB_TESTS_RESULT: ${{ needs.web_tests.result }}
+          PACKAGE_TESTS_RESULT: ${{ needs.package_tests.result }}
+        run: |
+          failed=0
+
+          case "$COMPATIBILITY_RESULT" in
+            success) ;;
+            skipped)
+              if [ "$GATE_RESULT" != success ] || [ "$GATE_RUN" != false ]; then
+                echo "::error::compatibility was skipped, but its path gate did not clear it"
+                failed=1
+              fi
+              ;;
+            *)
+              echo "::error::compatibility finished with result: $COMPATIBILITY_RESULT"
+              failed=1
+              ;;
+          esac
+
+          for entry in "web_tests=$WEB_TESTS_RESULT" "package_tests=$PACKAGE_TESTS_RESULT"; do
+            if [ "${entry#*=}" != success ]; then
+              echo "::error::${entry%%=*} finished with result: ${entry#*=}"
+              failed=1
+            fi
+          done
+
+          exit "$failed"
 
   first_build:
     name: Elixir first-build routes
