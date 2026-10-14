@@ -1,4 +1,5 @@
 defmodule BilimbiWeb.MCPPluginTest do
+  # Changes the shared Endpoint configuration and runs a Mix task.
   use BilimbiWeb.ConnCase, async: false
   alias Bilimbi.Base.Settings
 

@@ -1,4 +1,5 @@
 defmodule Bilimbi.Core.AgentAccess.Web.McpOAuthTest do
+  # Drives the node-wide OAuth rate-limit ETS bucket.
   use BilimbiWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   alias Bilimbi.Base.{Repo, Settings, Tenancy}

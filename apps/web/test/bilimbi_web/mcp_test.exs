@@ -1,4 +1,5 @@
 defmodule BilimbiWeb.MCPTest do
+  # Drives the node-wide MCP rate-limit ETS bucket.
   use BilimbiWeb.ConnCase, async: false
   alias Bilimbi.Base.{AgentApi, Authz, Repo, Settings, Tenancy}
   alias Bilimbi.Base.Tenancy.Authentication
