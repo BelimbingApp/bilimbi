@@ -26,6 +26,24 @@ defmodule Bilimbi.Base.AgentApi.MCPTest do
     assert Enum.find(tools, &(&1.name == "read")).annotations.readOnlyHint
     refute Enum.find(tools, &(&1.name == "plan")).annotations.readOnlyHint
     assert Enum.find(tools, &(&1.name == "commit")).annotations.destructiveHint
+
+    for params <- [%{"_meta" => %{}}, %{"_meta" => %{"progressToken" => 7}}] do
+      assert {:reply, %{result: %{tools: ^tools}}} =
+               MCP.dispatch(nil, %{
+                 "jsonrpc" => "2.0",
+                 "id" => 3,
+                 "method" => "tools/list",
+                 "params" => params
+               })
+    end
+
+    assert {:reply, %{error: %{code: -32_602, message: "Unsupported cursor"}}} =
+             MCP.dispatch(nil, %{
+               "jsonrpc" => "2.0",
+               "id" => 4,
+               "method" => "tools/list",
+               "params" => %{"cursor" => "next"}
+             })
   end
 
   test "notifications return no RPC reply and malformed messages and unknown methods fail" do

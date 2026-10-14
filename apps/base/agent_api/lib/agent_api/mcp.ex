@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.AgentApi.MCP do
   """
   alias Bilimbi.Base.AgentApi
 
-  @versions ~w(2025-11-25 2025-06-18 2025-03-26)
+  @versions ~w(2025-11-25 2025-06-18)
   def versions, do: @versions
 
   def public?(%{"method" => method}),
@@ -61,8 +61,14 @@ defmodule Bilimbi.Base.AgentApi.MCP do
   defp request(_, "initialize", _, id), do: error(id, -32_602, "Invalid initialize params")
   defp request(_, "ping", _, id), do: result(id, %{})
 
-  defp request(_, "tools/list", params, id) when map_size(params) == 0,
-    do: result(id, %{tools: tools()})
+  defp request(_, "tools/list", params, id) do
+    cond do
+      Map.has_key?(params, "cursor") -> error(id, -32_602, "Unsupported cursor")
+      Enum.any?(Map.keys(params), &(&1 != "_meta")) -> error(id, -32_602, "Invalid params")
+      not is_map(Map.get(params, "_meta", %{})) -> error(id, -32_602, "Invalid params")
+      true -> result(id, %{tools: tools()})
+    end
+  end
 
   defp request(scope, "tools/call", %{"name" => name} = params, id) when is_binary(name) do
     arguments = Map.get(params, "arguments", %{})

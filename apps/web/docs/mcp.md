@@ -83,7 +83,7 @@ Errors return `isError: true`; successful tools return text and structured data.
 
 POST handles JSON-RPC 2.0 initialization, ping, tools/list, tools/call,
 initialized and cancellation notifications. Supported versions are
-`2025-11-25`, `2025-06-18` and `2025-03-26`. Clients advertise both
+`2025-11-25` and `2025-06-18`. Clients advertise both
 `application/json` and `text/event-stream` in Accept. Requests get JSON;
 accepted notifications get empty 202 responses. There are no sessions or
 server-initiated events; GET and DELETE return 405. Present Origin headers
