@@ -5,6 +5,33 @@ the installed Agent API, runs no model, accepts no file uploads and exposes
 no additional business permissions. The native client remains available for
 local agents. MCP does not execute that client on the server.
 
+## Plugin for ChatGPT page
+
+Signed-in people can open **Settings → Plugin for ChatGPT** at
+`/settings/chatgpt-plugin`, also linked from Agent connections. The page shows
+this host's configured connection address and OAuth endpoints, lists registered
+public clients, and explains public HTTPS and private LAN/VPN setup separately.
+It never infers public reachability from a hostname or claims a tunnel is ready.
+
+A person chooses the administrator-registered client and downloads a ZIP of the
+portable manifest, MCP configuration and skills. Downloading creates no grant;
+the separate ChatGPT OAuth consent flow still names the person and end date.
+The page and download refuse impersonation and agent facets. Unconfigured
+clients and HTTP origins explain what an administrator must fix and cannot be
+used to download a package. Client registration is checked again at download.
+
+The ZIP can be distributed through a company marketplace or a supported local
+marketplace. A private connection still needs the workspace's Secure MCP Tunnel
+setup in ChatGPT; exporting or downloading a ZIP neither provisions that tunnel
+nor publishes a plugin. The tunnel's MCP route and the complete OAuth flow must
+both be verified for the installation.
+
+Core Agent Access compiles the canonical `plugins/bilimbi` manifest and skills
+into its package, so downloads work in releases without a source checkout.
+`mix bilimbi.mcp.plugin` and the browser share that one package builder. The
+archive contains public configuration and software only, never tokens, native
+executables, or a user's records. No temporary archive is written to disk.
+
 ## Administrator setup
 
 For local clients, `mix bilimbi.server` configures trusted Caddy HTTPS at

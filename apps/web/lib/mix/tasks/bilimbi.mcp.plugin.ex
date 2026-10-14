@@ -22,56 +22,32 @@ defmodule Mix.Tasks.Bilimbi.Mcp.Plugin do
 
     Mix.Task.run("app.start")
     endpoint = BilimbiWeb.Endpoint.url()
-    uri = URI.parse(endpoint)
 
-    unless uri.scheme == "https" and is_binary(uri.host),
-      do: Mix.raise("Configure the host's public HTTPS URL before exporting a ChatGPT plugin")
+    files =
+      case Bilimbi.Core.AgentAccess.plugin_files(endpoint, opts[:client]) do
+        {:ok, files} ->
+          files
 
-    unless Map.has_key?(Bilimbi.Base.Settings.get("agent_access.oauth_clients"), opts[:client]),
-      do: Mix.raise("Register this public OAuth client in Global Settings first")
+        {:error, :https_required} ->
+          Mix.raise("Configure the host's public HTTPS URL first")
+
+        {:error, :invalid_client} ->
+          Mix.raise("Register this public OAuth client in Global Settings first")
+      end
 
     output = Path.expand(opts[:output])
 
     if File.exists?(output),
       do: Mix.raise("Output directory already exists; choose a new directory")
 
-    source = Path.expand("../../../../../plugins/bilimbi", __DIR__)
-    manifest = source |> Path.join("plugin.json") |> File.read!() |> Jason.decode!()
-    File.mkdir_p!(output)
-    write(output, "plugin.json", manifest)
-
-    write(output, "mcp.json", %{
-      "$schema" => "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-      "mcpServers" => %{
-        "bilimbi" => %{
-          "type" => "streamable-http",
-          "url" => endpoint <> "/mcp",
-          "extensions" => %{
-            "com.openai" => %{
-              "auth" => %{
-                "type" => "oauth",
-                "client" => %{
-                  "mode" => "provided",
-                  "clientId" => opts[:client],
-                  "tokenEndpointAuthMethod" => "none"
-                },
-                "authorizationUrl" => endpoint <> "/oauth/authorize",
-                "tokenUrl" => endpoint <> "/oauth/token",
-                "baseScopes" => ["bilimbi"]
-              }
-            }
-          }
-        }
-      }
-    })
-
-    File.cp_r!(Path.join(source, "skills"), Path.join(output, "skills"))
+    for {path, bytes} <- files do
+      target = Path.join(output, path)
+      File.mkdir_p!(Path.dirname(target))
+      File.write!(target, bytes)
+    end
 
     Mix.shell().info(
       "Exported #{output}. Connect #{endpoint}/mcp in ChatGPT using client #{opts[:client]} and OAuth without a client secret."
     )
   end
-
-  defp write(output, name, value),
-    do: File.write!(Path.join(output, name), Jason.encode!(value, pretty: true) <> "\n")
 end
