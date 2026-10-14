@@ -8,7 +8,7 @@ only in the initial device response or successful token response.
 The built-in public client is `bilimbi-native`, with no secret or installation
 registration. Device codes last ten minutes; polling starts at five seconds
 and `slow_down` adds five seconds. Access tokens last at most one hour. The global Settings value
-`agent_access.connection_days` sets new connections' length (90 days by default).
+`agent_access.connection_days` sets new connections' length (90 days by default, 1 to 365).
 Both consent pages display the server-computed end time and accept no submitted
 expiry. Existing connections retain their end times. Refresh tokens last until that
 end date, rotate on every use, and a replay revokes the entire connection.

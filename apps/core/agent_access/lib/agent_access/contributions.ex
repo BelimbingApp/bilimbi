@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.AgentAccess.Contributions do
             scopes: [:global],
             default: 90,
             minimum: 1,
+            maximum: 365,
             label: "Agent connection length (days)",
             help:
               "Length of new device and OAuth connections. Existing connections keep their end dates.",

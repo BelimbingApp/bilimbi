@@ -599,6 +599,18 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     assert existing.expires_at == connection.expires_at
   end
 
+  test "connection length is bounded by the setting definition" do
+    assert_raise ArgumentError, fn ->
+      Bilimbi.Base.Settings.put("agent_access.connection_days", 10_000_000)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Bilimbi.Base.Settings.put("agent_access.connection_days", 0)
+    end
+
+    assert {:ok, _} = Bilimbi.Base.Settings.put("agent_access.connection_days", 365)
+  end
+
   test "device consent requires an explicit action and connections can be revoked", %{conn: conn} do
     device = start()
     conn = log_in_as(conn)
