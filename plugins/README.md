@@ -3,8 +3,9 @@
 [`.agents/plugins/marketplace.json`](../.agents/plugins/marketplace.json) is
 the repository's plugin catalog, named `bilimbi-local` and displayed as
 **Bilimbi**. It points to `./plugins/bilimbi`, relative to the repository
-root. That plugin holds `.codex-plugin/plugin.json`, `skills/`, and an ignored
-`bin/` directory for the built native program.
+root. That plugin holds a portable `plugin.json`, a Codex compatibility
+manifest at `.codex-plugin/plugin.json`, the workflow and setup skills under
+`skills/`, and an ignored `bin/` directory for the built native program.
 
 ## With a Bilimbi checkout
 
@@ -34,5 +35,8 @@ The [official OpenAI plugin documentation](https://developers.openai.com/plugins
 documents local-folder registration through the CLI; it does not confirm a
 local-folder option for the desktop Plugins **Add** button.
 
-See the [native client README](../clients/bilimbi-cli/README.md) for the full
-installation walk-through, sign-in, and command reference.
+## More
+
+- [Native client README](../clients/bilimbi-cli/README.md): installation,
+  sign-in, building, and the command reference.
+- [Bilimbi MCP for ChatGPT](../apps/web/docs/mcp.md): ChatGPT MCP setup.
