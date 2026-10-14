@@ -238,3 +238,35 @@ and refuses an archived company before writing the setting. The company's
 Agent access fact exposes this switch, on by default. Turning it off stops
 agents signed in there and employee writes targeting it, including plans
 already reviewed. It does not change a person's ordinary screen permissions.
+
+## Relationship roles and headless administration
+
+The existing `company_relationship_types` catalogue describes relationships,
+not legal company types. The production seed `core/company/relationship-roles`
+adds vendor/supplier, customer and partner if missing; it never overwrites an
+operator's rename or retirement. Run it through `mix bilimbi.seeds.run`, not at
+boot. Operators manage defaults and custom roles at `/companies/relationship-types`
+using the same reference-type page as the other company catalogues. The catalogue
+is platform-wide, so writes require the operator tenant plus company create/update
+capabilities; other tenants can read and assign its active roles.
+
+For source A, related B, role vendor: **B supplies A**. A sees B as vendor;
+B sees A under the catalogue's inverse label, customer. For customer: **B buys
+from A**, inverse vendor/supplier. Partner is symmetric. Custom roles store the
+inverse label in their existing metadata. Stable codes and IDs survive renaming.
+Retiring a role excludes it from new assignments without deleting, rewriting or
+ending existing relationships. Multiple roles between the same organisations
+are separate concurrent links. Role and affiliation creation grants no portal
+access or permissions; external access is administered separately.
+
+Discover `core.company.relationship_role.list/get/create/update/retire` and
+`core.company.relationship.list/get/create/update/unlink`. Searches support role
+name/code duplicate checks; company lookup remains `core.company.list/get`.
+Writes use preview, review/approval and bound plan-code commit. Relationship
+writes use the same source-company authorization and writable-company rules as
+the UI, and validate that both organisations are in the tenant. Unlink sets the
+existing soft-delete clock and retains the link and effective dates.
+`relationship.get` can still read that link, and `relationship.list` with
+`include_unlinked: true` includes it in history. Dates can
+be updated without changing the relationship's role or organisations. Catalogue
+retirement is distinct from unlinking one company's relationship.

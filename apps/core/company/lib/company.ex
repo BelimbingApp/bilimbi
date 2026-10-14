@@ -99,7 +99,7 @@ defmodule Bilimbi.Core.Company do
   The result proves only the Company identity. It is schema-free and valid only
   until the current `Bilimbi.Base.Repo` transaction commits or rolls back.
   Callers that acquire more than one module's records must lock Company rows
-  first, then Employee rows, then User rows; within each kind, acquire ids in
+  first, then Person and affiliation rows, then Employee rows, then User rows; within each kind, acquire ids in
   ascending order. Do not call this after taking an Employee or User row lock.
 
   A lock is only ever taken to write, so an archived company is refused here
@@ -990,4 +990,20 @@ defmodule Bilimbi.Core.Company do
 
   defp unwrap_mutation({:ok, result}), do: {:ok, result}
   defp unwrap_mutation({:error, reason}), do: {:error, reason}
+
+  @doc "Platform-wide roles; catalogue writes require the operator tenant. Codes and links are permanent."
+  defdelegate list_relationship_types(), to: Bilimbi.Core.Company.RelationshipCatalogue, as: :list
+  defdelegate get_relationship_type(id), to: Bilimbi.Core.Company.RelationshipCatalogue, as: :get
+
+  defdelegate create_relationship_type(scope, attrs),
+    to: Bilimbi.Core.Company.RelationshipCatalogue,
+    as: :create
+
+  defdelegate update_relationship_type(scope, id, attrs),
+    to: Bilimbi.Core.Company.RelationshipCatalogue,
+    as: :update
+
+  defdelegate toggle_relationship_type_active(scope, id),
+    to: Bilimbi.Core.Company.RelationshipCatalogue,
+    as: :toggle
 end

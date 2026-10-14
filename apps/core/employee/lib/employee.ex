@@ -1,6 +1,9 @@
 defmodule Bilimbi.Core.Employee do
   @moduledoc """
-  Public API for tenant-scoped employment relationships.
+  Deprecated compatibility API for tenant-scoped legacy HR records.
+
+  New contacts and affiliations use Bilimbi.Core.Person. Existing HR columns
+  and durable Employee IDs remain intact until People claims them; see docs/README.md.
 
   Employee identity remains separate from authentication identity. Every
   operation runs under a `Bilimbi.Base.Tenancy.Scope`, so the tenant is proven
@@ -55,6 +58,24 @@ defmodule Bilimbi.Core.Employee do
     status: "active"
   }
   @protected_orchestrator_fields [:employee_number, :employee_type]
+
+  @doc "Resolves the Core Person/affiliation mapping without exposing either module's private schemas."
+  def person_identity(%Scope{} = scope, employee_id) do
+    with {:ok, employees} <- get_tenant_employees(scope, [employee_id]),
+         true <- Map.has_key?(employees, employee_id),
+         {:ok, affiliation} <- Bilimbi.Core.Person.legacy_affiliation(scope, employee_id) do
+      {:ok,
+       %{
+         legacy_employee_id: affiliation.legacy_employee_id,
+         person_id: affiliation.person_id,
+         affiliation_id: affiliation.id,
+         company_id: affiliation.company_id
+       }}
+    else
+      false -> {:error, :employee_not_found}
+      error -> error
+    end
+  end
 
   @type lookup_error ::
           :company_not_found

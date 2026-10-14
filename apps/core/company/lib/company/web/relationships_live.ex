@@ -462,7 +462,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               </.badge>
             </:col>
             <:col :let={%{record: item}} id="type">
-              <span class="font-medium">{item.type.name}</span>
+              <span class="font-medium">{item.role_label}</span>
             </:col>
             <:col :let={%{record: item}} id="effective_period">
               <span class="text-xs text-ink-subtle">
@@ -531,7 +531,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               field={@form[:related_company_id]}
               id="relationship-related-company-id"
               type="select"
-              label="Related Company"
+              label="Related company (has this role toward the source)"
               options={@company_options}
               prompt="Select a company"
               required
@@ -578,7 +578,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
           :if={@pending_delete}
           id="delete-rel-confirm"
           consequence={"The #{@pending_delete.type.name} relationship with #{@pending_delete.other_company.name} will be removed."}
-          detail="Both companies are kept. The relationship's dates are lost and it would have to be added again."
+          detail="Both companies and the historical relationship are kept."
           confirm="Remove"
           working="Removing…"
           on_confirm={JS.push("delete")}

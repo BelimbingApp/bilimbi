@@ -40,7 +40,6 @@ defmodule Bilimbi.Core.Company.Relationship do
   def changeset(relationship, attrs) do
     relationship
     |> cast(attrs, [
-      :company_id,
       :related_company_id,
       :relationship_type_id,
       :effective_from,
