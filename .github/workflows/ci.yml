@@ -136,16 +136,18 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      # Cached PLTs include local path packages. Their exports can change
+      # without a mix.lock change, so refresh them before either analysis.
       - name: Run the existing host Dialyzer check
         env:
           BILIMBI_DIALYZER_SCOPE: host
-        run: mix dialyzer --format github
+        run: mix dialyzer --force-check --format github
 
       # The package analysis includes source-loaded composition helpers.
       - name: Check module-package Dialyzer warnings
         env:
           BILIMBI_DIALYZER_SCOPE: packages
-        run: mix dialyzer --format github
+        run: mix dialyzer --force-check --format github
 
   compatibility_paths:
     name: Check compatibility test paths

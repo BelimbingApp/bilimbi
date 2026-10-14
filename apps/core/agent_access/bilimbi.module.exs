@@ -15,7 +15,10 @@
     "core/user"
   ],
   migrations: "priv/repo/migrations",
-  migration_dispositions: %{20_261_011_120_000 => :bilimbi_only},
+  migration_dispositions: %{
+    20_261_011_120_000 => :bilimbi_only,
+    20_261_012_120_000 => :bilimbi_only
+  },
   schema_contract: Bilimbi.Core.AgentAccess.SchemaContract,
   web: "priv/web_routes.exs",
   contribution_provider: Bilimbi.Core.AgentAccess.Contributions,

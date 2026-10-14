@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "bilimbi",
+  "version": "0.1.4",
+  "description": "Connect to Bilimbi through MCP or a local native client, discover and read records, review supported writes, and show verified results.",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "displayName": "Bilimbi",
+        "shortDescription": "Read and update Bilimbi with reviewed changes",
+        "defaultPrompt": ["Use Bilimbi to connect to my server and discover available operations."]
+      }
+    }
+  }
+}

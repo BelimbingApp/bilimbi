@@ -83,6 +83,8 @@ defmodule BilimbiWeb.Router do
   scope "/.well-known", BilimbiWeb do
     pipe_through :oauth
     get "/oauth-authorization-server", OAuthController, :metadata
+    get "/oauth-protected-resource", OAuthController, :protected_resource
+    get "/oauth-protected-resource/mcp", OAuthController, :protected_resource
     get "/bilimbi", OAuthController, :descriptor
   end
 
@@ -100,6 +102,11 @@ defmodule BilimbiWeb.Router do
     post "/operations/:key/call", AgentApiController, :invoke
     post "/plans", AgentApiController, :plan
     post "/plans/commit", AgentApiController, :commit
+  end
+
+  scope "/", BilimbiWeb do
+    # MCP handles negotiation itself, including the optional SSE GET (405).
+    match :*, "/mcp", MCPController, :handle, log: false
   end
 
   # Signed machine traffic uses only this reserved scope. Browser routes keep

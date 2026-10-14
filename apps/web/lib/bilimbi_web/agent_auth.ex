@@ -10,9 +10,11 @@ defmodule BilimbiWeb.AgentAuth do
   alias Bilimbi.Core.{AgentAccess, Company, User}
   def init(opts), do: opts
 
-  def call(conn, _) do
+  def call(conn, opts) do
+    resource = if Keyword.get(opts, :audience) == :mcp, do: BilimbiWeb.MCPController.resource()
+
     with {:ok, token} <- bearer(conn),
-         {:ok, claims} <- AgentAccess.authenticate(token),
+         {:ok, claims} <- AgentAccess.authenticate(token, resource),
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(claims.company_id),
          true <- tenant_id == claims.tenant_id,
          {:ok, tenant} <- Tenancy.scope(tenant_id),
@@ -42,10 +44,10 @@ defmodule BilimbiWeb.AgentAuth do
           |> assign(:agent_actor, actor)
 
         _ ->
-          refused(conn)
+          refused(conn, opts)
       end
     else
-      _ -> refused(conn)
+      _ -> refused(conn, opts)
     end
   end
 
@@ -67,9 +69,15 @@ defmodule BilimbiWeb.AgentAuth do
     end
   end
 
-  defp refused(conn) do
+  defp refused(conn, opts) do
+    challenge =
+      if Keyword.get(opts, :audience) == :mcp,
+        do:
+          ~s(Bearer resource_metadata="#{BilimbiWeb.Endpoint.url()}/.well-known/oauth-protected-resource/mcp"),
+        else: "Bearer"
+
     conn
-    |> put_resp_header("www-authenticate", "Bearer")
+    |> put_resp_header("www-authenticate", challenge)
     |> put_resp_content_type("application/json")
     |> send_resp(401, Jason.encode!(%{error: "invalid_token"}))
     |> halt()

@@ -1,5 +1,9 @@
 # External agent HTTP API (version 1)
 
+ChatGPT also connects through the [MCP adapter](mcp.md). It uses the same
+Agent API and bearer edge with a separate resource-bound authorization-code
+grant. Native device connections continue to use this API directly.
+
 Give a client the server address once. Discovery is
 `GET /.well-known/oauth-authorization-server` (RFC 8414) and
 `GET /.well-known/bilimbi` (API base, version, server name and public client ID).
@@ -27,8 +31,9 @@ Machine endpoints accept URL-encoded or JSON objects and refuse multipart
 uploads; files stay in the harness. Token responses use
 `Cache-Control: no-store`. No client secret, cookies, impersonation or
 caller-supplied person/tenant/company identity authorizes API requests.
-Plain HTTP is allowed at the owner's direction for this stage; HTTPS deployment
-is deferred. This is an intentional departure from the RFC transport requirement.
+The native client permits plain HTTP at the owner's direction for this stage,
+an intentional departure from the RFC transport requirement. Production ChatGPT
+MCP connections and plugin export require the configured public HTTPS URL.
 
 - `GET /api/v1/search?q=words`: `{result: [...]}`. Optional `limit` (1–50),
   `kind` (`read` or `write`) and `include_unavailable` (`true` or `false`)
