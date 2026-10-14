@@ -23,9 +23,28 @@ const InlineEdit = {
 
     this.triggerEl.addEventListener("click", () => this.startEdit())
     this.triggerEl.addEventListener("keydown", (e) => {
+      if (e.defaultPrevented || e.isComposing || this.readOnly()) return
+
+      if (e.key === "F2" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        this.startEdit({caret: this.inputEl.value.length})
+        return
+      }
+
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault()
         this.startEdit()
+        return
+      }
+
+      if (
+        e.key.length === 1 &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault()
+        this.startEdit({value: e.key, caret: e.key.length})
       }
     })
 
@@ -69,12 +88,30 @@ const InlineEdit = {
     this.inputEl.value = this.originalValue
   },
 
-  startEdit() {
+  readOnly() {
+    return (
+      this.el.hasAttribute("disabled") ||
+      this.el.getAttribute("aria-disabled") === "true" ||
+      this.triggerEl.disabled ||
+      this.triggerEl.getAttribute("aria-disabled") === "true" ||
+      this.inputEl.disabled ||
+      this.inputEl.readOnly
+    )
+  },
+
+  startEdit({value, caret} = {}) {
+    if (this.readOnly()) return
+
     this.originalValue = this.inputEl.value
+    if (value !== undefined) this.inputEl.value = value
     this.triggerEl.classList.add("invisible", "pointer-events-none")
     this.inputEl.classList.remove("hidden")
     this.inputEl.focus()
-    this.inputEl.select()
+    if (caret === undefined) {
+      this.inputEl.select()
+    } else {
+      this.inputEl.setSelectionRange(caret, caret)
+    }
   },
 
   commit() {

@@ -7,15 +7,15 @@ import InlineEdit from "../js/inline_edit.js"
 import {focused, mountHook, render} from "./support/hook.mjs"
 
 // The markup `inline_edit/1` renders, trimmed to what the hook reads.
-function mountField({value = "Acme Sdn Bhd", allowEmpty = false} = {}) {
+function mountField({value = "Acme Sdn Bhd", allowEmpty = false, triggerAttrs = "", inputAttrs = ""} = {}) {
   const el = render(
     `<div id="company-name" phx-hook="InlineEdit" data-id="42" data-field="name"
           data-save-event="save_field" ${allowEmpty ? "data-allow-empty" : ""}>
-       <button id="company-name-trigger" type="button" data-role="trigger" aria-label="Name">
+       <button id="company-name-trigger" type="button" data-role="trigger" aria-label="Name" ${triggerAttrs}>
          <span data-role="text">${value || "—"}</span>
        </button>
        <input id="company-name-input" data-role="input" type="text" name="name"
-              value="${value}" class="hidden" aria-label="Name">
+              value="${value}" class="hidden" aria-label="Name" ${inputAttrs}>
        <span data-role="saving" class="hidden">Saving…</span>
      </div>
      <button id="elsewhere" type="button">Elsewhere</button>`,
@@ -30,8 +30,10 @@ const saving = () => document.querySelector('[data-role="saving"]')
 const shownText = () => document.querySelector('[data-role="text"]').textContent
 const editing = () => !input().classList.contains("hidden")
 
-const key = (el, name) => {
-  const event = new KeyboardEvent("keydown", {key: name, bubbles: true, cancelable: true})
+const key = (el, name, options = {}) => {
+  const {handled, ...keyboardOptions} = options
+  const event = new KeyboardEvent("keydown", {key: name, bubbles: true, cancelable: true, ...keyboardOptions})
+  if (handled) event.preventDefault()
   el.dispatchEvent(event)
   return event
 }
@@ -60,6 +62,64 @@ test("Enter and Space on the focused value open the editor", () => {
     assert.equal(event.defaultPrevented, true, `${JSON.stringify(name)} scrolled or clicked`)
     assert.equal(editing(), true)
     assert.equal(focused(), "company-name-input")
+  }
+})
+
+test("F2 opens with the current value and places the caret after it", () => {
+  mountField()
+  trigger().focus()
+
+  const event = key(trigger(), "F2")
+
+  assert.equal(event.defaultPrevented, true)
+  assert.equal(editing(), true)
+  assert.equal(focused(), "company-name-input")
+  assert.deepEqual([input().selectionStart, input().selectionEnd], ["Acme Sdn Bhd".length, "Acme Sdn Bhd".length])
+})
+
+test("a printable key replaces the value and places the caret after the character", () => {
+  mountField()
+  trigger().focus()
+
+  const event = key(trigger(), "X")
+
+  assert.equal(event.defaultPrevented, true)
+  assert.equal(editing(), true)
+  assert.equal(input().value, "X")
+  assert.deepEqual([input().selectionStart, input().selectionEnd], [1, 1])
+})
+
+test("modifiers, IME composition, and already handled keys do not open an editor", () => {
+  for (const [name, options] of [
+    ["X", {ctrlKey: true}],
+    ["X", {metaKey: true}],
+    ["X", {altKey: true}],
+    ["あ", {isComposing: true}],
+    ["F2", {handled: true}],
+  ]) {
+    mountField()
+    trigger().focus()
+
+    key(trigger(), name, options)
+
+    assert.equal(editing(), false, `${name} ${JSON.stringify(options)} opened the editor`)
+  }
+})
+
+test("a disabled or read-only field cannot be opened", () => {
+  for (const attrs of [
+    {triggerAttrs: "disabled"},
+    {triggerAttrs: 'aria-disabled="true"'},
+    {inputAttrs: "disabled"},
+    {inputAttrs: "readonly"},
+  ]) {
+    mountField(attrs)
+    trigger().focus()
+
+    key(trigger(), "F2")
+    trigger().click()
+
+    assert.equal(editing(), false, `${JSON.stringify(attrs)} opened the editor`)
   }
 })
 
