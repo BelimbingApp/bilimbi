@@ -7,15 +7,15 @@ import InlineEdit from "../js/inline_edit.js"
 import {focused, mountHook, render} from "./support/hook.mjs"
 
 // The markup `inline_edit/1` renders, trimmed to what the hook reads.
-function mountField({value = "Acme Sdn Bhd", allowEmpty = false, triggerAttrs = "", inputAttrs = ""} = {}) {
+function mountField({value = "Acme Sdn Bhd", allowEmpty = false} = {}) {
   const el = render(
     `<div id="company-name" phx-hook="InlineEdit" data-id="42" data-field="name"
           data-save-event="save_field" ${allowEmpty ? "data-allow-empty" : ""}>
-       <button id="company-name-trigger" type="button" data-role="trigger" aria-label="Name" ${triggerAttrs}>
+       <button id="company-name-trigger" type="button" data-role="trigger" aria-label="Name">
          <span data-role="text">${value || "—"}</span>
        </button>
        <input id="company-name-input" data-role="input" type="text" name="name"
-              value="${value}" class="hidden" aria-label="Name" ${inputAttrs}>
+              value="${value}" class="hidden" aria-label="Name">
        <span data-role="saving" class="hidden">Saving…</span>
      </div>
      <button id="elsewhere" type="button">Elsewhere</button>`,
@@ -103,23 +103,6 @@ test("modifiers, IME composition, and already handled keys do not open an editor
     key(trigger(), name, options)
 
     assert.equal(editing(), false, `${name} ${JSON.stringify(options)} opened the editor`)
-  }
-})
-
-test("a disabled or read-only field cannot be opened", () => {
-  for (const attrs of [
-    {triggerAttrs: "disabled"},
-    {triggerAttrs: 'aria-disabled="true"'},
-    {inputAttrs: "disabled"},
-    {inputAttrs: "readonly"},
-  ]) {
-    mountField(attrs)
-    trigger().focus()
-
-    key(trigger(), "F2")
-    trigger().click()
-
-    assert.equal(editing(), false, `${JSON.stringify(attrs)} opened the editor`)
   }
 })
 

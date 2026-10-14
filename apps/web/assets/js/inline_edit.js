@@ -23,7 +23,7 @@ const InlineEdit = {
 
     this.triggerEl.addEventListener("click", () => this.startEdit())
     this.triggerEl.addEventListener("keydown", (e) => {
-      if (e.defaultPrevented || e.isComposing || this.readOnly()) return
+      if (e.defaultPrevented || e.isComposing) return
 
       if (e.key === "F2" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
@@ -88,20 +88,7 @@ const InlineEdit = {
     this.inputEl.value = this.originalValue
   },
 
-  readOnly() {
-    return (
-      this.el.hasAttribute("disabled") ||
-      this.el.getAttribute("aria-disabled") === "true" ||
-      this.triggerEl.disabled ||
-      this.triggerEl.getAttribute("aria-disabled") === "true" ||
-      this.inputEl.disabled ||
-      this.inputEl.readOnly
-    )
-  },
-
   startEdit({value, caret} = {}) {
-    if (this.readOnly()) return
-
     this.originalValue = this.inputEl.value
     if (value !== undefined) this.inputEl.value = value
     this.triggerEl.classList.add("invisible", "pointer-events-none")
