@@ -71,7 +71,10 @@ address once, then run `discover <address>` to check compatibility before
 `login <address> --name <name>`. An origin refusal means the supplied address
 and configured server endpoints differ; ask for the canonical address rather
 than following untrusted endpoints. Show the device URL and user code printed
-to stderr; the person signs in and approves in Bilimbi.
+to stderr; the person signs in, checks the stated agent and end time, and approves in Bilimbi.
+Bilimbi’s operator sets connection length (90 days by default); do not ask the
+person to choose an end date. The finished screen confirms approval or refusal
+and lets them return to their agent.
 Keep the polling process running until it finishes or expires. Tokens are
 stored by the program; never ask for them, read credential files, copy them
 into chat or put them in arguments. Use `use <name>` to select a server and

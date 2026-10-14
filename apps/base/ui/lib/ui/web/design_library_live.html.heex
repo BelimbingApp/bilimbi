@@ -1063,6 +1063,14 @@
             </.card>
           </section>
 
+          <.card id="component-code_input" title="Code input" inner_class="p-4">
+            <.code_input
+              field={to_form(%{"code" => "ABCD-EF23"}, as: :specimen)[:code]}
+              label="Device code"
+              length={8}
+              group_size={4}
+            />
+          </.card>
           <.card id="component-period_filter" title="Period filter" inner_class="p-4 space-y-3">
             <p class="text-sm text-ink-muted">
               The canonical compact date filter for list and history pages. Choose a preset or Custom range; dates include the first and last day in the named clock.

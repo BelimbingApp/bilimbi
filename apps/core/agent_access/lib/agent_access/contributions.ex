@@ -6,6 +6,17 @@ defmodule Bilimbi.Core.AgentAccess.Contributions do
     %{
       settings: %{
         definitions: %{
+          "agent_access.connection_days" => %{
+            type: :integer,
+            scopes: [:global],
+            default: 90,
+            minimum: 1,
+            label: "Agent connection length (days)",
+            help:
+              "Length of new device and OAuth connections. Existing connections keep their end dates.",
+            editable: "operator",
+            capability: "base.settings.global.manage"
+          },
           "agent_access.oauth_clients" => %{
             type: :array,
             scopes: [:global],
