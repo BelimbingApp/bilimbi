@@ -38,6 +38,9 @@ returning deterministically ordered local path dependencies. Runtime validates
 that every package was compiled from the same graph and that the generated
 positions are complete and dependency-safe before exposing module and
 migration contributions.
+A changed fingerprint invalidates the generated `.app` resource before Mix
+regenerates it; rapid edits and unmount/remount cycles do not depend on
+whole-second filesystem timestamps. An unchanged graph retains its resource.
 
 The deployment application (the Web host, or a release command) installs the
 one contribution snapshot after every module application has started, so a

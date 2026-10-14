@@ -35,8 +35,24 @@ defmodule Mix.Tasks.Compile.BilimbiGraphTest do
     assert compile_and_assert_current!(root, module_root) == first_fingerprint
   end
 
-  defp compile_and_assert_current!(root, module_root) do
+  test "graph changes refresh metadata without a newer application-directory mtime", %{root: root} do
+    module_root = put_workspace!(root)
+
+    put_disposition!(module_root, :compatible_baseline)
+    first_fingerprint = compile_and_assert_current!(root, module_root)
+
+    # Make timestamp invalidation unavailable, as with successive compiles in
+    # one filesystem-clock tick. The descriptor contents must still win.
+    app_file = Path.join(module_root, "_build/dev/lib/test_base_probe/ebin/test_base_probe.app")
+    put_disposition!(module_root, :bilimbi_only)
     settle_mtimes!(root)
+    File.touch!(app_file, {{2100, 1, 1}, {0, 0, 0}})
+
+    refute compile_and_assert_current!(root, module_root, settle?: false) == first_fingerprint
+  end
+
+  defp compile_and_assert_current!(root, module_root, options \\ []) do
+    if Keyword.get(options, :settle?, true), do: settle_mtimes!(root)
 
     {output, status} =
       System.cmd("mix", ["compile"],
@@ -135,3 +151,4 @@ defmodule Mix.Tasks.Compile.BilimbiGraphTest do
     )
   end
 end
+
