@@ -3,6 +3,8 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
   Tests for the `/notifications` index LiveView and the top-bar notification bell component.
   """
 
+  # Stays `async: false`: changes application environment (the PubSub server)
+  # that other tests read.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

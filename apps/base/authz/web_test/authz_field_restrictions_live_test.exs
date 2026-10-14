@@ -8,7 +8,7 @@ defmodule BilimbiWeb.AuthzFieldRestrictionsLiveTest do
   the protected fields.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

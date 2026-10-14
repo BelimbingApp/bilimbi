@@ -10,5 +10,9 @@ Code.ensure_loaded!(Bilimbi.Core.Geonames.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Address.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.User.TestFixtures)
 
-ExUnit.start()
+# An async test holds one sandbox connection for its whole run, and the
+# LiveViews it mounts reach that connection through `$callers`. More
+# concurrent cases than connections only queue on the pool until checkouts
+# are dropped, so the case limit is the pool size (`config/test.exs`).
+ExUnit.start(max_cases: Keyword.fetch!(Bilimbi.Base.Repo.config(), :pool_size))
 Ecto.Adapters.SQL.Sandbox.mode(Bilimbi.Base.Repo, :manual)

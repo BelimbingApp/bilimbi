@@ -1,4 +1,6 @@
 defmodule Bilimbi.Core.AgentAccess.DoorTest do
+  # Stays `async: false`: swaps the node-wide contribution registry and drives
+  # the OAuth throttle.
   use BilimbiWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   alias Bilimbi.Base.{Repo, Tenancy}
@@ -47,9 +49,15 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
 
   test "discovery advertises this server and the public device client", %{conn: conn} do
     metadata = conn |> get("/.well-known/oauth-authorization-server") |> json_response(200)
-    assert metadata["grant_types_supported"] == [AgentAccess.device_grant(), "refresh_token"]
+
+    assert metadata["grant_types_supported"] == [
+             AgentAccess.device_grant(),
+             "authorization_code",
+             "refresh_token"
+           ]
+
     assert metadata["token_endpoint_auth_methods_supported"] == ["none"]
-    assert metadata["response_types_supported"] == []
+    assert metadata["response_types_supported"] == ["code"]
     descriptor = conn |> recycle() |> get("/.well-known/bilimbi") |> json_response(200)
     assert descriptor["api_version"] == "1"
     assert descriptor["client_id"] == AgentAccess.client_id()

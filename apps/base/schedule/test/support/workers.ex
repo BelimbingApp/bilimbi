@@ -15,6 +15,7 @@ defmodule Bilimbi.Base.Schedule.TestWorker do
   def handle_scheduled_job(%{"value" => value}, _execution) do
     if recipient = Application.get_env(:bilimbi_base_schedule, :test_recipient) do
       send(recipient, {:schedule_business_effect, value})
+      send(recipient, {:schedule_audit_context, Bilimbi.Base.Audit.Context.get()})
     end
 
     :ok

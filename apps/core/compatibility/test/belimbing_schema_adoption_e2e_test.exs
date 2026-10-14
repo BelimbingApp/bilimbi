@@ -26,7 +26,11 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
     # would be reported as missing, which is the documented refusal.
     MountedDomainFixture.unmount!()
 
-    %{base_env: [], migration_entries: workspace_migration_entries([])}
+    %{
+      base_env: [],
+      migration_entries: workspace_migration_entries([]),
+      platform_entries: workspace_migration_entries([], [:base, :core])
+    }
   end
 
   setup context, do: setup_databases(context)
@@ -36,7 +40,7 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
   end
 
   test "verify, adopt and migrate a database Belimbing's own migrations created",
-       %{env: env, migration_entries: entries} = context do
+       %{env: env, migration_entries: entries, platform_entries: platform_entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
       BelimbingSchemaFixture.load!(PlatformBaselineTestRepo.config())
 
@@ -58,7 +62,11 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
       assert run_mix!("bilimbi.schema.adopt", [], env) =~
                "Existing Belimbing schema verified and adopted by Bilimbi."
 
-      baseline_versions = for {version, _module, :compatible_baseline} <- entries, do: version
+      # The Laravel fixture contains Platform tables. Optional owners whose
+      # tables are absent remain pending until migrate creates their baseline.
+      baseline_versions =
+        for {version, _module, :compatible_baseline} <- platform_entries, do: version
+
       assert recorded_versions() == baseline_versions
 
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"

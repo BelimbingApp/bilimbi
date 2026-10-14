@@ -17,12 +17,127 @@ pinned versions with `mise install`.
 defaults. The test environment uses the same role and a `bilimbi_test`
 database.
 
+Independent checkouts should use separate development databases so one branch's
+migrations do not prevent another branch from starting. All development Mix
+commands read that checkout's ignored `.local/config.json`. Create or edit it
+with the settings needed for that checkout, for example:
+
+```json
+{
+  "database": {"name": "bilimbi_sbg_dev"},
+  "https": {"host": "sbg.bilimbi.localhost", "port": 4001}
+}
+```
+
+Both sections and their fields are optional. `database` accepts `name`, `host`,
+`port`, `username` and `password`; `https` accepts `host`, `port` and the
+automatically saved `root` checkout marker. Ports are JSON integers. Database
+ports range from 1 to 65535; HTTPS backend ports range from 1024 to 65535.
+Malformed JSON, unknown fields, invalid types and a marker for another checkout
+stop the command with a diagnostic without displaying connection values.
+
+Precedence is `DATABASE_URL` for the entire database connection, otherwise each
+shell `PG*` variable overrides its corresponding JSON field, which overrides
+the defaults above. `BILIMBI_DEV_HOST` and `PORT` similarly override saved HTTPS
+fields. Environment variables set by Mise follow the same precedence; remove
+an old `.mise.local.toml` database override when moving that setting into JSON.
+Test and production environments do not read this development file.
+
+Stop the checkout's server before editing its connection or HTTPS settings,
+then create a new database with `mix ecto.create -r Bilimbi.Base.Repo` and start
+it with `mix bilimbi.server`. Each database has its own accounts and migration
+ledger. `.local/` is Git-ignored, and generated config files have mode 0600.
+Keep these bootstrap credentials confined to local development.
+Every checkout includes the versioned [`.local/README.md`](../.local/README.md)
+with editing and startup instructions.
+
 ```bash
 mix setup
 mix bilimbi.server
 ```
 
-Open [http://localhost:4000](http://localhost:4000).
+Open the HTTPS address printed by `mix bilimbi.server`. The first local
+checkout normally uses [https://bilimbi.localhost](https://bilimbi.localhost).
+
+## Local HTTPS
+
+`mix bilimbi.server` prepares local HTTPS before compiling and starting Phoenix,
+then checks the certificate and OAuth issuer URL before announcing readiness.
+It uses the shared system Caddy service, like Belimbing's shared ingress, with
+mkcert certificates signed by your existing development CA. Install the local
+prerequisites once:
+
+```bash
+sudo apt install caddy mkcert libnss3-tools
+sudo systemctl enable --now caddy
+mix bilimbi.server
+```
+
+Setup may ask for sudo to install trust and the site fragment. It adds an import
+for `/etc/caddy/bilimbi/*.caddy` to the existing Caddyfile, validates the complete
+configuration and reloads Caddy, preserving other sites. A failed validation or
+reload restores the previous Caddyfile, site fragment and leaf certificates.
+Ctrl+C stops Phoenix; the shared Caddy service keeps running.
+
+The default address is `https://bilimbi.localhost`, with Phoenix listening only
+on `127.0.0.1:4000`. Caddy accepts this site's requests from loopback and, on
+NAT-mode WSL, the Windows virtual gateway. Other clients receive 403. No public
+DNS, public certificate issuer or internet tunnel is involved. Phoenix trusts
+Caddy's forwarded HTTPS scheme, uses secure session cookies and checks the
+LiveView origin against the canonical HTTPS address. Local HSTS is disabled.
+
+Multiple checkouts need no manual port or hostname assignment. Each plain
+`mix bilimbi.server` selects a free backend port, reserves it in its Caddy site,
+and saves the address in the `https` section of that checkout's ignored
+`.local/config.json`. When `bilimbi.localhost` belongs to another
+checkout, the new checkout gets `bilimbi-<checkout-fingerprint>.localhost`.
+Repeats reuse the saved address; an already running instance is reported
+without starting a duplicate or stopping any process. A stale/unhealthy server
+in the same checkout is reported so it can be restarted explicitly. Installed
+Caddy sites reserve ports while their checkouts are stopped or compiling.
+
+To choose a particular hostname or port, override the automatic allocation:
+
+```bash
+BILIMBI_DEV_HOST=other.bilimbi.localhost PORT=4001 mix bilimbi.server
+```
+
+An explicitly chosen hostname or port that belongs to another instance stops
+startup with a diagnostic. Subsequent Mix commands
+read the saved instance address, so OAuth discovery agrees without
+repeating environment variables. The hostname must be under `.localhost`;
+browsers resolve these names to loopback,
+and setup also adds the Linux hosts entry when needed. Under WSL, setup imports
+only mkcert's public CA certificate into the current Windows user's root store.
+An existing `CAROOT`, including Belimbing's shared Windows CA directory, is
+reused. Restart a browser that was already running if its trust cache is stale.
+Certificates and keys stay in ignored `.local/https/`; Caddy gets a protected
+copy of the leaf key, and the CA private key stays in mkcert's CA directory.
+Existing `.local/https/instance.json` settings migrate automatically into
+`.local/config.json`; any existing canonical values win, database settings are
+preserved, and the old instance file is removed after a successful save.
+HTTPS verification reads discovery responses without storing `resource.json`.
+This checkout-local state persists across `tmp/` cleanup; temporary test
+checkouts and logs remain disposable under `tmp/`.
+
+`mix bilimbi.server` in test or production does not configure local HTTPS.
+Production uses its deployed Caddy configuration and release commands.
+
+With the server running, verify the local HTTPS boundary without bypassing
+certificate validation:
+
+```bash
+python3 scripts/test-local-https.py
+python3 scripts/test-local-https-instances.py
+```
+
+This checks TLS, secure session cookies, redirects, OAuth URLs and the local
+client allowlist.
+The instance check creates and removes a temporary checkout's Caddy site to
+verify automatic allocation, stable repeats, explicit conflicts and rollback
+after a failed certificate validation. It requires sudo, like initial setup.
+
+## Development database startup
 
 `mix setup` fetches dependencies, creates the database, runs every installed
 migration through `mix bilimbi.migrate`, and builds the web assets.
@@ -85,6 +200,7 @@ mix help bilimbi.platform.provision
 mix help bilimbi.tenant.provision
 mix help bilimbi.server
 mix precommit
+mix dialyzer
 ```
 
 `mix bilimbi.migrate` migrates without starting a server, which setup, tests
@@ -118,6 +234,14 @@ installed module's tests and the Web host's integration tests, and verifies
 module contributions.
 The hook tests need Node.js 22 or
 later, with npm, on the `PATH`; `.mise.toml` does not pin it.
+
+`mix dialyzer` checks the host and every discovered module package. The root
+alias also compiles the source-loaded composition helpers into a separate
+analysis directory, so the Mix tasks' calls to discovery are checked. CI runs
+the host and package checks separately; warnings in either fail the job.
+Known OTP set-opacity false positives have exact file, line, and warning
+exclusions in `.dialyzer_ignore.exs`; no file or warning category is excluded
+wholesale.
 
 `mix precommit.test` runs every discovered module's tests in its own Mix
 project, plus the Web host's integration tests. It reports each package's wall

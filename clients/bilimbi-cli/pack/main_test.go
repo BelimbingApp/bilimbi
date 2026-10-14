@@ -51,11 +51,35 @@ func TestPackExecutableAndMarketplace(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var plugin struct{ Name string }
+			var plugin struct {
+				Name       string
+				Version    string
+				Extensions map[string]struct {
+					OnboardingSkill string `json:"onboardingSkill"`
+				}
+			}
 			err = json.NewDecoder(reader).Decode(&plugin)
 			reader.Close()
-			if err != nil || plugin.Name != "bilimbi" {
-				t.Fatal("invalid plugin")
+			if err != nil || plugin.Name != "bilimbi" || plugin.Version == "" {
+				t.Fatal("invalid plugin manifest")
+			}
+			onboarding := plugin.Extensions["com.openai"].OnboardingSkill
+			if onboarding != "./skills/setup/SKILL.md" || files["plugins/bilimbi/"+onboarding[2:]] == nil {
+				t.Fatal("setup cannot resolve its packaged skill")
+			}
+			compatibility := files["plugins/bilimbi/.codex-plugin/plugin.json"]
+			if compatibility == nil {
+				t.Fatal("compatibility manifest missing")
+			}
+			reader, err = compatibility.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var overlay struct{ Name, Version, Skills string }
+			err = json.NewDecoder(reader).Decode(&overlay)
+			reader.Close()
+			if err != nil || overlay.Name != plugin.Name || overlay.Version != plugin.Version || overlay.Skills != "./skills/" {
+				t.Fatal("compatibility manifest cannot discover the same plugin skills")
 			}
 			catalog := files[".agents/plugins/marketplace.json"]
 			if catalog == nil {
@@ -69,11 +93,12 @@ func TestPackExecutableAndMarketplace(t *testing.T) {
 				Plugins []struct {
 					Name   string
 					Source struct{ Path string }
+					Policy struct{ Authentication string }
 				}
 			}
 			err = json.NewDecoder(reader).Decode(&marketplace)
 			reader.Close()
-			if err != nil || len(marketplace.Plugins) != 1 || marketplace.Plugins[0].Source.Path != "./plugins/bilimbi" {
+			if err != nil || len(marketplace.Plugins) != 1 || marketplace.Plugins[0].Source.Path != "./plugins/bilimbi" || marketplace.Plugins[0].Policy.Authentication != "ON_USE" {
 				t.Fatal("catalog cannot resolve plugin")
 			}
 			name := "bilimbi"

@@ -24,7 +24,8 @@ defmodule Bilimbi.Base.AgentApi.MixProject do
     [
       {:decimal, "~> 3.1"},
       {:ecto, "~> 3.14"},
-      {:ecto_sql, "~> 3.14"}
+      {:ecto_sql, "~> 3.14"},
+      {:jason, "~> 1.4"}
     ]
   end
 end

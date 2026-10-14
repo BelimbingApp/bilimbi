@@ -50,7 +50,8 @@ defmodule Bilimbi.Core.Geonames.Downloader do
       |> Keyword.merge(
         url: url,
         headers: headers,
-        into: File.stream!(temporary_path, [:write]),
+        # Collectable opens a File.Stream for writing; :write is not a stream mode.
+        into: File.stream!(temporary_path),
         connect_options: connect_options,
         receive_timeout: Keyword.get(opts, :receive_timeout, @default_receive_timeout),
         retry: false

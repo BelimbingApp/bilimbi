@@ -6,7 +6,7 @@ defmodule BilimbiWeb.UserProfileLiveTest do
   an admin-shaped API, so it must edit the session's account and no other.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

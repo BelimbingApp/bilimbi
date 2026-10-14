@@ -6,7 +6,7 @@
 **Scope:** How an AI agent running outside Bilimbi is connected to a person,
 what it may do, how it finds and calls operations any installed module
 registers, and how its work is recorded
-**Last Updated:** 2026-10-11
+**Last Updated:** 2026-10-12
 
 > This record adds a second caller to the authentication edge of
 > [ADR 0016](./0016-authenticated-actor-on-scope.md) and a peer consumer to
@@ -42,14 +42,16 @@ Four facts shaped the decision.
 ## Decision
 
 **Everything happens in the harness; Bilimbi is the API.** A person asks
-their agent for any task, such as entering a namecard or adding people from
-a spreadsheet, and the agent does it through the API.
+their agent for any task, and the agent discovers the available operations,
+schemas and business guides to carry it out through the API. The plugin
+teaches connection, discovery and safe execution; task planning belongs to
+the agent.
 
 - Files stay in the harness, for example photos taken on a phone and handed
   to the agent. Bilimbi never receives files.
-- The review and report page is a local page on `127.0.0.1`, served by the
-  native Bilimbi program (Decision 9). Review happens at the desktop; a
-  phone only supplies files.
+- Native review and report use a local page on `127.0.0.1`, served by the
+  Bilimbi program. The MCP host displays its own preview and report, so
+  ChatGPT users need no local executable. Files stay in either harness.
 - Bilimbi hosts no review page and keeps no work sessions.
 
 1. **A connection is an OAuth grant owned by one person.** Bilimbi is its
@@ -153,8 +155,7 @@ a spreadsheet, and the agent does it through the API.
    a screen enters the same approval workflow when an agent makes it. There
    is no separate permission for agent changes.
 
-9. **The client is one native Bilimbi program and a skill, not a protocol
-   server.** The program has `login <address>`, profiles for more than one
+9. **Local clients use one native Bilimbi program and a skill.** The program has `login <address>`, profiles for more than one
    server, `search`, `describe`, `call` and `logout`. It signs in with the
    device grant, keeps the token in the operating system's credential store
    and out of the conversation, sends the agent ID
@@ -165,7 +166,7 @@ a spreadsheet, and the agent does it through the API.
    - The skill is versioned and tested with the API it teaches.
    - A Domain's or Extension's skill text is its `guides`, in its own
      repository, served through search.
-   - An MCP server is not part of this decision.
+   - The 2026-10-12 extension below adds MCP for hosts without local execution.
 
 ## The owner's decisions
 
@@ -201,9 +202,43 @@ Each job is its own change.
    and the skill.
 4. Safe writes on the API: dry run and plan code, creating a company and a
    person, and their guides.
-5. A namecard, end to end, from a phone photo to records in Bilimbi.
+5. End-to-end verification of discovery, local review, API writes and reports.
 
 ## Consequences
+
+### 2026-10-12 extension: ChatGPT MCP
+
+The owner requested MCP after testing the native skill in ChatGPT. A skill
+cannot supply process execution to that host. Base Agent API now owns a
+stateless, generic MCP protocol adapter; Web owns `/mcp`, transport checks,
+OAuth metadata and installation-specific package export. Domain modules
+continue to contribute operations to the same registry and never add tools
+or transport routes themselves. No second domain API, permission evaluator,
+tenant resolver or audit log is introduced.
+
+Core Agent Access adds predefined operator-configured public OAuth clients,
+exact HTTPS callback allowlists, authorization code plus S256 PKCE, short-lived
+hashed single-use codes, and client/resource binding on connections and refresh.
+The native device grant remains supported; its credentials and the MCP
+resource-bound credentials cannot cross transports. The bearer edge remains
+the same authentication caller under ADR 0016. The `bilimbi` OAuth scope
+delegates existing Agent API reach and grants no business permission.
+
+MCP tools are search, describe, guide, read, plan and commit. Initialization
+and generic discovery are public; private tool calls prove bearer identity.
+Plans display in the MCP host, which obtains explicit human approval for the
+complete immutable preview before commit. This extends the host-side go in
+Decision 8; Bilimbi still verifies only the bound plan, not the go itself.
+The server hosts no review page or work session. Every MCP request joins the
+existing Integration request log; mutation audits retain the same trace.
+
+Production uses a reachable HTTPS endpoint and operator-registered callbacks.
+Each adopter exports its own remote plugin rather than shipping a placeholder
+or one vendor endpoint. No additional runtime dependency is needed: the narrow
+stateless JSON-RPC adapter uses Phoenix, Jason and the existing Agent API.
+Transport and OAuth contracts and deployment steps are in
+`apps/web/docs/mcp.md`. Deployment reachability and a real ChatGPT connection
+must be verified separately from local protocol and authorization tests.
 
 - Agents get no unattended identity. Routine work stays on named system
   principals (ADR 0017).
@@ -226,8 +261,8 @@ Each job is its own change.
   The earlier `approval` contribution field is retired; a bound, expiring,
   single-use plan code gates every write. The native client refuses to commit
   a plan the person has not approved in its local review.
-- Bilimbi cannot tell whether the person really gave the go; only the native
-  client enforces it, locally. It relies on
+- Bilimbi cannot tell whether the person really gave the go; the native
+  client or MCP host obtains it before committing. It relies on
   the person's own permissions, the plan code and the request log.
 
 ## Alternatives considered

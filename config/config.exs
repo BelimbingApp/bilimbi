@@ -148,4 +148,4 @@ import_config "#{config_env()}.exs"
 # OAuth credentials and consent codes must never appear in Phoenix parameter logs.
 config :phoenix,
        :filter_parameters,
-       ~w(password token access_token refresh_token device_code user_code)
+       ~w(password token access_token refresh_token device_code user_code code code_verifier code_challenge)

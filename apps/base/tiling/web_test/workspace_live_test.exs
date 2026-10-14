@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   place of a frame, the chromeless refusal to nest, and saved layouts.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

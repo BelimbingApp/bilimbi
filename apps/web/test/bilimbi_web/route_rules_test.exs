@@ -27,6 +27,7 @@ defmodule BilimbiWeb.RouteRulesTest do
     "/settings/appearance",
     # OAuth consent and grant revocation belong to any signed-in person (ADR 0021).
     "/oauth/device",
+    "/oauth/authorize",
     "/settings/agent-connections",
     "/notifications"
   ]

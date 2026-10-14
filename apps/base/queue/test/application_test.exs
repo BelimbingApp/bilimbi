@@ -32,7 +32,7 @@ defmodule Bilimbi.Base.Queue.ApplicationTest do
     normalized = Oban.Config.new(config)
     assert normalized.queues == []
     assert normalized.plugins == []
-    assert normalized.stage_interval == :infinity
+    assert normalized.stager == false
   end
 
   test "shutdown drains an in-flight job within the configured grace period" do

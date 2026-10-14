@@ -3,6 +3,8 @@ defmodule Bilimbi.Core.User.DatabaseQueries do
 
   import Ecto.Query
 
+  alias Ecto.Changeset
+
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope

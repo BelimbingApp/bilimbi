@@ -149,8 +149,11 @@ func (c *apiClient) discover(ctx context.Context, address string) (discovery, er
 		hasDevice = hasDevice || grant == deviceGrant
 		hasRefresh = hasRefresh || grant == "refresh_token"
 	}
-	if err != nil || issuer != server || d.Version != "1" || d.ClientID != "bilimbi-native" || !hasDevice || !hasRefresh || !sameOrigin(server, d.API) || !sameOrigin(server, oauth.Device) || !sameOrigin(server, oauth.Token) {
-		return d, errors.New("incompatible discovery or endpoint outside the supplied server")
+	if err != nil || issuer != server || !sameOrigin(server, d.API) || !sameOrigin(server, oauth.Device) || !sameOrigin(server, oauth.Token) {
+		return d, errors.New("discovery endpoints must use the supplied server origin; use the server's configured canonical address")
+	}
+	if d.Version != "1" || d.ClientID != "bilimbi-native" || !hasDevice || !hasRefresh {
+		return d, errors.New("incompatible discovery: requires API version 1, bilimbi-native client, device authorization and refresh grants")
 	}
 	d.Server, d.Device, d.Token = server, oauth.Device, oauth.Token
 	return d, nil

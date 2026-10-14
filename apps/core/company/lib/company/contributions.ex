@@ -70,9 +70,9 @@ defmodule Bilimbi.Core.Company.Contributions do
 
             Before creating, search by company name, legal name and email with
             `core.company.list`. Reuse the existing company rather than making
-            a duplicate. A namecard's organisation becomes a company; the person
-            becomes an employee of that company, even when it is an external
-            supplier or customer. Use `core.company.create` through a dry run,
+            a duplicate. A person's employer must exist as a company first: reuse
+            it, or create it before recording the person. Use
+            `core.company.create` through a dry run,
             local review and plan-code commit. A missing code is generated from
             the name and shown in the preview. Do not invent legal identifiers
             or a jurisdiction from a phone number; ask when the source is unclear.

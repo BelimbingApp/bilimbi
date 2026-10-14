@@ -4,7 +4,7 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
   gains walked columns and rollups from the grid catalog.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

@@ -64,6 +64,10 @@ TTL and periodic expiry reclamation. `Settings.put/3` and `Settings.delete/2`
 invalidate the matching scope after a successful commit; transaction reads
 bypass the cache, and publication cannot undo a concurrent invalidation.
 Direct writes and writes on other nodes may remain stale until expiry.
+The test environment reads past the cache (`:read_cache` in
+`config/test.exs`): the cache cannot tell one SQL sandbox connection from
+another, so concurrent tests would serve each other's values.
+`test/settings_test.exs` turns it on for the tests that prove the cache.
 PubSub invalidation is a multi-node follow-up; it is not implemented yet.
 Settings forms fetch all rows for their requested keys and scope chain in one
 query, then derive values and override metadata from that snapshot.

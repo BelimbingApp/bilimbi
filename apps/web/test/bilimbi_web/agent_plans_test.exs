@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.AgentPlansTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
   import Ecto.Query
   import Phoenix.LiveViewTest
   alias Bilimbi.Base.{AgentApi, Authz, Repo, Settings, Tenancy}

@@ -15,7 +15,11 @@ defmodule Bilimbi.Base.Artifacts.Schema do
     field(:byte_size, :integer)
     field(:sha256, :string)
     field(:storage_root, :string)
+    # Exactly one of expires_at and retain_until is set: an ordinary document
+    # expires, a records-grade document is retained (see docs/README.md).
     field(:expires_at, :utc_datetime_usec)
+    field(:retain_until, :utc_datetime_usec)
+    field(:legal_hold_at, :utc_datetime_usec)
     field(:ready_at, :utc_datetime_usec)
     field(:deleted_at, :utc_datetime_usec)
     field(:purged_at, :utc_datetime_usec)
@@ -51,6 +55,8 @@ defmodule Bilimbi.Base.Artifacts.Schema do
     |> validate_number(:company_id, greater_than: 0)
     |> validate_number(:byte_size, greater_than: 0)
     |> check_constraint(:company_id, name: :base_artifacts_company_positive)
+    |> check_constraint(:retain_until, name: :base_artifacts_retention_exclusive)
+    |> check_constraint(:legal_hold_at, name: :base_artifacts_hold_requires_retention)
     |> foreign_key_constraint(:tenant_id, name: :base_artifacts_tenant_id_fkey)
   end
 end

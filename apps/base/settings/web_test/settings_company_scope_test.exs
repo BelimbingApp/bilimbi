@@ -8,6 +8,7 @@ defmodule BilimbiWeb.SettingsCompanyScopeTest do
   field is visibly not the same as saving nothing.
   """
 
+  # Stays `async: false`: resets the node-wide `BilimbiWeb.RateLimit` ETS table.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

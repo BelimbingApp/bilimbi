@@ -24,6 +24,27 @@ defmodule Bilimbi.Core.Employee.Schema do
   ]
   @statuses ~w(pending probation active inactive terminated)
 
+  @type t :: %__MODULE__{
+          id: pos_integer() | nil,
+          company_id: pos_integer() | nil,
+          department_id: pos_integer() | nil,
+          supervisor_id: pos_integer() | nil,
+          employee_number: String.t() | nil,
+          full_name: String.t() | nil,
+          short_name: String.t() | nil,
+          designation: String.t() | nil,
+          employee_type: String.t() | nil,
+          job_description: String.t() | nil,
+          email: String.t() | nil,
+          mobile_number: String.t() | nil,
+          status: String.t() | nil,
+          employment_start: Date.t() | nil,
+          employment_end: Date.t() | nil,
+          metadata: map() | list() | nil,
+          created_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil
+        }
+
   schema "employees" do
     field :company_id, :id
     field :department_id, :id

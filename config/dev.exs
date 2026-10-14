@@ -7,33 +7,31 @@ import Config
 
 Code.require_file(discovery_file)
 
-database_options =
-  case System.get_env("DATABASE_URL") do
-    nil ->
-      [
-        username: System.get_env("PGUSER", "bilimbi"),
-        password: System.get_env("PGPASSWORD", "bilimbi_dev_ca658ad7d8b5"),
-        hostname: System.get_env("PGHOST", "localhost"),
-        port: String.to_integer(System.get_env("PGPORT", "5433")),
-        database: System.get_env("PGDATABASE", "bilimbi_dev")
-      ]
-
-    url ->
-      [url: url]
-  end
+Code.require_file(Path.expand("../mix/local_config.exs", __DIR__))
+workspace_root = Path.expand("..", __DIR__)
+local_config = Bilimbi.LocalConfig.load(workspace_root)
+database_options = Bilimbi.LocalConfig.database_options(local_config)
 
 config :bilimbi_base_database,
        Bilimbi.Base.Repo,
        database_options ++
          [
            stacktrace: true,
-           show_sensitive_data_on_connection_error: true,
+           show_sensitive_data_on_connection_error: false,
            pool_size: 10
          ]
 
+https = Bilimbi.LocalConfig.https_options(local_config)
+
 config :web, BilimbiWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}],
-  check_origin: false,
+  # The development server uses the shared local Caddy ingress. Its HTTP
+  # listener remains loopback-only; Caddy supplies the trusted HTTPS scheme.
+  # Keep the canonical URL here so OAuth, exports and ordinary Mix commands
+  # all agree, rather than relying on the request Host header.
+  url: [scheme: "https", host: https.host, port: 443],
+  http: [ip: {127, 0, 0, 1}, port: https.port],
+  check_origin: ["https://#{https.host}"],
+  force_ssl: [rewrite_on: [:x_forwarded_proto], hsts: false, exclude: []],
   code_reloader: true,
   reloadable_apps:
     Bilimbi.Base.ModuleRegistry.MixDiscovery.reloadable_apps(Path.expand("..", __DIR__)),

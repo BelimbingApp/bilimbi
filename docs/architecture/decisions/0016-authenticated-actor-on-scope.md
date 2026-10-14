@@ -101,6 +101,7 @@ approve as anyone. Workflow approvals, a later port, need the same guarantee.
   refused rather than trusted.
 - Rotating `SECRET_KEY_BASE` signs everyone out, as before, and now also
   cancels queued jobs that act for a user.
-- Captured audit rows from a delegated job still use the guest default unless
-  the worker sets `Bilimbi.Base.Audit.Context`. Wiring that from
-  `execution.scope` is a separate change.
+- Captured audit rows from a delegated job are attributed from
+  `execution.scope`: Base Queue runs the job under `Audit.with_scope/2`, so
+  rows name the delegated user (or the system principal), and ordinary system
+  jobs run as actor `queue`.

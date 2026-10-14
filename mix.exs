@@ -15,11 +15,12 @@ defmodule Bilimbi.Umbrella.MixProject do
       deps: deps(),
       aliases: aliases(),
       releases: releases(),
-      # CI runs `mix dialyzer` from this umbrella root, so the PLT is built here.
+      # CI runs `mix dialyzer` from this umbrella root, so the PLT is built here
+      # and the analysis paths include every discovered module package.
       # The project's Mix tasks (`mix bilimbi.*`) call a `Mix.*` surface that needs
       # the Mix application in the PLT to type-check. PLT-only — this adds :mix to
       # Dialyzer's analysis, not to any app's runtime.
-      dialyzer: [plt_add_apps: [:mix]],
+      dialyzer: [plt_add_apps: [:mix], paths: dialyzer_paths()],
       listeners: [Phoenix.CodeReloader]
     ]
   end
@@ -65,7 +66,11 @@ defmodule Bilimbi.Umbrella.MixProject do
         "cmd --app web mix assets.setup",
         "cmd --app web mix assets.build"
       ],
-      "bilimbi.server": [&prepare_bilimbi_server/1, "bilimbi.server"],
+      "bilimbi.server": [
+        &prepare_bilimbi_server/1,
+        "bilimbi.server",
+        &verify_local_https/1
+      ],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
       precommit: [
@@ -78,12 +83,18 @@ defmodule Bilimbi.Umbrella.MixProject do
         "bilimbi.contributions.verify"
       ],
       "precommit.test": &precommit_test/1,
+      "precommit.test.compatibility": &precommit_test_compatibility/1,
+      "precommit.test.web": &precommit_test_web/1,
+      "precommit.test.packages": &precommit_test_packages/1,
+      dialyzer: [&prepare_dialyzer_helpers/1, "dialyzer"],
       "compile.strict": &compile_strict/1,
       "assets.test": &assets_test/1
     ]
   end
 
   defp prepare_bilimbi_server(_args) do
+    local_https("--prepare")
+
     # Resolving a task from a dependency can compile that dependency closure
     # before the task runs. Load recovery from source so its graph preflight
     # also protects the first compile after a pull.
@@ -104,16 +115,101 @@ defmodule Bilimbi.Umbrella.MixProject do
     Mix.Task.run("deps.get")
   end
 
-  defp precommit_test(args) do
-    mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+  defp verify_local_https(_args), do: local_https("--verify")
 
-    # Each package still owns its helper, OTP state, and test VM. Run packages
-    # directly so every one receives profiling flags, rather than a container
-    # alias forwarding them only to its last child. Keep execution serial:
-    # compatibility tests mount source and refresh the shared build graph.
+  # Shared ingress is host bootstrap, not ModuleRegistry graph recovery. Keep
+  # it in the umbrella entry point; module tests and production never touch
+  # a developer's Caddy service or trust stores. Source-loaded graph workspaces
+  # can run this alias without configuring the Phoenix host.
+  defp local_https(mode) do
+    with :dev <- Mix.env(),
+         endpoint when is_list(endpoint) <- Application.get_env(:web, BilimbiWeb.Endpoint) do
+      host = Keyword.fetch!(Keyword.fetch!(endpoint, :url), :host)
+      port = to_string(Keyword.fetch!(Keyword.fetch!(endpoint, :http), :port))
+
+      {_output, status} =
+        System.cmd("bash", [Path.join(__DIR__, "scripts/local-https.sh"), mode, host, port],
+          cd: __DIR__,
+          env: [
+            {"BILIMBI_ELIXIR", System.find_executable("elixir")},
+            {"BILIMBI_HOST_PINNED", if(System.get_env("BILIMBI_DEV_HOST"), do: "1", else: "0")},
+            {"BILIMBI_PORT_PINNED", if(System.get_env("PORT"), do: "1", else: "0")}
+          ],
+          into: IO.stream(:stdio, :line),
+          stderr_to_stdout: true
+        )
+
+      if status == 10, do: System.halt(0)
+      if status != 0, do: Mix.raise("Local HTTPS #{mode} failed; see the diagnostic above.")
+
+      if mode == "--prepare" do
+        instance = Bilimbi.LocalConfig.load(__DIR__)["https"]
+        System.put_env("BILIMBI_DEV_HOST", instance["host"])
+        System.put_env("PORT", to_string(instance["port"]))
+        lock_local_startup(instance["host"])
+      end
+    end
+  end
+
+  # The Caddy reservation protects different checkouts. Hold a kernel lock
+  # through this CLI's startup as well, so two terminals in the same checkout
+  # cannot race while the first VM is compiling and has no HTTP listener yet.
+  defp lock_local_startup(host) do
+    lock = Path.join(__DIR__, ".local/https/#{host}.startup.lock")
+    flock = System.find_executable("flock") || Mix.raise("flock is required for local startup")
+
+    port =
+      Port.open({:spawn_executable, flock}, [
+        :binary,
+        :exit_status,
+        {:line, 1024},
+        {:args, ["-n", "-E", "10", lock, "bash", "-c", "printf 'locked\\n'; cat >/dev/null"]}
+      ])
+
+    receive do
+      {^port, {:data, {:eol, "locked"}}} ->
+        :ok
+
+      {^port, {:exit_status, 10}} ->
+        Mix.shell().info("This Bilimbi instance is already starting: https://#{host}")
+        System.halt(0)
+
+      {^port, {:exit_status, status}} ->
+        Mix.raise("Could not lock local startup (exit #{status})")
+    after
+      5_000 ->
+        Port.close(port)
+        Mix.raise("Timed out locking local startup")
+    end
+  end
+
+  defp precommit_test(args) do
+    run_test_projects(test_projects(), args)
+  end
+
+  defp precommit_test_compatibility(args),
+    do: run_test_projects(["apps/core/compatibility"], args)
+
+  defp precommit_test_web(args), do: run_test_projects(["apps/web"], args)
+
+  defp precommit_test_packages(args) do
     projects =
-      module_paths([:core]) ++
-        module_paths([:base]) ++ ["apps/web"] ++ module_paths([:domain, :extension])
+      (module_paths([:core]) -- ["apps/core/compatibility"])
+      |> Kernel.++(module_paths([:base]))
+      |> Kernel.++(module_paths([:domain, :extension]))
+
+    run_test_projects(projects, args)
+  end
+
+  defp test_projects do
+    module_paths([:core]) ++
+      module_paths([:base]) ++ ["apps/web"] ++ module_paths([:domain, :extension])
+  end
+
+  # Each package owns its helper, OTP state, and test VM. Running packages
+  # directly also ensures every package receives profiling flags.
+  defp run_test_projects(projects, args) do
+    mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
 
     _ =
       Enum.reduce_while(projects, projects, fn project, remaining ->
@@ -141,6 +237,58 @@ defmodule Bilimbi.Umbrella.MixProject do
       end)
 
     :ok
+  end
+
+  # Mix loads composition helpers from source before dependency resolution,
+  # outside elixirc_paths. Give Dialyzer their actual code as well, so calls
+  # from compiled Mix tasks are checked against the same discovery contract.
+  defp prepare_dialyzer_helpers(_args) do
+    path = Path.join(Mix.Project.build_path(), "dialyzer_helpers")
+    File.mkdir_p!(path)
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+
+    try do
+      Code.put_compiler_option(:ignore_module_conflict, true)
+
+      sources = [
+        "mix/composition_lock.exs",
+        "apps/base/module_registry/mix/module_discovery.exs",
+        "apps/base/module_registry/mix/compile_bilimbi_graph.exs"
+      ]
+
+      for file <- sources,
+          {module, bytecode} <- Code.compile_file(Path.join(__DIR__, file)) do
+        File.write!(Path.join(path, Atom.to_string(module) <> ".beam"), bytecode)
+      end
+    after
+      Code.put_compiler_option(:ignore_module_conflict, previous)
+    end
+  end
+
+  defp dialyzer_paths do
+    workspace_root = __DIR__
+    env = Atom.to_string(Mix.env())
+
+    host_paths =
+      for app <- [:base, :core, :web] do
+        Path.join([workspace_root, "_build", env, "lib", Atom.to_string(app), "ebin"])
+      end
+
+    module_paths =
+      workspace_root
+      |> Bilimbi.Base.ModuleRegistry.MixDiscovery.discover_workspace!()
+      |> Enum.map(fn module ->
+        Path.join([workspace_root, "_build", env, "lib", Atom.to_string(module.otp_app), "ebin"])
+      end)
+
+    case System.get_env("BILIMBI_DIALYZER_SCOPE") do
+      "host" ->
+        host_paths
+
+      _all_applications ->
+        host_paths ++
+          module_paths ++ [Path.join([workspace_root, "_build", env, "dialyzer_helpers"])]
+    end
   end
 
   defp compile_strict(_args) do

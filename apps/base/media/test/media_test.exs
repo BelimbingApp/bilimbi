@@ -422,7 +422,7 @@ defmodule Bilimbi.Base.MediaTest do
            )
   end
 
-  test "plain system cleanup is recorded as console, not a guest", c do
+  test "plain system cleanup is recorded as the system actor, not a guest or console", c do
     {:ok, draft} = Media.upload_attachment(c.scope, {"test.record", "1"}, c.upload)
     row = Repo.get_by!(AttachmentSchema, public_id: draft.public_id)
 
@@ -443,7 +443,7 @@ defmodule Bilimbi.Base.MediaTest do
       )
 
     assert [_ | _] = deletes
-    assert Enum.all?(deletes, &(&1.actor_type == "console" and &1.actor_id == 0))
+    assert Enum.all?(deletes, &(&1.actor_type == "system" and &1.actor_id == 0))
   end
 
   test "deleting a file whose directory is already gone counts as absent", c do

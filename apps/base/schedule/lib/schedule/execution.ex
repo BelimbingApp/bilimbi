@@ -5,6 +5,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Queue.Execution, as: QueueExecution
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule
@@ -31,7 +32,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
     best_effort_prune()
 
     try do
-      result = worker.handle_scheduled_job(business_args, execution)
+      result = handle_attributed(worker, business_args, metadata, execution)
       best_effort_finish(metadata, run, result, execution, started)
       result
     rescue
@@ -44,6 +45,20 @@ defmodule Bilimbi.Base.Schedule.Execution do
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
+
+  # A job the recurrence enqueued has no user or principal behind it, so its
+  # captured writes name the scheduler rather than the queue's generic actor.
+  defp handle_attributed(
+         worker,
+         args,
+         %{"trigger" => "scheduled"},
+         %QueueExecution{scope: nil} = execution
+       ) do
+    AuditContext.with_actor("scheduler", fn -> worker.handle_scheduled_job(args, execution) end)
+  end
+
+  defp handle_attributed(worker, args, _metadata, execution),
+    do: worker.handle_scheduled_job(args, execution)
 
   defp authorize_occurrence(metadata, execution) do
     Schedule.authorize_execution(metadata, execution.job_id)

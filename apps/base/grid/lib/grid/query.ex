@@ -30,7 +30,9 @@ defmodule Bilimbi.Base.Grid.Query do
           selects: %{Column.t() => Ecto.Query.dynamic_expr()},
           key: Ecto.Query.dynamic_expr(),
           key_column: atom(),
-          columns: [Column.t()]
+          columns: [Column.t()],
+          trends: %{non_neg_integer() => Ecto.Query.dynamic_expr()},
+          deltas: %{non_neg_integer() => Ecto.Query.dynamic_expr()}
         }
 
   @doc """

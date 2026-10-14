@@ -69,8 +69,8 @@ fails.
 - The listener event is a plain map; Belimbing's rehydrated Eloquent models
   and actor object have no equivalent. A listener that needs current subject
   state reads it through its owner's API.
-- Maintenance and delivery writes are audited with the guest default, because
-  nobody signed in and no system principal is named. A listener that must be
+- Maintenance and delivery writes are audited as the anonymous `system` actor,
+  because nobody signed in and no system principal is named. A listener that must be
   attributed to a principal enqueues its own work as that principal.
 - Until the schedule definition is reviewed, deferred events and expired
   leases wait for the next manual pass; the immediate attempt still runs.

@@ -83,7 +83,7 @@ defmodule Bilimbi.Core.Company.AgentOperations do
       key: "core.company.create",
       title: "Create a company",
       summary: "Create an organisation in your tenant after searching for an existing company.",
-      keywords: ["add", "namecard", "contact", "business"],
+      keywords: ["add", "organisation", "business"],
       kind: :write,
       safe_write: true,
       capability: "admin.company.create",

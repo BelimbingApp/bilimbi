@@ -38,6 +38,7 @@ defmodule Bilimbi.Base.Audit.Mutation do
     :old_values,
     :new_values,
     :trace_id,
+    :recorded_at,
     :occurred_at,
     withheld: []
   ]
@@ -64,6 +65,7 @@ defmodule Bilimbi.Base.Audit.Mutation do
           old_values: map() | list() | nil,
           new_values: map() | list() | nil,
           trace_id: String.t() | nil,
+          recorded_at: NaiveDateTime.t() | nil,
           occurred_at: NaiveDateTime.t(),
           withheld: [String.t()]
         }
@@ -93,6 +95,7 @@ defmodule Bilimbi.Base.Audit.Mutation do
       old_values: mutation.old_values,
       new_values: mutation.new_values,
       trace_id: mutation.trace_id,
+      recorded_at: mutation.recorded_at,
       occurred_at: mutation.occurred_at
     }
   end

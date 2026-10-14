@@ -16,9 +16,32 @@ if trusted_proxies = System.get_env("TRUSTED_PROXIES") do
   config :web, :trusted_proxies, BilimbiWeb.ForwardedFor.parse!(trusted_proxies)
 end
 
-config :web, BilimbiWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+default_port =
+  if config_env() == :dev do
+    config = Application.fetch_env!(:web, BilimbiWeb.Endpoint)
+    to_string(Keyword.fetch!(Keyword.fetch!(config, :http), :port))
+  else
+    "4000"
+  end
+
+config :web, BilimbiWeb.Endpoint,
+  http: [port: String.to_integer(System.get_env("PORT", default_port))]
 
 if config_env() == :dev do
+  # The umbrella server bootstrap may allocate an address after Mix reads
+  # dev.exs. Runtime applies that allocation before the Endpoint starts.
+  if host = System.get_env("BILIMBI_DEV_HOST") do
+    config :web, BilimbiWeb.Endpoint,
+      url: [scheme: "https", host: host, port: 443],
+      check_origin: ["https://#{host}"]
+  end
+
+  host =
+    System.get_env("BILIMBI_DEV_HOST") ||
+      Keyword.fetch!(Application.fetch_env!(:web, BilimbiWeb.Endpoint)[:url], :host)
+
+  config :bilimbi_base_module_registry, :dev_url, "https://#{host}"
+
   config :web, BilimbiWeb.Endpoint,
     live_reload: [
       web_console_logger: true,

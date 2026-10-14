@@ -14,8 +14,9 @@ Declare a descriptor dependency on `base/artifacts`. Implement the
 - `artifact_owner_id/0` returns the business module's stable logical ID.
 - `authorize(scope, company_id, operation, reference)` returns literal `:ok`
   only when the company is live, belongs to the tenant scope, and the current
-  scope actor may perform `:create`, `:read` or `:delete` on that business subject. For `:purge`,
-  the reference is nil and the check must grant company maintenance access.
+  scope actor may perform `:create`, `:read`, `:delete` or `:retain` on that
+  business subject. For `:purge`, the reference is nil and the check must grant
+  company maintenance access.
   Recheck current permissions and subject state every time.
 
 The Domain adapter validates Company through its public API. Base has no
@@ -44,12 +45,13 @@ reference = %{subject: subject_id, kind: "evidence"}
 {:ok, :deleted} = Artifacts.delete(scope, company_id, DocumentOwner, document.id)
 ```
 
-Metadata contains ID, subject, kind, content type, byte size, SHA-256 and expiry;
-it exposes no Ecto schema or storage path. MIME type is owner-supplied metadata,
-not a content safety claim. The owner validates accepted uploads and any needed
-scanning/quarantine before storage. Its authenticated download adapter calls
-`read/4` on every request and delivers an attachment with private/no-store cache
-headers and content sniffing disabled. Never cache bytes for later callers.
+Metadata contains ID, subject, kind, content type, byte size, SHA-256, expiry,
+retain-until and legal-hold time; it exposes no Ecto schema or storage path.
+MIME type is owner-supplied metadata, not a content safety claim. The owner
+validates accepted uploads and any needed scanning/quarantine before storage.
+Its authenticated download adapter calls `read/4` on every request and delivers
+an attachment with private/no-store cache headers and content sniffing
+disabled. Never cache bytes for later callers.
 
 Call this API outside a Repo transaction. Files require durable reservation and
 tombstone commits before filesystem IO and cannot participate in an outer
@@ -272,10 +274,69 @@ module wires this into its authorized scheduled maintenance workflow with its
 declared system principal and operator-controlled schedule. Base does not
 enumerate arbitrary companies. Monitor errors in that calling workflow.
 
-Expiry refuses reads immediately, even before maintenance runs. There is no
-unbounded retention or implied legal hold. The owner resolves its retention
+Expiry refuses reads immediately, even before maintenance runs. An ordinary
+document has no implied legal hold. The owner resolves its retention
 obligations before storage; an unset period refuses uploads. The owner must
-authorize retention deletion appropriately.
+authorize retention deletion appropriately. A document that must outlive the
+operator period is records-grade (next section).
+
+## Records-grade retention
+
+Original source documents a law requires the business to keep (bank statement
+files, supplier invoice scans, contracts) are stored with a retain-until date
+instead of an expiry. The owner derives the date from its own obligation and
+settings; Base never guesses a period.
+
+```elixir
+{:ok, document} =
+  Artifacts.put(scope, company_id, DocumentOwner, reference, bytes, content_type,
+    retain_until: retain_until, legal_hold: false, reason: "Income Tax Act 1967 s.82")
+
+{:ok, document} = Artifacts.retain(scope, company_id, DocumentOwner, id, later_date)
+{:ok, document} = Artifacts.place_hold(scope, company_id, DocumentOwner, id, reason: "case 12")
+{:ok, document} = Artifacts.release_hold(scope, company_id, DocumentOwner, id)
+{:ok, events} = Artifacts.retention_history(scope, company_id, DocumentOwner, id)
+```
+
+A records-grade document never expires: `expires_at` is nil, reads keep
+working until retain-until and after, and `purge_expired/3` never selects it.
+`delete/4` answers `{:error, :legal_hold}` while a hold stands and
+`{:error, :retained}` before retain-until; after retain-until an explicit,
+`:delete`-authorized call deletes it, and nothing deletes it automatically.
+`retain/6` makes an ordinary document records-grade (its expiry is gone for
+good) or moves retain-until later; an equal or earlier date is
+`{:error, :retention_not_extended}`. Retain-until is a `DateTime` in `Etc/UTC`
+(stored at microsecond precision); a date that is not in the future, not a
+`DateTime` or in another zone is `{:error, :invalid_retention}`. A legal hold needs a retained document
+(`{:error, :not_retained}`); placing one twice is `{:error, :already_on_hold}`
+and releasing one that is not there is `{:error, :not_on_hold}`. Retention at
+creation is applied in the publication transaction, so a failed upload stays
+an ordinary reservation that cleanup can tombstone. The operator period still
+governs reservations and ordinary documents.
+
+The owner authorizes `:retain` for every retention change, on top of
+`:create` at creation. Retention is irreversible, so grant it to the people
+the business trusts with that commitment; `:read` is enough for the history.
+
+The database guards the same rules behind the facade
+(`base_artifacts_retention_guard`): a retained row's `retain_until` cannot be
+cleared or moved earlier, and its `deleted_at`, `purged_at` or row cannot be
+deleted while on hold or before retain-until, from any client. Two checks
+keep the states exclusive: exactly one of `expires_at` and `retain_until` is
+set, and a hold needs `retain_until`. The schema contract verifies the
+triggers are installed and enabled.
+
+Every change writes one row to `base_artifact_retention_events`: the event
+(`retained`, `retention_extended`, `hold_placed`, `hold_released`), the
+retain-until and hold state after it, the optional reason (at most 255
+characters; never document content), the scope actor (user, or system with any
+principal, plus any impersonator) and `recorded_at`, which PostgreSQL stamps
+in the append-only trigger; the application cannot supply it, and updates,
+deletes and truncates of that table are refused. The same change also records
+an `artifacts.<event>` audit action, like every other artifact operation, and
+is refused when the audit log is unavailable. `retention_history/4` returns
+the events, oldest first, for any document the caller may read, tombstones
+included.
 
 A failed or refused purge records its attempt count, last error and attempt
 time, and records `artifacts.purge_failed`. Retention skips that document until
@@ -301,19 +362,22 @@ leaves a tombstone for maintenance to retry. Physical purge is successful only
 when `:deleted` is returned. Metadata remains as a provenance tombstone; its
 removal is outside this byte-retention contract.
 
-Reads lock metadata, reauthorize, check expiry and SHA-256 integrity, then record
-`artifacts.read` before returning bytes. Deletes record `artifacts.delete` and
-physical cleanup records `artifacts.purge`. Actions carry tenant/company, scope
-actor attribution, artifact ID and stable owner ID. Metadata writes also receive
-standard Repo mutation capture. Denied/failed reads return no bytes.
+Reads lock metadata, reauthorize, check expiry (a records-grade document has
+none) and SHA-256 integrity, then record `artifacts.read` before returning
+bytes. Deletes record `artifacts.delete` and physical cleanup records
+`artifacts.purge`. Actions carry tenant/company, scope actor attribution,
+artifact ID and stable owner ID. Metadata writes also receive standard Repo
+mutation capture. Denied/failed reads return no bytes.
 
 ## Schema and verification
 
-The descriptor owns the Bilimbi-only migration and schema contract for
-`base_artifacts`. Incoming compatible databases may lack this Bilimbi-only
-contribution until migration; the owner invariant checks its complete structure
-whenever present and rejects partial installation or drift. Tenant identity has a restricted foreign key; company identity
-has a PostgreSQL positivity check and the owning-module validation contract.
+The descriptor owns the Bilimbi-only migrations and schema contract for
+`base_artifacts` and `base_artifact_retention_events`. Incoming compatible
+databases may lack this Bilimbi-only contribution until migration; the owner
+invariant checks its complete structure whenever present, guard triggers
+included, and rejects partial installation or drift. Tenant identity has a
+restricted foreign key; company identity has a PostgreSQL positivity check and
+the owning-module validation contract.
 Run `mix bilimbi.migrate` from the umbrella root. Focused tests run with
 `cd apps/base/artifacts && mix test`, using module-owned temporary tables and
 the shared SQL sandbox.

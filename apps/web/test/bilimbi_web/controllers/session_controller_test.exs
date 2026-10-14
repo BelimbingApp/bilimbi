@@ -1,5 +1,5 @@
 defmodule BilimbiWeb.SessionControllerTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   alias Bilimbi.Base.Session
   alias BilimbiWeb.UserAuth

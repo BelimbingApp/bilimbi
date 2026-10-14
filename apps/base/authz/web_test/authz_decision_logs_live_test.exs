@@ -7,6 +7,7 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
   rather than fixtures shaped to suit the screen.
   """
 
+  # Stays `async: false`: swaps the node-wide contribution registry snapshot.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

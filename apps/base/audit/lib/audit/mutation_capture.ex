@@ -8,8 +8,8 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   query-based bulk write; this module owns the policy for both, from one
   set of functions:
 
-    * actor columns come from the per-process `Audit.Context`, guest/0 when
-      absent — the source's `PrincipalType::GUEST` default — and so does
+    * actor columns come from the per-process `Audit.Context`, unknown/0 when
+      absent — and so does
       `impersonator_id`, the operator behind an impersonated session;
     * `tenant_id` prefers the mutated row's own `tenant_id` attribute over
       the context — the row is ground truth, as in the source;
@@ -21,7 +21,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
       `[redacted]`; the change is recorded, the value never is. `payload`
       is the durable session's opaque Laravel blob, which can carry a CSRF
       token or a password hash that no field name reveals. Long
-      strings are bounded by `Bilimbi.Base.Audit.PayloadText`;
+      strings retain their complete value; NUL is escaped as a JSON-safe marker;
     * `auditable_type` defaults to the Ecto schema module name; a schema
       that must match a Belimbing morph string defines
       `__audit_auditable_type__/0`;
@@ -34,7 +34,8 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
 
   Rows are inserted synchronously in the caller's process, inside any open
   transaction: a rolled-back write rolls its audit row back with it. The
-  seam guarantees a capture failure never fails the business write.
+  seam reports failure without failing the business write by default; callers
+  may opt into strict capture. PostgreSQL stamps recording and absent event time.
 
   A bulk write produces one `insert_all` of audit rows per 1,000 affected
   rows, never one insert per affected row: the per-row cost of capture is an
@@ -48,7 +49,6 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   alias Bilimbi.Base.Audit.ActionSchema
   alias Bilimbi.Base.Audit.Context
   alias Bilimbi.Base.Audit.MutationSchema
-  alias Bilimbi.Base.Audit.PayloadText
   alias Bilimbi.Base.Repo
 
   # Redact here, in the shared policy. A call site does not invent its own
@@ -57,7 +57,17 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   @redacted_fields ~w(password password_hash remember_token secret api_key token payload)a
   @redacted_marker "[redacted]"
   @bulk_chunk_size 1000
-  @excluded_schemas [ActionSchema, MutationSchema]
+  @excluded_schemas [
+    ActionSchema,
+    MutationSchema,
+    Bilimbi.Base.Audit.RetentionSchema,
+    Bilimbi.Base.Audit.CaptureFailureSchema
+  ]
+
+  @impl true
+  def capture_failure(action, schema, error_type) do
+    Bilimbi.Base.Audit.CaptureFailure.record(action, schema, error_type, Context.get())
+  end
 
   @impl true
   def capture_schema?(schema) when is_atom(schema), do: captured_schema?(schema)
@@ -88,8 +98,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
             event: event(action),
             old_values: old_values,
             new_values: new_values,
-            trace_id: bounded(context.trace_id, 12),
-            occurred_at: NaiveDateTime.truncate(NaiveDateTime.utc_now(), :second)
+            trace_id: bounded(context.trace_id, 12)
           }
           |> MutationSchema.changeset(tenant_id(result, context))
           |> insert_capture()
@@ -143,8 +152,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
           event: event(action),
           old_values: old_values,
           new_values: new_values,
-          trace_id: bounded(context.trace_id, 12),
-          occurred_at: NaiveDateTime.truncate(NaiveDateTime.utc_now(), :second)
+          trace_id: bounded(context.trace_id, 12)
         }
         |> MutationSchema.changeset(tenant_id(row, context))
         |> batched_entry()
@@ -177,8 +185,11 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
 
   defp batched_entry(changeset) do
     case Ecto.Changeset.apply_action(changeset, :insert) do
-      {:ok, mutation} -> mutation |> Map.from_struct() |> Map.drop([:__meta__, :id])
-      {:error, invalid} -> raise Ecto.InvalidChangesetError, action: :insert, changeset: invalid
+      {:ok, mutation} ->
+        mutation |> Map.from_struct() |> Map.drop([:__meta__, :id, :recorded_at, :occurred_at])
+
+      {:error, invalid} ->
+        raise Ecto.InvalidChangesetError, action: :insert, changeset: invalid
     end
   end
 
@@ -192,33 +203,17 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
     |> Enum.each(&Repo.insert_all(MutationSchema, &1, opts))
 
     :ok
-  rescue
-    error in Postgrex.Error ->
-      if match?(%{postgres: %{code: :undefined_table}}, error) do
-        :ok
-      else
-        reraise error, __STACKTRACE__
-      end
   end
 
   # Inside a caller's transaction the row is written under a savepoint
   # (DBConnection's `mode: :savepoint`), so a failed capture rolls back to
   # its own savepoint instead of aborting the business transaction — the
-  # business write's fate must never depend on the audit row's. A missing
-  # audit table is the pre-canonical state (fixture suites, fresh checkouts
-  # before migration) and is silently not captured; every other failure
-  # propagates to the seam, which logs and counts it.
+  # default business write survives a failed audit row. All failures, including
+  # missing audit tables, reach the seam for durable diagnostics and alerting.
   defp insert_capture(changeset) do
     opts = if Repo.in_transaction?(), do: [mode: :savepoint], else: []
     Repo.insert!(changeset, opts)
     :ok
-  rescue
-    error in Postgrex.Error ->
-      if match?(%{postgres: %{code: :undefined_table}}, error) do
-        :ok
-      else
-        reraise error, __STACKTRACE__
-      end
   end
 
   defp captured_schema?(schema) do
@@ -315,7 +310,8 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
 
   defp field_value(field, _value) when field in @redacted_fields, do: @redacted_marker
 
-  defp field_value(_field, value) when is_binary(value), do: PayloadText.bounded(value)
+  defp field_value(_field, value) when is_binary(value),
+    do: String.replace(value, "\u0000", "\u2400")
 
   defp field_value(_field, %NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   defp field_value(_field, %DateTime{} = value), do: DateTime.to_iso8601(value)

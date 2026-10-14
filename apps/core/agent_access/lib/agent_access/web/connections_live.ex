@@ -54,7 +54,7 @@ defmodule Bilimbi.Core.AgentAccess.Web.ConnectionsLive do
           :if={@count == 0 and is_nil(@error)}
           id="connections-empty"
           title="No connections"
-          reason="Connect an agent using its device sign-in code."
+          reason="Connect an app or agent through its sign-in flow."
         />
         <div id="agent-connections" phx-update="stream">
           <.card :for={{dom_id, connection} <- @streams.connections} id={dom_id} class="mb-2">
@@ -91,7 +91,7 @@ defmodule Bilimbi.Core.AgentAccess.Web.ConnectionsLive do
           :if={@pending}
           id="revoke-connection-dialog"
           consequence="Revoke connection?"
-          detail="Access ends immediately. Connect again with a new device code to grant access again."
+          detail="Access ends immediately. Connect again and approve a new connection to grant access again."
           on_confirm={JS.push("confirm_revoke")}
           on_cancel={JS.push("cancel_revoke")}
           confirm="Revoke"

@@ -11,6 +11,8 @@ defmodule BilimbiWeb.HostAuthorityTest do
   through the discovered host routes.
   """
 
+  # Stays `async: false`: subscribes to a fixed PubSub topic for a fixed session
+  # id.
   use BilimbiWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

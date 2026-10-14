@@ -7,7 +7,7 @@ defmodule BilimbiWeb.DevSeedTest do
   whole installed graph, which only exists with every module loaded — the same
   context `mix bilimbi.dev.seed` runs in.
   """
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Tenancy

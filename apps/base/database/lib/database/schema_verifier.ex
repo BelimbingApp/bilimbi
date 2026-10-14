@@ -9,7 +9,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   Index specs use `:order` as a boolean list aligned with `:columns`: `true`
   means descending and `false` ascending. An omitted or `nil` order means all
   columns ascend. Optional indexes may be absent, but their structure and
-  ordering must match when present.
+  ordering must match when present. An `optional: true` table may be absent
+  before a Bilimbi-only migration; a present table is verified in full.
   """
 
   alias Ecto.Adapters.SQL
@@ -58,7 +59,19 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           required(:columns) => %{required(String.t()) => column_spec()},
           required(:indexes) => %{required(String.t()) => index_spec()},
           required(:foreign_keys) => %{required(String.t()) => foreign_key_spec()},
-          optional(:checks) => %{required(String.t()) => check_spec()}
+          optional(:checks) => %{required(String.t()) => check_spec()},
+          optional(:optional) => boolean(),
+          optional(:optional_columns) => %{String.t() => column_spec()},
+          optional(:optional_indexes) => %{String.t() => index_spec()},
+          optional(:optional_checks) => %{String.t() => check_spec()},
+          optional(:optional_groups) => [optional_group_spec()]
+        }
+
+  @type optional_group_spec :: %{
+          required(:name) => String.t(),
+          required(:columns) => [String.t()],
+          required(:indexes) => [String.t()],
+          optional(:checks) => [String.t()]
         }
 
   @type table_contribution_spec :: %{
@@ -149,7 +162,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp verify_table(repo, schema, spec) do
     case columns(repo, schema, spec.name) do
       actual_columns when map_size(actual_columns) == 0 ->
-        ["missing table #{schema}.#{spec.name}"]
+        if Map.get(spec, :optional, false), do: [], else: ["missing table #{schema}.#{spec.name}"]
 
       actual_columns ->
         actual_indexes = indexes(repo, schema, spec.name)

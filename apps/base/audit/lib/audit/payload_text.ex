@@ -2,7 +2,7 @@ defmodule Bilimbi.Base.Audit.PayloadText do
   @moduledoc """
   The one bound on free text stored in an audit payload.
 
-  Captured mutations and recorded console commands store text as written,
+  Recorded console commands store text as written,
   cut at #{2000} characters with an explicit marker so a reader knows the
   stored value is a prefix. Each NUL character is stored as `␀` (U+2400),
   because PostgreSQL `jsonb` cannot hold one and a payload carrying it

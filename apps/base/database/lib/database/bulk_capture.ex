@@ -182,6 +182,7 @@ defmodule Bilimbi.Base.Database.BulkCapture do
     plan.schema
     |> WriteCapture.dispatch_bulk(changes(repo, action, plan, result))
   rescue
+    error in Bilimbi.Base.Database.CaptureError -> reraise error, __STACKTRACE__
     error -> WriteCapture.capture_failed(action, plan.schema, error, __STACKTRACE__)
   end
 

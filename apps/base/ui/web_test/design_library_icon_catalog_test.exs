@@ -5,7 +5,7 @@ defmodule BilimbiWeb.DesignLibraryIconCatalogTest do
   follows what the browser reported.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

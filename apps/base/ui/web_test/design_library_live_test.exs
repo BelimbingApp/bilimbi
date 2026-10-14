@@ -3,7 +3,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   End-to-end tests for the Design Library under `/system/design-library`.
   """
 
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

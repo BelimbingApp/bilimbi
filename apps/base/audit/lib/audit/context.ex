@@ -4,10 +4,9 @@ defmodule Bilimbi.Base.Audit.Context do
 
   The port of Belimbing's `RequestContext`: the web edge resolves it once
   per HTTP request or LiveView process — the same lifecycle as the locale —
-  and capture reads it when shaping rows. Absent context degrades to the
-  source's guest default (`actor_type "guest"`, `actor_id 0`) rather than
-  failing the write or skipping it. Do not silence capture to avoid a guest
-  row; background work that wants attribution sets its own.
+  and capture reads it when shaping rows. Absent context is explicitly `unknown/0`, never an assertion that the
+  caller was a guest. `with_scope/2` derives identity from the sealed scope
+  for direct facade calls and background work, restoring context afterwards.
 
   `impersonator_id` names the operator behind an impersonated session. The
   actor pair keeps naming the account acted as; the impersonator is the
@@ -24,7 +23,7 @@ defmodule Bilimbi.Base.Audit.Context do
 
   @key __MODULE__
 
-  defstruct actor_type: "guest",
+  defstruct actor_type: "unknown",
             actor_id: 0,
             actor_role: nil,
             impersonator_id: nil,
@@ -61,7 +60,67 @@ defmodule Bilimbi.Base.Audit.Context do
     :ok
   end
 
-  @doc "The process context, or the guest default when none was set."
+  @doc "The process context, or unknown attribution when none was set."
   @spec get() :: t()
   def get, do: Process.get(@key) || %__MODULE__{}
+
+  @doc "Derives attribution from a verified scope; only request diagnostics carry over, never a role."
+  def from_scope(%Bilimbi.Base.Tenancy.Scope{} = scope) do
+    actor = Bilimbi.Base.Tenancy.Scope.actor(scope)
+
+    %{
+      get()
+      | actor_type: if(actor.type == :user, do: "user", else: "system"),
+        actor_id: actor.user_id || 0,
+        actor_role: nil,
+        company_id: actor.company_id,
+        tenant_id: Bilimbi.Base.Tenancy.Scope.tenant_id(scope),
+        impersonator_id: actor.impersonator_id,
+        system_principal: actor.system_principal
+    }
+  end
+
+  @system_actor_types ~w(console queue scheduler system)
+
+  @doc """
+  Runs work attributed to a named non-user actor — `"system"` for seeds and
+  tasks, `"scheduler"`, `"queue"`, or `"console"` — restoring prior context
+  even on failure. Only request diagnostics (address, URL, agent, trace) carry
+  over; no user, company, tenant, or impersonation identity does.
+  """
+  @spec with_actor(String.t(), (-> result)) :: result when result: var
+  def with_actor(actor_type, fun)
+      when actor_type in @system_actor_types and is_function(fun, 0) do
+    previous = Process.get(@key)
+
+    put(%{
+      get()
+      | actor_type: actor_type,
+        actor_id: 0,
+        actor_role: nil,
+        impersonator_id: nil,
+        system_principal: nil,
+        company_id: nil,
+        tenant_id: nil
+    })
+
+    try do
+      fun.()
+    after
+      put(previous)
+    end
+  end
+
+  @doc "Runs work attributed to the scope, restoring prior context even on failure."
+  def with_scope(scope, fun) when is_function(fun, 0) do
+    context = from_scope(scope)
+    previous = Process.get(@key)
+    put(context)
+
+    try do
+      fun.()
+    after
+      put(previous)
+    end
+  end
 end

@@ -9,7 +9,7 @@ defmodule Bilimbi.Base.AgentApi.Plans do
   facade and consumes the code in one transaction. A failed operation rolls back
   all records, audits and code consumption. Changed defaults or reference data
   require a fresh plan. A code proves what was reviewed, not the person's go:
-  the native client enforces that go locally before it commits (ADR 0021), and
+  the native client or MCP host obtains that go before it commits (ADR 0021), and
   Bilimbi does not verify it. A new preview also deletes this tenant's plans
   that expired more than a day ago, used or not, so rows do not accumulate.
   """

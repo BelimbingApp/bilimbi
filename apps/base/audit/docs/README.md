@@ -8,7 +8,7 @@ actors and subjects: `company_id`, `tenant_id`, and the actor pair have
 **no foreign keys**. Recording takes a `Bilimbi.Base.Tenancy.Scope` or
 `:unscoped`; it never reads `tenant_id` from the attributes map. Unscoped
 rows stay null. Numeric ID 1 has no runtime meaning. Actor types are
-`user`, `agent`, `guest`, `console`, `scheduler`, and `queue`.
+`user`, `agent`, `guest`, `console`, `scheduler`, `queue`, `system`, and `unknown`.
 
 Payloads are PostgreSQL `jsonb`. `ip_address` is `inet`, matching Laravel 13
 `ipAddress()` on PostgreSQL. There are no `created_at` / `updated_at` /
@@ -48,7 +48,8 @@ A job that runs as a named system principal (ADR 0017) records `actor_type`
 `system_principal` column on both tables. Base Queue sets that context for the
 job; captured mutations take it from `Bilimbi.Base.Audit.Context`, and explicit
 records inherit it unless they name the key. A row with a principal must be a
-`"system"` row, and a `"system"` row must name one. The column and its partial
+`"system"` row; an anonymous system actor (seeds, tasks, maintenance) is also
+`"system"` with a null principal. The column and its partial
 index are a second optional group in the schema contract, added by the
 Bilimbi-only migration `20260927090000`.
 
@@ -63,12 +64,11 @@ with the matched row count, `database_query.refused` with the guard
 and its message, or `database_query.failed` with the database's error
 message. The actor pair, role, company, tenant, `impersonator_id`,
 `ip_address`, `url`, `user_agent`, and `trace_id` come from
-`Bilimbi.Base.Audit.Context`; an absent context records the guest default.
+`Bilimbi.Base.Audit.Context`; an absent context explicitly records `unknown/0`.
 Result rows never reach the record.
 
 The SQL is stored **as typed**, bounded by `Bilimbi.Base.Audit.PayloadText`
-(the same 2000-character cut, with marker, that captured mutation values
-get, with each NUL character stored as `␀` because PostgreSQL `jsonb`
+(a 2000-character cut, with marker, with each NUL character stored as `␀` because PostgreSQL `jsonb`
 cannot hold one). Nothing redacts by content: a secret pasted into a query is recorded.
 Rows are `is_retained: false` like every other recorded action; nothing in
 Bilimbi prunes `base_audit_actions`, retained or not, so the flag only
@@ -101,3 +101,56 @@ Recorded before/after measurements for the additive indexes: audit tenant
 count 169 ms to 22.7 ms, audit page 100 189 ms to 19.5 ms, and Authz page
 0.76 ms to 0.14 ms. These figures were supplied with the change, not
 re-measured.
+
+## Evidence hardening
+
+Migration `20261013120000` leaves existing evidence and event times intact.
+PostgreSQL rejects UPDATE, DELETE, and TRUNCATE on actions, mutations and
+capture-failure evidence. The compatibility `is_retained` bit becomes an
+immutable initial value; mutable bookmarks live in `base_audit_action_metadata`.
+The existing facade and retained filter resolve that metadata transparently.
+
+`recorded_at` is always stamped by PostgreSQL's `clock_timestamp()` in UTC,
+regardless of a caller-supplied value. Historical rows have null recording time:
+we cannot reconstruct when they were inserted. `occurred_at` remains the
+caller's event time for imported or explicit facts; when absent, the database
+sets it from recording time. Automatic capture uses database time only.
+
+Direct `record_action/2` and `record_mutation/2` calls inherit identity from
+Scope when attributes omit it. Explicit identity keys retain their contract.
+Use `Audit.with_scope(scope, fun)` for repo writes outside the web edge: it
+reads the sealed actor, including impersonation, and restores context. Base
+Queue runs every job under it with the job's resumed scope (the delegated user
+or the named system principal), and ordinary system jobs as actor `queue`. A
+job the Schedule recurrence enqueued runs as actor `scheduler`. Seeds and mix tasks that write run
+under `Audit.with_actor("system", fun)` (`"console"` for operator grants).
+Only a write with no edge at all is `unknown/0`; an explicitly supplied guest
+remains a guest. Mutation strings are stored in full, never truncated, with
+NUL escaped as `␀`.
+
+### Redacted fields
+
+The change to a redacted field is recorded; its value is not, because an audit
+log readable by many operators must not become a second copy of a credential.
+Two sets are replaced with `[redacted]` in `old_values` and `new_values`:
+
+- Globally, by field name on any captured schema: `password`, `password_hash`,
+  `remember_token`, `secret`, `api_key`, `token`, and `payload`. `payload` is
+  the durable session's opaque Laravel blob, which can hold a CSRF token or a
+  password hash that no field name reveals.
+- Per schema, through `__audit_redacted_fields__/0`: Integration exchanges,
+  Agent API plans, and Agent Access devices and tokens declare their hashes.
+
+A schema whose field is named `secret`, `token`, or `payload` but holds
+non-sensitive data must use another field name; widening the audit record means
+changing the list in `MutationCapture`, not working around it at a call site.
+
+Capture failures create append-only `base_audit_capture_failures` diagnostics
+under a savepoint, in the caller's transaction, and emit `capture_failure`
+telemetry with a `durable` flag. Messages and row values are
+never logged or stored in diagnostics. A rolled-back business transaction
+also rolls back diagnostics. If the diagnostics store itself is unavailable,
+telemetry reports `durable: false`; the default business write still succeeds.
+`Audit.with_strict_capture(fun)` raises a value-safe `Database.CaptureError` on failure; wrap it in a Repo transaction
+when the business write must roll back. Existing capture adapters may implement
+the optional `capture_failure/3` callback without changing their existing API.

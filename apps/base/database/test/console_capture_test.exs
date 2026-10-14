@@ -125,7 +125,9 @@ defmodule Bilimbi.Base.Database.ConsoleCaptureTest do
         assert {:ok, %{rows: [%{"one" => 1}]}} = as_operator("SELECT 1 AS one")
       end)
 
-    assert log =~ "console capture exploded"
+    # Messages can carry row values, so the log names the error type only.
+    assert log =~ "RuntimeError"
+    refute log =~ "console capture exploded"
 
     assert_receive {:capture_failure, %{count: 1},
                     %{action: :console_command, schema: Bilimbi.Base.Database.ConsoleCapture}}
