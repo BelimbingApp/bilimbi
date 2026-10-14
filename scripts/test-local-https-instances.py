@@ -27,6 +27,8 @@ with tempfile.TemporaryDirectory(prefix="instance-test-", dir=scratch) as direct
     checkout = Path(directory)
     host = "bilimbi-" + hashlib.sha256(str(checkout).encode()).hexdigest()[:10] + ".localhost"
     site = caddy / f"{host}.caddy"
+    hosts_line = f"127.0.0.1\t{host} # Bilimbi local HTTPS\n"
+    hosts_entry_existed = hosts_line in Path("/etc/hosts").read_text()
     for filename in ("scripts/local-https.sh", "scripts/local-config.exs", "mix/local_config.exs",
                      "scripts/local-https/install-caddy.sh", "scripts/trust-local-ca.ps1"):
         destination = checkout / filename
@@ -74,14 +76,18 @@ with tempfile.TemporaryDirectory(prefix="instance-test-", dir=scratch) as direct
     finally:
         # Remove only this fixture's owned site and leaf files. Never touch its
         # mkcert CA or the other development sites.
-        if site.exists():
-            assert site.read_text().splitlines()[0] == f"# Bilimbi checkout: {checkout}"
+        owns_site = site.exists() and site.read_text().splitlines()[0] == f"# Bilimbi checkout: {checkout}"
+        if owns_site:
             result = run("sudo", "rm", "--", str(site),
                          str(caddy / "certs" / f"{host}.pem"),
                          str(caddy / "certs" / f"{host}-key.pem"))
             assert result.returncode == 0, result.stderr
             result = run("sudo", "systemctl", "reload", "caddy")
             assert result.returncode == 0, result.stderr
+        # The installer adds this exact line only when no resolver entry is
+        # available. Remove it even if site cleanup already removed the
+        # fragment, but preserve any entry that predated this fixture.
+        if not hosts_entry_existed:
             cleanup_hosts = (
                 "from pathlib import Path; import sys; p=Path('/etc/hosts'); "
                 "line='127.0.0.1\\t'+sys.argv[1]+' # Bilimbi local HTTPS\\n'; "
