@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.UI.Components.Forms do
   @moduledoc """
   Form controls: `code_input/1`, `secret_input/1`, `input/1`, `combobox/1`,
-  `multi_select/1` and `radio_group/1`, with the field classes, described-by wiring and error
-  translation they share.
+  `multi_select/1` and `radio_group/1`, with the field classes, described-by
+  wiring and error translation they share.
 
   `use Bilimbi.Base.UI.Components` imports it with the rest.
   """
