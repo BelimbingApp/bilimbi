@@ -1,0 +1,11 @@
+{
+  "name": "bilimbi",
+  "version": "0.1.4",
+  "description": "Connect to Bilimbi through MCP or a local native client, discover and read records, review supported writes, and show verified results.",
+  "skills": "./skills/",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md"
+    }
+  }
+}

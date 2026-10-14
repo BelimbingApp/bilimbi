@@ -54,7 +54,10 @@ defmodule BilimbiWeb.IncomingApi do
   end
 
   defp recorded?(["api", "v1" | _]), do: true
+  defp recorded?(["mcp"]), do: true
   defp recorded?(["oauth", action]) when action in ["device_authorization", "token"], do: true
+
+  defp recorded?([".well-known", "oauth-protected-resource" | _]), do: true
 
   defp recorded?([".well-known", name]) when name in ["bilimbi", "oauth-authorization-server"],
     do: true

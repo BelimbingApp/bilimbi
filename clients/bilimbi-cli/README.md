@@ -1,9 +1,18 @@
-# Bilimbi native client and Codex plugin
+# Bilimbi native client and local agent plugin
 
 One native executable connects to any Bilimbi adopter's server. Give it the
 server address once, approve device sign-in, and use the same plugin across
 several profiles. Files stay in the harness. The client calls the API and
 serves review/results on the desktop's `127.0.0.1`; it does not run AI.
+
+The native marketplace supplies skills and an executable. Use a host with
+local process execution and network access to the server, such as Codex desktop.
+For ChatGPT without local execution, connect the installation's MCP server
+and use its exported remote plugin; see [MCP setup](../../apps/web/docs/mcp.md).
+The shared skill selects connected MCP tools first, otherwise the native
+workflow. Installing a native package alone does not register an MCP server.
+Use the plugin's **Setup** action to test the runtime, discover the server and
+complete device sign-in before attempting a task.
 
 ## Install on a Windows office PC
 
@@ -44,12 +53,16 @@ server deployment is separately deferred by ADR 0021. This client accepts the
 server's HTTP or HTTPS address and uses the OS trust store for HTTPS.
 
 Packaging follows the [official OpenAI plugin documentation](https://developers.openai.com/plugins/build/plugins):
-a portable root manifest, a discoverable skill and a local marketplace. No
-MCP, hooks, app registration or automatic companion-runtime installer is used.
+a portable root manifest, workflow and setup skills, a Codex compatibility
+manifest for clients that still use explicit skill discovery, and a local
+marketplace. The portable manifest declares the setup action. No
+MCP server configuration, hooks, app registration or automatic companion-runtime
+installer is used in these native archives. The separate MCP export packages
+the same skills with an installation-specific HTTPS server configuration.
 The repository marketplace can also be registered with
 `codex plugin marketplace add <repository-root>` after building its binary.
 Release archives relocate the plugin to `plugins/bilimbi` and ship a matching
-marketplace. The repository version lives at `plugins/codex/bilimbi`.
+marketplace. The repository version lives at `plugins/bilimbi`.
 
 ## Commands
 
@@ -59,6 +72,7 @@ addresses print to stderr. Header flags may occur before or after the command.
 
 ```text
 bilimbi login http://bilimbi.office:4000 --name office --agent-id codex/gpt-6.1-high
+bilimbi discover http://bilimbi.office:4000
 bilimbi profiles
 bilimbi use office
 bilimbi search company --agent-id codex/gpt-6.1-high --run-id task-123
@@ -70,6 +84,9 @@ bilimbi logout office
 
 `BILIMBI_AGENT_ID` and `BILIMBI_RUN_ID` are equivalent to the flags. Use the
 actual `harness/model-ver-effort`, not the example when a different model runs.
+When the host does not disclose a component, state it as `unknown` rather
+than guessing, for example `codex/unknown-unknown`. The label is self-reported
+audit context, not authorization. Keep one unique run ID throughout a task.
 `call` reads one JSON object from stdin by default (`--input -`). It describes
 the operation first and refuses every kind except `read`. This release has no
 direct write call. Supported writes use `plan`, review, `commit` and report.
@@ -77,6 +94,13 @@ direct write call. Supported writes use `plan`, review, `commit` and report.
 Discovery verifies API version 1, the public `bilimbi-native` client and both
 OAuth grants. Endpoints must stay on the supplied origin; redirects are
 refused. Use the canonical server address rather than a redirecting alias.
+`discover <address>` validates compatibility without sign-in or profile
+changes. Origin refusals name the recovery: use the configured canonical
+address. For example, a development server advertising `https://bilimbi.localhost`
+refuses `http://127.0.0.1:4000`; these addresses are different origins even on
+the same machine. The client does not follow a different origin automatically.
+`mix bilimbi.server` prints each checkout's canonical HTTPS address and installs
+its local CA trust. Use that address for discovery and sign-in.
 Access tokens expire after an hour. The client rotates the refresh token before
 expiry under a profile-store lock, persists the replacement, and never retries
 a failed rotation. The lock is an operating-system file lock held only while
@@ -193,6 +217,26 @@ present it, and a local approval alone performs no mutation. For a plan, the
 safe write loop above builds the document from the saved server results, and
 only `commit` writes.
 
+## Namecard device test
+
+Use the [Bilimbi workflow](../../plugins/bilimbi/skills/bilimbi/SKILL.md)
+to discover the available company and employee operations and their guides.
+Start on the desktop, attach photos in the same
+conversation through Codex Remote on the phone, and return to the desktop
+for the local draft and validated-plan reviews. Photos stay in the harness.
+Review confirms uncertain readings, duplicate matches and the person/employer
+shape before any commit. New employers are committed and reported first;
+their returned ids feed separately reviewed employee plans. A later failure
+must report the earlier successful company creation.
+
+Phone delivery requires a real paired-device test. A local synthetic image
+can prove extraction, searches, review, API writes and verification links,
+but cannot establish Remote attachment delivery. Remote access and pairing
+come from [OpenAI's host setup](https://learn.chatgpt.com/docs/remote-connections),
+and [photo capture belongs to the mobile prompt](https://developers.openai.com/blog/mastering-codex-remote-for-engineering).
+The native program and browser must share the desktop host: a remote machine's
+loopback URL cannot be opened directly on the phone or another computer.
+
 ## Build and verify
 
 Go is chosen for a single distributable program, standard-library HTTP/JSON,
@@ -214,7 +258,7 @@ go run ./pack --root ../.. --binary /tmp/bilimbi --target linux-amd64 --output /
 Build macOS on macOS with cgo enabled so the credential backend is present;
 do not ship a Darwin cgo-disabled binary. Build Windows with
 `CGO_ENABLED=0 GOOS=windows GOARCH=amd64`, and Linux x64 similarly. To develop the
-repository plugin, put the local build in `plugins/codex/bilimbi/bin/` (ignored
+repository plugin, put the local build in `plugins/bilimbi/bin/` (ignored
 by Git). CI tests on Linux, macOS and Windows, builds all four targets, and
 uploads ZIP marketplaces plus SHA-256 files. No binaries are committed.
 

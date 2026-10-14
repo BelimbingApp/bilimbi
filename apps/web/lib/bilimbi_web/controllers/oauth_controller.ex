@@ -8,10 +8,23 @@ defmodule BilimbiWeb.OAuthController do
     json(conn, %{
       issuer: base,
       device_authorization_endpoint: url(~p"/oauth/device_authorization"),
+      authorization_endpoint: url(~p"/oauth/authorize"),
       token_endpoint: url(~p"/oauth/token"),
-      response_types_supported: [],
-      grant_types_supported: [AgentAccess.device_grant(), "refresh_token"],
+      response_types_supported: ["code"],
+      grant_types_supported: [AgentAccess.device_grant(), "authorization_code", "refresh_token"],
+      code_challenge_methods_supported: ["S256"],
+      scopes_supported: ["bilimbi"],
+      authorization_response_iss_parameter_supported: true,
       token_endpoint_auth_methods_supported: ["none"]
+    })
+  end
+
+  def protected_resource(conn, _) do
+    json(conn, %{
+      resource: BilimbiWeb.MCPController.resource(),
+      authorization_servers: [BilimbiWeb.Endpoint.url()],
+      scopes_supported: ["bilimbi"],
+      bearer_methods_supported: ["header"]
     })
   end
 
@@ -64,7 +77,14 @@ defmodule BilimbiWeb.OAuthController do
               AgentAccess.exchange(params["client_id"], params["device_code"])
 
             params["grant_type"] == "refresh_token" ->
-              AgentAccess.refresh(params["client_id"], params["refresh_token"])
+              AgentAccess.refresh(
+                params["client_id"],
+                params["refresh_token"],
+                params["resource"]
+              )
+
+            params["grant_type"] == "authorization_code" ->
+              AgentAccess.exchange_code(params, BilimbiWeb.MCPController.resource())
 
             true ->
               {:error, :unsupported_grant_type}

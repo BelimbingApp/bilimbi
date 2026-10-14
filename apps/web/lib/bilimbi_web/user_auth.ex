@@ -393,7 +393,15 @@ defmodule BilimbiWeb.UserAuth do
 
   defp maybe_put_return_to(conn) do
     if conn.method == "GET" do
-      put_session(conn, @return_to_key, conn.request_path)
+      # OAuth consent must survive sign-in with its client, callback, state,
+      # resource and PKCE challenge intact. The target comes from the local
+      # request path, never a caller-supplied return URL or Host header.
+      destination =
+        if conn.query_string == "",
+          do: conn.request_path,
+          else: conn.request_path <> "?" <> conn.query_string
+
+      put_session(conn, @return_to_key, destination)
     else
       conn
     end

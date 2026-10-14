@@ -8,9 +8,9 @@ defmodule Bilimbi.Core.AgentAccess do
   agent facets. A stated agent ID labels a request and never authenticates it.
   """
   import Ecto.Query
-  alias Bilimbi.Base.{Repo, Tenancy}
+  alias Bilimbi.Base.{Repo, Settings, Tenancy}
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Core.AgentAccess.{Connection, Device, Token}
+  alias Bilimbi.Core.AgentAccess.{AuthorizationCode, Connection, Device, OAuthClient, Token}
   alias Bilimbi.Core.{Company, User}
 
   @client "bilimbi-native"
@@ -18,6 +18,96 @@ defmodule Bilimbi.Core.AgentAccess do
   @seen_limit 20
   def client_id, do: @client
   def device_grant, do: "urn:ietf:params:oauth:grant-type:device_code"
+
+  @doc "Validates an operator-registered authorization-code request before displaying consent."
+  defdelegate authorization_request(params, resource), to: OAuthClient, as: :request
+
+  @doc "Creates a person-owned MCP grant only after explicit browser consent."
+  def authorize(%Scope{} = scope, params, resource, expires_at) do
+    with :ok <- self_service(scope),
+         {:ok, request} <- OAuthClient.request(params, resource),
+         true <- match?(%DateTime{}, expires_at) and DateTime.compare(expires_at, now()) == :gt do
+      transaction(fn ->
+        actor = Scope.actor(scope)
+
+        {:ok, connection} =
+          Repo.insert(
+            Ecto.Changeset.change(%Connection{}, %{
+              tenant_id: Scope.tenant_id(scope),
+              company_id: actor.company_id,
+              user_id: actor.user_id,
+              agent_id: request["client_name"],
+              client_id: request["client_id"],
+              resource: resource,
+              oauth_scope: "bilimbi",
+              seen_agent_ids: %{},
+              expires_at: DateTime.truncate(expires_at, :second)
+            })
+          )
+
+        code = secret()
+
+        {:ok, _} =
+          Repo.insert(
+            Ecto.Changeset.change(%AuthorizationCode{}, %{
+              connection_id: connection.id,
+              code_hash: hash(code),
+              code_challenge: request["code_challenge"],
+              redirect_uri: request["redirect_uri"],
+              expires_at:
+                DateTime.add(now(), Settings.get("agent_access.authorization_code_seconds"))
+            })
+          )
+
+        {:ok, code}
+      end)
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :invalid_expiry}
+    end
+  end
+
+  @doc "Redeems a short-lived code once, bound to client, callback, resource and S256 verifier."
+  def exchange_code(params, resource) when is_map(params) do
+    code = params["code"]
+
+    with true <- is_binary(code) and byte_size(code) == 43,
+         %AuthorizationCode{} = found <-
+           Repo.one(from(c in AuthorizationCode, where: c.code_hash == ^hash(code))) do
+      transaction(fn ->
+        connection = locked_connection(found.connection_id)
+        auth = Repo.get!(AuthorizationCode, found.id)
+
+        client = Map.get(Settings.get("agent_access.oauth_clients"), connection.client_id)
+
+        valid_client? =
+          is_map(client) and auth.redirect_uri in client["redirect_uris"]
+
+        cond do
+          not valid_client? or connection.client_id != params["client_id"] or
+            connection.resource != resource or params["resource"] != resource or
+            auth.redirect_uri != params["redirect_uri"] or
+            not OAuthClient.proof?(params["code_verifier"], auth.code_challenge) or
+              DateTime.compare(auth.expires_at, now()) != :gt ->
+            {:error, :invalid_grant}
+
+          not is_nil(auth.used_at) ->
+            Repo.update!(Ecto.Changeset.change(connection, revoked_at: now()))
+            {:error, :invalid_grant}
+
+          true ->
+            with :ok <- live(connection) do
+              Repo.update!(Ecto.Changeset.change(auth, used_at: now()))
+              issue(connection)
+            end
+        end
+      end)
+    else
+      _ -> {:error, :invalid_grant}
+    end
+  end
+
+  def exchange_code(_, _), do: {:error, :invalid_request}
 
   def start_device(@client, agent_id) when is_binary(agent_id) do
     if valid_label?(agent_id) do
@@ -163,7 +253,9 @@ defmodule Bilimbi.Core.AgentAccess do
   def exchange(@client, _), do: {:error, :invalid_request}
   def exchange(_, _), do: {:error, :invalid_client}
 
-  def refresh(@client, value) when is_binary(value) do
+  def refresh(client, value, resource \\ nil)
+
+  def refresh(client, value, resource) when is_binary(value) do
     # First locate the immutable parent, then lock parent before token everywhere.
     # Otherwise concurrent refresh and device redemption could invert lock order.
     case Repo.one(from(t in Token, where: t.token_hash == ^hash(value) and t.kind == "refresh")) do
@@ -176,6 +268,13 @@ defmodule Bilimbi.Core.AgentAccess do
           token = Repo.get!(Token, found.id)
 
           cond do
+            connection.client_id != client or connection.resource != resource ->
+              {:error, :invalid_grant}
+
+            client != @client and
+                not Map.has_key?(Settings.get("agent_access.oauth_clients"), client) ->
+              {:error, :invalid_client}
+
             not is_nil(token.used_at) ->
               {:ok, _} = Repo.update(Ecto.Changeset.change(connection, revoked_at: now()))
               {:error, :invalid_grant}
@@ -193,15 +292,16 @@ defmodule Bilimbi.Core.AgentAccess do
     end
   end
 
-  def refresh(@client, _), do: {:error, :invalid_request}
-  def refresh(_, _), do: {:error, :invalid_client}
+  def refresh(@client, _, _), do: {:error, :invalid_request}
+  def refresh(_, _, _), do: {:error, :invalid_client}
 
   @doc "Opaque credential lookup before a tenant is known. Returns stable claims only."
-  def authenticate(value) when is_binary(value) do
+  def authenticate(value, resource \\ nil) when is_binary(value) do
     case Repo.one(from(t in Token, where: t.token_hash == ^hash(value) and t.kind == "access")) do
       %Token{} = token ->
         with true <- DateTime.compare(token.expires_at, now()) == :gt,
              connection when not is_nil(connection) <- lockedless_connection(token.connection_id),
+             true <- connection.resource == resource,
              :ok <- live_grant(connection) do
           {:ok, Map.take(connection, [:id, :tenant_id, :company_id, :user_id])}
         else
@@ -352,13 +452,15 @@ defmodule Bilimbi.Core.AgentAccess do
         )
     end
 
+    result = %{
+      access_token: access,
+      refresh_token: refresh,
+      token_type: "Bearer",
+      expires_in: max(DateTime.diff(expiry, now()), 0)
+    }
+
     {:ok,
-     %{
-       access_token: access,
-       refresh_token: refresh,
-       token_type: "Bearer",
-       expires_in: max(DateTime.diff(expiry, now()), 0)
-     }}
+     if(connection.oauth_scope, do: Map.put(result, :scope, connection.oauth_scope), else: result)}
   end
 
   # OAuth errors such as pending/slow_down and replay must commit their state.

@@ -86,6 +86,71 @@ func TestDiscoveryAndDeviceFlow(t *testing.T) {
 		t.Fatalf("unsafe sign-in output %s", shown.String())
 	}
 }
+func TestDiscoverCommandNeedsNoIdentityOrCredentials(t *testing.T) {
+	t.Setenv("BILIMBI_AGENT_ID", "")
+	t.Setenv("BILIMBI_RUN_ID", "")
+	server := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("discovery attempted authentication or API call: %s", r.URL.Path)
+	})
+	store, vault := testStore(t)
+	var out, errout bytes.Buffer
+	if err := run(context.Background(), []string{"discover", server.URL}, nil, &out, &errout, store); err != nil {
+		t.Fatal(err)
+	}
+	var result discovery
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil || result.Server != server.URL || result.API != server.URL+"/api/v1" {
+		t.Fatalf("unusable discovery output: %s", out.String())
+	}
+	profiles, err := store.load()
+	if err != nil || len(profiles.Items) != 0 || len(vault) != 0 || errout.Len() != 0 {
+		t.Fatal("discovery changed credentials or profiles")
+	}
+	for _, args := range [][]string{{"discover"}, {"discover", server.URL, "extra"}} {
+		if err := run(context.Background(), args, nil, &out, &errout, store); err == nil {
+			t.Fatal("invalid discover arguments accepted")
+		}
+	}
+}
+
+func TestDiscoveryExplainsCompatibilityAndOriginFailures(t *testing.T) {
+	for _, mismatch := range []string{"origin", "version", "client", "grants"} {
+		t.Run(mismatch, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				origin := "http://" + r.Host
+				d := discovery{API: origin + "/api/v1", Version: "1", ClientID: "bilimbi-native"}
+				issuer, grants := origin, []string{deviceGrant, "refresh_token"}
+				switch mismatch {
+				case "origin":
+					issuer = "http://canonical.example"
+				case "version":
+					d.Version = "2"
+				case "client":
+					d.ClientID = "another-client"
+				case "grants":
+					grants = []string{deviceGrant}
+				}
+				if r.URL.Path == "/.well-known/bilimbi" {
+					_ = outputJSON(w, d)
+				} else {
+					_ = outputJSON(w, map[string]any{"issuer": issuer, "device_authorization_endpoint": origin + "/device", "token_endpoint": origin + "/token", "grant_types_supported": grants})
+				}
+			}))
+			defer server.Close()
+			_, err := newClient("", "").discover(context.Background(), server.URL)
+			if err == nil {
+				t.Fatal("incompatible server accepted")
+			}
+			want := "incompatible discovery"
+			if mismatch == "origin" {
+				want = "canonical address"
+			}
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("missing recovery guidance: %v", err)
+			}
+		})
+	}
+}
+
 func TestDiscoveryRefusesCrossOriginAndRedirect(t *testing.T) {
 	stolen := 0
 	attacker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { stolen++; w.WriteHeader(200) }))

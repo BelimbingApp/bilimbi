@@ -17,6 +17,7 @@ defmodule BilimbiWeb.WebhookParsers do
 
   def call(%Plug.Conn{path_info: ["webhooks" | _]} = conn, _opts), do: conn
   def call(%Plug.Conn{path_info: ["api", "v1" | _]} = conn, opts), do: parse(conn, opts.machine)
+  def call(%Plug.Conn{path_info: ["mcp"]} = conn, opts), do: parse(conn, opts.machine)
 
   def call(%Plug.Conn{path_info: ["oauth", action]} = conn, opts)
       when action in ["device_authorization", "token"], do: parse(conn, opts.machine)

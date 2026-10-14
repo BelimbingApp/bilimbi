@@ -13,6 +13,9 @@ defmodule Bilimbi.Core.AgentAccess.SchemaContract do
           "company_id" => column(:bigint, false, nil),
           "user_id" => column(:bigint, false, nil),
           "agent_id" => column({:varchar, 255}, false, nil),
+          "client_id" => column({:varchar, 255}, false, {:string, "bilimbi-native"}),
+          "resource" => column(:text, true, nil),
+          "oauth_scope" => column({:varchar, 255}, true, nil),
           "seen_agent_ids" => column(:jsonb, false, {:string, "{}"}),
           "expires_at" => column({:timestamp, 0}, false, nil),
           "revoked_at" => column({:timestamp, 0}, true, nil),
@@ -89,6 +92,31 @@ defmodule Bilimbi.Core.AgentAccess.SchemaContract do
         },
         foreign_keys: %{
           "core_agent_tokens_connection_id_fkey" => %{
+            columns: ["connection_id"],
+            references: {"core_agent_connections", ["id"]},
+            on_delete: :cascade
+          }
+        }
+      },
+      %{
+        name: "core_agent_authorization_codes",
+        columns: %{
+          "id" => column(:bigint, false, {:sequence, "core_agent_authorization_codes_id_seq"}),
+          "connection_id" => column(:bigint, false, nil),
+          "code_hash" => column(:bytea, false, nil),
+          "code_challenge" => column({:varchar, 255}, false, nil),
+          "redirect_uri" => column(:text, false, nil),
+          "expires_at" => column({:timestamp, 0}, false, nil),
+          "used_at" => column({:timestamp, 0}, true, nil),
+          "inserted_at" => column({:timestamp, 0}, false, nil),
+          "updated_at" => column({:timestamp, 0}, false, nil)
+        },
+        indexes: %{
+          "core_agent_authorization_codes_pkey" => index(["id"], true),
+          "core_agent_authorization_codes_code_hash_index" => index(["code_hash"], true)
+        },
+        foreign_keys: %{
+          "core_agent_authorization_codes_connection_id_fkey" => %{
             columns: ["connection_id"],
             references: {"core_agent_connections", ["id"]},
             on_delete: :cascade

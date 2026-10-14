@@ -16,7 +16,7 @@ defmodule Bilimbi.Base.AgentApi do
   found and not called.
 
   `call/3` runs reads. Supported writes use `plan/2` then `commit/3`, bound
-  to the preview and person, with the native client obtaining the person's go.
+  to the preview and person, with the client host obtaining the person's go.
   Unsupported writes answer `{:error, :writes_not_enabled}` (ADR 0021).
   """
 
