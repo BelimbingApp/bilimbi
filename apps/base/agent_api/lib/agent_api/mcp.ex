@@ -23,21 +23,21 @@ defmodule Bilimbi.Base.AgentApi.MCP do
 
     cond do
       not is_map(params) ->
-        error(id, -32602, "Invalid params")
+        error(id, -32_602, "Invalid params")
 
       not Map.has_key?(message, "id") and
           method in ~w(notifications/initialized notifications/cancelled) ->
         :accepted
 
       not (is_integer(id) or is_binary(id)) ->
-        error(nil, -32600, "Invalid request")
+        error(nil, -32_600, "Invalid request")
 
       true ->
         request(scope, method, params, id)
     end
   end
 
-  def dispatch(_, _), do: error(nil, -32600, "Invalid request")
+  def dispatch(_, _), do: error(nil, -32_600, "Invalid request")
 
   defp request(
          _,
@@ -58,7 +58,7 @@ defmodule Bilimbi.Base.AgentApi.MCP do
     })
   end
 
-  defp request(_, "initialize", _, id), do: error(id, -32602, "Invalid initialize params")
+  defp request(_, "initialize", _, id), do: error(id, -32_602, "Invalid initialize params")
   defp request(_, "ping", _, id), do: result(id, %{})
 
   defp request(_, "tools/list", params, id) when map_size(params) == 0,
@@ -75,14 +75,14 @@ defmodule Bilimbi.Base.AgentApi.MCP do
   end
 
   defp request(_, method, _, id) when method in ~w(tools/list tools/call),
-    do: error(id, -32602, "Invalid params")
+    do: error(id, -32_602, "Invalid params")
 
-  defp request(_, _, _, id), do: error(id, -32601, "Method not found")
+  defp request(_, _, _, id), do: error(id, -32_601, "Method not found")
 
   defp invoke(nil, _, _), do: {:error, :authentication_required}
 
   defp invoke(_, _, args) when not is_map(args),
-    do: {:protocol_error, -32602, "Arguments must be an object"}
+    do: {:protocol_error, -32_602, "Arguments must be an object"}
 
   defp invoke(scope, "search", %{"query" => query} = args)
        when is_binary(query) and map_size(args) == 1,
@@ -107,9 +107,9 @@ defmodule Bilimbi.Base.AgentApi.MCP do
        do: AgentApi.commit(scope, code, operations)
 
   defp invoke(_, name, _) when name in ~w(search describe guide read plan commit),
-    do: {:protocol_error, -32602, "Arguments do not match the tool schema"}
+    do: {:protocol_error, -32_602, "Arguments do not match the tool schema"}
 
-  defp invoke(_, _, _), do: {:protocol_error, -32602, "Unknown tool"}
+  defp invoke(_, _, _), do: {:protocol_error, -32_602, "Unknown tool"}
 
   def tools do
     operation = %{

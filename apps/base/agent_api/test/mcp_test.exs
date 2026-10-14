@@ -38,13 +38,13 @@ defmodule Bilimbi.Base.AgentApi.MCPTest do
           %{"jsonrpc" => "1.0", "id" => 1, "method" => "ping"},
           %{"jsonrpc" => "2.0", "method" => "tools/list"}
         ] do
-      assert {:reply, %{error: %{code: -32600}}} = MCP.dispatch(nil, message)
+      assert {:reply, %{error: %{code: -32_600}}} = MCP.dispatch(nil, message)
     end
 
-    assert {:reply, %{error: %{code: -32601}}} =
+    assert {:reply, %{error: %{code: -32_601}}} =
              MCP.dispatch(nil, %{"jsonrpc" => "2.0", "id" => 1, "method" => "unknown"})
 
-    assert {:reply, %{error: %{code: -32602}}} =
+    assert {:reply, %{error: %{code: -32_602}}} =
              MCP.dispatch(nil, %{
                "jsonrpc" => "2.0",
                "id" => 1,
