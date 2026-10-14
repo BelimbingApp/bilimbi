@@ -24,6 +24,8 @@ This checks API compatibility without signing in or saving credentials. Use
 the canonical address configured by the server; never bypass an origin refusal.
 Then run `login` with the identity and run flags from the workflow, show the
 device address and user code, and keep polling until approval or expiry.
+The person reviews the end time Bilimbi shows; the operator configures the
+connection length (90 days by default). They do not choose an end date.
 
 After sign-in, run `profiles` and `search` for the person's requested task (or
 `search company` for a connection test). Report the server and available

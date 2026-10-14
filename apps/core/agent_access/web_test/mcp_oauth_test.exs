@@ -73,11 +73,18 @@ defmodule Bilimbi.Core.AgentAccess.Web.McpOAuthTest do
     assert has_element?(view, "#oauth-consent")
     assert Repo.aggregate(AuthorizationCode, :count) == 0
 
-    view
-    |> form("#oauth-consent-form",
-      grant: %{end_date: Date.utc_today() |> Date.add(1) |> Date.to_iso8601()}
-    )
-    |> render_submit()
+    {:ok, _} = Settings.put("agent_access.connection_days", 12)
+    {:ok, view, _} = live(log_in_as(conn), "/oauth/authorize?" <> URI.encode_query(request()))
+    refute has_element?(view, "input[type=date]")
+    assert has_element?(view, "#oauth-connection-end")
+    render_submit(view, "approve", %{"grant" => %{"end_date" => "2099-01-01"}})
+    assert has_element?(view, "#oauth-consent-error")
+    assert Repo.aggregate(AuthorizationCode, :count) == 0
+    view |> form("#oauth-consent-form") |> render_submit()
+    connection = Repo.one!(Bilimbi.Core.AgentAccess.Connection)
+
+    assert DateTime.diff(connection.expires_at, DateTime.utc_now()) in (12 * 86_400 - 5)..(12 *
+                                                                                             86_400)
 
     {redirect, _flash} = assert_redirect(view)
     uri = URI.parse(redirect)

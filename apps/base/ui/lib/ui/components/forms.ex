@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.UI.Components.Forms do
   @moduledoc """
-  Form controls: `secret_input/1`, `input/1`, `combobox/1`, `multi_select/1`
-  and `radio_group/1`, with the field classes, described-by wiring and error
-  translation they share.
+  Form controls: `code_input/1`, `secret_input/1`, `input/1`, `combobox/1`,
+  `multi_select/1` and `radio_group/1`, with the field classes, described-by
+  wiring and error translation they share.
 
   `use Bilimbi.Base.UI.Components` imports it with the rest.
   """
@@ -12,6 +12,59 @@ defmodule Bilimbi.Base.UI.Components.Forms do
   import Bilimbi.Base.UI.Components.Icon
 
   alias Phoenix.LiveView.JS
+
+  @doc """
+  A short code shown as one box per character, with one real labelled input.
+  CodeInput preserves native selection, arrow keys, backspace and one screen
+  reader field; the boxes are decorative. Without the hook it is a normal
+  text field. The owner validates the alphabet and canonicalizes separators.
+  Use this for device codes rather than separate focusable character fields.
+  """
+  attr(:field, Phoenix.HTML.FormField, required: true)
+  attr(:label, :string, required: true)
+  attr(:length, :integer, required: true)
+  attr(:group_size, :integer, default: nil)
+
+  def code_input(assigns) do
+    ~H"""
+    <div id={"#{@field.id}-code"} phx-hook="CodeInput" data-code-length={@length} class="mb-4">
+      <label for={@field.id} class="mb-1.5 block text-sm font-medium text-ink">{@label}</label>
+      <div class="relative w-fit">
+        <input
+          id={@field.id}
+          name={@field.name}
+          value={@field.value}
+          type="text"
+          required
+          autocomplete="one-time-code"
+          autocapitalize="characters"
+          spellcheck="false"
+          aria-describedby={"#{@field.id}-hint"}
+          class="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+        />
+        <div
+          id={"#{@field.id}-boxes"}
+          data-code-boxes
+          phx-update="ignore"
+          hidden
+          aria-hidden="true"
+          class="flex items-center gap-1"
+        >
+          <%= for index <- 0..(@length - 1) do %>
+            <span :if={@group_size && index > 0 && rem(index, @group_size) == 0} class="text-muted">-</span>
+            <span
+              data-code-index={index}
+              class="flex h-9 w-7 items-center justify-center rounded-md border border-line bg-surface font-mono text-sm text-ink data-[active]:border-brand-strong data-[active]:ring-1 data-[active]:ring-brand-strong/30"
+            ></span>
+          <% end %>
+        </div>
+      </div>
+      <p id={"#{@field.id}-hint"} class="mt-1 text-xs text-muted">
+        Type or paste all {@length} characters. The separator is optional.
+      </p>
+    </div>
+    """
+  end
 
   @doc """
   Renders a field the viewer may not see.

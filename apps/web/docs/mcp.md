@@ -43,8 +43,9 @@ not provide a transport from ChatGPT's hosted connector to this machine.
    as a custom MCP server. Configure OAuth with the registered client ID and
    no client secret. Discovery supplies the authorization and token endpoints.
    Install the connection and sign into Bilimbi when prompted. Consent names
-   the app and callback, uses the person's current company, and asks for the
-   connection's end date. Opening consent never grants access.
+   the app and callback, uses the person's current company, and shows the
+   connection's end time, set by the platform operator in Settings (90 days by default).
+   Opening consent never grants access. Existing connections keep their end dates.
 5. To distribute skills and this installation's MCP configuration, run from
    the umbrella root:
 

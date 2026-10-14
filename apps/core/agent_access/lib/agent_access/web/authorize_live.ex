@@ -11,7 +11,7 @@ defmodule Bilimbi.Core.AgentAccess.Web.AuthorizeLive do
   @write_guard_opt_out ~w(approve deny dismiss)
 
   def mount(_, _, socket),
-    do: {:ok, assign(socket, request: nil, error: nil, expiry_form: expiry_form())}
+    do: {:ok, assign(socket, request: nil, error: nil, expires_at: nil)}
 
   def handle_params(params, _uri, socket) do
     # The host supplies this endpoint on the socket. Never use the request's
@@ -25,6 +25,7 @@ defmodule Bilimbi.Core.AgentAccess.Web.AuthorizeLive do
       {:noreply,
        assign(socket,
          request: request,
+         expires_at: AgentAccess.connection_expiry(),
          resource: resource,
          issuer: String.replace_suffix(resource, "/mcp", ""),
          error: nil
@@ -38,17 +39,16 @@ defmodule Bilimbi.Core.AgentAccess.Web.AuthorizeLive do
     end
   end
 
-  def handle_event("approve", %{"grant" => %{"end_date" => value}}, socket) do
-    expires =
-      with {:ok, date} <- Date.from_iso8601(value),
-           do: DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+  def handle_event("approve", params, socket) when map_size(params) > 0,
+    do: {:noreply, assign(socket, error: message(:invalid_expiry))}
 
+  def handle_event("approve", _, socket) do
     if socket.assigns.request do
       case AgentAccess.authorize(
              socket.assigns.current_scope.scope,
              socket.assigns.request,
              socket.assigns.resource,
-             expires
+             socket.assigns.expires_at
            ) do
         {:ok, code} -> {:noreply, return_to_client(socket, %{code: code})}
         {:error, reason} -> {:noreply, assign(socket, error: message(reason))}
@@ -84,14 +84,11 @@ defmodule Bilimbi.Core.AgentAccess.Web.AuthorizeLive do
     redirect(socket, external: URI.to_string(%{uri | query: URI.encode_query(query)}))
   end
 
-  defp expiry_form,
-    do:
-      to_form(%{"end_date" => Date.utc_today() |> Date.add(30) |> Date.to_iso8601()}, as: :grant)
-
   defp message(:person_required),
     do: "Connect from your own account. Impersonation and agents cannot approve connections."
 
-  defp message(:invalid_expiry), do: "Choose an end date in the future."
+  defp message(:invalid_expiry),
+    do: "The connection end time cannot be changed here. Start a new connection."
 
   defp message(:invalid_client),
     do:
@@ -128,13 +125,10 @@ defmodule Bilimbi.Core.AgentAccess.Web.AuthorizeLive do
           <p class="text-sm text-muted">
             This app acts as you in your current company. It can read records and request supported changes within your permissions. Review and approve each write in the app before it commits. You can revoke this connection in Your connections.
           </p>
-          <.form for={@expiry_form} id="oauth-consent-form" phx-submit="approve">
-            <.input
-              field={@expiry_form[:end_date]}
-              type="date"
-              label="Connection ends (UTC)"
-              required
-            />
+          <p id="oauth-connection-end" class="text-sm text-muted">
+            Connection ends <.datetime id="oauth-expiry" value={@expires_at} />.
+          </p>
+          <.form for={%{}} id="oauth-consent-form" phx-submit="approve">
             <.button id="oauth-consent-approve" type="submit" phx-disable-with="Connecting…">Approve connection</.button>
             <.button id="oauth-consent-deny" type="button" phx-click="deny">Refuse</.button>
           </.form>
