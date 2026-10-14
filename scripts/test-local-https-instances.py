@@ -6,19 +6,128 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 
 root = Path(__file__).resolve().parent.parent
-current = json.loads((root / ".local/config.json").read_text())["https"]
-caddy = Path("/etc/caddy/bilimbi")
-current_site = caddy / f'{current["host"]}.caddy'
-before = current_site.read_bytes()
 env = os.environ.copy()
 env.update(BILIMBI_HOST_PINNED="0", BILIMBI_PORT_PINNED="0")
 
 
 def run(*arguments, environment=env):
     return subprocess.run(arguments, env=environment, capture_output=True, text=True)
+
+
+def test_stale_site_pruning():
+    """Exercise install-time pruning with all privileged paths redirected to a fixture."""
+    with tempfile.TemporaryDirectory(prefix="caddy-prune-test-") as directory:
+        fixture = Path(directory)
+        caddy_root = fixture / "etc/caddy"
+        caddy = caddy_root / "bilimbi"
+        certs = caddy / "certs"
+        certs.mkdir(parents=True)
+        (caddy_root / "Caddyfile").write_text("# fixture caddyfile\n")
+        hosts = fixture / "etc/hosts"
+        hosts.parent.mkdir(parents=True, exist_ok=True)
+        hosts.write_text(
+            "127.0.0.1\told.localhost # Bilimbi local HTTPS\n"
+            "127.0.0.1\tlive.localhost # Bilimbi local HTTPS\n"
+        )
+
+        stale_root = fixture / "deleted-checkout"
+        stale_host = "old.localhost"
+        (caddy / f"{stale_host}.caddy").write_text(
+            f"# Bilimbi checkout: {stale_root}\n{stale_host} {{ reverse_proxy 127.0.0.1:4600 }}\n"
+        )
+        (certs / f"{stale_host}.pem").write_text("stale cert")
+        (certs / f"{stale_host}-key.pem").write_text("stale key")
+
+        live_root = fixture / "live-checkout"
+        live_root.mkdir()
+        live_host = "live.localhost"
+        live_fragment = caddy / f"{live_host}.caddy"
+        live_fragment.write_text(
+            f"# Bilimbi checkout: {live_root}\n{live_host} {{ reverse_proxy 127.0.0.1:4601 }}\n"
+        )
+        live_bytes = live_fragment.read_bytes()
+        (certs / f"{live_host}.pem").write_text("live cert")
+        (certs / f"{live_host}-key.pem").write_text("live key")
+
+        checkout = fixture / "new-checkout"
+        https = checkout / ".local/https"
+        https.mkdir(parents=True)
+        new_host = "new.localhost"
+        (https / f"{new_host}.pem").write_text("new cert")
+        (https / f"{new_host}-key.pem").write_text("new key")
+
+        redirected = fixture / "install-caddy.sh"
+        source = (root / "scripts/local-https/install-caddy.sh").read_text()
+        source = source.replace("/etc/caddy", str(caddy_root))
+        source = source.replace("/etc/hosts", str(hosts))
+        source = source.replace("/run/lock/bilimbi-local-https.lock", str(fixture / "lock"))
+        source = source.replace("install -d -o root -g caddy -m 0750", "install -d")
+        source = source.replace("install -o root -g caddy -m 0644", "install -m 0644")
+        source = source.replace("install -o root -g caddy -m 0640", "install -m 0640")
+        redirected.write_text(source)
+        redirected.chmod(0o755)
+
+        commands = fixture / "bin"
+        commands.mkdir()
+        for name in ("systemctl",):
+            executable = commands / name
+            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.chmod(0o755)
+        runuser = commands / "runuser"
+        runuser.write_text(
+            "#!/bin/sh\n"
+            "if [ -n \"${BILIMBI_TEST_FAIL_VALIDATE:-}\" ] && "
+            "[ -e \"$BILIMBI_TEST_FAIL_VALIDATE\" ]; then exit 1; fi\n"
+            "exit 0\n"
+        )
+        runuser.chmod(0o755)
+        ss = commands / "ss"
+        ss.write_text("#!/bin/sh\nexit 0\n")
+        ss.chmod(0o755)
+        environment = dict(env, PATH=f"{commands}:{os.environ['PATH']}")
+        validation_failure = fixture / "fail-validation"
+        validation_failure.touch()
+        result = run(
+            "sudo", "env", f"PATH={environment['PATH']}",
+            f"BILIMBI_TEST_FAIL_VALIDATE={validation_failure}", "bash", str(redirected),
+            str(checkout), new_host, "4600", "127.0.0.1 ::1", "1",
+            environment=environment,
+        )
+        assert result.returncode != 0, "Validation failure did not abort the installation"
+        assert (caddy / f"{stale_host}.caddy").exists()
+        assert (certs / f"{stale_host}.pem").read_text() == "stale cert"
+        assert (certs / f"{stale_host}-key.pem").read_text() == "stale key"
+        assert "old.localhost # Bilimbi local HTTPS" in hosts.read_text()
+        validation_failure.unlink()
+
+        result = run(
+            "sudo", "env", f"PATH={environment['PATH']}", "bash", str(redirected),
+            str(checkout), new_host, "4600", "127.0.0.1 ::1", "1",
+            environment=environment,
+        )
+        assert result.returncode == 0, result.stderr
+        assert not (caddy / f"{stale_host}.caddy").exists()
+        assert not (certs / f"{stale_host}.pem").exists()
+        assert not (certs / f"{stale_host}-key.pem").exists()
+        assert live_fragment.read_bytes() == live_bytes
+        assert (certs / f"{live_host}.pem").read_text() == "live cert"
+        assert "old.localhost # Bilimbi local HTTPS" not in hosts.read_text()
+        assert "live.localhost # Bilimbi local HTTPS" in hosts.read_text()
+
+
+if sys.argv[1:] == ["--prune-harness-only"]:
+    test_stale_site_pruning()
+    print("Stale Caddy site pruning harness passed.")
+    raise SystemExit(0)
+
+current = json.loads((root / ".local/config.json").read_text())["https"]
+caddy = Path("/etc/caddy/bilimbi")
+current_site = caddy / f'{current["host"]}.caddy'
+before = current_site.read_bytes()
 
 
 scratch = root / "tmp/local-https"
