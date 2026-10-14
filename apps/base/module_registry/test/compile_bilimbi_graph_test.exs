@@ -5,9 +5,8 @@ defmodule Mix.Tasks.Compile.BilimbiGraphTest do
 
   @discovery_file Path.expand("../mix/module_discovery.exs", __DIR__)
   @migration_version 20_260_814_120_000
-  # compile.app compares whole-second mtimes, so every file is moved to this
-  # instant before a compile. Only a change to the ebin directory's entries can
-  # then make the .app stale, which is exactly what the graph marker controls.
+  # Keep build inputs and existing resources at one timestamp, so changes to
+  # descriptor contents must refresh metadata independently of source mtimes.
   @settled_mtime {{2000, 1, 1}, {0, 0, 0}}
 
   setup do
@@ -33,6 +32,18 @@ defmodule Mix.Tasks.Compile.BilimbiGraphTest do
 
     put_disposition!(module_root, :compatible_baseline)
     assert compile_and_assert_current!(root, module_root) == first_fingerprint
+  end
+
+  test "an unchanged graph retains its application resource", %{root: root} do
+    module_root = put_workspace!(root)
+    put_disposition!(module_root, :compatible_baseline)
+    fingerprint = compile_and_assert_current!(root, module_root)
+    app_file = Path.join(module_root, "_build/dev/lib/test_base_probe/ebin/test_base_probe.app")
+    contents = File.read!(app_file)
+
+    assert compile_and_assert_current!(root, module_root) == fingerprint
+    assert File.read!(app_file) == contents
+    assert File.stat!(app_file).mtime == @settled_mtime
   end
 
   test "graph changes refresh metadata without a newer application-directory mtime", %{root: root} do
