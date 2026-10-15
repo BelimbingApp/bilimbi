@@ -51,6 +51,72 @@ defmodule Bilimbi.Core.Company.RelationshipRolesTest do
     assert Repo.aggregate(Bilimbi.Core.Company.ExternalAccess, :count) == 0
   end
 
+  test "a prospect becomes a customer by ending one dated link and starting the other", %{
+    scope: scope
+  } do
+    {:ok, roles} = Company.list_relationship_types()
+    prospect = Enum.find(roles, &(&1.code == "prospect"))
+    customer = Enum.find(roles, &(&1.code == "customer"))
+
+    assert {:ok, first} =
+             Company.create_relationship(scope, 73, %{
+               related_company_id: 74,
+               relationship_type_id: prospect.id,
+               effective_from: "2026-01-01"
+             })
+
+    assert {:ok, ended} =
+             Company.end_relationship(scope, 73, first.id, %{"effective_to" => "2026-03-31"})
+
+    assert ended.id == first.id and ended.deleted_at == nil
+
+    assert {:ok, second} =
+             Company.create_relationship(scope, 73, %{
+               related_company_id: 74,
+               relationship_type_id: customer.id,
+               effective_from: "2026-04-01"
+             })
+
+    assert {:ok, rows} = Company.list_relationships(scope, 73)
+
+    assert [{"Prospect", ~D[2026-01-01], ~D[2026-03-31]}, {"Customer", ~D[2026-04-01], nil}] ==
+             rows
+             |> Enum.sort_by(& &1.id)
+             |> Enum.map(&{&1.role_label, &1.effective_from, &1.effective_to})
+
+    assert [first.id, second.id] == rows |> Enum.map(& &1.id) |> Enum.sort()
+  end
+
+  test "ending defaults to today, keeps the link, and is separate from unlinking", %{
+    scope: scope
+  } do
+    {:ok, roles} = Company.list_relationship_types()
+    vendor = Enum.find(roles, &(&1.code == "vendor"))
+
+    {:ok, rel} =
+      Company.create_relationship(scope, 73, %{
+        related_company_id: 74,
+        relationship_type_id: vendor.id,
+        effective_from: "2026-01-01"
+      })
+
+    assert {:ok, %{effective_to: today}} = Company.end_relationship(scope, 73, rel.id)
+    assert today == Date.utc_today()
+
+    assert {:ok, [%{effective_to: ^today, unlinked_at: nil}]} =
+             Company.list_relationships(scope, 73)
+
+    assert {:error, %Ecto.Changeset{} = cs} =
+             Company.end_relationship(scope, 73, rel.id, %{"effective_to" => "2025-12-31"})
+
+    assert %{effective_to: [_]} = errors_on(cs)
+    assert :ok = Company.delete_relationship(scope, 73, rel.id)
+    assert {:ok, []} = Company.list_relationships(scope, 73)
+
+    assert {:ok, [%{effective_to: ^today}]} =
+             Company.list_relationships(scope, 73, include_unlinked: true)
+  end
+
   test "forged source and cross-tenant targets cannot change relationship ownership", %{
     scope: scope
   } do

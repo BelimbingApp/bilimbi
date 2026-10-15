@@ -26,8 +26,10 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
      "Assign a role to the related company toward the source company. Roles grant no access."},
     {"relationship.update", :write, "update", ["company_id", "relationship_id"],
      "Update relationship effective dates, preserving its role and organisations."},
+    {"relationship.end", :write, "update", ["company_id", "relationship_id"],
+     "End a relationship on a date (default today), keeping it as dated history. A prospect becomes a customer by ending that role and creating the other."},
     {"relationship.unlink", :write, "update", ["company_id", "relationship_id"],
-     "Remove a relationship from active lists while retaining history."}
+     "Remove a mistaken relationship entry from active lists while retaining history. Use relationship.end for a normal transition."}
   ]
   def declarations do
     Enum.map(@operations, fn {suffix, kind, capability, required, description} ->
@@ -82,6 +84,17 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
 
         "relationship.unlink" ->
           %{"company_id" => id, "relationship_id" => id}
+
+        "relationship.end" ->
+          %{
+            "company_id" => id,
+            "relationship_id" => id,
+            "effective_to" => %{
+              "type" => "string",
+              "maxLength" => 10,
+              "description" => "ISO date (YYYY-MM-DD); defaults to today."
+            }
+          }
 
         _ ->
           %{
@@ -154,6 +167,11 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
   end
 
   def preview("core.company.relationship." <> action, scope, input) do
+    {action, input} =
+      if action == "end",
+        do: {"update", Map.merge(input, Relationships.ending_attrs(input))},
+        else: {action, input}
+
     with :ok <- target_policy(scope, input["company_id"]),
          do:
            Relationships.preview(
@@ -191,6 +209,14 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
 
           "update" ->
             Company.update_relationship(
+              scope,
+              input["company_id"],
+              input["relationship_id"],
+              input
+            )
+
+          "end" ->
+            Company.end_relationship(
               scope,
               input["company_id"],
               input["relationship_id"],

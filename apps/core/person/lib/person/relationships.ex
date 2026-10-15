@@ -51,6 +51,17 @@ defmodule Bilimbi.Core.Person.Relationships do
          do: persist(scope, cs, :update)
   end
 
+  def end_role(%Scope{} = scope, person_id, id, attrs),
+    do: update(scope, person_id, id, ending_attrs(attrs))
+
+  @doc false
+  def ending_attrs(attrs) do
+    case Map.get(attrs, "effective_to") || Map.get(attrs, :effective_to) do
+      blank when blank in [nil, ""] -> %{"effective_to" => Date.to_iso8601(Date.utc_today())}
+      date -> %{"effective_to" => date}
+    end
+  end
+
   def unlink(%Scope{} = scope, person_id, id) do
     with {:ok, cs} <- changeset(scope, person_id, nil, id, %{}),
          do: persist(scope, Changeset.change(cs, deleted_at: now()), :update)
@@ -58,8 +69,9 @@ defmodule Bilimbi.Core.Person.Relationships do
 
   def preview(%Scope{} = scope, action, input) do
     id = if action == :relationship_create, do: nil, else: input["relationship_id"]
+    attrs = if action == :relationship_end, do: ending_attrs(input), else: input
 
-    with {:ok, cs} <- changeset(scope, input["person_id"], input["company_id"], id, input),
+    with {:ok, cs} <- changeset(scope, input["person_id"], input["company_id"], id, attrs),
          cs =
            if(action == :relationship_unlink,
              do: Changeset.change(cs, deleted_at: now()),

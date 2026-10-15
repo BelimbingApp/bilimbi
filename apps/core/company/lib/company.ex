@@ -924,6 +924,22 @@ defmodule Bilimbi.Core.Company do
              | Ecto.Changeset.t()}
   defdelegate update_relationship(scope, company_id, relationship_id, attrs), to: Relationships
 
+  @doc """
+  Ends a relationship: sets `effective_to` (today when none is given) and keeps
+  the row as history. `delete_relationship/3` is for removing a mistaken entry.
+  """
+  @spec end_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, Relationship.t()}
+          | {:error,
+             :forbidden
+             | :company_not_found
+             | :company_archived
+             | :related_company_archived
+             | :not_found
+             | Ecto.Changeset.t()}
+  defdelegate end_relationship(scope, company_id, relationship_id, attrs \\ %{}),
+    to: Relationships
+
   @spec delete_relationship(Scope.t(), pos_integer(), pos_integer()) ::
           :ok
           | {:error,

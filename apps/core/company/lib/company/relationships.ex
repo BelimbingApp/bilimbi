@@ -218,6 +218,19 @@ defmodule Bilimbi.Core.Company.Relationships do
     end
   end
 
+  @spec end_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, Relationship.t()} | {:error, term()}
+  def end_relationship(%Scope{} = scope, company_id, relationship_id, attrs \\ %{}),
+    do: update_relationship(scope, company_id, relationship_id, ending_attrs(attrs))
+
+  @doc false
+  def ending_attrs(attrs) do
+    case Map.get(attrs, "effective_to") || Map.get(attrs, :effective_to) do
+      blank when blank in [nil, ""] -> %{"effective_to" => Date.to_iso8601(Date.utc_today())}
+      date -> %{"effective_to" => date}
+    end
+  end
+
   @spec delete_relationship(Scope.t(), pos_integer(), pos_integer()) ::
           :ok
           | {:error,

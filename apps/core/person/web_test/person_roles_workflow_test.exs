@@ -55,6 +55,102 @@ defmodule BilimbiWeb.PersonRolesWorkflowTest do
     assert {:ok, [%{id: 91}]} = Bilimbi.Core.User.list_users(scope)
   end
 
+  test "UI ends a prospect role with a date, keeps it as history, then starts the customer role",
+       %{conn: conn, scope: scope, lead: lead, roles: roles} do
+    grant_capabilities!(@caps)
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/#{lead.id}")
+
+    view
+    |> form("#role-form",
+      role: %{
+        company_id: "73",
+        relationship_type_id: "#{roles["prospect"].id}",
+        effective_from: "2026-01-01"
+      }
+    )
+    |> render_submit()
+
+    assert {:ok, [%{id: id}]} = Person.relationships(scope, lead.id)
+    view |> element("#end-role-#{id}") |> render_click()
+    assert has_element?(view, "#role-dates-modal")
+    refute has_element?(view, "#role-dates-from")
+    today = Date.to_iso8601(Date.utc_today())
+    assert has_element?(view, "#role-dates-to[value='#{today}']")
+
+    view
+    |> form("#role-dates-form", role_dates: %{effective_to: "2026-03-31"})
+    |> render_submit()
+
+    refute has_element?(view, "#role-dates-modal")
+    assert has_element?(view, "#flash-success", "Role ended")
+    assert has_element?(view, "#contact-roles", "2026-03-31")
+
+    view
+    |> form("#role-form",
+      role: %{
+        company_id: "73",
+        relationship_type_id: "#{roles["customer"].id}",
+        effective_from: "2026-04-01"
+      }
+    )
+    |> render_submit()
+
+    assert {:ok, rows} = Person.relationships(scope, lead.id)
+
+    assert [{"prospect", ~D[2026-01-01], ~D[2026-03-31]}, {"customer", ~D[2026-04-01], nil}] ==
+             Enum.map(rows, &{&1.role_code, &1.effective_from, &1.effective_to})
+
+    view |> element("#edit-role-#{id}") |> render_click()
+    assert has_element?(view, "#role-dates-from[value='2026-01-01']")
+
+    view
+    |> form("#role-dates-form",
+      role_dates: %{effective_from: "2025-12-01", effective_to: "2026-03-30"}
+    )
+    |> render_submit()
+
+    assert {:ok, [%{effective_from: ~D[2025-12-01], effective_to: ~D[2026-03-30]} | _]} =
+             Person.relationships(scope, lead.id)
+
+    view |> element("#unlink-role-#{id}") |> render_click()
+    assert has_element?(view, "#role-unlinked-#{id}")
+    refute has_element?(view, "#end-role-#{id}")
+  end
+
+  test "agents end a person role by date and keep it as history", %{
+    scope: scope,
+    lead: lead,
+    roles: roles
+  } do
+    grant_capabilities!(@caps)
+
+    {:ok, rel} =
+      Person.create_relationship(scope, lead.id, 73, %{
+        relationship_type_id: roles["prospect"].id,
+        effective_from: "2026-01-01"
+      })
+
+    op = %{
+      "key" => "core.person.relationship.end",
+      "input" => %{
+        "person_id" => lead.id,
+        "relationship_id" => rel.id,
+        "effective_to" => "2026-03-31"
+      }
+    }
+
+    assert {:ok, plan} = AgentApi.plan(scope, [op])
+    assert plan["valid"]
+    assert {:ok, [%{effective_to: nil}]} = Person.relationships(scope, lead.id)
+    assert {:ok, _} = AgentApi.commit(scope, plan["plan_code"], [op])
+
+    assert {:ok, [%{effective_to: ~D[2026-03-31], unlinked_at: nil}]} =
+             Person.relationships(scope, lead.id)
+
+    foreign = put_in(op, ["input", "person_id"], 999_999)
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [foreign])
+  end
+
   test "forged UI company and missing write capability cannot assign a role", %{
     conn: conn,
     scope: scope,

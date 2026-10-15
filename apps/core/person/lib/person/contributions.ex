@@ -43,9 +43,10 @@ defmodule Bilimbi.Core.Person.Contributions do
             A person can hold a role toward a company too (individual customer, prospect or
             lead): core.person.relationship.create with person_id, company_id and a role from
             core.company.relationship_role.list; the person is the role toward that company.
-            A prospect becomes a customer by core.person.relationship.unlink (or an
-            effective_to date) on the prospect role and a create for the customer role;
-            history is kept. A role targets exactly one company or one person.
+            A prospect becomes a customer by core.person.relationship.end (effective_to,
+            default today) on the prospect role and a create for the customer role; both
+            rows stay as dated history. core.person.relationship.unlink only removes a
+            mistaken entry. A role targets exactly one company or one person.
             Do not invent employee numbers, employment type/status or a login from a namecard.
             core.employee.* is deprecated HR compatibility, reserved for confirmed HR records.
             People will own employment facts and reference this same core identity/affiliation.

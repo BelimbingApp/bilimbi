@@ -273,5 +273,10 @@ the UI, and validate that both organisations are in the tenant. Unlink sets the
 existing soft-delete clock and retains the link and effective dates.
 `relationship.get` can still read that link, and `relationship.list` with
 `include_unlinked: true` includes it in history. Dates can
-be updated without changing the relationship's role or organisations. Catalogue
+be updated without changing the relationship's role or organisations.
+`core.company.relationship.end` is the normal transition: it sets `effective_to`
+(default today) and keeps the row as dated history; a prospect becomes a customer
+by ending that link and creating the customer link. Unlink is only for removing
+a mistaken entry. The relationships page offers End relationship (editable date),
+Edit dates and Unlink. Catalogue
 retirement is distinct from unlinking one company's relationship.

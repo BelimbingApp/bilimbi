@@ -27,7 +27,7 @@ defmodule Bilimbi.Core.PersonRelationshipsTest do
     assert %{name: "Prospect", is_active: true} = roles["prospect"]
   end
 
-  test "a bare person is a prospect, then a customer, with history kept", %{
+  test "a prospect becomes a customer by ending one dated role and starting the other", %{
     scope: scope,
     lead: lead,
     roles: roles
@@ -42,20 +42,83 @@ defmodule Bilimbi.Core.PersonRelationshipsTest do
     assert prospect.is_active
     assert {:ok, [^prospect]} = Person.relationships(scope, lead.id)
 
-    assert {:ok, ended} = Person.unlink_relationship(scope, lead.id, prospect.id)
-    assert ended.unlinked_at
+    assert {:ok, ended} =
+             Person.end_relationship(scope, lead.id, prospect.id, %{
+               "effective_to" => "2026-03-31"
+             })
+
+    assert ended.id == prospect.id
+    assert {ended.effective_from, ended.effective_to} == {~D[2026-01-01], ~D[2026-03-31]}
+    assert ended.unlinked_at == nil
+    refute ended.is_active
 
     assert {:ok, customer} =
              Person.create_relationship(scope, lead.id, 73, %{
-               relationship_type_id: roles["customer"].id
+               relationship_type_id: roles["customer"].id,
+               effective_from: "2026-04-01"
              })
 
-    assert {:ok, [only]} = Person.relationships(scope, lead.id)
-    assert only.id == customer.id
-    assert {:ok, history} = Person.relationships(scope, lead.id, include_unlinked: true)
+    assert {:ok, history} = Person.relationships(scope, lead.id)
+
+    assert [{"prospect", ~D[2026-01-01], ~D[2026-03-31]}, {"customer", ~D[2026-04-01], nil}] ==
+             Enum.map(history, &{&1.role_code, &1.effective_from, &1.effective_to})
+
     assert [prospect.id, customer.id] == Enum.map(history, & &1.id)
     assert Repo.aggregate(Company.Relationship, :count) == 0
     assert {:ok, %{affiliations: []}} = Person.get(scope, lead.id)
+  end
+
+  test "ending defaults to today, keeps the row, and can be redated; unlink is separate", %{
+    scope: scope,
+    lead: lead,
+    roles: roles
+  } do
+    {:ok, rel} =
+      Person.create_relationship(scope, lead.id, 73, %{
+        relationship_type_id: roles["prospect"].id,
+        effective_from: "2026-01-01"
+      })
+
+    assert {:ok, ended} = Person.end_relationship(scope, lead.id, rel.id)
+    assert ended.effective_to == Date.utc_today()
+    assert ended.unlinked_at == nil
+    assert {:ok, [_]} = Person.relationships(scope, lead.id)
+
+    assert {:ok, redated} =
+             Person.update_relationship(scope, lead.id, rel.id, %{effective_to: "2026-06-30"})
+
+    assert redated.effective_to == ~D[2026-06-30]
+
+    assert {:error, cs} =
+             Person.end_relationship(scope, lead.id, rel.id, %{"effective_to" => "2025-12-31"})
+
+    assert %{effective_to: [_]} = errors_on(cs)
+
+    assert {:ok, %{unlinked_at: %NaiveDateTime{}}} =
+             Person.unlink_relationship(scope, lead.id, rel.id)
+
+    assert {:ok, []} = Person.relationships(scope, lead.id)
+    assert {:ok, [only]} = Person.relationships(scope, lead.id, include_unlinked: true)
+    assert only.effective_to == ~D[2026-06-30]
+  end
+
+  test "ending is previewed without mutation and refused across tenants", %{
+    scope: scope,
+    foreign: foreign,
+    lead: lead,
+    roles: roles
+  } do
+    {:ok, rel} =
+      Person.create_relationship(scope, lead.id, 73, %{relationship_type_id: roles["prospect"].id})
+
+    input = %{"person_id" => lead.id, "relationship_id" => rel.id}
+    assert {:ok, %{changes: changes}} = Person.preview(scope, :relationship_end, input)
+    today = Date.utc_today()
+    assert Enum.any?(changes, &(&1.field == "effective_to" and &1.to == today))
+    assert {:ok, [%{effective_to: nil}]} = Person.relationships(scope, lead.id)
+
+    assert {:error, :not_found} = Person.end_relationship(foreign, lead.id, rel.id)
+    assert {:ok, [%{effective_to: nil}]} = Person.relationships(scope, lead.id)
   end
 
   test "a person can hold several concurrent roles toward a company", %{

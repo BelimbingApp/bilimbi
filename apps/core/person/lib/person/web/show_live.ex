@@ -30,7 +30,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
        |> assign(:company_options, Enum.map(companies, &{&1.name, &1.id}))
        |> assign(:role_options, active_role_options())
        |> assign(:link_form, to_form(%{}, as: :affiliation))
-       |> assign(:role_form, to_form(%{}, as: :role))}
+       |> assign(:role_form, to_form(%{}, as: :role))
+       |> assign(:role_dialog, nil)
+       |> assign(:role_dates_form, nil)}
     else
       _ ->
         {:ok,
@@ -85,6 +87,56 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
 
       :error ->
         {:noreply, put_flash(socket, :error, "Select the company the person is related to.")}
+    end
+  end
+
+  def handle_event("edit_role", %{"id" => id, "mode" => mode}, socket)
+      when mode in ["edit", "end"] do
+    with {:ok, id} <- Params.positive_id(id),
+         {:ok, rows} <-
+           Person.relationships(socket.assigns.current_scope.scope, socket.assigns.person.id),
+         %{} = role <- Enum.find(rows, &(&1.id == id)) do
+      dates = %{
+        "effective_from" => unrestricted(role.effective_from),
+        "effective_to" =>
+          if(mode == "end", do: Date.utc_today(), else: unrestricted(role.effective_to))
+      }
+
+      {:noreply,
+       socket
+       |> assign(:role_dialog, %{mode: String.to_existing_atom(mode), role: role})
+       |> assign(:role_dates_form, to_form(dates, as: :role_dates))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "That role is no longer active.")}
+    end
+  end
+
+  def handle_event("close_role_dialog", _, socket),
+    do: {:noreply, assign(socket, role_dialog: nil, role_dates_form: nil)}
+
+  def handle_event("save_role_dates", %{"role_dates" => attrs}, socket) do
+    %{mode: mode, role: role} = socket.assigns.role_dialog
+    scope = socket.assigns.current_scope.scope
+    person_id = socket.assigns.person.id
+
+    result =
+      if mode == :end,
+        do: Person.end_relationship(scope, person_id, role.id, attrs),
+        else: Person.update_relationship(scope, person_id, role.id, attrs)
+
+    case result do
+      {:ok, _} ->
+        {:noreply,
+         reload(socket)
+         |> assign(role_dialog: nil, role_dates_form: nil)
+         |> put_flash(
+           :success,
+           if(mode == :end, do: "Role ended; it stays in history.", else: "Role dates updated.")
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         put_flash(socket, :error, "Role was not changed: #{Person.refusal_message(reason)}")}
     end
   end
 
@@ -182,6 +234,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
     {:ok, person} = Person.get(socket.assigns.current_scope.scope, socket.assigns.person.id)
     loaded(socket, person)
   end
+
+  defp unrestricted(value),
+    do: if(Bilimbi.Base.Authz.Restricted.restricted?(value), do: nil, else: value)
 
   defp active_role_options do
     {:ok, types} = Company.list_active_relationship_types()
@@ -451,13 +506,34 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
                   true -> "inactive"
                 end}
               </.badge>
+              <span :if={r.unlinked_at} class="block text-xs text-ink-subtle">
+                Unlinked <.datetime id={"role-unlinked-#{r.id}"} value={r.unlinked_at} />
+              </span>
             </:col>
             <:action :let={r}>
               <.icon_button
                 :if={@can_update? and is_nil(r.unlinked_at)}
+                id={"edit-role-#{r.id}"}
+                icon="edit"
+                label="Edit role dates"
+                phx-click="edit_role"
+                phx-value-id={r.id}
+                phx-value-mode="edit"
+              />
+              <.icon_button
+                :if={@can_update? and is_nil(r.unlinked_at)}
+                id={"end-role-#{r.id}"}
+                icon="stop"
+                label="End role"
+                phx-click="edit_role"
+                phx-value-id={r.id}
+                phx-value-mode="end"
+              />
+              <.icon_button
+                :if={@can_update? and is_nil(r.unlinked_at)}
                 id={"unlink-role-#{r.id}"}
                 icon="unlink"
-                label="Unlink role"
+                label="Unlink (remove a mistaken entry)"
                 phx-click="unlink_role"
                 phx-value-id={r.id}
               />
@@ -502,6 +578,45 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
             <.button id="role-add" type="submit">Add role</.button>
           </.form>
         </.card>
+        <.modal
+          :if={@role_dialog}
+          id="role-dates-modal"
+          title={if @role_dialog.mode == :end, do: "End role", else: "Edit role dates"}
+          flash={@flash}
+          on_cancel={JS.push("close_role_dialog")}
+        >
+          <:description>
+            {if @role_dialog.mode == :end,
+              do:
+                "End the #{@role_dialog.role.role_label} role toward #{@role_dialog.role.company_name} on this date. It stays in history.",
+              else:
+                "Update the dates of the #{@role_dialog.role.role_label} role toward #{@role_dialog.role.company_name}."}
+          </:description>
+          <.form
+            for={@role_dates_form}
+            id="role-dates-form"
+            phx-submit="save_role_dates"
+            class="mt-4 space-y-4"
+          >
+            <.input
+              :if={@role_dialog.mode == :edit}
+              field={@role_dates_form[:effective_from]}
+              id="role-dates-from"
+              type="date"
+              label="Effective from"
+            />
+            <.input
+              field={@role_dates_form[:effective_to]}
+              id="role-dates-to"
+              type="date"
+              label={if @role_dialog.mode == :end, do: "Ends on", else: "Effective to"}
+            />
+            <div class="mt-6 flex justify-end gap-2">
+              <.button type="button" phx-click="close_role_dialog">Cancel</.button>
+              <.button id="role-dates-save" type="submit" variant="primary">Save</.button>
+            </div>
+          </.form>
+        </.modal>
         <.button :if={@can_update?} id="contact-retire" phx-click="request_retire">Retire contact</.button>
         <.confirm_dialog
           :if={@pending_retire?}

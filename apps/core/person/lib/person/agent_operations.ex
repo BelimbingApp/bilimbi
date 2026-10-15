@@ -33,8 +33,10 @@ defmodule Bilimbi.Core.Person.AgentOperations do
      "Give a person a catalogue role (customer, prospect, vendor...) toward a company. Roles grant no access."},
     {"core.person.relationship.update", :relationship_update, :write, "update",
      "Update a person role's effective dates, preserving its role and company."},
+    {"core.person.relationship.end", :relationship_end, :write, "update",
+     "End a person role on a date (default today), keeping dated history. Use it for normal transitions."},
     {"core.person.relationship.unlink", :relationship_unlink, :write, "update",
-     "Unlink a person role while retaining its history. Prospect becomes customer by ending one role and creating the other."}
+     "Remove a mistaken person role entry, retaining the row. Use relationship.end for transitions."}
   ]
 
   def declarations do
@@ -129,6 +131,13 @@ defmodule Bilimbi.Core.Person.AgentOperations do
         :relationship_update ->
           {["person_id", "relationship_id"],
            Map.merge(%{"person_id" => id, "relationship_id" => id}, dates())}
+
+        :relationship_end ->
+          {["person_id", "relationship_id"],
+           Map.merge(
+             %{"person_id" => id, "relationship_id" => id},
+             Map.take(dates(), ["effective_to"])
+           )}
 
         :relationship_unlink ->
           {["person_id", "relationship_id"], %{"person_id" => id, "relationship_id" => id}}
@@ -225,6 +234,9 @@ defmodule Bilimbi.Core.Person.AgentOperations do
 
   defp perform(:relationship_update, scope, input),
     do: Person.update_relationship(scope, input["person_id"], input["relationship_id"], input)
+
+  defp perform(:relationship_end, scope, input),
+    do: Person.end_relationship(scope, input["person_id"], input["relationship_id"], input)
 
   defp perform(:relationship_unlink, scope, input),
     do: Person.unlink_relationship(scope, input["person_id"], input["relationship_id"])

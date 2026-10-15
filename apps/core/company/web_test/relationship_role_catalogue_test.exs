@@ -235,4 +235,43 @@ defmodule BilimbiWeb.RelationshipRoleCatalogueTest do
 
     assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [hd(ops)])
   end
+
+  test "agents end a relationship on a date, keeping it as dated history; preview does not mutate",
+       %{scope: scope} do
+    grant_capabilities!(
+      ~w(admin.company.list admin.company.view admin.company.create admin.company.update)
+    )
+
+    Company.TestFixtures.insert_company!(%{id: 74, code: "vendor"})
+    :ok = Bilimbi.Core.Company.RelationshipCatalogue.ensure_defaults(Bilimbi.Base.Repo)
+    {:ok, roles} = Company.list_relationship_types()
+    prospect = Enum.find(roles, &(&1.code == "prospect"))
+
+    {:ok, rel} =
+      Company.create_relationship(scope, 73, %{
+        related_company_id: 74,
+        relationship_type_id: prospect.id,
+        effective_from: "2026-01-01"
+      })
+
+    end_op = %{
+      "key" => "core.company.relationship.end",
+      "input" => %{
+        "company_id" => 73,
+        "relationship_id" => rel.id,
+        "effective_to" => "2026-03-31"
+      }
+    }
+
+    {:ok, plan} = AgentApi.plan(scope, [end_op])
+    assert plan["valid"]
+    assert Bilimbi.Base.Repo.get!(Bilimbi.Core.Company.Relationship, rel.id).effective_to == nil
+    assert {:ok, _} = AgentApi.commit(scope, plan["plan_code"], [end_op])
+    kept = Bilimbi.Base.Repo.get!(Bilimbi.Core.Company.Relationship, rel.id)
+    assert kept.effective_to == ~D[2026-03-31]
+    assert kept.deleted_at == nil
+
+    bad = put_in(end_op, ["input", "effective_to"], "2025-12-31")
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [bad])
+  end
 end

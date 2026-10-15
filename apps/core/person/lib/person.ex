@@ -210,6 +210,14 @@ defmodule Bilimbi.Core.Person do
   defdelegate update_relationship(scope, person_id, id, attrs), to: Relationships, as: :update
   defdelegate unlink_relationship(scope, person_id, id), to: Relationships, as: :unlink
 
+  @doc """
+  Ends a role: sets `effective_to` (today when none is given) and keeps the
+  row as history. Unlinking is for removing a mistaken entry.
+  """
+  defdelegate end_relationship(scope, person_id, id, attrs \\ %{}),
+    to: Relationships,
+    as: :end_role
+
   @doc "Resolves the validated company target for a stored person role; never changes the actor's company."
   defdelegate relationship_target(scope, person_id, id), to: Relationships, as: :target
 
@@ -259,7 +267,13 @@ defmodule Bilimbi.Core.Person do
            }}
         end
 
-      action when action in [:relationship_create, :relationship_update, :relationship_unlink] ->
+      action
+      when action in [
+             :relationship_create,
+             :relationship_update,
+             :relationship_end,
+             :relationship_unlink
+           ] ->
         Relationships.preview(scope, action, input)
 
       action when action in [:link, :affiliation_update, :unlink] ->

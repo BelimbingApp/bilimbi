@@ -79,7 +79,11 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
-    write(socket, fn -> open_relationship(socket, id) end)
+    write(socket, fn -> open_relationship(socket, id, :edit) end)
+  end
+
+  def handle_event("end", %{"id" => id}, socket) do
+    write(socket, fn -> open_relationship(socket, id, :end) end)
   end
 
   def handle_event("close_modal", _params, socket) do
@@ -93,7 +97,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   def handle_event("validate", %{"relationship" => params}, socket) do
     changeset =
       case socket.assigns.modal_action do
-        :edit ->
+        action when action in [:edit, :end] ->
           socket.assigns.editing_rel.relationship
           |> Relationship.update_changeset(params)
           |> Map.put(:action, :validate)
@@ -155,7 +159,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  defp open_relationship(socket, id) do
+  defp open_relationship(socket, id, action) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
@@ -168,12 +172,17 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
                 {:noreply, put_flash(socket, :error, "Relationship not found.")}
 
               item ->
-                changeset = Relationship.update_changeset(item.relationship, %{})
+                attrs =
+                  if action == :end,
+                    do: %{"effective_to" => Date.to_iso8601(Date.utc_today())},
+                    else: %{}
+
+                changeset = Relationship.update_changeset(item.relationship, attrs)
 
                 {:noreply,
                  socket
                  |> clear_flash()
-                 |> assign(:modal_action, :edit)
+                 |> assign(:modal_action, action)
                  |> assign(:editing_rel, item)
                  |> assign_form(changeset)}
             end
@@ -217,16 +226,27 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             {:noreply, put_flash(socket, :error, "Could not create relationship.")}
         end
 
-      :edit ->
+      action when action in [:edit, :end] ->
         rel_id = socket.assigns.editing_rel.id
 
-        case Company.update_relationship(scope, company_id, rel_id, params) do
+        result =
+          if action == :end,
+            do: Company.end_relationship(scope, company_id, rel_id, params),
+            else: Company.update_relationship(scope, company_id, rel_id, params)
+
+        case result do
           {:ok, _rel} ->
             {:ok, relationships} = Company.list_relationships(scope, company_id)
 
             {:noreply,
              socket
-             |> put_flash(:success, "Relationship updated successfully.")
+             |> put_flash(
+               :success,
+               if(action == :end,
+                 do: "Relationship ended; it stays in history.",
+                 else: "Relationship updated successfully."
+               )
+             )
              |> assign(:modal_action, nil)
              |> assign(:editing_rel, nil)
              |> assign_form(nil)
@@ -488,8 +508,16 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
                 />
                 <.icon_button
                   :if={@can_update?}
+                  icon="stop"
+                  label="End relationship"
+                  id={"end-rel-#{item.id}"}
+                  phx-click="end"
+                  phx-value-id={item.id}
+                />
+                <.icon_button
+                  :if={@can_update?}
                   icon="unlink"
-                  label="Remove relationship"
+                  label="Unlink (remove a mistaken entry)"
                   kind={:danger}
                   id={"delete-rel-#{item.id}"}
                   phx-click="request_delete"
@@ -504,9 +532,15 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         </.card>
 
         <.modal
-          :if={@modal_action in [:new, :edit]}
+          :if={@modal_action in [:new, :edit, :end]}
           id="relationship-modal"
-          title={if @modal_action == :new, do: "Add Relationship", else: "Edit Relationship Dates"}
+          title={
+            case @modal_action do
+              :new -> "Add Relationship"
+              :edit -> "Edit Relationship Dates"
+              :end -> "End Relationship"
+            end
+          }
           flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
@@ -515,7 +549,12 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               do:
                 "Establish a corporate relationship between #{@company.display_name} and another company.",
               else:
-                "Update effective date range for relationship with #{@editing_rel.other_company.name}."}
+                if(@modal_action == :end,
+                  do:
+                    "End the relationship with #{@editing_rel.other_company.name} on this date. It stays in history.",
+                  else:
+                    "Update effective date range for relationship with #{@editing_rel.other_company.name}."
+                )}
           </:description>
 
           <.form
@@ -547,6 +586,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               required
             />
             <.input
+              :if={@modal_action != :end}
               field={@form[:effective_from]}
               id="relationship-effective-from"
               type="date"
@@ -577,8 +617,8 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
         <.confirm_dialog
           :if={@pending_delete}
           id="delete-rel-confirm"
-          consequence={"The #{@pending_delete.type.name} relationship with #{@pending_delete.other_company.name} will be removed."}
-          detail="Both companies and the historical relationship are kept."
+          consequence={"The #{@pending_delete.type.name} relationship with #{@pending_delete.other_company.name} will be unlinked as a mistaken entry."}
+          detail="Both companies and the historical relationship are kept. To record a normal change, use End relationship instead."
           confirm="Remove"
           working="Removing…"
           on_confirm={JS.push("delete")}
