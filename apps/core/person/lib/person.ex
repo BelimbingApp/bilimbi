@@ -106,8 +106,8 @@ defmodule Bilimbi.Core.Person do
 
   @doc """
   The work email and phone to show beside people who hold none of their own:
-  those of their current affiliation (linked, not ended), the most recently
-  started first. Display only; each value is redacted like an affiliation's.
+  those of their current affiliation (linked, not ended) that has either, the
+  most recently started first; both come from that one affiliation. Display only; each value is redacted like an affiliation's.
   """
   def work_contacts(%Scope{} = scope, person_ids) when is_list(person_ids) do
     with :ok <- authorize(scope, "admin.person.list") do
@@ -124,11 +124,8 @@ defmodule Bilimbi.Core.Person do
         |> Enum.map(&summary(&1, scope))
         |> Enum.group_by(& &1.person_id)
         |> Map.new(fn {person_id, rows} ->
-          {person_id,
-           %{
-             email: Enum.find_value(rows, & &1.email),
-             phone: Enum.find_value(rows, & &1.phone)
-           }}
+          row = Enum.find(rows, &(&1.email || &1.phone))
+          {person_id, %{email: row && row.email, phone: row && row.phone}}
         end)
 
       {:ok, contacts}

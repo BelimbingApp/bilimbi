@@ -178,6 +178,28 @@ defmodule Bilimbi.Core.PersonTest do
       assert contacts[person.id] == %{email: "new@b.test", phone: "+601"}
     end
 
+    test "never combine an email and a phone from two affiliations", %{scope: scope} do
+      {:ok, person} = Person.create(scope, %{full_name: "Vera"})
+
+      {:ok, _older} =
+        Person.link(scope, person.id, 74, %{phone: "+609", started_on: "2020-01-01"})
+
+      {:ok, _newest} =
+        Person.link(scope, person.id, 73, %{email: "new@b.test", started_on: "2024-01-01"})
+
+      assert {:ok, contacts} = Person.work_contacts(scope, [person.id])
+      assert contacts[person.id] == %{email: "new@b.test", phone: nil}
+    end
+
+    test "skip an affiliation with no contact and use the next current one", %{scope: scope} do
+      {:ok, person} = Person.create(scope, %{full_name: "Vera"})
+      {:ok, _} = Person.link(scope, person.id, 74, %{phone: "+609", started_on: "2020-01-01"})
+      {:ok, _} = Person.link(scope, person.id, 73, %{title: "Adviser", started_on: "2024-01-01"})
+
+      assert {:ok, contacts} = Person.work_contacts(scope, [person.id])
+      assert contacts[person.id] == %{email: nil, phone: "+609"}
+    end
+
     test "skip ended and unlinked affiliations and other tenants", %{
       scope: scope,
       foreign: foreign
