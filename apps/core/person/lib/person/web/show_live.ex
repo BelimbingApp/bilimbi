@@ -114,6 +114,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
   def handle_event("close_role_dialog", _, socket),
     do: {:noreply, assign(socket, role_dialog: nil, role_dates_form: nil)}
 
+  def handle_event("save_role_dates", _, %{assigns: %{role_dialog: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("save_role_dates", %{"role_dates" => attrs}, socket) do
     %{mode: mode, role: role} = socket.assigns.role_dialog
     scope = socket.assigns.current_scope.scope

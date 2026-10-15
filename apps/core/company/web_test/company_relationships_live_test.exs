@@ -161,6 +161,8 @@ defmodule BilimbiWeb.CompanyRelationshipsLiveTest do
       refute has_element?(view, "#relationship-modal")
       assert has_element?(view, "#flash-success", "Relationship ended")
       assert has_element?(view, "#company-relationships", "2026-03-31")
+
+      render_hook(view, "save", %{"relationship" => %{"effective_to" => "2026-02-01"}})
       kept = Repo.get!(Relationship, rel.id)
       assert {kept.effective_to, kept.deleted_at} == {~D[2026-03-31], nil}
     end

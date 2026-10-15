@@ -100,8 +100,17 @@ defmodule BilimbiWeb.PersonRolesWorkflowTest do
     assert [{"prospect", ~D[2026-01-01], ~D[2026-03-31]}, {"customer", ~D[2026-04-01], nil}] ==
              Enum.map(rows, &{&1.role_code, &1.effective_from, &1.effective_to})
 
+    stale = %{"role_dates" => %{"effective_to" => "2026-02-01"}}
+    render_hook(view, "save_role_dates", stale)
+    assert {:ok, [%{effective_to: ~D[2026-03-31]} | _]} = Person.relationships(scope, lead.id)
+
     view |> element("#edit-role-#{id}") |> render_click()
     assert has_element?(view, "#role-dates-from[value='2026-01-01']")
+    view |> element("#role-dates-form button", "Cancel") |> render_click()
+    refute has_element?(view, "#role-dates-modal")
+    render_hook(view, "save_role_dates", stale)
+    assert {:ok, [%{effective_to: ~D[2026-03-31]} | _]} = Person.relationships(scope, lead.id)
+    view |> element("#edit-role-#{id}") |> render_click()
 
     view
     |> form("#role-dates-form",
