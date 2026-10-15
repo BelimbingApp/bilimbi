@@ -11,7 +11,7 @@ In the age of AI, companies should own the business system they run on without t
 Bilimbi is designed for AI as the programmers so that builders with minimum programming knowledge can build. It shipped with essential functions encapsulated as the `Base` and `Core`. `Domains` and `Extensions` are where the applications live.
 
 - **Base** is the framework infrastructure: authz, audit, schedules, and other essentials
-- **Core** contains the core modules: users, companies, people, employees, and address.
+- **Core** contains the core modules: users, companies, contacts, employees, and address.
 - **Domains** is where the subject matter applications live
 - **Extensions** is for customization for specific use cases
 
