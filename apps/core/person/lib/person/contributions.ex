@@ -1,4 +1,5 @@
 defmodule Bilimbi.Core.Person.Contributions do
+  @moduledoc false
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
   @capabilities ~w(admin.person.list admin.person.view admin.person.create admin.person.update)
   @impl true

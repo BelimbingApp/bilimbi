@@ -23,7 +23,7 @@ defmodule Bilimbi.Core.Person do
   alias Bilimbi.Base.Tenancy.Actor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
-  alias Bilimbi.Core.Person.{Schema, Affiliation, Relationships}
+  alias Bilimbi.Core.Person.{Affiliation, Relationships, Schema}
   alias Ecto.Changeset
 
   @affiliation_facts [:title, :email, :phone, :started_on, :ended_on]
@@ -710,10 +710,7 @@ defmodule Bilimbi.Core.Person do
 
   @doc "Operational refusal wording shared by the contact adapters."
   def refusal_message(%Changeset{} = cs),
-    do:
-      cs.errors
-      |> Enum.map(fn {field, {message, _}} -> "#{field} #{message}" end)
-      |> Enum.join(", ")
+    do: Enum.map_join(cs.errors, ", ", fn {field, {message, _}} -> "#{field} #{message}" end)
 
   def refusal_message(reason) do
     case reason do

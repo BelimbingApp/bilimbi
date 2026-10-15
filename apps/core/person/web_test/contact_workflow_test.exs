@@ -3,8 +3,8 @@ defmodule BilimbiWeb.ContactWorkflowTest do
   import Phoenix.LiveViewTest
   alias Bilimbi.Base.{AgentApi, Authz, Tenancy}
   alias Bilimbi.Base.Tenancy.Authentication
-  alias Bilimbi.Core.Person
   alias Bilimbi.Core.Company.TestFixtures, as: Companies
+  alias Bilimbi.Core.Person
 
   @caps ~w(admin.person.list admin.person.view admin.person.create admin.person.update admin.company.view admin.company.list admin.company.tenant-wide.manage)
 

@@ -1,7 +1,7 @@
 defmodule Bilimbi.Core.Person.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
-  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Base.Grid.Web.PageColumns
+  alias Bilimbi.Base.UI.ListState
   alias Bilimbi.Core.Person
   @list_spec ListState.spec!(page_sizes: [25, 50, 100], default_page_size: 25)
   @write_guard_opt_out ~w(grid)

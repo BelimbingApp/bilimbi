@@ -100,7 +100,7 @@ defmodule Bilimbi.Core.Company do
   until the current `Bilimbi.Base.Repo` transaction commits or rolls back.
   Callers that acquire more than one module's records must lock Company rows
   first, then Person and affiliation rows, then Employee rows, then User rows; within each kind, acquire ids in
-  ascending order. Do not call this after taking an Employee or User row lock.
+  ascending order. Do not call this after taking a Person, affiliation, Employee, or User row lock.
 
   A lock is only ever taken to write, so an archived company is refused here
   with `{:error, :company_archived}` (`require_writable_company/2` is the

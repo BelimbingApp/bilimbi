@@ -24,14 +24,14 @@ defmodule Bilimbi.Core.Company.Relationship do
         }
 
   schema "company_relationships" do
-    field :effective_from, :date
-    field :effective_to, :date
-    field :metadata, Bilimbi.Base.Database.Json
-    field :deleted_at, :naive_datetime
+    field(:effective_from, :date)
+    field(:effective_to, :date)
+    field(:metadata, Bilimbi.Base.Database.Json)
+    field(:deleted_at, :naive_datetime)
 
-    belongs_to :company, Bilimbi.Core.Company.Schema, foreign_key: :company_id
-    belongs_to :related_company, Bilimbi.Core.Company.Schema, foreign_key: :related_company_id
-    belongs_to :type, Bilimbi.Core.Company.RelationshipType, foreign_key: :relationship_type_id
+    belongs_to(:company, Bilimbi.Core.Company.Schema, foreign_key: :company_id)
+    belongs_to(:related_company, Bilimbi.Core.Company.Schema, foreign_key: :related_company_id)
+    belongs_to(:type, Bilimbi.Core.Company.RelationshipType, foreign_key: :relationship_type_id)
 
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end

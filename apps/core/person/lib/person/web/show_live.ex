@@ -192,34 +192,41 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
   end
 
   def handle_event("save_affiliation", params, socket) do
-    with {:ok, id} <- Params.positive_id(params["id"]) do
-      fields =
-        Map.new(
-          [:title, :email, :phone, :started_on, :ended_on],
-          &{"affiliation-#{id}-#{&1}", &1}
-        )
+    case Params.positive_id(params["id"]) do
+      {:ok, id} ->
+        fields =
+          Map.new(
+            [:title, :email, :phone, :started_on, :ended_on],
+            &{"affiliation-#{id}-#{&1}", &1}
+          )
 
-      {:noreply,
-       CommitStatus.save_field(socket, params, fields,
-         can?: Authz.can(socket.assigns.current_scope.scope, "admin.person.update").allowed,
-         forbidden: "You do not have permission to update contacts.",
-         write: fn s, name, field, value ->
-           s
-           |> CommitStatus.commit(
-             name,
-             Person.update_affiliation(s.assigns.current_scope.scope, s.assigns.person.id, id, %{
-               field => value
-             }),
-             field: field,
-             label: to_string(field),
-             submitted: value,
-             on_ok: fn changed, _ -> changed end
-           )
-           |> reload()
-         end
-       )}
-    else
-      _ -> {:noreply, socket}
+        {:noreply,
+         CommitStatus.save_field(socket, params, fields,
+           can?: Authz.can(socket.assigns.current_scope.scope, "admin.person.update").allowed,
+           forbidden: "You do not have permission to update contacts.",
+           write: fn s, name, field, value ->
+             s
+             |> CommitStatus.commit(
+               name,
+               Person.update_affiliation(
+                 s.assigns.current_scope.scope,
+                 s.assigns.person.id,
+                 id,
+                 %{
+                   field => value
+                 }
+               ),
+               field: field,
+               label: to_string(field),
+               submitted: value,
+               on_ok: fn changed, _ -> changed end
+             )
+             |> reload()
+           end
+         )}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 

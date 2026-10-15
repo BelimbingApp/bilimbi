@@ -1,4 +1,5 @@
 defmodule Bilimbi.Core.Person.Grid.PeopleSource do
+  @moduledoc false
   @behaviour Bilimbi.Base.Grid.Source
   import Ecto.Query
   @impl true

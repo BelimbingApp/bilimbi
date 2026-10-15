@@ -55,7 +55,7 @@ defmodule Bilimbi.Core.Company.RelationshipCatalogue do
   end
 
   def list do
-    types = Repo.all(from t in RelationshipType, order_by: [asc: t.name, asc: t.id])
+    types = Repo.all(from(t in RelationshipType, order_by: [asc: t.name, asc: t.id]))
     {:ok, Enum.map(types, &%{&1 | inverse_name: RelationshipType.inverse_name(&1)})}
   end
 

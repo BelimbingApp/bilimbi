@@ -38,24 +38,28 @@ defmodule Bilimbi.Core.Company.Migrations.AddLiveCompanyRelationshipUniqueIndex 
       )
     """)
 
-    create unique_index(
-             :company_relationships,
-             [
-               :company_id,
-               :related_company_id,
-               :relationship_type_id
-             ],
-             where: "deleted_at IS NULL AND effective_to IS NULL",
-             name: :company_relationship_live_unique
-           )
+    create(
+      unique_index(
+        :company_relationships,
+        [
+          :company_id,
+          :related_company_id,
+          :relationship_type_id
+        ],
+        where: "deleted_at IS NULL AND effective_to IS NULL",
+        name: :company_relationship_live_unique
+      )
+    )
   end
 
   # Unlinked duplicates stay unlinked: they were history by then.
   def down do
-    drop_if_exists unique_index(
-                     :company_relationships,
-                     [:company_id, :related_company_id, :relationship_type_id],
-                     name: :company_relationship_live_unique
-                   )
+    drop_if_exists(
+      unique_index(
+        :company_relationships,
+        [:company_id, :related_company_id, :relationship_type_id],
+        name: :company_relationship_live_unique
+      )
+    )
   end
 end

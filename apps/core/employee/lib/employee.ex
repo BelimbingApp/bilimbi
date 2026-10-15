@@ -361,8 +361,8 @@ defmodule Bilimbi.Core.Employee do
 
   The caller must already be inside the shared Repo transaction. The returned
   proof is valid only for that transaction and contains no Employee schema or
-  queryable. Callers that also lock User state must keep the global lock order:
-  Company, then Employee, then User, with ascending IDs within each module.
+  queryable. Callers that also lock another module's rows keep the order on
+  `Bilimbi.Core.Company.lock_writable_company/2`.
 
   Missing, cross-tenant, and company-mismatched identities all fail as
   `:not_found`; an archived company is `:company_archived`, since the lock is

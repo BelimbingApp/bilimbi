@@ -53,8 +53,9 @@ through this generic affiliation seam with `:invariant_violation`; a non-agent
 legacy `SYS-001` row remains an ordinary affiliation under Employee's existing
 invariant.
 
-Cross-module writers use one strict lock order: **Company → Employee → User**.
-Within each module they lock ascending IDs. A returned proof is useful only
+Cross-module writers follow the lock order on
+`Bilimbi.Core.Company.lock_writable_company/2`. Within each module they lock
+ascending IDs. A returned proof is useful only
 inside the transaction that created it and must not be cached or treated as a
 capability after commit or rollback.
 
@@ -188,11 +189,11 @@ People's follow-up contract:
    overwritten only by a later change to the same Employee fact. The synced
    dates pass through the affiliation's own validation: an employment date that
    would invert the affiliation's start/end range is refused on that employment
-   date field. An Employee write takes the mapped person's and affiliation's row
-   locks first (the Core Person order: Company, Person, affiliation, then
-   Employee), so a concurrent Contacts edit queues instead of deadlocking, and an
-   employee that has no mapping yet gets one from its complete stored facts on
-   its next create or edit. Contacts owns retire and unlink: the sync leaves a retired
+   date field. An employee update or delete locks the mapped person, then that
+   affiliation, before the employee row (`Person.lock_legacy_employee/2`), so a
+   concurrent Contacts edit queues instead of deadlocking. A retired person or
+   an unlinked affiliation is only read. An employee that has no mapping yet
+   gets one from its complete stored facts on its next create or edit. Contacts owns retire and unlink: the sync leaves a retired
    person and an unlinked affiliation untouched, and the employee write still
    succeeds. Deleting an employee unlinks its mapped affiliation and sets its
    end date in the same transaction; the Core person stays.

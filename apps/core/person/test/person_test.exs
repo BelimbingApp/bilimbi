@@ -1,8 +1,8 @@
 defmodule Bilimbi.Core.PersonTest do
   use Bilimbi.Base.Database.DataCase, async: true
-  alias Bilimbi.Core.Person
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Person
 
   setup do
     # No employees or People tables exist: these contracts work without HR.

@@ -196,10 +196,8 @@ cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`; an
 archived company is read-only and returns `{:error, :company_archived}`;
 calling outside an explicit transaction returns `{:error, :transaction_required}`.
 
-The proof remains valid only until that transaction commits or rolls back. A
-cross-module workflow acquires locks in this order: Company, then Employee,
-then User; within each record kind, ids ascend. It must not take an Employee or
-User lock before calling `lock_writable_company/2`.
+The proof remains valid only until that transaction commits or rolls back. The
+cross-module lock order is the contract on `lock_writable_company/2`.
 
 ## External access
 
