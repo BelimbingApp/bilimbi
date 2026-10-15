@@ -32,6 +32,8 @@ defmodule Bilimbi.Core.Person.SchemaContract do
             "email" => column({:varchar, 255}),
             "phone" => column({:varchar, 255}),
             "legacy_employee_id" => column(:bigint),
+            "started_on" => column(:date),
+            "ended_on" => column(:date),
             "unlinked_at" => column({:timestamp, 0})
           }),
         indexes: %{

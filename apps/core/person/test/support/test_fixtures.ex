@@ -24,6 +24,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
         id bigserial PRIMARY KEY, tenant_id bigint NOT NULL REFERENCES tenants(id),
         person_id bigint NOT NULL, company_id bigint NOT NULL REFERENCES companies(id),
         title varchar(255), email varchar(255), phone varchar(255), legacy_employee_id bigint UNIQUE,
+        started_on date, ended_on date,
         unlinked_at timestamp(0), created_at timestamp(0), updated_at timestamp(0),
         CONSTRAINT core_person_affiliations_person_tenant_foreign FOREIGN KEY(person_id, tenant_id)
           REFERENCES core_people(id, tenant_id)

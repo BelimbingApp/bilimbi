@@ -193,7 +193,11 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
 
   def handle_event("save_affiliation", params, socket) do
     with {:ok, id} <- Params.positive_id(params["id"]) do
-      fields = Map.new([:title, :email, :phone], &{"affiliation-#{id}-#{&1}", &1})
+      fields =
+        Map.new(
+          [:title, :email, :phone, :started_on, :ended_on],
+          &{"affiliation-#{id}-#{&1}", &1}
+        )
 
       {:noreply,
        CommitStatus.save_field(socket, params, fields,
@@ -237,6 +241,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
     {:ok, person} = Person.get(socket.assigns.current_scope.scope, socket.assigns.person.id)
     loaded(socket, person)
   end
+
+  defp date_text(nil), do: ""
+  defp date_text(%Date{} = date), do: Date.to_iso8601(date)
 
   defp unrestricted(value),
     do: if(Bilimbi.Base.Authz.Restricted.restricted?(value), do: nil, else: value)
@@ -400,6 +407,27 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
                   !Bilimbi.Base.Authz.Restricted.restricted?(a.phone)
               }>{a.phone || "—"}</span>
             </:col>
+            <:col
+              :let={a}
+              :for={{field, label} <- [started_on: "Started", ended_on: "Ended"]}
+              label={label}
+            >
+              <.inline_edit
+                :if={@can_update? and is_nil(a.unlinked_at)}
+                id={"affiliation-#{a.id}-#{field}"}
+                name={"affiliation-#{a.id}-#{field}"}
+                id_value={a.id}
+                save_event="save_affiliation"
+                value={date_text(Map.fetch!(a, field))}
+                label={"#{label} (YYYY-MM-DD)"}
+                placeholder="YYYY-MM-DD"
+                allow_empty
+                status={@field_status["affiliation-#{a.id}-#{field}"]}
+              />
+              <span :if={!@can_update? or a.unlinked_at != nil}>
+                {date_text(Map.fetch!(a, field)) |> then(&if(&1 == "", do: "—", else: &1))}
+              </span>
+            </:col>
             <:col :let={a} label="Affiliation">
               <span :if={!a.unlinked_at}>Linked</span><span :if={a.unlinked_at}>Unlinked</span>
             </:col>
@@ -463,6 +491,13 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
               id="affiliation-phone"
               label="Phone"
             />
+            <.input
+              field={@link_form[:started_on]}
+              id="affiliation-started-on"
+              type="date"
+              label="Started"
+            />
+            <.input field={@link_form[:ended_on]} id="affiliation-ended-on" type="date" label="Ended" />
             <.button id="affiliation-link" type="submit">Add affiliation</.button>
           </.form>
         </.card>

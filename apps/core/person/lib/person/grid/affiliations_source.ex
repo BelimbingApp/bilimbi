@@ -12,6 +12,8 @@ defmodule Bilimbi.Core.Person.Grid.AffiliationsSource do
           :title,
           :email,
           :phone,
+          :started_on,
+          :ended_on,
           :legacy_employee_id,
           :created_at,
           :unlinked_at

@@ -171,6 +171,13 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
                []
              ).rows
 
+    assert [[9470, ~D[2020-01-02], ~D[2027-03-04]], [9471, nil, nil]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT legacy_employee_id, started_on, ended_on FROM core_person_affiliations ORDER BY legacy_employee_id",
+               []
+             ).rows
+
     assert [[9470, 947, "Legacy Human", nil], [9471, 947, "Legacy System Agent", nil]] =
              SQL.query!(
                PlatformBaselineTestRepo,

@@ -24,7 +24,12 @@ identity belongs to the tenant, not exclusively to one employer. All reads are
 tenant-scoped, field restrictions apply to summaries and writes, and Repo writes
 carry the performing scope into audit capture. Retired identity remains readable
 but read-only and leaves active searches. Unlink keeps the affiliation and its
-stable ID; linking again creates a new retained link.
+stable ID and sets its end date (today, unless an earlier end date is recorded);
+linking again creates a new retained link. An affiliation carries optional
+`started_on` and `ended_on` dates (the end on or after the start), shown and
+editable on the contact page; a person can hold several, each with its own
+dates. Existing affiliations were dated on migration: the legacy employee's
+employment start and end where known, otherwise the creation and unlink dates.
 
 The UI is `/contacts`, `/contacts/new` and `/contacts/:id`. Supported headless
 operations are discoverable under `core.person.*`:
@@ -35,7 +40,7 @@ operations are discoverable under `core.person.*`:
 | `create`, `update`, `retire` | Identity lifecycle |
 | `contact.create` | Namecard identity and affiliation in one transaction |
 | `affiliation.list` | Retained affiliation history |
-| `affiliation.link`, `affiliation.update`, `affiliation.unlink` | Reuse identity and maintain company contact facts |
+| `affiliation.link`, `affiliation.update`, `affiliation.unlink` | Reuse identity and maintain company contact facts and `started_on`/`ended_on` dates; unlink sets the end date |
 | `relationship.list`, `relationship.get` | Roles a person holds toward a company, including unlinked history |
 | `relationship.create`, `relationship.update` | Assign a role; change its dates |
 | `relationship.end` | Normal transition: set `effective_to` (default today) and keep the row as dated history |

@@ -9,7 +9,9 @@ defmodule Bilimbi.Core.Person.Web.CreateLive do
     company_id: :integer,
     title: :string,
     email: :string,
-    phone: :string
+    phone: :string,
+    started_on: :date,
+    ended_on: :date
   }
   @impl true
   def mount(_, _, socket) do
@@ -139,6 +141,8 @@ defmodule Bilimbi.Core.Person.Web.CreateLive do
             id="contact-phone"
             label="Phone"
           />
+          <.input field={@form[:started_on]} id="contact-started-on" type="date" label="Started" />
+          <.input field={@form[:ended_on]} id="contact-ended-on" type="date" label="Ended" />
           <.button id="contact-save" variant="primary" type="submit" disabled={@companies == []}>Create contact</.button>
         </.form>
       </.page>

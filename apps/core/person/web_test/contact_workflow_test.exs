@@ -59,6 +59,49 @@ defmodule BilimbiWeb.ContactWorkflowTest do
     assert {:ok, [%{id: 91}]} = Bilimbi.Core.User.list_users(scope)
   end
 
+  test "UI records, edits and ends affiliation dates, keeping the unlinked row as history", %{
+    conn: conn,
+    scope: scope
+  } do
+    grant_capabilities!(@caps)
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/new")
+
+    view
+    |> form("#contact-form",
+      contact: %{full_name: "Dated Dan", company_id: "74", started_on: "2024-02-01"}
+    )
+    |> render_submit()
+
+    {:ok, %{entries: [p]}} = Person.list(scope)
+    {:ok, details, _} = conn |> log_in_as() |> live(~p"/contacts/#{p.id}")
+
+    assert {:ok, %{affiliations: [%{id: id, started_on: ~D[2024-02-01]}]}} =
+             Person.get(scope, p.id)
+
+    assert has_element?(details, "#affiliation-#{id}-started_on")
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-ended_on" => "2025-06-30"
+    })
+
+    assert {:ok, %{affiliations: [%{ended_on: ~D[2025-06-30]}]}} = Person.get(scope, p.id)
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-ended_on" => "2023-01-01"
+    })
+
+    assert {:ok, %{affiliations: [%{ended_on: ~D[2025-06-30]}]}} = Person.get(scope, p.id)
+
+    details |> element("#unlink-affiliation-#{id}") |> render_click()
+
+    assert {:ok, %{affiliations: [%{unlinked_at: %NaiveDateTime{}, ended_on: ~D[2025-06-30]}]}} =
+             Person.get(scope, p.id)
+
+    refute has_element?(details, "#affiliation-#{id}-started_on")
+  end
+
   test "forged UI cross-tenant target and revoked capability cannot create contacts", %{
     conn: conn,
     scope: scope

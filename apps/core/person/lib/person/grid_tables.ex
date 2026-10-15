@@ -38,6 +38,8 @@ defmodule Bilimbi.Core.Person.GridTables do
             %{id: "phone", label: "Phone", type: :string},
             %{id: "person_id", type: :integer, protected: true},
             %{id: "company_id", type: :integer, protected: true},
+            %{id: "started_on", type: :date, protected: true},
+            %{id: "ended_on", type: :date, protected: true},
             %{id: "legacy_employee_id", type: :integer, protected: true},
             %{id: "created_at", type: :datetime},
             %{id: "unlinked_at", type: :datetime, protected: true}

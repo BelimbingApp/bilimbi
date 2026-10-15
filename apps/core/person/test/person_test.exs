@@ -123,4 +123,107 @@ defmodule Bilimbi.Core.PersonTest do
     assert id == person.id
     assert {:ok, %{entries: [%{id: ^id}]}} = Person.list(scope, search: "555-947")
   end
+
+  describe "affiliation dates" do
+    test "a namecard and a later link carry start and end dates, kept in history", %{
+      scope: scope
+    } do
+      assert {:ok, %{person: person, affiliation: a}} =
+               Person.create_contact(scope, 74, %{
+                 full_name: "Vera",
+                 title: "Sales",
+                 started_on: "2024-02-01"
+               })
+
+      assert {a.started_on, a.ended_on} == {~D[2024-02-01], nil}
+
+      assert {:ok, updated} =
+               Person.update_affiliation(scope, person.id, a.id, %{ended_on: "2025-06-30"})
+
+      assert updated.id == a.id
+      assert {updated.started_on, updated.ended_on} == {~D[2024-02-01], ~D[2025-06-30]}
+
+      assert {:ok, second} =
+               Person.link(scope, person.id, 73, %{started_on: "2025-07-01", title: "Adviser"})
+
+      assert second.started_on == ~D[2025-07-01]
+      assert {:ok, %{affiliations: [first, later]}} = Person.get(scope, person.id)
+
+      assert {first.ended_on, later.id, later.started_on} ==
+               {~D[2025-06-30], second.id, ~D[2025-07-01]}
+    end
+
+    test "an end date before the start date is refused on every write", %{scope: scope} do
+      assert {:error, %Ecto.Changeset{} = cs} =
+               Person.create_contact(scope, 74, %{
+                 full_name: "Vera",
+                 started_on: "2025-01-02",
+                 ended_on: "2025-01-01"
+               })
+
+      assert %{ended_on: [_]} = Bilimbi.Base.Database.TestHelpers.errors_on(cs)
+      {:ok, person} = Person.create(scope, %{full_name: "Una"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Person.link(scope, person.id, 74, %{
+                 started_on: "2025-01-02",
+                 ended_on: "2025-01-01"
+               })
+
+      {:ok, link} = Person.link(scope, person.id, 74, %{started_on: "2025-01-02"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Person.update_affiliation(scope, person.id, link.id, %{ended_on: "2025-01-01"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Person.preview(scope, :affiliation_update, %{
+                 "person_id" => person.id,
+                 "affiliation_id" => link.id,
+                 "ended_on" => "2025-01-01"
+               })
+    end
+
+    test "unlinking sets the end date and keeps history; an earlier end date is kept", %{
+      scope: scope
+    } do
+      {:ok, person} = Person.create(scope, %{full_name: "Vera"})
+      {:ok, open} = Person.link(scope, person.id, 74, %{started_on: "2020-01-01"})
+      today = Date.utc_today()
+
+      assert {:ok, %{ended_on: ^today, unlinked_at: %NaiveDateTime{}}} =
+               Person.unlink(scope, person.id, open.id)
+
+      {:ok, left} = Person.link(scope, person.id, 74, %{ended_on: "2021-05-05"})
+      assert {:ok, %{ended_on: ~D[2021-05-05]}} = Person.unlink(scope, person.id, left.id)
+
+      {:ok, planned} = Person.link(scope, person.id, 74, %{ended_on: "2999-01-01"})
+      assert {:ok, %{ended_on: ^today}} = Person.unlink(scope, person.id, planned.id)
+      assert {:ok, %{affiliations: rows}} = Person.get(scope, person.id)
+      assert length(rows) == 3
+    end
+
+    test "previews show dates without mutating; unlink preview defers the clock", %{
+      scope: scope
+    } do
+      assert {:ok, preview} =
+               Person.preview(scope, :contact, %{
+                 "company_id" => 74,
+                 "full_name" => "Vera",
+                 "started_on" => "2024-02-01"
+               })
+
+      assert Enum.any?(preview.changes, &(&1.field == "started_on" and &1.to == ~D[2024-02-01]))
+      assert {:ok, %{entries: []}} = Person.list(scope)
+
+      {:ok, %{person: person, affiliation: a}} =
+        Person.create_contact(scope, 74, %{full_name: "Vera"})
+
+      input = %{"person_id" => person.id, "affiliation_id" => a.id}
+      assert {:ok, %{changes: changes}} = Person.preview(scope, :unlink, input)
+      assert Enum.any?(changes, &(&1.field == "ended_on" and &1.to == "recorded at commit"))
+
+      assert {:ok, %{affiliations: [%{unlinked_at: nil, ended_on: nil}]}} =
+               Person.get(scope, person.id)
+    end
+  end
 end

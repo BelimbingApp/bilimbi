@@ -223,7 +223,7 @@ defmodule Bilimbi.Core.Person do
 
   def unlink(%Scope{} = scope, person_id, id) do
     with {:ok, cs} <- affiliation_changeset(scope, person_id, nil, id, %{}) do
-      persist(Changeset.change(cs, unlinked_at: now()), :update, scope)
+      persist(unlinking(cs), :update, scope)
     end
   end
 
@@ -237,7 +237,7 @@ defmodule Bilimbi.Core.Person do
 
       :retire ->
         with {:ok, cs} <- person_changeset(scope, input["person_id"], %{}, "admin.person.update"),
-             do: preview_changes(Changeset.change(cs, retired_at: now()), :retired_at)
+             do: preview_changes(Changeset.change(cs, retired_at: now()), [:retired_at])
 
       :contact ->
         with {:ok, _} <- target(scope, input["company_id"], "admin.person.create"),
@@ -262,7 +262,7 @@ defmodule Bilimbi.Core.Person do
                  changes(person_cs) ++
                  Enum.filter(
                    changes(affiliation_cs),
-                   &(&1.field in ~w(title email phone company_id))
+                   &(&1.field in ~w(title email phone started_on ended_on company_id))
                  )
            }}
         end
@@ -285,11 +285,18 @@ defmodule Bilimbi.Core.Person do
                  input["affiliation_id"],
                  input
                ) do
-          cs = if action == :unlink, do: Changeset.change(cs, unlinked_at: now()), else: cs
-          preview_changes(cs, if(action == :unlink, do: :unlinked_at, else: nil))
+          cs = if action == :unlink, do: unlinking(cs), else: cs
+          preview_changes(cs, if(action == :unlink, do: [:unlinked_at, :ended_on], else: []))
         end
     end
   end
+
+  defp unlinking(%Changeset{data: affiliation} = cs),
+    do:
+      Changeset.change(
+        cs,
+        [unlinked_at: now()] ++ Affiliation.unlink_changes(affiliation, Date.utc_today())
+      )
 
   defp preview_person(scope, id, attrs, capability) do
     with {:ok, cs} <- person_changeset(scope, id, attrs, capability), do: preview_changes(cs)
@@ -489,7 +496,7 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp preview_changes(cs, lifecycle_field \\ nil) do
+  defp preview_changes(cs, lifecycle_fields \\ []) do
     targets =
       if match?(%Affiliation{}, cs.data),
         do:
@@ -506,7 +513,7 @@ defmodule Bilimbi.Core.Person do
               changes:
                 targets ++
                   Enum.map(changes(cs), fn c ->
-                    if c.field == to_string(lifecycle_field),
+                    if c.field in Enum.map(lifecycle_fields, &to_string/1),
                       do: %{c | to: "recorded at commit"},
                       else: c
                   end)

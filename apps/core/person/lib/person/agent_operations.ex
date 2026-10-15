@@ -20,11 +20,11 @@ defmodule Bilimbi.Core.Person.AgentOperations do
     {"core.person.affiliation.list", :affiliations, :read, "view",
      "Read retained affiliations, including unlinked history."},
     {"core.person.affiliation.link", :link, :write, "update",
-     "Affiliate an existing person with a company, with title and company contact details."},
+     "Affiliate an existing person with a company: title, company contact details, start and end dates."},
     {"core.person.affiliation.update", :affiliation_update, :write, "update",
-     "Update title and company contact details without changing HR facts."},
+     "Update title, company contact details and start/end dates without changing HR facts."},
     {"core.person.affiliation.unlink", :unlink, :write, "update",
-     "Unlink an affiliation while preserving its identity and history."},
+     "Unlink an affiliation, setting its end date and preserving identity and history."},
     {"core.person.relationship.list", :relationships, :read, "view",
      "Read the roles a person holds toward companies, including unlinked history."},
     {"core.person.relationship.get", :relationship_get, :read, "view",
@@ -97,23 +97,29 @@ defmodule Bilimbi.Core.Person.AgentOperations do
 
         :contact ->
           {["full_name", "company_id"],
-           %{
-             "full_name" => text,
-             "company_id" => id,
-             "title" => text,
-             "email" => text,
-             "phone" => text
-           }}
+           Map.merge(
+             %{
+               "full_name" => text,
+               "company_id" => id,
+               "title" => text,
+               "email" => text,
+               "phone" => text
+             },
+             affiliation_dates()
+           )}
 
         :link ->
           {["person_id", "company_id"],
-           %{
-             "person_id" => id,
-             "company_id" => id,
-             "title" => text,
-             "email" => text,
-             "phone" => text
-           }}
+           Map.merge(
+             %{
+               "person_id" => id,
+               "company_id" => id,
+               "title" => text,
+               "email" => text,
+               "phone" => text
+             },
+             affiliation_dates()
+           )}
 
         :relationships ->
           {["person_id"], %{"person_id" => id, "include_unlinked" => %{"type" => "boolean"}}}
@@ -144,27 +150,32 @@ defmodule Bilimbi.Core.Person.AgentOperations do
 
         :affiliation_update ->
           {["person_id", "affiliation_id"],
-           %{
-             "person_id" => id,
-             "affiliation_id" => id,
-             "title" => text,
-             "email" => text,
-             "phone" => text
-           }}
+           Map.merge(
+             %{
+               "person_id" => id,
+               "affiliation_id" => id,
+               "title" => text,
+               "email" => text,
+               "phone" => text
+             },
+             affiliation_dates()
+           )}
       end
 
     %{"type" => "object", "required" => required, "properties" => fields}
   end
 
-  defp dates do
-    date = %{
+  defp date do
+    %{
       "type" => "string",
       "maxLength" => 10,
       "description" => "ISO date (YYYY-MM-DD); an empty string clears this optional date."
     }
-
-    %{"effective_from" => date, "effective_to" => date}
   end
+
+  defp dates, do: %{"effective_from" => date(), "effective_to" => date()}
+
+  defp affiliation_dates, do: %{"started_on" => date(), "ended_on" => date()}
 
   @impl true
   def call("core.person.list", scope, input) do

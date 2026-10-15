@@ -19,7 +19,8 @@
   migrations: "priv/repo/migrations",
   migration_dispositions: %{
     20_261_014_050_232 => :bilimbi_only,
-    20_261_014_070_000 => :bilimbi_only
+    20_261_014_070_000 => :bilimbi_only,
+    20_261_014_080_000 => :bilimbi_only
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Person.SchemaContract,
