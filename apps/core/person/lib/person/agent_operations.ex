@@ -171,19 +171,25 @@ defmodule Bilimbi.Core.Person.AgentOperations do
     result =
       cond do
         input["affiliation_id"] ->
-          Person.affiliation_target(scope, input["person_id"], input["affiliation_id"])
+          with {:ok, id} <-
+                 Person.affiliation_target(scope, input["person_id"], input["affiliation_id"]),
+               do: {:ok, [id]}
 
         input["company_id"] ->
-          Person.company_target(scope, input["company_id"], capability)
+          with {:ok, id} <- Person.company_target(scope, input["company_id"], capability),
+               do: {:ok, [id]}
+
+        operation_action in [:update, :retire] ->
+          Person.person_targets(scope, input["person_id"])
 
         true ->
-          {:ok, nil}
+          {:ok, []}
       end
 
-    with {:ok, company_id} <- result do
-      if company_id && not AgentPolicy.writes_enabled_in_company?(scope, company_id),
-        do: {:error, :writes_not_enabled},
-        else: :ok
+    with {:ok, company_ids} <- result do
+      if Enum.all?(company_ids, &AgentPolicy.writes_enabled_in_company?(scope, &1)),
+        do: :ok,
+        else: {:error, :writes_not_enabled}
     end
   end
 

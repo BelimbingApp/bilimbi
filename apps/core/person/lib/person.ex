@@ -116,6 +116,18 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
+  @doc """
+  The live affiliation companies a person-wide change reaches, after the actor
+  is authorized for each of them. Updating or retiring a person changes what
+  every affiliated company sees, so one unauthorized company refuses it.
+  """
+  def person_targets(%Scope{} = scope, person_id) do
+    with :ok <- authorize(scope, "admin.person.update"),
+         {:ok, person} <- fetch(scope, person_id),
+         :ok <- live(person),
+         do: authorize_affiliated_companies(scope, person.id)
+  end
+
   def update(%Scope{} = scope, id, attrs) do
     with {:ok, changeset} <- person_changeset(scope, id, attrs, "admin.person.update") do
       persist(changeset, :update, scope)
@@ -248,11 +260,38 @@ defmodule Bilimbi.Core.Person do
          :ok <- reject_hr(attrs),
          {:ok, person} <-
            if(is_nil(id), do: {:ok, %Schema{tenant_id: scope.tenant.id}}, else: fetch(scope, id)),
-         :ok <- live(person) do
+         :ok <- live(person),
+         {:ok, _} <-
+           if(is_nil(id), do: {:ok, []}, else: authorize_affiliated_companies(scope, id)) do
       {:ok,
        Schema.changeset(person, attrs)
        |> Authz.refuse_restricted_attempts(scope, "core_people", attrs)}
     end
+  end
+
+  defp authorize_affiliated_companies(scope, person_id) do
+    company_ids =
+      Repo.all(
+        from(a in Tenancy.scope_query(Affiliation, scope),
+          where: a.person_id == ^person_id and is_nil(a.unlinked_at),
+          distinct: true,
+          order_by: a.company_id,
+          select: a.company_id
+        )
+      )
+
+    system? =
+      Actor.system?(Scope.actor(scope)) and is_nil(Actor.system_principal(Scope.actor(scope)))
+
+    Enum.reduce_while(company_ids, {:ok, company_ids}, fn company_id, ok ->
+      with false <- system?,
+           {:error, reason} when reason != :not_found <-
+             Company.authorize_company_target(scope, company_id, "admin.person.update") do
+        {:halt, {:error, reason}}
+      else
+        _ -> {:cont, ok}
+      end
+    end)
   end
 
   defp affiliation_changeset(scope, person_id, company_id, id, attrs) do
@@ -371,8 +410,14 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp lock_changeset(scope, %Changeset{data: %Schema{id: id}} = cs, :update),
-    do: %{cs | data: lock_person_or_rollback(scope, id)}
+  defp lock_changeset(scope, %Changeset{data: %Schema{id: id}} = cs, :update) do
+    person = lock_person_or_rollback(scope, id)
+
+    case authorize_affiliated_companies(scope, id) do
+      {:ok, _} -> %{cs | data: person}
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
 
   defp lock_changeset(_scope, cs, :insert), do: cs
 

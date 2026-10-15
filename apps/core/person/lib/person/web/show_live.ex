@@ -136,6 +136,7 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
       submitted: value,
       field: field,
       label: name,
+      failures: &Person.refusal_message/1,
       on_ok: fn s, _ -> reload(s) end
     )
   end

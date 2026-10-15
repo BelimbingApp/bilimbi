@@ -158,6 +158,83 @@ defmodule BilimbiWeb.ContactWorkflowTest do
              Person.get(scope, person.id)
   end
 
+  test "person-wide writes need authority over every affiliated company", %{
+    conn: conn,
+    scope: scope,
+    system: system
+  } do
+    grant_capabilities!(
+      ~w(admin.person.list admin.person.view admin.person.create admin.person.update admin.company.view admin.company.list)
+    )
+
+    {:ok, %{person: sibling_only}} =
+      Person.create_contact(system, 74, %{full_name: "Vera Sibling"})
+
+    {:ok, %{person: mixed}} = Person.create_contact(system, 73, %{full_name: "Mia Mixed"})
+    {:ok, _} = Person.link(system, mixed.id, 74, %{})
+    {:ok, %{person: own}} = Person.create_contact(system, 73, %{full_name: "Olive Own"})
+    {:ok, unaffiliated} = Person.create(system, %{full_name: "Una Unaffiliated"})
+
+    for person <- [sibling_only, mixed] do
+      assert {:error, :unauthorized} = Person.update(scope, person.id, %{full_name: "Taken"})
+      assert {:error, :unauthorized} = Person.retire(scope, person.id)
+      assert {:error, :unauthorized} = Person.preview(scope, :update, %{"person_id" => person.id})
+      assert {:error, :unauthorized} = Person.preview(scope, :retire, %{"person_id" => person.id})
+
+      for {key, input} <- [
+            {"core.person.update", %{"person_id" => person.id, "full_name" => "Taken"}},
+            {"core.person.retire", %{"person_id" => person.id}}
+          ] do
+        assert {:ok, %{"valid" => false}} =
+                 AgentApi.plan(scope, [%{"key" => key, "input" => input}])
+      end
+    end
+
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/#{sibling_only.id}")
+    render_hook(view, "save_field", %{"full_name" => "Forged"})
+    render_hook(view, "request_retire", %{})
+    render_hook(view, "retire", %{})
+
+    assert {:ok, %{full_name: "Vera Sibling", retired_at: nil}} =
+             Person.get(system, sibling_only.id)
+
+    assert {:ok, %{full_name: "Mia Mixed", retired_at: nil}} = Person.get(system, mixed.id)
+
+    assert {:ok, %{full_name: "Olive Updated"}} =
+             Person.update(scope, own.id, %{full_name: "Olive Updated"})
+
+    assert {:ok, %{full_name: "Una Updated"}} =
+             Person.update(scope, unaffiliated.id, %{full_name: "Una Updated"})
+
+    assert {:ok, %{retired_at: %NaiveDateTime{}}} = Person.retire(scope, own.id)
+  end
+
+  test "person-wide agent writes honor the agent switch of every affiliated company", %{
+    scope: scope,
+    system: system
+  } do
+    grant_capabilities!(@caps)
+    {:ok, %{person: person}} = Person.create_contact(system, 73, %{full_name: "Vera"})
+    {:ok, _} = Person.link(system, person.id, 74, %{})
+
+    {:ok, _} =
+      Bilimbi.Base.Settings.put(
+        "authz.agent_writes_enabled",
+        false,
+        Bilimbi.Base.Settings.Scope.company(74, 41)
+      )
+
+    for {key, input} <- [
+          {"core.person.update", %{"person_id" => person.id, "full_name" => "Taken"}},
+          {"core.person.retire", %{"person_id" => person.id}}
+        ] do
+      assert {:ok, %{"valid" => false}} =
+               AgentApi.plan(scope, [%{"key" => key, "input" => input}])
+    end
+
+    assert {:ok, %{full_name: "Vera", retired_at: nil}} = Person.get(system, person.id)
+  end
+
   test "read-only contact viewers see facts and cannot forge updates or affiliation writes", %{
     conn: conn,
     system: system
