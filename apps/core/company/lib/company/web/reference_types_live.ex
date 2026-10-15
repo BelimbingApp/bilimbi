@@ -611,7 +611,9 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
       new_attrs: %{is_active: true},
       new_struct: %{},
       new_description: "Name the role and its inverse from the other company's perspective.",
-      edit_description: "Renaming or retiring a role preserves existing relationships."
+      edit_description: "Renaming or retiring a role preserves existing relationships.",
+      created: "Relationship role created successfully.",
+      updated: "Relationship role updated successfully."
     })
   end
 

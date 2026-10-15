@@ -31,6 +31,8 @@ defmodule BilimbiWeb.RelationshipRoleCatalogueTest do
     )
     |> render_submit()
 
+    assert has_element?(view, "#flash-success", "Relationship role created successfully.")
+
     {:ok, [role]} = Company.list_relationship_types()
 
     {:ok, rel} =
@@ -46,6 +48,8 @@ defmodule BilimbiWeb.RelationshipRoleCatalogueTest do
       relationship_type: %{name: "Vendor", inverse_name: "Customer"}
     )
     |> render_submit()
+
+    assert has_element?(view, "#flash-success", "Relationship role updated successfully.")
 
     view |> element("#toggle-type-#{role.id}") |> render_click()
 
