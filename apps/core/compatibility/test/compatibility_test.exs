@@ -425,6 +425,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     decision_log_tenant = 20_261_008_070_000
     run_provenance = 20_261_008_070_100
     log_backfill = 20_261_008_070_200
+    live_relationship_index = 20_261_014_060_000
 
     assert %{disposition: "bilimbi_only"} =
              Compatibility.MigrationProvenance.fetch(MigrationTestRepo, schema)[account_indexes]
@@ -444,7 +445,15 @@ defmodule Bilimbi.Core.CompatibilityTest do
       []
     )
 
-    for version <- [decision_log_tenant, run_provenance, log_backfill] do
+    # Core Company's later migration is unrecorded with the earlier one, as an
+    # older database would have it: the ledger holds a prefix of each sequence.
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(DROP INDEX "#{schema}".company_relationship_live_unique),
+      []
+    )
+
+    for version <- [decision_log_tenant, run_provenance, log_backfill, live_relationship_index] do
       SQL.query!(
         MigrationTestRepo,
         ~s(DELETE FROM "#{schema}".bilimbi_schema_migrations WHERE version = $1),
@@ -488,7 +497,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     end
 
     assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) ==
-             [decision_log_tenant, run_provenance, log_backfill]
+             [decision_log_tenant, run_provenance, log_backfill, live_relationship_index]
 
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
 
