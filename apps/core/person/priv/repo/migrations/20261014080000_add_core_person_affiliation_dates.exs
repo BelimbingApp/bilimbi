@@ -12,7 +12,11 @@ defmodule Bilimbi.Core.Person.Migrations.AddCorePersonAffiliationDates do
 
     execute("""
     UPDATE #{schema}.core_person_affiliations
-    SET started_on = created_at::date, ended_on = unlinked_at::date
+    SET ended_on = unlinked_at::date,
+        started_on = CASE
+          WHEN unlinked_at IS NOT NULL AND created_at::date > unlinked_at::date THEN NULL
+          ELSE created_at::date
+        END
     """)
 
     [[employees]] =
@@ -23,7 +27,7 @@ defmodule Bilimbi.Core.Person.Migrations.AddCorePersonAffiliationDates do
     if employees do
       execute("""
       UPDATE #{schema}.core_person_affiliations a
-      SET started_on = COALESCE(e.employment_start, a.started_on),
+      SET started_on = e.employment_start,
           ended_on = COALESCE(e.employment_end, a.ended_on)
       FROM #{schema}.employees e
       WHERE a.legacy_employee_id = e.id
