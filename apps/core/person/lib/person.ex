@@ -105,6 +105,37 @@ defmodule Bilimbi.Core.Person do
   end
 
   @doc """
+  The work email and phone to show beside people who hold none of their own:
+  those of their current affiliation (linked, not ended), the most recently
+  started first. Display only; each value is redacted like an affiliation's.
+  """
+  def work_contacts(%Scope{} = scope, person_ids) when is_list(person_ids) do
+    with :ok <- authorize(scope, "admin.person.list") do
+      today = Date.utc_today()
+
+      contacts =
+        from(a in Tenancy.scope_query(Affiliation, scope),
+          where:
+            a.person_id in ^person_ids and is_nil(a.unlinked_at) and
+              (is_nil(a.ended_on) or a.ended_on >= ^today),
+          order_by: [desc_nulls_last: a.started_on, desc: a.id]
+        )
+        |> Repo.all()
+        |> Enum.map(&summary(&1, scope))
+        |> Enum.group_by(& &1.person_id)
+        |> Map.new(fn {person_id, rows} ->
+          {person_id,
+           %{
+             email: Enum.find_value(rows, & &1.email),
+             phone: Enum.find_value(rows, & &1.phone)
+           }}
+        end)
+
+      {:ok, contacts}
+    end
+  end
+
+  @doc """
   Keeps the Core person and affiliation mapped to a legacy employee in step
   with the employee write that just succeeded.
 

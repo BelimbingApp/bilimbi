@@ -324,8 +324,14 @@ defmodule BilimbiWeb.ContactWorkflowTest do
     {:ok, _} =
       Person.create_contact(system, 74, %{full_name: "Vendor Vera", email: "vera@vendor.test"})
 
+    {:ok, own} = Person.create(system, %{full_name: "Own Olive", email: "olive@own.test"})
+    {:ok, _} = Person.link(system, own.id, 74, %{email: "olive@work.test"})
+
     {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts")
     assert has_element?(view, "#contacts tbody a", "Vendor Vera")
+    assert has_element?(view, "#contact-#{own.id}", "olive@own.test")
+    refute has_element?(view, "#contact-#{own.id}", "olive@work.test")
+    assert has_element?(view, "#contacts tbody", "vera@vendor.test")
     view |> form("#contacts-filters", filters: %{search: "missing"}) |> render_change()
     assert_patch(view)
     assert has_element?(view, "#contacts-empty")

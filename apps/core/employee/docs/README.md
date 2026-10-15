@@ -176,9 +176,9 @@ People's follow-up contract:
    redirect/deprecate the HR operations in a versioned compatibility release.
    Keep the old operations until integrations have an announced migration path.
 5. Core Employee keeps the Core mapping in step while the HR rows stay here:
-   `create_employee/3` and `update_employee/4` (and so `core.employee.create`,
-   `core.employee.update` and the Employee pages) write the employee and its
-   Core person and affiliation in one transaction. A new employee gets a person
+   `create_employee/3` and `update_employee/4` (and so `core.employee.create`
+   and the Employee pages; there is no headless update operation) write the
+   employee and its Core person and affiliation in one transaction. A new employee gets a person
    and an affiliation with its employer company, `legacy_employee_id` being the
    mapping; an edit carries only the facts that changed (name to the person;
    designation, work email, mobile number and employment start/end to the

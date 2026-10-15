@@ -26,16 +26,17 @@ defmodule Bilimbi.Core.Person.Web.IndexLive do
     state = ListState.parse(params, @list_spec)
     columns = PageColumns.from_params(socket.assigns.columns, params)
 
+    scope = socket.assigns.current_scope.scope
+
     {:ok, page} =
-      Person.list(socket.assigns.current_scope.scope,
-        search: state.search,
-        page: state.page,
-        page_size: state.page_size
-      )
+      Person.list(scope, search: state.search, page: state.page, page_size: state.page_size)
+
+    {:ok, work_contacts} = Person.work_contacts(scope, Enum.map(page.entries, & &1.id))
+    entries = Enum.map(page.entries, &with_work_contact(&1, Map.get(work_contacts, &1.id, %{})))
 
     {:noreply,
      socket
-     |> assign(:records, Map.new(page.entries, &{&1.id, &1}))
+     |> assign(:records, Map.new(entries, &{&1.id, &1}))
      |> assign(:state, state)
      |> assign(:filters_form, ListState.filters_form(state))
      |> assign(:page_result, %{
@@ -48,7 +49,11 @@ defmodule Bilimbi.Core.Person.Web.IndexLive do
        :can_create?,
        Bilimbi.Base.Authz.can(socket.assigns.current_scope.scope, "admin.person.create").allowed
      )
-     |> assign(:columns, PageColumns.load(columns, page.entries, & &1.id))}
+     |> assign(:columns, PageColumns.load(columns, entries, & &1.id))}
+  end
+
+  defp with_work_contact(person, work) do
+    %{person | email: person.email || work[:email], phone: person.phone || work[:phone]}
   end
 
   @impl true

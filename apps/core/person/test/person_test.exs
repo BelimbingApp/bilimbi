@@ -160,6 +160,43 @@ defmodule Bilimbi.Core.PersonTest do
     end
   end
 
+  describe "work contacts for display" do
+    test "come from the current affiliation, the most recently started first", %{scope: scope} do
+      {:ok, person} = Person.create(scope, %{full_name: "Vera"})
+
+      {:ok, _old} =
+        Person.link(scope, person.id, 74, %{email: "old@a.test", started_on: "2020-01-01"})
+
+      {:ok, _new} =
+        Person.link(scope, person.id, 73, %{
+          email: "new@b.test",
+          phone: "+601",
+          started_on: "2024-01-01"
+        })
+
+      assert {:ok, %{} = contacts} = Person.work_contacts(scope, [person.id])
+      assert contacts[person.id] == %{email: "new@b.test", phone: "+601"}
+    end
+
+    test "skip ended and unlinked affiliations and other tenants", %{
+      scope: scope,
+      foreign: foreign
+    } do
+      {:ok, person} = Person.create(scope, %{full_name: "Vera"})
+
+      {:ok, ended} =
+        Person.link(scope, person.id, 74, %{email: "ended@a.test", ended_on: "2020-01-01"})
+
+      {:ok, left} = Person.link(scope, person.id, 73, %{email: "left@a.test"})
+      assert {:ok, _} = Person.unlink(scope, person.id, left.id)
+      assert ended.ended_on == ~D[2020-01-01]
+
+      assert {:ok, contacts} = Person.work_contacts(scope, [person.id])
+      assert contacts == %{}
+      assert {:ok, %{}} = Person.work_contacts(foreign, [person.id])
+    end
+  end
+
   describe "affiliation dates" do
     test "a namecard and a later link carry start and end dates, kept in history", %{
       scope: scope

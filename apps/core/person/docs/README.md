@@ -12,7 +12,7 @@ A namecard's email and phone are work contact details: `create_contact/3` stores
 them on the affiliation only, and the person keeps identity (name) alone. A person
 with no company (a lead, created with `create/2`) keeps its email and phone on the
 Person. The legacy-employee backfill follows the same rule (the employee's work
-email and mobile live on the affiliation). Duplicate search covers both. Person
+email and mobile live on the affiliation). Duplicate search covers both. The Contacts list shows a person's own email and phone and, where they have none, those of their current (linked, not ended) affiliation, the most recently started first (`work_contacts/2`, display only). Person
 and affiliation reads are tenant-wide by design, gated by `admin.person.list` and
 `admin.person.view`.
 
