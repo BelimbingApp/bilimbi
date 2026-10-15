@@ -144,23 +144,16 @@ defmodule Bilimbi.Core.Person do
   employee's complete current facts; `facts` when omitted): a new person and an
   affiliation with the employer company carrying the work email and phone, the
   mapping `legacy_employee_id` being the durable link. An existing mapping
-  receives only the facts given. Call `lock_legacy_employee/2` before writing
-  the employee row. The affiliation facts pass through its own changeset,
+  receives only the facts given, unless Contacts froze it: a retired person is
+  left untouched and so is an unlinked affiliation. Call `lock_legacy_employee/2`
+  before writing the employee row. The affiliation facts pass through its own changeset,
   so a date range it would refuse comes back as `{:error, changeset}` for the
   caller to surface on its own write. No HR field is stored here.
   """
   def sync_legacy_employee(%Scope{} = scope, employee_id, company_id, facts, initial_facts \\ nil) do
-    affiliation =
-      Repo.one(
-        from(a in Tenancy.scope_query(Affiliation, scope),
-          where: a.legacy_employee_id == ^employee_id,
-          lock: "FOR UPDATE"
-        )
-      )
-
-    case affiliation do
+    case mapped_legacy_employee(scope, employee_id) do
       nil -> insert_legacy_mapping(scope, employee_id, company_id, initial_facts || facts)
-      %Affiliation{} = row -> update_legacy_mapping(scope, row, facts)
+      {row, person} -> update_legacy_mapping(row, person, facts)
     end
   end
 
@@ -168,29 +161,48 @@ defmodule Bilimbi.Core.Person do
   Takes the row locks of the person and affiliation mapped to a legacy
   employee, in the Person order (person, then affiliation), before the caller
   writes the employee row, so a concurrent Contacts edit queues behind the
-  employee write instead of crossing it. No mapping is a no-op.
+  employee write instead of crossing it. No mapping is a no-op, and a retired
+  person or an unlinked affiliation is only read: Contacts owns those records.
   """
   def lock_legacy_employee(%Scope{} = scope, employee_id) do
-    mapped =
-      from(a in Tenancy.scope_query(Affiliation, scope),
-        where: a.legacy_employee_id == ^employee_id
-      )
-
-    case Repo.one(from(a in mapped, select: a.person_id)) do
-      nil ->
-        :ok
-
-      person_id ->
+    case mapped_legacy_employee(scope, employee_id) do
+      {row, %Schema{retired_at: nil} = person} ->
         _ =
           Repo.one!(
             from(p in Tenancy.scope_query(Schema, scope),
-              where: p.id == ^person_id,
+              where: p.id == ^person.id,
               lock: "FOR UPDATE"
             )
           )
 
-        _ = Repo.one(from(a in mapped, lock: "FOR UPDATE"))
+        if is_nil(row.unlinked_at),
+          do:
+            Repo.one(
+              from(a in Tenancy.scope_query(Affiliation, scope),
+                where: a.id == ^row.id,
+                lock: "FOR UPDATE"
+              )
+            )
+
         :ok
+
+      _no_mapping_or_retired ->
+        :ok
+    end
+  end
+
+  defp mapped_legacy_employee(scope, employee_id) do
+    case Repo.one(
+           from(a in Tenancy.scope_query(Affiliation, scope),
+             where: a.legacy_employee_id == ^employee_id
+           )
+         ) do
+      nil ->
+        nil
+
+      %Affiliation{} = row ->
+        {row,
+         Repo.one!(from(p in Tenancy.scope_query(Schema, scope), where: p.id == ^row.person_id))}
     end
   end
 
@@ -214,27 +226,24 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp update_legacy_mapping(scope, %Affiliation{} = row, facts) do
-    case Map.take(facts, [:full_name]) do
-      names when map_size(names) == 0 ->
-        :ok
+  defp update_legacy_mapping(_row, %Schema{retired_at: retired_at}, _facts)
+       when retired_at != nil,
+       do: :ok
 
-      names ->
-        from(p in Tenancy.scope_query(Schema, scope), where: p.id == ^row.person_id)
-        |> Repo.one!()
-        |> Changeset.change(names)
-        |> Repo.update!()
+  defp update_legacy_mapping(%Affiliation{} = row, %Schema{} = person, facts) do
+    with names when map_size(names) > 0 <- Map.take(facts, [:full_name]) do
+      person |> Changeset.change(names) |> Repo.update!()
     end
 
-    case Map.take(facts, @affiliation_facts) do
-      changes when map_size(changes) == 0 ->
-        :ok
+    changes = Map.take(facts, @affiliation_facts)
 
-      changes ->
-        case row |> Affiliation.changeset(changes) |> Repo.update() do
-          {:ok, _} -> :ok
-          {:error, changeset} -> {:error, changeset}
-        end
+    if map_size(changes) == 0 or row.unlinked_at != nil do
+      :ok
+    else
+      case row |> Affiliation.changeset(changes) |> Repo.update() do
+        {:ok, _} -> :ok
+        {:error, changeset} -> {:error, changeset}
+      end
     end
   end
 

@@ -191,4 +191,50 @@ defmodule Bilimbi.Core.EmployeePersonSyncTest do
     assert {:ok, _} = Employee.update_employee(owner, 73, id, %{status: "inactive"})
     assert {:ok, %{affiliations: [^a]}} = Person.get(owner, person_id)
   end
+
+  test "the sync leaves a retired person and an unlinked affiliation untouched", %{owner: owner} do
+    {:ok, retired} =
+      Employee.create_employee(owner, 73, %{
+        employee_number: "E-6",
+        full_name: "Rita Retired",
+        designation: "Clerk"
+      })
+
+    {:ok, %{person_id: retired_person}} = Employee.person_identity(owner, retired.id)
+    assert {:ok, _} = Person.retire(owner, retired_person)
+
+    assert {:ok, _} =
+             Employee.update_employee(owner, 73, retired.id, %{
+               full_name: "Rita Renamed",
+               designation: "Chief"
+             })
+
+    assert {:ok, %{full_name: "Rita Retired", affiliations: [%{title: "Clerk"}]}} =
+             Person.get(owner, retired_person)
+
+    {:ok, left} =
+      Employee.create_employee(owner, 73, %{
+        employee_number: "E-7",
+        full_name: "Len Left",
+        designation: "Clerk",
+        employment_start: "2026-02-01"
+      })
+
+    {:ok, %{person_id: left_person, affiliation_id: left_affiliation}} =
+      Employee.person_identity(owner, left.id)
+
+    assert {:ok, _} = Person.unlink(owner, left_person, left_affiliation)
+
+    assert {:ok, _} =
+             Employee.update_employee(owner, 73, left.id, %{
+               full_name: "Len Renamed",
+               designation: "Chief",
+               employment_end: "2026-03-01"
+             })
+
+    assert {:ok, %{full_name: "Len Renamed", affiliations: [a]}} = Person.get(owner, left_person)
+    assert {a.title, a.ended_on} == {"Clerk", Date.utc_today()}
+    assert %NaiveDateTime{} = a.unlinked_at
+    assert {:ok, %{person_id: ^left_person}} = Employee.person_identity(owner, left.id)
+  end
 end

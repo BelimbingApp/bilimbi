@@ -192,7 +192,9 @@ People's follow-up contract:
    locks first (the Core Person order: Company, Person, affiliation, then
    Employee), so a concurrent Contacts edit queues instead of deadlocking, and an
    employee that has no mapping yet gets one from its complete stored facts on
-   its next create or edit. Deleting an employee unlinks its mapped affiliation and sets its
+   its next create or edit. Contacts owns retire and unlink: the sync leaves a retired
+   person and an unlinked affiliation untouched, and the employee write still
+   succeeds. Deleting an employee unlinks its mapped affiliation and sets its
    end date in the same transaction; the Core person stays.
 
 Core Person's retirement or affiliation unlink preserves legacy records and
