@@ -1,7 +1,7 @@
 defmodule Bilimbi.Core.Person.TestFixtures do
   @moduledoc "Owner-defined identity/affiliation tables for package and real-host tests."
-  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Database.TestTables
+  alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
   def create_person_tables!(opts \\ []) do
