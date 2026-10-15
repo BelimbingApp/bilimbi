@@ -114,6 +114,15 @@ defmodule BilimbiWeb.ContactWorkflowTest do
            )
 
     details |> element("#unlink-affiliation-#{id}") |> render_click()
+    assert has_element?(details, "#contact-unlink-confirm")
+    details |> element("#contact-unlink-confirm-cancel") |> render_click()
+    refute has_element?(details, "#contact-unlink-confirm")
+    assert {:ok, %{affiliations: [%{unlinked_at: nil}]}} = Person.get(scope, p.id)
+    render_hook(details, "unlink", %{"id" => "#{id}"})
+    assert {:ok, %{affiliations: [%{unlinked_at: nil}]}} = Person.get(scope, p.id)
+    details |> element("#unlink-affiliation-#{id}") |> render_click()
+    details |> element("#contact-unlink-confirm-confirm") |> render_click()
+    refute has_element?(details, "#contact-unlink-confirm")
 
     assert {:ok, %{affiliations: [%{unlinked_at: %NaiveDateTime{}, ended_on: ~D[2025-06-30]}]}} =
              Person.get(scope, p.id)

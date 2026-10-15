@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Employee.AffiliationLockTest do
   alias Bilimbi.Core.Employee.AffiliationProof
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeFixtures
+  alias Bilimbi.Core.Person
   alias Ecto.Adapters.SQL
 
   setup do
@@ -48,6 +49,82 @@ defmodule Bilimbi.Core.Employee.AffiliationLockTest do
                  assert Repo.in_transaction?()
                  Employee.lock_affiliation(scope, 73, 101)
                end)
+    end)
+  end
+
+  test "employee update waits for the company before locking its mapped person", context do
+    assert_company_lock_precedes_person(context, :update)
+  end
+
+  test "employee deletion waits for the company before locking its mapped person", context do
+    assert_company_lock_precedes_person(context, :delete)
+  end
+
+  defp assert_company_lock_precedes_person(%{schema: schema, owner_scope: scope}, operation) do
+    parent = self()
+
+    person_id =
+      on_schema!(schema, fn ->
+        EmployeeFixtures.create_employee_types_table!(persistent: true)
+        Bilimbi.Base.Authz.TestFixtures.create_authz_tables!(persistent: true)
+        Bilimbi.Base.Authz.TestFixtures.create_field_restriction_tables!(persistent: true)
+        :ok = Employee.ensure_system_types()
+
+        {:ok, :ok} =
+          Repo.transaction(fn ->
+            Person.sync_legacy_employee(scope, 101, 73, %{full_name: "Ordinary Employee"})
+          end)
+
+        {:ok, %{person_id: id}} = Employee.person_identity(scope, 101)
+        id
+      end)
+
+    holder =
+      Task.async(fn ->
+        checkout_on_schema!(schema, fn ->
+          Repo.transaction(fn ->
+            assert {:ok, _} = Bilimbi.Core.Company.lock_writable_company(scope, 73)
+            send(parent, :company_locked_before_employee)
+            await_message!(:archive_company_before_employee)
+            SQL.query!(Repo, "UPDATE companies SET status = 'archived' WHERE id = 73", [])
+          end)
+        end)
+      end)
+
+    assert_receive :company_locked_before_employee, 5_000
+
+    contender =
+      Task.async(fn ->
+        checkout_on_schema!(schema, fn ->
+          send(parent, {:employee_write_backend, backend_pid!()})
+
+          case operation do
+            :update -> Employee.update_employee(scope, 73, 101, %{full_name: "Must not change"})
+            :delete -> Employee.delete_employee(scope, 73, 101)
+          end
+        end)
+      end)
+
+    assert_receive {:employee_write_backend, backend_pid}, 5_000
+    await_row_lock!(backend_pid)
+
+    on_schema!(schema, fn ->
+      # The waiting employee write must not already hold the later Person lock.
+      assert {:ok, %{rows: [[^person_id]]}} =
+               Repo.transaction(fn ->
+                 SQL.query!(Repo, "SELECT id FROM core_people WHERE id = $1 FOR UPDATE NOWAIT", [
+                   person_id
+                 ])
+               end)
+    end)
+
+    send(holder.pid, :archive_company_before_employee)
+    assert {:ok, %{num_rows: 1}} = Task.await(holder, 5_000)
+    assert {:error, :company_archived} = Task.await(contender, 5_000)
+
+    on_schema!(schema, fn ->
+      assert {:ok, %{full_name: "Ordinary Employee"}} = Employee.get_employee(scope, 73, 101)
+      assert {:ok, %{full_name: "Ordinary Employee"}} = Person.get(scope, person_id)
     end)
   end
 

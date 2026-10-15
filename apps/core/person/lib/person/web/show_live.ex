@@ -20,6 +20,7 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
       {:ok,
        socket
        |> assign(:pending_retire?, false)
+       |> assign(:pending_unlink, nil)
        |> assign(:active_nav, "admin.contacts")
        |> CommitStatus.init()
        |> loaded(person)
@@ -143,32 +144,17 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
     end
   end
 
-  def handle_event("unlink_role", %{"id" => id}, socket) do
-    with {:ok, id} <- Params.positive_id(id),
-         {:ok, _} <-
-           Person.unlink_relationship(
-             socket.assigns.current_scope.scope,
-             socket.assigns.person.id,
-             id
-           ) do
-      {:noreply, reload(socket) |> put_flash(:success, "Role unlinked; history preserved.")}
-    else
-      {:error, reason} -> {:noreply, put_flash(socket, :error, Person.refusal_message(reason))}
-      :error -> {:noreply, socket}
-    end
-  end
+  def handle_event("request_unlink_role", %{"id" => id}, socket),
+    do: request_unlink(socket, :role, id)
 
-  def handle_event("unlink", %{"id" => id}, socket) do
-    with {:ok, id} <- Params.positive_id(id),
-         {:ok, _} <-
-           Person.unlink(socket.assigns.current_scope.scope, socket.assigns.person.id, id) do
-      {:noreply,
-       reload(socket) |> put_flash(:success, "Affiliation unlinked; history preserved.")}
-    else
-      {:error, reason} -> {:noreply, put_flash(socket, :error, Person.refusal_message(reason))}
-      :error -> {:noreply, socket}
-    end
-  end
+  def handle_event("request_unlink", %{"id" => id}, socket),
+    do: request_unlink(socket, :affiliation, id)
+
+  def handle_event("cancel_unlink", _, socket),
+    do: {:noreply, assign(socket, :pending_unlink, nil)}
+
+  def handle_event("unlink_role", _, socket), do: confirm_unlink(socket, :role)
+  def handle_event("unlink", _, socket), do: confirm_unlink(socket, :affiliation)
 
   def handle_event("request_retire", _, socket),
     do: {:noreply, assign(socket, :pending_retire?, true)}
@@ -249,6 +235,52 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
     {:ok, person} = Person.get(socket.assigns.current_scope.scope, socket.assigns.person.id)
     loaded(socket, person)
   end
+
+  defp request_unlink(socket, kind, raw_id) do
+    scope = socket.assigns.current_scope.scope
+    person_id = socket.assigns.person.id
+
+    with {:ok, id} <- Params.positive_id(raw_id),
+         true <- Authz.can(scope, "admin.person.update").allowed,
+         {:ok, rows} <- unlink_records(kind, scope, person_id),
+         %{} = record <- Enum.find(rows, &(&1.id == id and is_nil(&1.unlinked_at))) do
+      {:noreply, assign(socket, :pending_unlink, %{kind: kind, record: record})}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "That link is not available to unlink.")}
+    end
+  end
+
+  defp unlink_records(:role, scope, person_id), do: Person.relationships(scope, person_id)
+  defp unlink_records(:affiliation, scope, person_id), do: Person.affiliations(scope, person_id)
+
+  # The dialog holds the requested record; a confirm never accepts a replacement id.
+  # Clear it before writing so cancellations, failures and repeated submits cannot replay it.
+  defp confirm_unlink(
+         %{assigns: %{pending_unlink: %{kind: pending_kind, record: record}}} = socket,
+         kind
+       )
+       when pending_kind == kind do
+    socket = assign(socket, :pending_unlink, nil)
+    scope = socket.assigns.current_scope.scope
+    person_id = socket.assigns.person.id
+
+    result =
+      case kind do
+        :role -> Person.unlink_relationship(scope, person_id, record.id)
+        :affiliation -> Person.unlink(scope, person_id, record.id)
+      end
+
+    case result do
+      {:ok, _} ->
+        noun = if kind == :role, do: "Role", else: "Affiliation"
+        {:noreply, reload(socket) |> put_flash(:success, "#{noun} unlinked; history preserved.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, Person.refusal_message(reason))}
+    end
+  end
+
+  defp confirm_unlink(socket, _kind), do: {:noreply, socket}
 
   defp date_text(nil), do: ""
   defp date_text(%Date{} = date), do: Date.to_iso8601(date)
@@ -445,7 +477,7 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
                 id={"unlink-affiliation-#{a.id}"}
                 icon="unlink"
                 label="Unlink affiliation"
-                phx-click="unlink"
+                phx-click="request_unlink"
                 phx-value-id={a.id}
               />
             </:action>
@@ -580,7 +612,7 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
                 id={"unlink-role-#{r.id}"}
                 icon="unlink"
                 label="Unlink (remove a mistaken entry)"
-                phx-click="unlink_role"
+                phx-click="request_unlink_role"
                 phx-value-id={r.id}
               />
             </:action>
@@ -663,6 +695,21 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
             </div>
           </.form>
         </.modal>
+        <.confirm_dialog
+          :if={@pending_unlink}
+          id="contact-unlink-confirm"
+          consequence={
+            if @pending_unlink.kind == :role,
+              do:
+                "The #{@pending_unlink.record.role_label} role toward #{@pending_unlink.record.company_name} will be unlinked as a mistaken entry.",
+              else: "The affiliation with #{@pending_unlink.record.company_name} will be unlinked."
+          }
+          detail="The person and link history are kept. This link cannot be restored from this page."
+          confirm="Unlink"
+          working="Unlinking…"
+          on_confirm={JS.push(if @pending_unlink.kind == :role, do: "unlink_role", else: "unlink")}
+          on_cancel={JS.push("cancel_unlink")}
+        />
         <.button :if={@can_update?} id="contact-retire" phx-click="request_retire">Retire contact</.button>
         <.confirm_dialog
           :if={@pending_retire?}

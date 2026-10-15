@@ -189,8 +189,10 @@ People's follow-up contract:
    overwritten only by a later change to the same Employee fact. The synced
    dates pass through the affiliation's own validation: an employment date that
    would invert the affiliation's start/end range is refused on that employment
-   date field. An employee update or delete locks the mapped person, then that
-   affiliation, before the employee row (`Person.lock_legacy_employee/2`), so a
+   date field. An employee update or delete first locks and rechecks the writable
+   company inside the transaction (`Company.lock_writable_company/2`), then locks
+   the mapped person and affiliation before the employee row
+   (`Person.lock_legacy_employee/2`), so a
    concurrent Contacts edit queues instead of deadlocking. A retired person or
    an unlinked affiliation is only read. An employee that has no mapping yet
    gets one from its complete stored facts on its next create or edit. Contacts owns retire and unlink: the sync leaves a retired

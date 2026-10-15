@@ -46,6 +46,16 @@ defmodule BilimbiWeb.PersonRolesWorkflowTest do
     assert has_element?(view, "#contact-roles", "Prospect")
 
     view |> element("#unlink-role-#{id}") |> render_click()
+    assert has_element?(view, "#contact-unlink-confirm")
+    assert {:ok, [%{id: ^id}]} = Person.relationships(scope, lead.id)
+    view |> element("#contact-unlink-confirm-cancel") |> render_click()
+    refute has_element?(view, "#contact-unlink-confirm")
+    assert {:ok, [%{id: ^id}]} = Person.relationships(scope, lead.id)
+    render_hook(view, "unlink_role", %{"id" => "#{id}"})
+    assert {:ok, [%{id: ^id}]} = Person.relationships(scope, lead.id)
+    view |> element("#unlink-role-#{id}") |> render_click()
+    view |> element("#contact-unlink-confirm-confirm") |> render_click()
+    refute has_element?(view, "#contact-unlink-confirm")
     assert {:ok, []} = Person.relationships(scope, lead.id)
 
     assert {:ok, [%{unlinked_at: %NaiveDateTime{}}]} =
@@ -122,6 +132,7 @@ defmodule BilimbiWeb.PersonRolesWorkflowTest do
              Person.relationships(scope, lead.id)
 
     view |> element("#unlink-role-#{id}") |> render_click()
+    view |> element("#contact-unlink-confirm-confirm") |> render_click()
     assert has_element?(view, "#role-unlinked-#{id}")
     refute has_element?(view, "#end-role-#{id}")
   end

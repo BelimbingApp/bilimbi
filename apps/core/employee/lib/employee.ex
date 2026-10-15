@@ -436,6 +436,7 @@ defmodule Bilimbi.Core.Employee do
         {:error, :invariant_violation}
       else
         Repo.transaction(fn ->
+          lock_company_or_rollback(scope, employee.company_id)
           :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, employee.id)
 
           case Repo.delete(employee) do
@@ -958,6 +959,7 @@ defmodule Bilimbi.Core.Employee do
     facts = person_facts(changeset.changes)
 
     Repo.transaction(fn ->
+      lock_company_or_rollback(scope, changeset.data.company_id)
       :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, changeset.data.id)
 
       case Repo.update(changeset) do
@@ -985,6 +987,14 @@ defmodule Bilimbi.Core.Employee do
         facts,
         initial_facts
       )
+
+  # Re-prove writability inside the transaction, before Person/affiliation and Employee locks.
+  defp lock_company_or_rollback(scope, company_id) do
+    case normalize_company(Company.lock_writable_company(scope, company_id)) do
+      {:ok, _proof} -> :ok
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
 
   defp reject_person_sync(%Changeset{} = changeset, %Changeset{errors: errors}, action) do
     Enum.reduce(errors, %{changeset | action: action}, fn {fact, {message, _}}, acc ->
