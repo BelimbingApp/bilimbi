@@ -28,7 +28,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
          Authz.restricted_fields(socket.assigns.current_scope.scope, "core_person_affiliations")
        )
        |> assign(:company_options, Enum.map(companies, &{&1.name, &1.id}))
-       |> assign(:link_form, to_form(%{}, as: :affiliation))}
+       |> assign(:role_options, active_role_options())
+       |> assign(:link_form, to_form(%{}, as: :affiliation))
+       |> assign(:role_form, to_form(%{}, as: :role))}
     else
       _ ->
         {:ok,
@@ -63,6 +65,41 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
 
       :error ->
         {:noreply, put_flash(socket, :error, "Select an affiliated company.")}
+    end
+  end
+
+  def handle_event("add_role", %{"role" => attrs}, socket) do
+    with {:ok, company_id} <- Params.positive_id(attrs["company_id"]),
+         {:ok, _} <-
+           Person.create_relationship(
+             socket.assigns.current_scope.scope,
+             socket.assigns.person.id,
+             company_id,
+             attrs
+           ) do
+      {:noreply, reload(socket) |> put_flash(:success, "Role added.")}
+    else
+      {:error, reason} ->
+        {:noreply,
+         put_flash(socket, :error, "Role was not added: #{Person.refusal_message(reason)}")}
+
+      :error ->
+        {:noreply, put_flash(socket, :error, "Select the company the person is related to.")}
+    end
+  end
+
+  def handle_event("unlink_role", %{"id" => id}, socket) do
+    with {:ok, id} <- Params.positive_id(id),
+         {:ok, _} <-
+           Person.unlink_relationship(
+             socket.assigns.current_scope.scope,
+             socket.assigns.person.id,
+             id
+           ) do
+      {:noreply, reload(socket) |> put_flash(:success, "Role unlinked; history preserved.")}
+    else
+      {:error, reason} -> {:noreply, put_flash(socket, :error, Person.refusal_message(reason))}
+      :error -> {:noreply, socket}
     end
   end
 
@@ -146,18 +183,26 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
     loaded(socket, person)
   end
 
-  defp loaded(socket, person),
-    do:
-      socket
-      |> Bilimbi.Base.UI.Workspace.announce(%{kind: "core/person", id: person.id})
-      |> assign(:person, Map.delete(person, :affiliations))
-      |> stream(:affiliations, person.affiliations, reset: true)
-      |> assign(:page_title, person.full_name)
-      |> assign(
-        :can_update?,
-        Authz.can(socket.assigns.current_scope.scope, "admin.person.update").allowed and
-          is_nil(person.retired_at)
-      )
+  defp active_role_options do
+    {:ok, types} = Company.list_active_relationship_types()
+    Enum.map(types, &{&1.name, &1.id})
+  end
+
+  defp loaded(socket, person) do
+    scope = socket.assigns.current_scope.scope
+    {:ok, roles} = Person.relationships(scope, person.id, include_unlinked: true)
+
+    socket
+    |> Bilimbi.Base.UI.Workspace.announce(%{kind: "core/person", id: person.id})
+    |> assign(:person, Map.delete(person, :affiliations))
+    |> stream(:affiliations, person.affiliations, reset: true)
+    |> stream(:relationships, roles, reset: true)
+    |> assign(:page_title, person.full_name)
+    |> assign(
+      :can_update?,
+      Authz.can(scope, "admin.person.update").allowed and is_nil(person.retired_at)
+    )
+  end
 
   @impl true
   def render(assigns) do
@@ -361,6 +406,100 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
               label="Phone"
             />
             <.button id="affiliation-link" type="submit">Add affiliation</.button>
+          </.form>
+        </.card>
+        <.card inner_class="p-5 sm:p-6" role="region" aria-labelledby="contact-roles-heading">
+          <.section_heading id="contact-roles-heading" title="Company roles" />
+          <p class="text-sm text-ink-subtle">
+            How a company relates to this person, such as customer or prospect. A role grants no access.
+          </p>
+          <.table
+            id="contact-roles"
+            rows={@streams.relationships}
+            row_item={fn {_id, r} -> r end}
+            row_id={fn {id, _} -> id end}
+            framed={false}
+          >
+            <:col :let={r} label="Company">
+              <.link navigate={~p"/companies/#{r.company_id}"}>{r.company_name}</.link>
+            </:col>
+            <:col :let={r} label="Role">{r.role_label}</:col>
+            <:col :let={r} label="Period">
+              <span class="text-xs text-ink-subtle">
+                <.restricted
+                  :if={Bilimbi.Base.Authz.Restricted.restricted?(r.effective_from)}
+                  id={"role-restricted-#{r.id}-from"}
+                />
+                <span :if={!Bilimbi.Base.Authz.Restricted.restricted?(r.effective_from)}>
+                  {r.effective_from || "Always"}
+                </span>
+                {" → "}
+                <.restricted
+                  :if={Bilimbi.Base.Authz.Restricted.restricted?(r.effective_to)}
+                  id={"role-restricted-#{r.id}-to"}
+                />
+                <span :if={!Bilimbi.Base.Authz.Restricted.restricted?(r.effective_to)}>
+                  {r.effective_to || "Present"}
+                </span>
+              </span>
+            </:col>
+            <:col :let={r} label="Status">
+              <.badge kind={if r.is_active, do: :success, else: :neutral}>
+                {cond do
+                  r.unlinked_at -> "unlinked"
+                  r.is_active -> "active"
+                  true -> "inactive"
+                end}
+              </.badge>
+            </:col>
+            <:action :let={r}>
+              <.icon_button
+                :if={@can_update? and is_nil(r.unlinked_at)}
+                id={"unlink-role-#{r.id}"}
+                icon="unlink"
+                label="Unlink role"
+                phx-click="unlink_role"
+                phx-value-id={r.id}
+              />
+            </:action>
+            <:empty title="No company roles" />
+          </.table>
+          <.form
+            :if={@can_update?}
+            for={@role_form}
+            id="role-form"
+            phx-submit="add_role"
+            class="mt-4 space-y-2"
+          >
+            <.input
+              field={@role_form[:company_id]}
+              id="role-company"
+              type="select"
+              label="Company"
+              options={@company_options}
+              prompt="Select a company"
+            />
+            <.input
+              field={@role_form[:relationship_type_id]}
+              id="role-type"
+              type="select"
+              label="Role of this person toward the company"
+              options={@role_options}
+              prompt="Select a role"
+            />
+            <.input
+              field={@role_form[:effective_from]}
+              id="role-effective-from"
+              type="date"
+              label="Effective from"
+            />
+            <.input
+              field={@role_form[:effective_to]}
+              id="role-effective-to"
+              type="date"
+              label="Effective to"
+            />
+            <.button id="role-add" type="submit">Add role</.button>
           </.form>
         </.card>
         <.button :if={@can_update?} id="contact-retire" phx-click="request_retire">Retire contact</.button>

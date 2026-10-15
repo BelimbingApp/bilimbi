@@ -1,5 +1,5 @@
 defmodule Bilimbi.Core.Person.SchemaContract do
-  @moduledoc "Bilimbi-only person identity and affiliation structure, optional during baseline adoption."
+  @moduledoc "Bilimbi-only person identity, affiliation and role structure, optional during baseline adoption."
   @behaviour Bilimbi.Base.Database.SchemaContract
   @impl true
   def tables do
@@ -52,6 +52,37 @@ defmodule Bilimbi.Core.Person.SchemaContract do
           "core_person_affiliations_person_tenant_foreign" =>
             fk(["person_id", "tenant_id"], "core_people", ["id", "tenant_id"])
         }
+      },
+      %{
+        name: "core_person_relationships",
+        optional: true,
+        columns:
+          Map.merge(common("core_person_relationships"), %{
+            "person_id" => column(:bigint, false),
+            "company_id" => column(:bigint, false),
+            "relationship_type_id" => column(:bigint, false),
+            "effective_from" => column(:date),
+            "effective_to" => column(:date),
+            "deleted_at" => column({:timestamp, 0})
+          }),
+        indexes: %{
+          "core_person_relationships_pkey" => index(["id"], true),
+          "core_person_relationship_live_unique" => %{
+            columns: ["company_id", "person_id", "relationship_type_id"],
+            unique: true,
+            where: "deleted_at IS NULL AND effective_to IS NULL"
+          },
+          "core_person_relationships_tenant_id_person_id_index" =>
+            index(["tenant_id", "person_id"])
+        },
+        foreign_keys: %{
+          "core_person_relationships_tenant_id_fkey" => fk(["tenant_id"], "tenants", ["id"]),
+          "core_person_relationships_company_id_fkey" => fk(["company_id"], "companies", ["id"]),
+          "core_person_relationships_relationship_type_id_fkey" =>
+            fk(["relationship_type_id"], "company_relationship_types", ["id"]),
+          "core_person_relationships_person_tenant_foreign" =>
+            fk(["person_id", "tenant_id"], "core_people", ["id", "tenant_id"])
+        }
       }
     ]
   end
@@ -68,10 +99,11 @@ defmodule Bilimbi.Core.Person.SchemaContract do
         [prefix, names]
       ).rows
 
-    if count in [0, 2],
+    if count in [0, length(names)],
       do: :ok,
       else:
-        {:error, ["core/person: identity and affiliation structure must be installed together"]}
+        {:error,
+         ["core/person: identity, affiliation and role structure must be installed together"]}
   end
 
   defp common(table),

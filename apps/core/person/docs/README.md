@@ -36,6 +36,8 @@ operations are discoverable under `core.person.*`:
 | `contact.create` | Namecard identity and affiliation in one transaction |
 | `affiliation.list` | Retained affiliation history |
 | `affiliation.link`, `affiliation.update`, `affiliation.unlink` | Reuse identity and maintain company contact facts |
+| `relationship.list`, `relationship.get` | Roles a person holds toward a company, including unlinked history |
+| `relationship.create`, `relationship.update`, `relationship.unlink` | Assign a role, change its dates, end it while retaining history |
 
 Use discovered input schemas; tenant, actor and HR fields are not inputs.
 Writes use the existing agent preview/review/approval/plan-code commit contract.
@@ -44,9 +46,30 @@ write policy is checked for both the signed-in company and affiliation target,
 including updates and unlinks resolved from their stored affiliation ID.
 
 Core Company owns the existing role catalogue and intercompany relationships;
-see its README. Vendor/customer/partner are simultaneous relationship roles,
-not mutually exclusive legal types. Neither a role nor an affiliation grants
-access. Account and external-access administration remain explicit workflows.
+see its README. Vendor/customer/prospect/partner are simultaneous relationship
+roles, not mutually exclusive legal types. Neither a role nor an affiliation
+grants access. Account and external-access administration remain explicit workflows.
+
+# Person roles
+
+A role links our side to either an organisation or a person, never both:
+a company-to-company link lives in Core Company (`company_relationships`), and
+a company-to-person link lives here in `core_person_relationships`
+(`Person.relationships/3`, `create_relationship/4`, `update_relationship/4`,
+`unlink_relationship/3`). Both use the one Company role catalogue, so there is
+no second taxonomy. Core Company cannot depend on Person, which is why the
+person-targeted link is owned here rather than as a nullable column there. For
+source company A and person P with role customer, **P buys from A**; the
+catalogue's inverse label describes A from P's side. A person can be a lead
+with only a prospect role and no affiliation, hold several concurrent roles
+toward the same company, and become a customer by unlinking the prospect link
+(or ending it with `effective_to`) and creating the customer link; both rows
+are retained. At most one open-ended live link exists per company, person and
+role; retired roles cannot be newly assigned and existing links survive
+retirement. A role writes under `admin.person.update`, locks Company, then
+Person, then the role, refuses an archived company or retired person, and honours
+the company's agent write switch. Roles confer no access, employee number or
+login. `/contacts/:id` shows the person's roles and offers add and unlink.
 
 # Legacy identity mapping
 

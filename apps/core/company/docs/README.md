@@ -243,7 +243,7 @@ already reviewed. It does not change a person's ordinary screen permissions.
 
 The existing `company_relationship_types` catalogue describes relationships,
 not legal company types. The production seed `core/company/relationship-roles`
-adds vendor/supplier, customer and partner if missing; it never overwrites an
+adds vendor/supplier, customer, prospect and partner if missing; it never overwrites an
 operator's rename or retirement. Run it through `mix bilimbi.seeds.run`, not at
 boot. Operators manage defaults and custom roles at `/companies/relationship-types`
 using the same reference-type page as the other company catalogues. The catalogue
@@ -258,6 +258,11 @@ Retiring a role excludes it from new assignments without deleting, rewriting or
 ending existing relationships. Multiple roles between the same organisations
 are separate concurrent links. Role and affiliation creation grants no portal
 access or permissions; external access is administered separately.
+
+A company-to-person role (an individual customer, prospect or lead) uses the
+same catalogue but is owned by Core Person (`core.person.relationship.*`; see its
+README), because Core Company cannot depend on Person. A role targets exactly one
+company or one person.
 
 Discover `core.company.relationship_role.list/get/create/update/retire` and
 `core.company.relationship.list/get/create/update/unlink`. Searches support role

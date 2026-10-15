@@ -3,7 +3,8 @@ defmodule Bilimbi.Core.Company.RelationshipCatalogue do
   The existing platform-wide relationship role catalogue. Reads are shared;
   writes require the platform operator and the same company capability as the
   reference-type page. Stable codes and IDs survive renaming and retirement.
-  A role means: the related company is `name` to the source; `inverse_name`
+  A role means: the related company (or, in Core Person, the related person)
+  is `name` to the source company; `inverse_name`
   describes the source from the related company's perspective. No role grants
   portal access. Access remains an independent, explicit workflow.
   """
@@ -26,6 +27,13 @@ defmodule Bilimbi.Core.Company.RelationshipCatalogue do
       name: "Customer",
       description: "The related company buys from the source company.",
       metadata: %{"inverse_name" => "Vendor / Supplier"}
+    },
+    %{
+      code: "prospect",
+      name: "Prospect",
+      description:
+        "The related organisation or person may become a customer of the source company.",
+      metadata: %{"inverse_name" => "Prospective vendor / Supplier"}
     },
     %{
       code: "partner",

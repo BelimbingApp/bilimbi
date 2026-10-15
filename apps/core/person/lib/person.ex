@@ -22,7 +22,7 @@ defmodule Bilimbi.Core.Person do
   alias Bilimbi.Base.Tenancy.Actor
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
-  alias Bilimbi.Core.Person.{Schema, Affiliation}
+  alias Bilimbi.Core.Person.{Schema, Affiliation, Relationships}
   alias Ecto.Changeset
 
   def list(%Scope{} = scope, opts \\ []) do
@@ -196,6 +196,23 @@ defmodule Bilimbi.Core.Person do
          do: {:ok, affiliation.company_id}
   end
 
+  @doc """
+  Roles the person holds toward a company of the tenant: the company is the
+  source and the person has the catalogue role toward it. Like affiliations,
+  reads are tenant-wide behind `admin.person.view`; a role grants no access.
+  """
+  defdelegate relationships(scope, person_id, opts \\ []), to: Relationships, as: :list
+
+  defdelegate create_relationship(scope, person_id, company_id, attrs),
+    to: Relationships,
+    as: :create
+
+  defdelegate update_relationship(scope, person_id, id, attrs), to: Relationships, as: :update
+  defdelegate unlink_relationship(scope, person_id, id), to: Relationships, as: :unlink
+
+  @doc "Resolves the validated company target for a stored person role; never changes the actor's company."
+  defdelegate relationship_target(scope, person_id, id), to: Relationships, as: :target
+
   def unlink(%Scope{} = scope, person_id, id) do
     with {:ok, cs} <- affiliation_changeset(scope, person_id, nil, id, %{}) do
       persist(Changeset.change(cs, unlinked_at: now()), :update, scope)
@@ -241,6 +258,9 @@ defmodule Bilimbi.Core.Person do
                  )
            }}
         end
+
+      action when action in [:relationship_create, :relationship_update, :relationship_unlink] ->
+        Relationships.preview(scope, action, input)
 
       action when action in [:link, :affiliation_update, :unlink] ->
         with {:ok, cs} <-
@@ -332,7 +352,8 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp fetch(scope, id, lock \\ false) do
+  @doc false
+  def fetch(scope, id, lock \\ false) do
     query = from(p in Tenancy.scope_query(Schema, scope), where: p.id == ^id)
     query = if lock, do: from(p in query, lock: "FOR UPDATE"), else: query
 
@@ -342,7 +363,8 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp target(scope, id, capability) do
+  @doc false
+  def target(scope, id, capability) do
     actor = Scope.actor(scope)
 
     if Actor.system?(actor) and is_nil(Actor.system_principal(actor)) do
@@ -354,7 +376,8 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp authorize(scope, capability) do
+  @doc false
+  def authorize(scope, capability) do
     actor = Scope.actor(scope)
 
     if Actor.system?(actor) and is_nil(Actor.system_principal(actor)),
@@ -362,8 +385,9 @@ defmodule Bilimbi.Core.Person do
       else: if(Authz.can(scope, capability).allowed, do: :ok, else: {:error, :forbidden})
   end
 
-  defp live(%Schema{retired_at: nil}), do: :ok
-  defp live(_), do: {:error, :person_retired}
+  @doc false
+  def live(%Schema{retired_at: nil}), do: :ok
+  def live(_), do: {:error, :person_retired}
 
   defp reject_hr(attrs) do
     fields =
@@ -427,7 +451,8 @@ defmodule Bilimbi.Core.Person do
 
   defp lock_changeset(_scope, cs, :insert), do: cs
 
-  defp lock_person_or_rollback(scope, id) do
+  @doc false
+  def lock_person_or_rollback(scope, id) do
     with {:ok, person} <- fetch(scope, id, true), :ok <- live(person) do
       person
     else
@@ -435,7 +460,8 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
-  defp lock_company_or_rollback(scope, id) do
+  @doc false
+  def lock_company_or_rollback(scope, id) do
     case Company.lock_writable_company(scope, id) do
       {:ok, proof} -> proof
       {:error, reason} -> Repo.rollback(reason)
@@ -515,6 +541,9 @@ defmodule Bilimbi.Core.Person do
 
       :affiliation_unlinked ->
         "The affiliation has already been unlinked."
+
+      :relationship_unlinked ->
+        "The role has already been unlinked."
 
       :hr_fields_not_supported ->
         "Employment facts belong to People; only identity and affiliation facts are accepted."

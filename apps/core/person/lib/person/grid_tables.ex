@@ -1,5 +1,5 @@
 defmodule Bilimbi.Core.Person.GridTables do
-  @moduledoc "Core identity and affiliation field access policy, including audit read models."
+  @moduledoc "Core identity, affiliation and role field access policy, including audit read models."
   def tables do
     %{
       tables: [
@@ -41,6 +41,27 @@ defmodule Bilimbi.Core.Person.GridTables do
             %{id: "legacy_employee_id", type: :integer, protected: true},
             %{id: "created_at", type: :datetime},
             %{id: "unlinked_at", type: :datetime, protected: true}
+          ],
+          links: []
+        },
+        %{
+          id: "core_person_relationships",
+          label: "Person roles",
+          capability: "admin.person.view",
+          source: Bilimbi.Core.Person.Grid.RelationshipsSource,
+          key: "id",
+          label_field: "id",
+          time_field: "created_at",
+          record_types: ["Bilimbi.Core.Person.Relationship"],
+          fields: [
+            %{id: "id", type: :integer},
+            %{id: "effective_from", label: "Effective from", type: :date},
+            %{id: "effective_to", label: "Effective to", type: :date},
+            %{id: "person_id", type: :integer, protected: true},
+            %{id: "company_id", type: :integer, protected: true},
+            %{id: "relationship_type_id", type: :integer, protected: true},
+            %{id: "created_at", type: :datetime},
+            %{id: "deleted_at", type: :datetime, protected: true}
           ],
           links: []
         }

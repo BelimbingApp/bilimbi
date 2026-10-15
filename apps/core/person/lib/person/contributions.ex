@@ -40,6 +40,12 @@ defmodule Bilimbi.Core.Person.Contributions do
             company-specific details use core.person.affiliation.update. Unlink and retire
             preserve history and never terminate employment or revoke account grants.
             These writes require preview, review/approval, and exact plan-code commit.
+            A person can hold a role toward a company too (individual customer, prospect or
+            lead): core.person.relationship.create with person_id, company_id and a role from
+            core.company.relationship_role.list; the person is the role toward that company.
+            A prospect becomes a customer by core.person.relationship.unlink (or an
+            effective_to date) on the prospect role and a create for the customer role;
+            history is kept. A role targets exactly one company or one person.
             Do not invent employee numbers, employment type/status or a login from a namecard.
             core.employee.* is deprecated HR compatibility, reserved for confirmed HR records.
             People will own employment facts and reference this same core identity/affiliation.

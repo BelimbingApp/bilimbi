@@ -24,7 +24,17 @@ defmodule Bilimbi.Core.Person.AgentOperations do
     {"core.person.affiliation.update", :affiliation_update, :write, "update",
      "Update title and company contact details without changing HR facts."},
     {"core.person.affiliation.unlink", :unlink, :write, "update",
-     "Unlink an affiliation while preserving its identity and history."}
+     "Unlink an affiliation while preserving its identity and history."},
+    {"core.person.relationship.list", :relationships, :read, "view",
+     "Read the roles a person holds toward companies, including unlinked history."},
+    {"core.person.relationship.get", :relationship_get, :read, "view",
+     "Read one role a person holds toward a company."},
+    {"core.person.relationship.create", :relationship_create, :write, "update",
+     "Give a person a catalogue role (customer, prospect, vendor...) toward a company. Roles grant no access."},
+    {"core.person.relationship.update", :relationship_update, :write, "update",
+     "Update a person role's effective dates, preserving its role and company."},
+    {"core.person.relationship.unlink", :relationship_unlink, :write, "update",
+     "Unlink a person role while retaining its history. Prospect becomes customer by ending one role and creating the other."}
   ]
 
   def declarations do
@@ -39,7 +49,8 @@ defmodule Bilimbi.Core.Person.AgentOperations do
         handler: __MODULE__,
         input: input(action),
         output: %{
-          "type" => if(action == :list or action == :affiliations, do: "array", else: "object"),
+          "type" =>
+            if(action in [:list, :affiliations, :relationships], do: "array", else: "object"),
           "description" =>
             "Core identity/contact facts and stable person/affiliation identifiers; no HR fields or account grants."
         }
@@ -102,6 +113,26 @@ defmodule Bilimbi.Core.Person.AgentOperations do
              "phone" => text
            }}
 
+        :relationships ->
+          {["person_id"], %{"person_id" => id, "include_unlinked" => %{"type" => "boolean"}}}
+
+        :relationship_get ->
+          {["person_id", "relationship_id"], %{"person_id" => id, "relationship_id" => id}}
+
+        :relationship_create ->
+          {["person_id", "company_id", "relationship_type_id"],
+           Map.merge(
+             %{"person_id" => id, "company_id" => id, "relationship_type_id" => id},
+             dates()
+           )}
+
+        :relationship_update ->
+          {["person_id", "relationship_id"],
+           Map.merge(%{"person_id" => id, "relationship_id" => id}, dates())}
+
+        :relationship_unlink ->
+          {["person_id", "relationship_id"], %{"person_id" => id, "relationship_id" => id}}
+
         :affiliation_update ->
           {["person_id", "affiliation_id"],
            %{
@@ -114,6 +145,16 @@ defmodule Bilimbi.Core.Person.AgentOperations do
       end
 
     %{"type" => "object", "required" => required, "properties" => fields}
+  end
+
+  defp dates do
+    date = %{
+      "type" => "string",
+      "maxLength" => 10,
+      "description" => "ISO date (YYYY-MM-DD); an empty string clears this optional date."
+    }
+
+    %{"effective_from" => date, "effective_to" => date}
   end
 
   @impl true
@@ -131,6 +172,21 @@ defmodule Bilimbi.Core.Person.AgentOperations do
 
   def call("core.person.affiliation.list", scope, input),
     do: Person.affiliations(scope, input["person_id"])
+
+  def call("core.person.relationship.list", scope, input),
+    do:
+      Person.relationships(scope, input["person_id"],
+        include_unlinked: Map.get(input, "include_unlinked", false)
+      )
+
+  def call("core.person.relationship.get", scope, input) do
+    with {:ok, rows} <- Person.relationships(scope, input["person_id"], include_unlinked: true) do
+      case Enum.find(rows, &(&1.id == input["relationship_id"])) do
+        nil -> {:error, :not_found}
+        row -> {:ok, row}
+      end
+    end
+  end
 
   @impl true
   def preview(key, scope, input) do
@@ -164,12 +220,26 @@ defmodule Bilimbi.Core.Person.AgentOperations do
   defp perform(:unlink, scope, input),
     do: Person.unlink(scope, input["person_id"], input["affiliation_id"])
 
+  defp perform(:relationship_create, scope, input),
+    do: Person.create_relationship(scope, input["person_id"], input["company_id"], input)
+
+  defp perform(:relationship_update, scope, input),
+    do: Person.update_relationship(scope, input["person_id"], input["relationship_id"], input)
+
+  defp perform(:relationship_unlink, scope, input),
+    do: Person.unlink_relationship(scope, input["person_id"], input["relationship_id"])
+
   defp target_write_policy(scope, input, operation_action) do
     capability =
       if operation_action == :contact, do: "admin.person.create", else: "admin.person.update"
 
     result =
       cond do
+        input["relationship_id"] ->
+          with {:ok, id} <-
+                 Person.relationship_target(scope, input["person_id"], input["relationship_id"]),
+               do: {:ok, [id]}
+
         input["affiliation_id"] ->
           with {:ok, id} <-
                  Person.affiliation_target(scope, input["person_id"], input["affiliation_id"]),

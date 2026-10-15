@@ -34,6 +34,31 @@ defmodule Bilimbi.Core.Person.TestFixtures do
 
     SQL.query!(
       Repo,
+      """
+      CREATE TEMPORARY TABLE core_person_relationships (
+        id bigserial PRIMARY KEY, tenant_id bigint NOT NULL REFERENCES tenants(id),
+        person_id bigint NOT NULL, company_id bigint NOT NULL REFERENCES companies(id),
+        relationship_type_id bigint NOT NULL, effective_from date, effective_to date,
+        deleted_at timestamp(0), created_at timestamp(0), updated_at timestamp(0),
+        CONSTRAINT core_person_relationships_person_tenant_foreign FOREIGN KEY(person_id, tenant_id)
+          REFERENCES core_people(id, tenant_id)
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE UNIQUE INDEX core_person_relationship_live_unique
+      ON core_person_relationships(company_id, person_id, relationship_type_id)
+      WHERE deleted_at IS NULL AND effective_to IS NULL
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
       "CREATE UNIQUE INDEX core_person_affiliations_live_unique ON core_person_affiliations(person_id, company_id) WHERE unlinked_at IS NULL",
       []
     )
