@@ -372,13 +372,10 @@ defmodule Bilimbi.Core.Company.Relationships do
     others = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
     duplicate? = open_ended? and Repo.exists?(others)
 
+    field = if cs.data.id, do: :effective_to, else: :relationship_type_id
+
     if duplicate?,
-      do:
-        Ecto.Changeset.add_error(
-          cs,
-          :relationship_type_id,
-          "is already assigned between these companies"
-        ),
+      do: Ecto.Changeset.add_error(cs, field, Relationship.live_duplicate_message()),
       else: cs
   end
 

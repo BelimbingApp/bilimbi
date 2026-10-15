@@ -150,7 +150,7 @@ defmodule Bilimbi.Core.Company.RelationshipRolesTest do
       assert {:error, %Ecto.Changeset{} = changeset} =
                Company.update_relationship(scope, 73, ended.id, %{effective_to: nil})
 
-      assert %{relationship_type_id: ["is already assigned between these companies"]} =
+      assert %{effective_to: ["is already assigned between these companies"]} =
                errors_on(changeset)
     end
 

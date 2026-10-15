@@ -68,13 +68,16 @@ defmodule Bilimbi.Core.Company.Relationship do
     relationship
     |> cast(attrs, [:effective_from, :effective_to, :metadata])
     |> validate_effective_dates()
-    |> live_unique_constraint()
+    |> live_unique_constraint(:effective_to)
   end
 
-  defp live_unique_constraint(changeset) do
-    unique_constraint(changeset, :relationship_type_id,
+  @doc false
+  def live_duplicate_message, do: "is already assigned between these companies"
+
+  defp live_unique_constraint(changeset, field \\ :relationship_type_id) do
+    unique_constraint(changeset, field,
       name: :company_relationship_live_unique,
-      message: "is already assigned between these companies"
+      message: live_duplicate_message()
     )
   end
 
