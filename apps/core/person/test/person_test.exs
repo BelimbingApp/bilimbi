@@ -124,6 +124,42 @@ defmodule Bilimbi.Core.PersonTest do
     assert {:ok, %{entries: [%{id: ^id}]}} = Person.list(scope, search: "555-947")
   end
 
+  describe "work contact details" do
+    test "a namecard keeps email and phone on the affiliation, not the person", %{scope: scope} do
+      input = %{full_name: "Vera", email: "vera@a.test", phone: "+601", title: "Sales"}
+      assert {:ok, %{person: person, affiliation: a}} = Person.create_contact(scope, 74, input)
+      assert {person.email, person.phone} == {nil, nil}
+      assert {a.email, a.phone} == {"vera@a.test", "+601"}
+
+      assert {:ok, %{entries: [%{id: id}]}} = Person.list(scope, search: "vera@a.test")
+      assert id == person.id
+
+      assert {:ok, _} = Person.unlink(scope, person.id, a.id)
+      assert {:ok, b} = Person.link(scope, person.id, 73, %{email: "vera@b.test"})
+
+      assert {:ok, %{email: nil, phone: nil, affiliations: [first, second]}} =
+               Person.get(scope, person.id)
+
+      assert {first.email, second.id, second.email} == {"vera@a.test", b.id, "vera@b.test"}
+    end
+
+    test "the namecard preview shows the contact once, on the affiliation", %{scope: scope} do
+      input = %{"company_id" => 74, "full_name" => "Vera", "email" => "vera@a.test"}
+      assert {:ok, %{changes: changes}} = Person.preview(scope, :contact, input)
+      assert [_] = Enum.filter(changes, &(&1.field == "email"))
+      assert {:ok, %{entries: []}} = Person.list(scope)
+    end
+
+    test "a bare person (no company) keeps its own contact details", %{scope: scope} do
+      assert {:ok, person} =
+               Person.create(scope, %{full_name: "Lena", email: "lena@lead.test", phone: "+602"})
+
+      assert {person.email, person.phone} == {"lena@lead.test", "+602"}
+      assert {:ok, %{entries: [%{id: id}]}} = Person.list(scope, search: "lena@lead.test")
+      assert id == person.id
+    end
+  end
+
   describe "affiliation dates" do
     test "a namecard and a later link carry start and end dates, kept in history", %{
       scope: scope

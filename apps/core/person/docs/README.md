@@ -8,6 +8,14 @@ employment type/status/dates, login account, principal grant or portal access.
 An affiliation can describe employment at a vendor without claiming that our HR
 team administers that employment.
 
+A namecard's email and phone are work contact details: `create_contact/3` stores
+them on the affiliation only, and the person keeps identity (name) alone. A person
+with no company (a lead, created with `create/2`) keeps its email and phone on the
+Person. The legacy-employee backfill follows the same rule (the employee's work
+email and mobile live on the affiliation). Duplicate search covers both. Person
+and affiliation reads are tenant-wide by design, gated by `admin.person.list` and
+`admin.person.view`.
+
 Search names/email/phone with `list/2` before creating. Matching data never
 implicitly merges identities. Use `create_contact/3` to create the identity and
 its affiliation atomically, or `create/2` then `link/4`. Reuse an existing

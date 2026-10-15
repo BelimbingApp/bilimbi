@@ -151,7 +151,8 @@ defmodule Bilimbi.Core.Person do
   # unrelated people automatically.
   def create_contact(%Scope{} = scope, company_id, attrs) do
     with {:ok, _} <- target(scope, company_id, "admin.person.create"),
-         {:ok, person_cs} <- person_changeset(scope, nil, attrs, "admin.person.create") do
+         {:ok, person_cs} <-
+           person_changeset(scope, nil, identity_attrs(attrs), "admin.person.create") do
       Bilimbi.Base.Audit.with_scope(scope, fn ->
         Repo.transaction(fn ->
           lock_company_or_rollback(scope, company_id)
@@ -241,7 +242,8 @@ defmodule Bilimbi.Core.Person do
 
       :contact ->
         with {:ok, _} <- target(scope, input["company_id"], "admin.person.create"),
-             {:ok, person_cs} <- person_changeset(scope, nil, input, "admin.person.create"),
+             {:ok, person_cs} <-
+               person_changeset(scope, nil, identity_attrs(input), "admin.person.create"),
              {:ok, _} <- Changeset.apply_action(person_cs, :insert),
              affiliation_cs =
                Affiliation.changeset(
@@ -297,6 +299,8 @@ defmodule Bilimbi.Core.Person do
         cs,
         [unlinked_at: now()] ++ Affiliation.unlink_changes(affiliation, Date.utc_today())
       )
+
+  defp identity_attrs(attrs), do: Map.drop(attrs, [:email, :phone, "email", "phone"])
 
   defp preview_person(scope, id, attrs, capability) do
     with {:ok, cs} <- person_changeset(scope, id, attrs, capability), do: preview_changes(cs)

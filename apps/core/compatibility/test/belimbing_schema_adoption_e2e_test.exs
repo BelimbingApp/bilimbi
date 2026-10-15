@@ -117,8 +117,8 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
     SQL.query!(
       PlatformBaselineTestRepo,
       """
-      INSERT INTO employees(id, company_id, employee_number, full_name, designation, employee_type, status, employment_start, employment_end, metadata)
-      VALUES (9470, 947, 'HR-947', 'Legacy Human', 'Engineer', 'part_time', 'probation', '2020-01-02', '2027-03-04', '{"legacy":"preserved"}')
+      INSERT INTO employees(id, company_id, employee_number, full_name, designation, email, mobile_number, employee_type, status, employment_start, employment_end, metadata)
+      VALUES (9470, 947, 'HR-947', 'Legacy Human', 'Engineer', 'legacy@work.test', '+60947', 'part_time', 'probation', '2020-01-02', '2027-03-04', '{"legacy":"preserved"}')
       """,
       []
     )
@@ -175,6 +175,20 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
              SQL.query!(
                PlatformBaselineTestRepo,
                "SELECT legacy_employee_id, started_on, ended_on FROM core_person_affiliations ORDER BY legacy_employee_id",
+               []
+             ).rows
+
+    assert [["legacy@work.test", "+60947"]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT email, phone FROM core_person_affiliations WHERE legacy_employee_id = 9470",
+               []
+             ).rows
+
+    assert [[nil, nil]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT email, phone FROM core_people WHERE id = 9470",
                []
              ).rows
 
