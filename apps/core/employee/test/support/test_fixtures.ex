@@ -95,5 +95,7 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
       """,
       []
     )
+
+    unless persistent, do: apply(Bilimbi.Core.Person.TestFixtures, :create_person_tables!, [])
   end
 end

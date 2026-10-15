@@ -256,7 +256,13 @@ from A**, inverse vendor/supplier. Partner is symmetric. Custom roles store the
 inverse label in their existing metadata. Stable codes and IDs survive renaming.
 Retiring a role excludes it from new assignments without deleting, rewriting or
 ending existing relationships. Multiple roles between the same organisations
-are separate concurrent links. Role and affiliation creation grants no portal
+are separate concurrent links. For one source, target and role, live links
+may not overlap in time (inclusive dates, an absent date being open); create,
+update and the previews all refuse an overlap, on the role for a create and on
+the end date for an update. The check runs inside the write's transaction under
+a per-source/target/role advisory lock, next to the open-ended unique index. An
+exact repeat of a create (same dates) is a replay: it returns the existing link.
+Ending a link and starting the next one on a later date therefore never conflicts. Role and affiliation creation grants no portal
 access or permissions; external access is administered separately.
 
 A company-to-person role (an individual customer, prospect or lead) uses the

@@ -1,0 +1,113 @@
+defmodule Bilimbi.Core.EmployeePersonSyncTest do
+  use Bilimbi.Base.Database.DataCase, async: false
+
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Person
+
+  import Bilimbi.Base.Database.TestHelpers
+  import Bilimbi.Core.Employee.TestFixtures
+
+  setup do
+    create_employee_tables!()
+    CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant A"})
+
+    CompanyFixtures.insert_company!(%{
+      id: 73,
+      tenant_id: 41,
+      name: "Company A",
+      code: "company_a"
+    })
+
+    CompanyFixtures.insert_tenant!(%{id: 42, name: "Tenant B", is_platform_operator: false})
+
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 42,
+      name: "Company B",
+      code: "company_b"
+    })
+
+    :ok = Employee.ensure_system_types()
+    {:ok, owner} = Tenancy.scope(41)
+    {:ok, other} = Tenancy.scope(42)
+    %{owner: owner, other: other}
+  end
+
+  test "a new employee is found by Person.list and resolves through person_identity", %{
+    owner: owner,
+    other: other
+  } do
+    assert {:ok, employee} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "E-1",
+               full_name: "Nora Newhire",
+               designation: "Analyst",
+               email: "nora@work.test",
+               mobile_number: "+60111",
+               employment_start: "2026-02-01"
+             })
+
+    assert {:ok, %{entries: [person]}} = Person.list(owner, search: "nora@work.test")
+    assert {person.full_name, person.email, person.phone} == {"Nora Newhire", nil, nil}
+
+    assert {:ok, %{person_id: person_id, affiliation_id: affiliation_id, company_id: 73}} =
+             Employee.person_identity(owner, employee.id)
+
+    assert person_id == person.id
+
+    assert {:ok, %{affiliations: [a]}} = Person.get(owner, person.id)
+
+    assert {a.id, a.title, a.email, a.phone, a.started_on, a.legacy_employee_id} ==
+             {affiliation_id, "Analyst", "nora@work.test", "+60111", ~D[2026-02-01], employee.id}
+
+    assert {:ok, %{entries: []}} = Person.list(other, search: "Nora")
+  end
+
+  test "an edit carries only the changed facts and leaves Contacts edits alone", %{owner: owner} do
+    {:ok, employee} =
+      Employee.create_employee(owner, 73, %{
+        employee_number: "E-2",
+        full_name: "Omar Original",
+        designation: "Clerk",
+        email: "omar@work.test"
+      })
+
+    {:ok, %{person_id: person_id, affiliation_id: affiliation_id}} =
+      Employee.person_identity(owner, employee.id)
+
+    assert {:ok, _} =
+             Person.update_affiliation(owner, person_id, affiliation_id, %{phone: "555-1"})
+
+    assert {:ok, _} =
+             Employee.update_employee(owner, 73, employee.id, %{
+               designation: "Senior Clerk",
+               full_name: "Omar Renamed",
+               employment_end: "2027-01-31"
+             })
+
+    assert {:ok, %{full_name: "Omar Renamed", affiliations: [a]}} = Person.get(owner, person_id)
+
+    assert {a.title, a.email, a.phone, a.ended_on} ==
+             {"Senior Clerk", "omar@work.test", "555-1", ~D[2027-01-31]}
+
+    assert {:ok, _} = Employee.update_employee(owner, 73, employee.id, %{status: "inactive"})
+    assert {:ok, %{affiliations: [^a]}} = Person.get(owner, person_id)
+  end
+
+  test "a refused employee write leaves no person behind", %{owner: owner} do
+    assert {:error, %Ecto.Changeset{} = changeset} =
+             Employee.create_employee(owner, 73, %{full_name: "No Number"})
+
+    assert %{employee_number: [_ | _]} = errors_on(changeset)
+    assert {:ok, %{entries: [], total: 0}} = Person.list(owner)
+  end
+
+  test "the platform orchestrator is mapped like any other employee" do
+    CompanyFixtures.assign_primary_company!(41, 73)
+    assert {:ok, orchestrator, :created} = Employee.ensure_platform_orchestrator()
+    {:ok, owner} = Tenancy.scope(41)
+    assert {:ok, %{company_id: 73}} = Employee.person_identity(owner, orchestrator.id)
+  end
+end

@@ -175,10 +175,17 @@ People's follow-up contract:
 4. After People reads identity through Core Person and ports its write workflows,
    redirect/deprecate the HR operations in a versioned compatibility release.
    Keep the old operations until integrations have an announced migration path.
-5. Legacy records created or edited during the transition remain in employees;
-   the initial backfill is a cutover snapshot. The follow-up must reconcile
-   post-backfill rows and changed facts, report conflicts with subsequent Core
-   contact edits, and obtain reviewed resolutions rather than overwrite either.
+5. Core Employee keeps the Core mapping in step while the HR rows stay here:
+   `create_employee/3` and `update_employee/4` (and so `core.employee.create`,
+   `core.employee.update` and the Employee pages) write the employee and its
+   Core person and affiliation in one transaction. A new employee gets a person
+   and an affiliation with its employer company, `legacy_employee_id` being the
+   mapping; an edit carries only the facts that changed (name to the person;
+   designation, work email, mobile number and employment start/end to the
+   affiliation's title, email, phone and dates). Work email and phone live on the
+   affiliation only. No HR field is copied, so People reads employment from the
+   employee row and identity and contact from Core. A later Contacts edit is
+   overwritten only by a later change to the same Employee fact.
 
 Core Person's retirement or affiliation unlink preserves legacy records and
 never terminates HR employment, clears user links or changes permission grants.

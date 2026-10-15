@@ -7,6 +7,8 @@ defmodule Bilimbi.Core.PersonRelationshipsTest do
   alias Bilimbi.Core.Person
   import Bilimbi.Base.Database.TestHelpers, only: [errors_on: 1]
 
+  @overlap "is already assigned between this company and person for an overlapping period"
+
   setup do
     CompanyFixtures.create_company_identity_tables!()
     CompanyFixtures.create_external_access_tables!()
@@ -138,26 +140,78 @@ defmodule Bilimbi.Core.PersonRelationshipsTest do
     assert Enum.find(rows, &(&1.role_code == "vendor")).inverse_label == "Customer"
   end
 
-  test "a live duplicate and a retired role are refused; dated updates keep identity", %{
+  test "an exact replay is idempotent; overlapping periods are refused, adjacent ones allowed", %{
     scope: scope,
     lead: lead,
     roles: roles
   } do
     attrs = %{relationship_type_id: roles["customer"].id}
     assert {:ok, rel} = Person.create_relationship(scope, lead.id, 73, attrs)
+    assert {:ok, replay} = Person.create_relationship(scope, lead.id, 73, attrs)
+    assert replay.id == rel.id
 
-    assert {:error, cs} = Person.create_relationship(scope, lead.id, 73, attrs)
-    assert %{relationship_type_id: [_]} = errors_on(cs)
+    assert {:error, cs} =
+             Person.create_relationship(
+               scope,
+               lead.id,
+               73,
+               Map.put(attrs, :effective_from, "2026-05-01")
+             )
+
+    assert %{relationship_type_id: [@overlap]} = errors_on(cs)
+    assert {:ok, [_]} = Person.relationships(scope, lead.id)
 
     assert {:ok, updated} =
-             Person.update_relationship(scope, lead.id, rel.id, %{effective_to: "2030-12-31"})
+             Person.update_relationship(scope, lead.id, rel.id, %{
+               effective_from: "2026-01-01",
+               effective_to: "2030-12-31"
+             })
 
     assert updated.id == rel.id and updated.role_code == "customer"
 
+    dated = Map.merge(attrs, %{effective_from: "2026-01-01", effective_to: "2030-12-31"})
+    assert {:ok, again} = Person.create_relationship(scope, lead.id, 73, dated)
+    assert again.id == rel.id
+
+    for {from, to} <- [{"2026-06-01", "2027-06-01"}, {"2025-01-01", "2026-01-01"}, {nil, nil}] do
+      assert {:error, cs} =
+               Person.create_relationship(
+                 scope,
+                 lead.id,
+                 73,
+                 Map.merge(attrs, %{effective_from: from, effective_to: to})
+               )
+
+      assert %{relationship_type_id: [@overlap]} = errors_on(cs)
+    end
+
+    assert {:ok, next} =
+             Person.create_relationship(
+               scope,
+               lead.id,
+               73,
+               Map.put(attrs, :effective_from, "2031-01-01")
+             )
+
     assert {:error, cs} =
-             Person.update_relationship(scope, lead.id, rel.id, %{effective_from: "2031-01-01"})
+             Person.update_relationship(scope, lead.id, next.id, %{effective_from: "2030-06-01"})
+
+    assert %{effective_to: [@overlap]} = errors_on(cs)
+
+    assert {:error, cs} =
+             Person.update_relationship(scope, lead.id, rel.id, %{effective_from: "2031-02-01"})
 
     assert %{effective_to: [_]} = errors_on(cs)
+
+    assert {:ok, preview} = Person.preview(scope, :relationship_create, stringify(dated, lead.id))
+    assert preview.summary
+
+    assert {:error, %Ecto.Changeset{}} =
+             Person.preview(
+               scope,
+               :relationship_create,
+               stringify(Map.put(dated, :effective_from, "2026-02-02"), lead.id)
+             )
 
     Repo.update!(Ecto.Changeset.change(roles["partner"], is_active: false))
 
@@ -167,6 +221,12 @@ defmodule Bilimbi.Core.PersonRelationshipsTest do
              })
 
     assert %{relationship_type_id: [_]} = errors_on(cs)
+  end
+
+  defp stringify(attrs, person_id) do
+    attrs
+    |> Map.new(fn {k, v} -> {to_string(k), v} end)
+    |> Map.merge(%{"person_id" => person_id, "company_id" => 73})
   end
 
   test "unlinked, retired and cross-tenant targets are refused", %{

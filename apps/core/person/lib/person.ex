@@ -25,6 +25,8 @@ defmodule Bilimbi.Core.Person do
   alias Bilimbi.Core.Person.{Schema, Affiliation, Relationships}
   alias Ecto.Changeset
 
+  @affiliation_facts [:title, :email, :phone, :started_on, :ended_on]
+
   def list(%Scope{} = scope, opts \\ []) do
     with :ok <- authorize(scope, "admin.person.list") do
       search = "%#{Keyword.get(opts, :search, "")}%"
@@ -100,6 +102,71 @@ defmodule Bilimbi.Core.Person do
          Map.put(summary(row, scope), :company_name, company_name)
        end)}
     end
+  end
+
+  @doc """
+  Keeps the Core person and affiliation mapped to a legacy employee in step
+  with the employee write that just succeeded.
+
+  The caller owns the transaction and has already authorized and validated the
+  employee write; `facts` carries only the identity and company-contact facts
+  to apply (`:full_name`, `:title`, `:email`, `:phone`, `:started_on`,
+  `:ended_on`). A missing mapping is created: a new person and an affiliation
+  with the employer company carrying the work email and phone, the mapping
+  `legacy_employee_id` being the durable link. An existing mapping receives
+  only the facts given. No HR field is stored here.
+  """
+  def sync_legacy_employee(%Scope{} = scope, employee_id, company_id, facts) do
+    affiliation =
+      Repo.one(
+        from(a in Tenancy.scope_query(Affiliation, scope),
+          where: a.legacy_employee_id == ^employee_id,
+          lock: "FOR UPDATE"
+        )
+      )
+
+    case affiliation do
+      nil -> insert_legacy_mapping(scope, employee_id, company_id, facts)
+      %Affiliation{} = row -> update_legacy_mapping(scope, row, facts)
+    end
+  end
+
+  defp insert_legacy_mapping(scope, employee_id, company_id, facts) do
+    person =
+      %Schema{tenant_id: scope.tenant.id}
+      |> Changeset.change(Map.take(facts, [:full_name]))
+      |> Repo.insert!()
+
+    %Affiliation{
+      tenant_id: scope.tenant.id,
+      person_id: person.id,
+      company_id: company_id,
+      legacy_employee_id: employee_id
+    }
+    |> Changeset.change(Map.take(facts, @affiliation_facts))
+    |> Repo.insert!()
+
+    :ok
+  end
+
+  defp update_legacy_mapping(scope, %Affiliation{} = row, facts) do
+    case Map.take(facts, [:full_name]) do
+      names when map_size(names) == 0 ->
+        :ok
+
+      names ->
+        from(p in Tenancy.scope_query(Schema, scope), where: p.id == ^row.person_id)
+        |> Repo.one!()
+        |> Changeset.change(names)
+        |> Repo.update!()
+    end
+
+    case Map.take(facts, @affiliation_facts) do
+      changes when map_size(changes) == 0 -> :ok
+      changes -> row |> Changeset.change(changes) |> Repo.update!()
+    end
+
+    :ok
   end
 
   @doc "The scoped compatibility mapping for an existing Employee ID. It is never a login or HR grant."

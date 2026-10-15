@@ -72,7 +72,8 @@ defmodule Bilimbi.Core.Company.Relationship do
   end
 
   @doc false
-  def live_duplicate_message, do: "is already assigned between these companies"
+  def live_duplicate_message,
+    do: "is already assigned between these companies for an overlapping period"
 
   defp live_unique_constraint(changeset, field \\ :relationship_type_id) do
     unique_constraint(changeset, field,

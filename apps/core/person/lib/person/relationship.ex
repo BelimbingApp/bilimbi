@@ -14,7 +14,8 @@ defmodule Bilimbi.Core.Person.Relationship do
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 
-  def live_duplicate_message, do: "is already assigned between this company and person"
+  def live_duplicate_message,
+    do: "is already assigned between this company and person for an overlapping period"
 
   def changeset(relationship, attrs) do
     relationship

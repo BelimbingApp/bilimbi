@@ -112,7 +112,7 @@ defmodule Bilimbi.Core.Person.Relationships do
 
         {:ok,
          cs
-         |> validate_no_open_duplicate(scope)
+         |> validate_no_overlap(scope)
          |> Authz.refuse_restricted_attempts(scope, @table, attrs)}
       end
     end
@@ -151,28 +151,67 @@ defmodule Bilimbi.Core.Person.Relationships do
     end
   end
 
-  defp validate_no_open_duplicate(%Changeset{valid?: false} = cs, _scope), do: cs
+  defp validate_no_overlap(%Changeset{valid?: false} = cs, _scope), do: cs
 
-  defp validate_no_open_duplicate(cs, scope) do
+  defp validate_no_overlap(cs, scope) do
+    case classify_overlap(scope, cs) do
+      :overlap -> overlap_error(cs)
+      _free_or_replay -> cs
+    end
+  end
+
+  defp overlap_error(cs),
+    do:
+      Changeset.add_error(
+        cs,
+        if(cs.data.id, do: :effective_to, else: :relationship_type_id),
+        Relationship.live_duplicate_message()
+      )
+
+  defp classify_overlap(scope, cs) do
+    from_date = Changeset.get_field(cs, :effective_from)
+    to_date = Changeset.get_field(cs, :effective_to)
+
+    overlap = dynamic(true)
+
+    overlap =
+      if from_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_to) or r.effective_to >= ^from_date)),
+        else: overlap
+
+    overlap =
+      if to_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_from) or r.effective_from <= ^to_date)),
+        else: overlap
+
     live =
       from(r in Tenancy.scope_query(Relationship, scope),
         where:
           r.company_id == ^Changeset.get_field(cs, :company_id) and
             r.person_id == ^Changeset.get_field(cs, :person_id) and
             r.relationship_type_id == ^Changeset.get_field(cs, :relationship_type_id) and
-            is_nil(r.deleted_at) and is_nil(r.effective_to)
+            is_nil(r.deleted_at),
+        where: ^overlap
       )
 
-    others = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
+    live = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
 
-    if is_nil(Changeset.get_field(cs, :effective_to)) and Repo.exists?(others),
-      do:
-        Changeset.add_error(
-          cs,
-          if(cs.data.id, do: :effective_to, else: :relationship_type_id),
-          Relationship.live_duplicate_message()
-        ),
-      else: cs
+    case Repo.all(live) do
+      [] ->
+        :free
+
+      rows ->
+        replay = Enum.find(rows, &(&1.effective_from == from_date and &1.effective_to == to_date))
+        if replay && is_nil(cs.data.id), do: {:replay, replay}, else: :overlap
+    end
+  end
+
+  defp lock_pair(cs) do
+    key =
+      "person_relationship:#{Changeset.get_field(cs, :company_id)}:" <>
+        "#{Changeset.get_field(cs, :person_id)}:#{Changeset.get_field(cs, :relationship_type_id)}"
+
+    Ecto.Adapters.SQL.query!(Repo, "SELECT pg_advisory_xact_lock(hashtext($1))", [key])
   end
 
   # Company -> Person -> role is the lock order, like affiliations: a company
@@ -187,14 +226,27 @@ defmodule Bilimbi.Core.Person.Relationships do
         Person.lock_company_or_rollback(scope, row.company_id)
         _ = Person.lock_person_or_rollback(scope, row.person_id)
         cs = lock_row(scope, cs)
+        lock_pair(cs)
 
-        case apply(Repo, operation, [cs]) do
-          {:ok, saved} -> saved_model(saved, scope)
-          {:error, reason} -> Repo.rollback(reason)
+        case serialized_outcome(scope, cs) do
+          {:replay, existing} ->
+            saved_model(existing, scope)
+
+          :overlap ->
+            Repo.rollback(%{overlap_error(cs) | action: operation})
+
+          :free ->
+            case apply(Repo, operation, [cs]) do
+              {:ok, saved} -> saved_model(saved, scope)
+              {:error, reason} -> Repo.rollback(reason)
+            end
         end
       end)
     end)
   end
+
+  defp serialized_outcome(scope, cs),
+    do: if(Map.has_key?(cs.changes, :deleted_at), do: :free, else: classify_overlap(scope, cs))
 
   defp lock_row(_scope, %Changeset{data: %Relationship{id: nil}} = cs), do: cs
 

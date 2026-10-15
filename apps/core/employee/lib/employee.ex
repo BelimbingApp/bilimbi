@@ -58,6 +58,14 @@ defmodule Bilimbi.Core.Employee do
     status: "active"
   }
   @protected_orchestrator_fields [:employee_number, :employee_type]
+  @person_fact_fields [
+    full_name: :full_name,
+    designation: :title,
+    email: :email,
+    mobile_number: :phone,
+    employment_start: :started_on,
+    employment_end: :ended_on
+  ]
 
   @doc "Resolves the Core Person/affiliation mapping without exposing either module's private schemas."
   def person_identity(%Scope{} = scope, employee_id) do
@@ -317,7 +325,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       end
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
@@ -338,7 +346,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       else
         {:ok, Summary.from_schema(subordinate)}
       end
@@ -374,7 +382,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
     with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
-      scope |> creation_changeset(company_id, attributes) |> persist_insert()
+      scope |> creation_changeset(company_id, attributes) |> persist_insert(scope)
     end
   end
 
@@ -411,7 +419,7 @@ defmodule Bilimbi.Core.Employee do
       |> protect_platform_orchestrator_identity(employee)
       |> reject_reserved_orchestrator_number(employee)
       |> validate_references(scope, company_id, employee_id)
-      |> persist_update()
+      |> persist_update(scope)
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
@@ -878,7 +886,7 @@ defmodule Bilimbi.Core.Employee do
 
     changeset = Schema.creation_changeset(company.id, attributes)
 
-    case Repo.insert(changeset) do
+    case insert_orchestrator(company, changeset) do
       {:ok, employee} ->
         {:ok, Summary.from_schema(employee), :created}
 
@@ -891,6 +899,20 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  defp insert_orchestrator(company, changeset) do
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          {:ok, scope} = Bilimbi.Base.Tenancy.scope(company.tenant_id)
+          :ok = sync_person(scope, employee, person_facts(employee))
+          employee
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
   defp platform_orchestrator_record?(%Schema{
          employee_number: @platform_orchestrator_number,
          employee_type: @platform_orchestrator_type
@@ -899,21 +921,46 @@ defmodule Bilimbi.Core.Employee do
 
   defp platform_orchestrator_record?(%Schema{}), do: false
 
-  defp persist_insert(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp persist_insert(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
 
-  defp persist_insert(changeset) do
-    case Repo.insert(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
-    end
+  defp persist_insert(changeset, scope) do
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          :ok = sync_person(scope, employee, person_facts(employee))
+          Summary.from_schema(employee)
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
   end
 
-  defp persist_update(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp persist_update(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
 
-  defp persist_update(changeset) do
-    case Repo.update(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
+  defp persist_update(changeset, scope) do
+    facts = person_facts(changeset.changes)
+
+    Repo.transaction(fn ->
+      case Repo.update(changeset) do
+        {:ok, employee} ->
+          if facts != %{}, do: :ok = sync_person(scope, employee, facts)
+          Summary.from_schema(employee)
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp sync_person(scope, %Schema{} = employee, facts),
+    do: Bilimbi.Core.Person.sync_legacy_employee(scope, employee.id, employee.company_id, facts)
+
+  defp person_facts(%Schema{} = employee), do: employee |> Map.from_struct() |> person_facts()
+
+  defp person_facts(fields) when is_map(fields) do
+    for {field, fact} <- @person_fact_fields, Map.has_key?(fields, field), into: %{} do
+      {fact, Map.fetch!(fields, field)}
     end
   end
 

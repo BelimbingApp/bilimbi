@@ -6,6 +6,7 @@ Code.ensure_loaded!(Bilimbi.Base.Session.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Base.Authz.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Geonames.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Company.TestFixtures)
+Code.ensure_loaded!(Bilimbi.Core.Person.TestFixtures)
 Code.ensure_loaded!(Bilimbi.Core.Employee.TestFixtures)
 
 ExUnit.start()

@@ -154,11 +154,7 @@ defmodule Bilimbi.Core.Company.Relationships do
           {:ok, _related} ->
             company_id
             |> create_changeset(attrs)
-            |> Repo.insert()
-            |> case do
-              {:ok, rel} -> {:ok, Repo.preload(rel, [:type])}
-              {:error, changeset} -> {:error, changeset}
-            end
+            |> insert_serialized()
 
           {:error, :company_not_found} = error ->
             error
@@ -169,7 +165,7 @@ defmodule Bilimbi.Core.Company.Relationships do
       else
         company_id
         |> create_changeset(attrs)
-        |> Repo.insert()
+        |> insert_serialized()
       end
     end
   end
@@ -212,7 +208,7 @@ defmodule Bilimbi.Core.Company.Relationships do
             with :ok <- other_side_writable(scope, rel, company_id) do
               rel
               |> update_changeset(attrs)
-              |> Repo.update()
+              |> update_serialized()
             end
         end
     end
@@ -365,13 +361,44 @@ defmodule Bilimbi.Core.Company.Relationships do
     %Relationship{company_id: company_id}
     |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
     |> validate_active_type()
-    |> validate_no_open_duplicate()
+    |> validate_no_overlap()
   end
 
-  defp validate_no_open_duplicate(%Ecto.Changeset{valid?: false} = cs), do: cs
+  # A role between the same source, target and type may not overlap another
+  # live link's dates (inclusive, an absent bound being open). An exact repeat
+  # of a create is a replay, not a conflict: `insert_serialized/1` returns the
+  # existing link.
+  defp validate_no_overlap(%Ecto.Changeset{valid?: false} = cs), do: cs
 
-  defp validate_no_open_duplicate(cs) do
-    open_ended? = is_nil(Ecto.Changeset.get_field(cs, :effective_to))
+  defp validate_no_overlap(cs) do
+    case classify_overlap(cs) do
+      :overlap ->
+        Ecto.Changeset.add_error(
+          cs,
+          if(cs.data.id, do: :effective_to, else: :relationship_type_id),
+          Relationship.live_duplicate_message()
+        )
+
+      _free_or_replay ->
+        cs
+    end
+  end
+
+  defp classify_overlap(cs) do
+    from_date = Ecto.Changeset.get_field(cs, :effective_from)
+    to_date = Ecto.Changeset.get_field(cs, :effective_to)
+
+    overlap = dynamic(true)
+
+    overlap =
+      if from_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_to) or r.effective_to >= ^from_date)),
+        else: overlap
+
+    overlap =
+      if to_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_from) or r.effective_from <= ^to_date)),
+        else: overlap
 
     live =
       from(r in Relationship,
@@ -379,23 +406,90 @@ defmodule Bilimbi.Core.Company.Relationships do
           r.company_id == ^Ecto.Changeset.get_field(cs, :company_id) and
             r.related_company_id == ^Ecto.Changeset.get_field(cs, :related_company_id) and
             r.relationship_type_id == ^Ecto.Changeset.get_field(cs, :relationship_type_id) and
-            is_nil(r.deleted_at) and is_nil(r.effective_to)
+            is_nil(r.deleted_at),
+        where: ^overlap
       )
 
-    others = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
-    duplicate? = open_ended? and Repo.exists?(others)
+    live = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
 
-    field = if cs.data.id, do: :effective_to, else: :relationship_type_id
+    case Repo.all(live) do
+      [] ->
+        :free
 
-    if duplicate?,
-      do: Ecto.Changeset.add_error(cs, field, Relationship.live_duplicate_message()),
-      else: cs
+      rows ->
+        replay = Enum.find(rows, &(&1.effective_from == from_date and &1.effective_to == to_date))
+        if replay && is_nil(cs.data.id), do: {:replay, replay}, else: :overlap
+    end
+  end
+
+  defp lock_pair(cs) do
+    key =
+      "company_relationship:#{Ecto.Changeset.get_field(cs, :company_id)}:" <>
+        "#{Ecto.Changeset.get_field(cs, :related_company_id)}:" <>
+        "#{Ecto.Changeset.get_field(cs, :relationship_type_id)}"
+
+    Ecto.Adapters.SQL.query!(Repo, "SELECT pg_advisory_xact_lock(hashtext($1))", [key])
+  end
+
+  defp insert_serialized(%Ecto.Changeset{valid?: false} = cs),
+    do: {:error, %{cs | action: :insert}}
+
+  defp insert_serialized(cs) do
+    Repo.transaction(fn ->
+      lock_pair(cs)
+
+      case classify_overlap(cs) do
+        {:replay, existing} ->
+          Repo.preload(existing, [:type])
+
+        :overlap ->
+          Repo.rollback(
+            Ecto.Changeset.add_error(
+              %{cs | action: :insert},
+              :relationship_type_id,
+              Relationship.live_duplicate_message()
+            )
+          )
+
+        :free ->
+          case Repo.insert(cs) do
+            {:ok, rel} -> Repo.preload(rel, [:type])
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+      end
+    end)
+  end
+
+  defp update_serialized(%Ecto.Changeset{valid?: false} = cs),
+    do: {:error, %{cs | action: :update}}
+
+  defp update_serialized(cs) do
+    Repo.transaction(fn ->
+      lock_pair(cs)
+
+      case classify_overlap(cs) do
+        :free ->
+          case Repo.update(cs) do
+            {:ok, rel} -> rel
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+
+        _overlap ->
+          Repo.rollback(
+            Ecto.Changeset.add_error(
+              %{cs | action: :update},
+              :effective_to,
+              Relationship.live_duplicate_message()
+            )
+          )
+      end
+    end)
   end
 
   defp update_changeset(rel, attrs) do
     rel
     |> Relationship.update_changeset(attrs)
-    |> validate_no_open_duplicate()
+    |> validate_no_overlap()
   end
 
   defp validate_active_type(%Ecto.Changeset{valid?: false} = cs), do: cs

@@ -80,8 +80,11 @@ with only a prospect role and no affiliation, hold several concurrent roles
 toward the same company, and become a customer by ending the prospect link
 (`end_relationship/4`, `effective_to` defaulting to today) and creating the
 customer link; both rows are retained with their dates. Unlinking is only for
-removing a mistaken entry and records `deleted_at`, not an end date. At most one open-ended live link exists per company, person and
-role; retired roles cannot be newly assigned and existing links survive
+removing a mistaken entry and records `deleted_at`, not an end date. Live links for one company, person and role may not overlap in time
+(inclusive dates, an absent date being open); create, update and the previews
+refuse an overlap, enforced in the write transaction under a per-pair advisory
+lock beside the open-ended unique index, and an exact repeat of a create returns
+the existing link; retired roles cannot be newly assigned and existing links survive
 retirement. A role writes under `admin.person.update`, locks Company, then
 Person, then the role, refuses an archived company or retired person, and honours
 the company's agent write switch. Roles confer no access, employee number or
@@ -101,7 +104,10 @@ merge is attempted, including employees who share a user identity: deduplication
 needs reviewed evidence.
 
 Use `legacy_affiliation/2` or `Employee.person_identity/2` to resolve an existing
-ID under the tenant boundary. Mappings retain system agents as well as humans;
+ID under the tenant boundary. Employees created or edited later through
+`Employee.create_employee/3` and `update_employee/4` are mapped in the same
+transaction (`sync_legacy_employee/4`), so they appear in `list/2` duplicate
+checks and resolve through `person_identity/2`. Mappings retain system agents as well as humans;
 SYS-001's durable orchestrator identity and its existing protection are untouched.
 See Core Employee's README for the People handoff and deprecation contract.
 The structure migration refuses rollback while identity rows exist, because

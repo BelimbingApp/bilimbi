@@ -7,7 +7,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE core_people (
+      CREATE TEMPORARY TABLE IF NOT EXISTS core_people (
         id bigserial PRIMARY KEY, tenant_id bigint NOT NULL REFERENCES tenants(id),
         full_name varchar(255) NOT NULL, email varchar(255), phone varchar(255),
         retired_at timestamp(0), created_at timestamp(0), updated_at timestamp(0),
@@ -20,7 +20,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE core_person_affiliations (
+      CREATE TEMPORARY TABLE IF NOT EXISTS core_person_affiliations (
         id bigserial PRIMARY KEY, tenant_id bigint NOT NULL REFERENCES tenants(id),
         person_id bigint NOT NULL, company_id bigint NOT NULL REFERENCES companies(id),
         title varchar(255), email varchar(255), phone varchar(255), legacy_employee_id bigint UNIQUE,
@@ -36,7 +36,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE core_person_relationships (
+      CREATE TEMPORARY TABLE IF NOT EXISTS core_person_relationships (
         id bigserial PRIMARY KEY, tenant_id bigint NOT NULL REFERENCES tenants(id),
         person_id bigint NOT NULL, company_id bigint NOT NULL REFERENCES companies(id),
         relationship_type_id bigint NOT NULL, effective_from date, effective_to date,
@@ -51,7 +51,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE UNIQUE INDEX core_person_relationship_live_unique
+      CREATE UNIQUE INDEX IF NOT EXISTS core_person_relationship_live_unique
       ON core_person_relationships(company_id, person_id, relationship_type_id)
       WHERE deleted_at IS NULL AND effective_to IS NULL
       """,
@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Person.TestFixtures do
 
     SQL.query!(
       Repo,
-      "CREATE UNIQUE INDEX core_person_affiliations_live_unique ON core_person_affiliations(person_id, company_id) WHERE unlinked_at IS NULL",
+      "CREATE UNIQUE INDEX IF NOT EXISTS core_person_affiliations_live_unique ON core_person_affiliations(person_id, company_id) WHERE unlinked_at IS NULL",
       []
     )
   end
