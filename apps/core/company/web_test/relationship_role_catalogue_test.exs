@@ -274,4 +274,61 @@ defmodule BilimbiWeb.RelationshipRoleCatalogueTest do
     bad = put_in(end_op, ["input", "effective_to"], "2025-12-31")
     assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [bad])
   end
+
+  test "relationship create and update accept only the inputs they apply", %{scope: scope} do
+    grant_capabilities!(
+      ~w(admin.company.list admin.company.view admin.company.create admin.company.update)
+    )
+
+    Company.TestFixtures.insert_company!(%{id: 74, code: "vendor"})
+    :ok = Bilimbi.Core.Company.RelationshipCatalogue.ensure_defaults(Bilimbi.Base.Repo)
+    {:ok, roles} = Company.list_relationship_types()
+    vendor = Enum.find(roles, &(&1.code == "vendor"))
+    customer = Enum.find(roles, &(&1.code == "customer"))
+
+    {:ok, rel} =
+      Company.create_relationship(scope, 73, %{
+        related_company_id: 74,
+        relationship_type_id: vendor.id
+      })
+
+    retype = %{
+      "key" => "core.company.relationship.update",
+      "input" => %{
+        "company_id" => 73,
+        "relationship_id" => rel.id,
+        "relationship_type_id" => customer.id
+      }
+    }
+
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [retype])
+
+    plain_update = %{
+      "key" => "core.company.relationship.update",
+      "input" => %{
+        "company_id" => 73,
+        "relationship_id" => rel.id,
+        "effective_to" => "2030-01-01"
+      }
+    }
+
+    assert {:ok, %{"valid" => true}} = AgentApi.plan(scope, [plain_update])
+
+    stray_id = %{
+      "key" => "core.company.relationship.create",
+      "input" => %{
+        "company_id" => 73,
+        "related_company_id" => 74,
+        "relationship_type_id" => customer.id,
+        "relationship_id" => rel.id
+      }
+    }
+
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [stray_id])
+
+    assert {:ok, %{"valid" => true}} =
+             AgentApi.plan(scope, [
+               put_in(stray_id, ["input"], Map.delete(stray_id["input"], "relationship_id"))
+             ])
+  end
 end

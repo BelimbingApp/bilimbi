@@ -185,7 +185,11 @@ People's follow-up contract:
    affiliation's title, email, phone and dates). Work email and phone live on the
    affiliation only. No HR field is copied, so People reads employment from the
    employee row and identity and contact from Core. A later Contacts edit is
-   overwritten only by a later change to the same Employee fact.
+   overwritten only by a later change to the same Employee fact. The synced
+   dates pass through the affiliation's own validation: an employment date that
+   would invert the affiliation's start/end range is refused on that employment
+   date field. Deleting an employee unlinks its mapped affiliation and sets its
+   end date in the same transaction; the Core person stays.
 
 Core Person's retirement or affiliation unlink preserves legacy records and
 never terminates HR employment, clears user links or changes permission grants.

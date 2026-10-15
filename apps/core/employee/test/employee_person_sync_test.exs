@@ -110,4 +110,56 @@ defmodule Bilimbi.Core.EmployeePersonSyncTest do
     {:ok, owner} = Tenancy.scope(41)
     assert {:ok, %{company_id: 73}} = Employee.person_identity(owner, orchestrator.id)
   end
+
+  test "deleting an employee ends its mapped affiliation and keeps the person", %{owner: owner} do
+    {:ok, employee} =
+      Employee.create_employee(owner, 73, %{
+        employee_number: "E-3",
+        full_name: "Dara Deleted",
+        email: "dara@work.test"
+      })
+
+    {:ok, %{person_id: person_id, affiliation_id: affiliation_id}} =
+      Employee.person_identity(owner, employee.id)
+
+    assert :ok = Employee.delete_employee(owner, 73, employee.id)
+    today = Date.utc_today()
+
+    assert {:ok, %{full_name: "Dara Deleted", affiliations: [a]}} = Person.get(owner, person_id)
+    assert {a.id, a.ended_on, a.legacy_employee_id} == {affiliation_id, today, employee.id}
+    assert %NaiveDateTime{} = a.unlinked_at
+    assert {:ok, contacts} = Person.work_contacts(owner, [person_id])
+    assert contacts == %{}
+    assert {:error, :employee_not_found} = Employee.person_identity(owner, employee.id)
+  end
+
+  test "an employee date that would invert the affiliation's range is refused", %{owner: owner} do
+    {:ok, employee} =
+      Employee.create_employee(owner, 73, %{
+        employee_number: "E-4",
+        full_name: "Ivy Inverted",
+        employment_start: "2026-02-01"
+      })
+
+    {:ok, %{person_id: person_id, affiliation_id: affiliation_id}} =
+      Employee.person_identity(owner, employee.id)
+
+    assert {:ok, _} =
+             Person.update_affiliation(owner, person_id, affiliation_id, %{
+               started_on: "2026-06-01"
+             })
+
+    assert {:error, %Ecto.Changeset{} = changeset} =
+             Employee.update_employee(owner, 73, employee.id, %{employment_end: "2026-03-31"})
+
+    assert %{employment_end: [message]} = errors_on(changeset)
+    assert message =~ "Contacts affiliation"
+    assert {:ok, %{employment_end: nil}} = Employee.get_employee(owner, 73, employee.id)
+
+    assert {:ok, %{affiliations: [%{started_on: ~D[2026-06-01], ended_on: nil}]}} =
+             Person.get(owner, person_id)
+
+    assert {:ok, _} =
+             Employee.update_employee(owner, 73, employee.id, %{employment_end: "2026-12-31"})
+  end
 end

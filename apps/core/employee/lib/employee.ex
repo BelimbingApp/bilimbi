@@ -435,9 +435,18 @@ defmodule Bilimbi.Core.Employee do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
       else
-        case Repo.delete(employee) do
-          {:ok, _} -> :ok
-          {:error, _} -> {:error, :invariant_violation}
+        Repo.transaction(fn ->
+          case Repo.delete(employee) do
+            {:ok, _} ->
+              :ok = Bilimbi.Core.Person.end_legacy_employee_affiliation(scope, employee.id)
+
+            {:error, _} ->
+              Repo.rollback(:invariant_violation)
+          end
+        end)
+        |> case do
+          {:ok, :ok} -> :ok
+          {:error, reason} -> {:error, reason}
         end
       end
     else
@@ -927,8 +936,13 @@ defmodule Bilimbi.Core.Employee do
     Repo.transaction(fn ->
       case Repo.insert(changeset) do
         {:ok, employee} ->
-          :ok = sync_person(scope, employee, person_facts(employee))
-          Summary.from_schema(employee)
+          case sync_person(scope, employee, person_facts(employee)) do
+            :ok ->
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :insert))
+          end
 
         {:error, changeset} ->
           Repo.rollback(changeset)
@@ -944,8 +958,13 @@ defmodule Bilimbi.Core.Employee do
     Repo.transaction(fn ->
       case Repo.update(changeset) do
         {:ok, employee} ->
-          if facts != %{}, do: :ok = sync_person(scope, employee, facts)
-          Summary.from_schema(employee)
+          case if(facts == %{}, do: :ok, else: sync_person(scope, employee, facts)) do
+            :ok ->
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :update))
+          end
 
         {:error, changeset} ->
           Repo.rollback(changeset)
@@ -955,6 +974,18 @@ defmodule Bilimbi.Core.Employee do
 
   defp sync_person(scope, %Schema{} = employee, facts),
     do: Bilimbi.Core.Person.sync_legacy_employee(scope, employee.id, employee.company_id, facts)
+
+  defp reject_person_sync(%Changeset{} = changeset, %Changeset{errors: errors}, action) do
+    Enum.reduce(errors, %{changeset | action: action}, fn {fact, {message, _}}, acc ->
+      case Enum.find(@person_fact_fields, fn {_field, mapped} -> mapped == fact end) do
+        {field, _fact} ->
+          Changeset.add_error(acc, field, "conflicts with the Contacts affiliation: #{message}")
+
+        nil ->
+          acc
+      end
+    end)
+  end
 
   defp person_facts(%Schema{} = employee), do: employee |> Map.from_struct() |> person_facts()
 

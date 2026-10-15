@@ -49,6 +49,16 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
     end)
   end
 
+  defp dates do
+    date = %{
+      "type" => "string",
+      "maxLength" => 10,
+      "description" => "ISO date (YYYY-MM-DD); an empty string clears this optional date."
+    }
+
+    %{"effective_from" => date, "effective_to" => date}
+  end
+
   defp schema(suffix, required) do
     id = %{"type" => "integer", "minimum" => 1}
     text = %{"type" => "string", "maxLength" => 255}
@@ -96,23 +106,14 @@ defmodule Bilimbi.Core.Company.RelationshipOperations do
             }
           }
 
-        _ ->
-          %{
-            "company_id" => id,
-            "related_company_id" => id,
-            "relationship_type_id" => id,
-            "relationship_id" => id,
-            "effective_from" => %{
-              "type" => "string",
-              "maxLength" => 10,
-              "description" => "ISO date (YYYY-MM-DD); an empty string clears this optional date."
-            },
-            "effective_to" => %{
-              "type" => "string",
-              "maxLength" => 10,
-              "description" => "ISO date (YYYY-MM-DD); an empty string clears this optional date."
-            }
-          }
+        "relationship.create" ->
+          Map.merge(
+            %{"company_id" => id, "related_company_id" => id, "relationship_type_id" => id},
+            dates()
+          )
+
+        "relationship.update" ->
+          Map.merge(%{"company_id" => id, "relationship_id" => id}, dates())
       end
 
     %{"type" => "object", "required" => required, "properties" => props}

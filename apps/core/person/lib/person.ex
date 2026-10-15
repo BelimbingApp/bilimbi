@@ -142,7 +142,9 @@ defmodule Bilimbi.Core.Person do
   `:ended_on`). A missing mapping is created: a new person and an affiliation
   with the employer company carrying the work email and phone, the mapping
   `legacy_employee_id` being the durable link. An existing mapping receives
-  only the facts given. No HR field is stored here.
+  only the facts given. The affiliation facts pass through its own changeset,
+  so a date range it would refuse comes back as `{:error, changeset}` for the
+  caller to surface on its own write. No HR field is stored here.
   """
   def sync_legacy_employee(%Scope{} = scope, employee_id, company_id, facts) do
     affiliation =
@@ -171,10 +173,12 @@ defmodule Bilimbi.Core.Person do
       company_id: company_id,
       legacy_employee_id: employee_id
     }
-    |> Changeset.change(Map.take(facts, @affiliation_facts))
-    |> Repo.insert!()
-
-    :ok
+    |> Affiliation.changeset(Map.take(facts, @affiliation_facts))
+    |> Repo.insert()
+    |> case do
+      {:ok, _} -> :ok
+      {:error, changeset} -> {:error, changeset}
+    end
   end
 
   defp update_legacy_mapping(scope, %Affiliation{} = row, facts) do
@@ -190,11 +194,41 @@ defmodule Bilimbi.Core.Person do
     end
 
     case Map.take(facts, @affiliation_facts) do
-      changes when map_size(changes) == 0 -> :ok
-      changes -> row |> Changeset.change(changes) |> Repo.update!()
-    end
+      changes when map_size(changes) == 0 ->
+        :ok
 
-    :ok
+      changes ->
+        case row |> Affiliation.changeset(changes) |> Repo.update() do
+          {:ok, _} -> :ok
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @doc """
+  Ends the affiliation mapped to a deleted legacy employee: it is unlinked and
+  its end date set, as `unlink/3` does. The person stays: identity may hold
+  other affiliations and roles. No mapping, or an already unlinked one, is a no-op.
+  """
+  def end_legacy_employee_affiliation(%Scope{} = scope, employee_id) do
+    from(a in Tenancy.scope_query(Affiliation, scope),
+      where: a.legacy_employee_id == ^employee_id and is_nil(a.unlinked_at),
+      lock: "FOR UPDATE"
+    )
+    |> Repo.one()
+    |> case do
+      nil ->
+        :ok
+
+      %Affiliation{} = row ->
+        row
+        |> Changeset.change(
+          [unlinked_at: now()] ++ Affiliation.unlink_changes(row, Date.utc_today())
+        )
+        |> Repo.update!()
+
+        :ok
+    end
   end
 
   @doc "The scoped compatibility mapping for an existing Employee ID. It is never a login or HR grant."
