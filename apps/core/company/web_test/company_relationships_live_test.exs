@@ -112,7 +112,7 @@ defmodule BilimbiWeb.CompanyRelationshipsLiveTest do
       assert has_element?(
                view,
                "#delete-rel-confirm-description",
-               "Both companies are kept. The relationship's dates are lost and it would have to be added again."
+               "Both companies and the historical relationship are kept."
              )
 
       # Cancelling keeps the relationship.

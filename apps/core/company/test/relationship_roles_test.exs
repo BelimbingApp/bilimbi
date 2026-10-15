@@ -3,7 +3,9 @@ defmodule Bilimbi.Core.Company.RelationshipRolesTest do
   alias Bilimbi.Base.{Repo, Tenancy}
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.RelationshipCatalogue
+  alias Bilimbi.Core.Company.Relationships
   import Bilimbi.Core.Company.TestFixtures
+  import Bilimbi.Base.Database.TestHelpers, only: [errors_on: 1]
 
   setup do
     create_company_identity_tables!()
@@ -84,5 +86,85 @@ defmodule Bilimbi.Core.Company.RelationshipRolesTest do
                related_company_id: 74,
                relationship_type_id: role.id
              })
+  end
+
+  describe "live relationship uniqueness" do
+    setup do
+      {:ok, roles} = Company.list_relationship_types()
+      %{vendor: Enum.find(roles, &(&1.code == "vendor"))}
+    end
+
+    defp attrs(vendor, extra \\ %{}),
+      do: Map.merge(%{related_company_id: 74, relationship_type_id: vendor.id}, extra)
+
+    test "a replayed assignment is refused, dated or not", %{scope: scope, vendor: vendor} do
+      assert {:ok, _} = Company.create_relationship(scope, 73, attrs(vendor))
+
+      for extra <- [%{}, %{effective_from: ~D[2026-10-14]}] do
+        assert {:error, %Ecto.Changeset{} = changeset} =
+                 Company.create_relationship(scope, 73, attrs(vendor, extra))
+
+        assert %{relationship_type_id: ["is already assigned between these companies"]} =
+                 errors_on(changeset)
+      end
+
+      assert {:ok, [_only_one]} = Company.list_relationships(scope, 73)
+    end
+
+    test "preview refuses what commit would duplicate", %{scope: scope, vendor: vendor} do
+      input = %{"related_company_id" => 74, "relationship_type_id" => vendor.id}
+      assert {:ok, _} = Relationships.preview(scope, 73, nil, "create", input)
+      assert {:ok, _} = Company.create_relationship(scope, 73, attrs(vendor))
+      assert {:error, %Ecto.Changeset{}} = Relationships.preview(scope, 73, nil, "create", input)
+    end
+
+    test "ended and unlinked links stay history and allow a later link", %{
+      scope: scope,
+      vendor: vendor
+    } do
+      assert {:ok, ended} =
+               Company.create_relationship(
+                 scope,
+                 73,
+                 attrs(vendor, %{effective_from: ~D[2025-01-01], effective_to: ~D[2025-12-31]})
+               )
+
+      assert {:ok, current} = Company.create_relationship(scope, 73, attrs(vendor))
+      assert :ok = Company.delete_relationship(scope, 73, current.id)
+      assert {:ok, again} = Company.create_relationship(scope, 73, attrs(vendor))
+
+      assert {:ok, rows} = Company.list_relationships(scope, 73, include_unlinked: true)
+      assert MapSet.new(Enum.map(rows, & &1.id)) == MapSet.new([ended.id, current.id, again.id])
+    end
+
+    test "reopening an ended link cannot duplicate the open one", %{scope: scope, vendor: vendor} do
+      assert {:ok, ended} =
+               Company.create_relationship(
+                 scope,
+                 73,
+                 attrs(vendor, %{effective_from: ~D[2025-01-01], effective_to: ~D[2025-12-31]})
+               )
+
+      assert {:ok, _open} = Company.create_relationship(scope, 73, attrs(vendor))
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Company.update_relationship(scope, 73, ended.id, %{effective_to: nil})
+
+      assert %{relationship_type_id: ["is already assigned between these companies"]} =
+               errors_on(changeset)
+    end
+
+    test "the same role in the opposite direction is a different link", %{
+      scope: scope,
+      vendor: vendor
+    } do
+      assert {:ok, _} = Company.create_relationship(scope, 73, attrs(vendor))
+
+      assert {:ok, _} =
+               Company.create_relationship(scope, 74, %{
+                 related_company_id: 73,
+                 relationship_type_id: vendor.id
+               })
+    end
   end
 end

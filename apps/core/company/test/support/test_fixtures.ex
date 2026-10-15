@@ -285,6 +285,16 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
+      CREATE UNIQUE INDEX IF NOT EXISTS company_relationship_live_unique
+      ON company_relationships (company_id, related_company_id, relationship_type_id)
+      WHERE deleted_at IS NULL AND effective_to IS NULL
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
       #{TestTables.create(persistent)} IF NOT EXISTS company_external_accesses (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,

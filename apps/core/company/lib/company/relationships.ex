@@ -152,9 +152,8 @@ defmodule Bilimbi.Core.Company.Relationships do
       if related_id != nil do
         case WritableCompany.fetch_parent(scope, related_id) do
           {:ok, _related} ->
-            %Relationship{company_id: company_id}
-            |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
-            |> validate_active_type()
+            company_id
+            |> create_changeset(attrs)
             |> Repo.insert()
             |> case do
               {:ok, rel} -> {:ok, Repo.preload(rel, [:type])}
@@ -168,9 +167,8 @@ defmodule Bilimbi.Core.Company.Relationships do
             {:error, :related_company_archived}
         end
       else
-        %Relationship{company_id: company_id}
-        |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
-        |> validate_active_type()
+        company_id
+        |> create_changeset(attrs)
         |> Repo.insert()
       end
     end
@@ -297,9 +295,8 @@ defmodule Bilimbi.Core.Company.Relationships do
          {:ok, _} <- WritableCompany.fetch_parent(scope, company_id) do
       if action == "create" do
         with {:ok, _} <- WritableCompany.fetch_parent(scope, attrs["related_company_id"]) do
-          %Relationship{company_id: company_id}
-          |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
-          |> validate_active_type()
+          company_id
+          |> create_changeset(attrs)
           |> preview_changes()
         end
       else
@@ -349,6 +346,40 @@ defmodule Bilimbi.Core.Company.Relationships do
         {:error, :not_found} -> {:error, :company_not_found}
       end
     end
+  end
+
+  defp create_changeset(company_id, attrs) do
+    %Relationship{company_id: company_id}
+    |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
+    |> validate_active_type()
+    |> validate_no_open_duplicate()
+  end
+
+  defp validate_no_open_duplicate(%Ecto.Changeset{valid?: false} = cs), do: cs
+
+  defp validate_no_open_duplicate(cs) do
+    open_ended? = is_nil(Ecto.Changeset.get_field(cs, :effective_to))
+
+    duplicate? =
+      open_ended? and
+        Repo.exists?(
+          from(r in Relationship,
+            where:
+              r.company_id == ^Ecto.Changeset.get_field(cs, :company_id) and
+                r.related_company_id == ^Ecto.Changeset.get_field(cs, :related_company_id) and
+                r.relationship_type_id == ^Ecto.Changeset.get_field(cs, :relationship_type_id) and
+                is_nil(r.deleted_at) and is_nil(r.effective_to)
+          )
+        )
+
+    if duplicate?,
+      do:
+        Ecto.Changeset.add_error(
+          cs,
+          :relationship_type_id,
+          "is already assigned between these companies"
+        ),
+      else: cs
   end
 
   defp validate_active_type(%Ecto.Changeset{valid?: false} = cs), do: cs

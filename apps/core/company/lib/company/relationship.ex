@@ -53,6 +53,7 @@ defmodule Bilimbi.Core.Company.Relationship do
       [:company_id, :related_company_id, :relationship_type_id, :effective_from],
       name: :company_relationship_unique
     )
+    |> live_unique_constraint()
     |> foreign_key_constraint(:company_id, name: :company_relationships_company_id_foreign)
     |> foreign_key_constraint(:related_company_id,
       name: :company_relationships_related_company_id_foreign
@@ -67,6 +68,14 @@ defmodule Bilimbi.Core.Company.Relationship do
     relationship
     |> cast(attrs, [:effective_from, :effective_to, :metadata])
     |> validate_effective_dates()
+    |> live_unique_constraint()
+  end
+
+  defp live_unique_constraint(changeset) do
+    unique_constraint(changeset, :relationship_type_id,
+      name: :company_relationship_live_unique,
+      message: "is already assigned between these companies"
+    )
   end
 
   defp validate_not_same_company(changeset) do
