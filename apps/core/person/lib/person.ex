@@ -3,7 +3,8 @@ defmodule Bilimbi.Core.Person do
   Core person identity and company affiliation, independent of HR employment.
 
   This module owns person identity and affiliations; its schemas contain
-  no employee number, employment type, HR status, dates or account identity.
+  no employee number, employment type, HR status, employment dates or account
+  identity (an affiliation carries only its own start and end dates).
   The retained employees API is a deprecated compatibility seam for People.
   A legacy_employee_id is an explicit migration mapping, never a person ID.
   Unlinking and retiring preserve records and never terminate employment or
