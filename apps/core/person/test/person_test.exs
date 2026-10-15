@@ -161,7 +161,7 @@ defmodule Bilimbi.Core.PersonTest do
                  ended_on: "2025-01-01"
                })
 
-      assert %{ended_on: [_]} = Bilimbi.Base.Database.TestHelpers.errors_on(cs)
+      assert %{ended_on: [_], started_on: [_]} = Bilimbi.Base.Database.TestHelpers.errors_on(cs)
       {:ok, person} = Person.create(scope, %{full_name: "Una"})
 
       assert {:error, %Ecto.Changeset{}} =

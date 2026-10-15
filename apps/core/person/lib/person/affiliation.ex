@@ -34,7 +34,10 @@ defmodule Bilimbi.Core.Person.Affiliation do
     ended = get_field(changeset, :ended_on)
 
     if started != nil and ended != nil and Date.compare(started, ended) == :gt,
-      do: add_error(changeset, :ended_on, "must be on or after the start date"),
+      do:
+        changeset
+        |> add_error(:started_on, "must be on or before the end date")
+        |> add_error(:ended_on, "must be on or after the start date"),
       else: changeset
   end
 

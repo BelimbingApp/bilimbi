@@ -94,6 +94,25 @@ defmodule BilimbiWeb.ContactWorkflowTest do
 
     assert {:ok, %{affiliations: [%{ended_on: ~D[2025-06-30]}]}} = Person.get(scope, p.id)
 
+    assert has_element?(
+             details,
+             "#affiliation-#{id}-ended_on-status",
+             "must be on or after the start date"
+           )
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-started_on" => "2026-01-01"
+    })
+
+    assert {:ok, %{affiliations: [%{started_on: ~D[2024-02-01]}]}} = Person.get(scope, p.id)
+
+    assert has_element?(
+             details,
+             "#affiliation-#{id}-started_on-status",
+             "must be on or before the end date"
+           )
+
     details |> element("#unlink-affiliation-#{id}") |> render_click()
 
     assert {:ok, %{affiliations: [%{unlinked_at: %NaiveDateTime{}, ended_on: ~D[2025-06-30]}]}} =

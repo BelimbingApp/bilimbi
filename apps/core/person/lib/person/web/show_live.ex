@@ -204,8 +204,8 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
          can?: Authz.can(socket.assigns.current_scope.scope, "admin.person.update").allowed,
          forbidden: "You do not have permission to update contacts.",
          write: fn s, name, field, value ->
-           CommitStatus.commit(
-             s,
+           s
+           |> CommitStatus.commit(
              name,
              Person.update_affiliation(s.assigns.current_scope.scope, s.assigns.person.id, id, %{
                field => value
@@ -213,8 +213,9 @@ defmodule Bilimbi.Core.Person.Web.ShowLive do
              field: field,
              label: to_string(field),
              submitted: value,
-             on_ok: fn changed, _ -> reload(changed) end
+             on_ok: fn changed, _ -> changed end
            )
+           |> reload()
          end
        )}
     else
