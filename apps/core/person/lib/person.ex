@@ -705,7 +705,11 @@ defmodule Bilimbi.Core.Person do
 
   defp summary(row, scope) do
     table = if match?(%Schema{}, row), do: "core_people", else: "core_person_affiliations"
-    Authz.redact(scope, table, row |> Map.from_struct() |> Map.drop([:__meta__, :tenant_id]))
+
+    scope
+    |> Authz.redact(table, row)
+    |> Map.from_struct()
+    |> Map.drop([:__meta__, :tenant_id])
   end
 
   @doc "Operational refusal wording shared by the contact adapters."

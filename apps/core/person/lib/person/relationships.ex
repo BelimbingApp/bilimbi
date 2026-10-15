@@ -12,6 +12,25 @@ defmodule Bilimbi.Core.Person.Relationships do
   alias Bilimbi.Core.Person.Relationship
   alias Ecto.Changeset
 
+  # Field restrictions apply to a struct. Callers still receive the plain map.
+  defmodule Role do
+    @moduledoc false
+    defstruct [
+      :id,
+      :person_id,
+      :company_id,
+      :company_name,
+      :relationship_type_id,
+      :role_code,
+      :role_label,
+      :inverse_label,
+      :effective_from,
+      :effective_to,
+      :unlinked_at,
+      :is_active
+    ]
+  end
+
   @table "core_person_relationships"
   @update "admin.person.update"
 
@@ -280,7 +299,8 @@ defmodule Bilimbi.Core.Person.Relationships do
 
     today = Date.utc_today()
 
-    Authz.redact(scope, @table, %{
+    scope
+    |> Authz.redact(@table, %Role{
       id: row.id,
       person_id: row.person_id,
       company_id: row.company_id,
@@ -297,6 +317,7 @@ defmodule Bilimbi.Core.Person.Relationships do
           (is_nil(row.effective_from) or Date.compare(row.effective_from, today) != :gt) and
           (is_nil(row.effective_to) or Date.compare(row.effective_to, today) != :lt)
     })
+    |> Map.from_struct()
   end
 
   defp now, do: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
