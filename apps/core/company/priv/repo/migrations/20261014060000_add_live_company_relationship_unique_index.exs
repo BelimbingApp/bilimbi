@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.Company.Migrations.AddLiveCompanyRelationshipUniqueIndex 
 
     execute("""
     UPDATE #{schema}.company_relationships AS dup
-    SET deleted_at = NOW()::timestamp(0)
+    SET deleted_at = (NOW() AT TIME ZONE 'UTC')::timestamp(0)
     WHERE dup.deleted_at IS NULL
       AND dup.effective_to IS NULL
       AND dup.id NOT IN (

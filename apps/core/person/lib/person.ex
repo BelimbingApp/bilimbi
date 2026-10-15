@@ -8,6 +8,12 @@ defmodule Bilimbi.Core.Person do
   A legacy_employee_id is an explicit migration mapping, never a person ID.
   Unlinking and retiring preserve records and never terminate employment or
   revoke access. Company relationships likewise confer no access.
+
+  Reads are deliberately tenant-wide, like a shared address book: `list/2`,
+  `get/2` and `affiliations/2` ask only `admin.person.list` or
+  `admin.person.view`. Writes are company-authorized: every company a person
+  is affiliated with must authorize the change. Do not narrow reads to the
+  actor's companies to mirror Employee.
   """
   import Ecto.Query
   alias Bilimbi.Base.Authz

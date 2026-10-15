@@ -154,6 +154,26 @@ defmodule Bilimbi.Core.Company.RelationshipRolesTest do
                errors_on(changeset)
     end
 
+    test "preview of reopening an ended link refuses what commit would refuse", %{
+      scope: scope,
+      vendor: vendor
+    } do
+      assert {:ok, ended} =
+               Company.create_relationship(
+                 scope,
+                 73,
+                 attrs(vendor, %{effective_from: ~D[2025-01-01], effective_to: ~D[2025-12-31]})
+               )
+
+      assert {:ok, open} = Company.create_relationship(scope, 73, attrs(vendor))
+      clear = %{"effective_to" => nil}
+
+      assert {:error, %Ecto.Changeset{}} =
+               Relationships.preview(scope, 73, ended.id, "update", clear)
+
+      assert {:ok, _} = Relationships.preview(scope, 73, open.id, "update", clear)
+    end
+
     test "the same role in the opposite direction is a different link", %{
       scope: scope,
       vendor: vendor

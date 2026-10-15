@@ -211,7 +211,7 @@ defmodule Bilimbi.Core.Company.Relationships do
           rel ->
             with :ok <- other_side_writable(scope, rel, company_id) do
               rel
-              |> Relationship.update_changeset(attrs)
+              |> update_changeset(attrs)
               |> Repo.update()
             end
         end
@@ -310,7 +310,7 @@ defmodule Bilimbi.Core.Company.Relationships do
                changes: [%{field: "deleted_at", from: nil, to: "recorded at commit"}]
              }}
           else
-            row |> Relationship.update_changeset(attrs) |> preview_changes()
+            row |> update_changeset(attrs) |> preview_changes()
           end
         else
           nil -> {:error, :not_found}
@@ -360,17 +360,17 @@ defmodule Bilimbi.Core.Company.Relationships do
   defp validate_no_open_duplicate(cs) do
     open_ended? = is_nil(Ecto.Changeset.get_field(cs, :effective_to))
 
-    duplicate? =
-      open_ended? and
-        Repo.exists?(
-          from(r in Relationship,
-            where:
-              r.company_id == ^Ecto.Changeset.get_field(cs, :company_id) and
-                r.related_company_id == ^Ecto.Changeset.get_field(cs, :related_company_id) and
-                r.relationship_type_id == ^Ecto.Changeset.get_field(cs, :relationship_type_id) and
-                is_nil(r.deleted_at) and is_nil(r.effective_to)
-          )
-        )
+    live =
+      from(r in Relationship,
+        where:
+          r.company_id == ^Ecto.Changeset.get_field(cs, :company_id) and
+            r.related_company_id == ^Ecto.Changeset.get_field(cs, :related_company_id) and
+            r.relationship_type_id == ^Ecto.Changeset.get_field(cs, :relationship_type_id) and
+            is_nil(r.deleted_at) and is_nil(r.effective_to)
+      )
+
+    others = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
+    duplicate? = open_ended? and Repo.exists?(others)
 
     if duplicate?,
       do:
@@ -380,6 +380,12 @@ defmodule Bilimbi.Core.Company.Relationships do
           "is already assigned between these companies"
         ),
       else: cs
+  end
+
+  defp update_changeset(rel, attrs) do
+    rel
+    |> Relationship.update_changeset(attrs)
+    |> validate_no_open_duplicate()
   end
 
   defp validate_active_type(%Ecto.Changeset{valid?: false} = cs), do: cs
