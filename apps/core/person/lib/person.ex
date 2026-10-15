@@ -140,14 +140,16 @@ defmodule Bilimbi.Core.Person do
   The caller owns the transaction and has already authorized and validated the
   employee write; `facts` carries only the identity and company-contact facts
   to apply (`:full_name`, `:title`, `:email`, `:phone`, `:started_on`,
-  `:ended_on`). A missing mapping is created: a new person and an affiliation
-  with the employer company carrying the work email and phone, the mapping
-  `legacy_employee_id` being the durable link. An existing mapping receives
-  only the facts given. The affiliation facts pass through its own changeset,
+  `:ended_on`). A missing mapping is created from `initial_facts` (the
+  employee's complete current facts; `facts` when omitted): a new person and an
+  affiliation with the employer company carrying the work email and phone, the
+  mapping `legacy_employee_id` being the durable link. An existing mapping
+  receives only the facts given. Call `lock_legacy_employee/2` before writing
+  the employee row. The affiliation facts pass through its own changeset,
   so a date range it would refuse comes back as `{:error, changeset}` for the
   caller to surface on its own write. No HR field is stored here.
   """
-  def sync_legacy_employee(%Scope{} = scope, employee_id, company_id, facts) do
+  def sync_legacy_employee(%Scope{} = scope, employee_id, company_id, facts, initial_facts \\ nil) do
     affiliation =
       Repo.one(
         from(a in Tenancy.scope_query(Affiliation, scope),
@@ -157,8 +159,38 @@ defmodule Bilimbi.Core.Person do
       )
 
     case affiliation do
-      nil -> insert_legacy_mapping(scope, employee_id, company_id, facts)
+      nil -> insert_legacy_mapping(scope, employee_id, company_id, initial_facts || facts)
       %Affiliation{} = row -> update_legacy_mapping(scope, row, facts)
+    end
+  end
+
+  @doc """
+  Takes the row locks of the person and affiliation mapped to a legacy
+  employee, in the Person order (person, then affiliation), before the caller
+  writes the employee row, so a concurrent Contacts edit queues behind the
+  employee write instead of crossing it. No mapping is a no-op.
+  """
+  def lock_legacy_employee(%Scope{} = scope, employee_id) do
+    mapped =
+      from(a in Tenancy.scope_query(Affiliation, scope),
+        where: a.legacy_employee_id == ^employee_id
+      )
+
+    case Repo.one(from(a in mapped, select: a.person_id)) do
+      nil ->
+        :ok
+
+      person_id ->
+        _ =
+          Repo.one!(
+            from(p in Tenancy.scope_query(Schema, scope),
+              where: p.id == ^person_id,
+              lock: "FOR UPDATE"
+            )
+          )
+
+        _ = Repo.one(from(a in mapped, lock: "FOR UPDATE"))
+        :ok
     end
   end
 

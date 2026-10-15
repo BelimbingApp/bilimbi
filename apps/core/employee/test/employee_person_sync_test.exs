@@ -162,4 +162,33 @@ defmodule Bilimbi.Core.EmployeePersonSyncTest do
     assert {:ok, _} =
              Employee.update_employee(owner, 73, employee.id, %{employment_end: "2026-12-31"})
   end
+
+  test "an edit of an employee with no mapping creates one from the complete stored facts", %{
+    owner: owner
+  } do
+    %{rows: [[id]]} =
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        """
+        INSERT INTO employees (company_id, employee_number, full_name, designation, email,
+                               mobile_number, employment_start, employment_end)
+        VALUES (73, 'E-5', 'Una Unmapped', 'Clerk', 'una@work.test', '+60555', '2025-01-01', '2026-12-31')
+        RETURNING id
+        """,
+        []
+      )
+
+    assert {:error, :not_found} = Bilimbi.Core.Person.legacy_affiliation(owner, id)
+
+    assert {:ok, _} = Employee.update_employee(owner, 73, id, %{designation: "Senior Clerk"})
+
+    assert {:ok, %{person_id: person_id}} = Employee.person_identity(owner, id)
+    assert {:ok, %{full_name: "Una Unmapped", affiliations: [a]}} = Person.get(owner, person_id)
+
+    assert {a.title, a.email, a.phone, a.started_on, a.ended_on, a.company_id} ==
+             {"Senior Clerk", "una@work.test", "+60555", ~D[2025-01-01], ~D[2026-12-31], 73}
+
+    assert {:ok, _} = Employee.update_employee(owner, 73, id, %{status: "inactive"})
+    assert {:ok, %{affiliations: [^a]}} = Person.get(owner, person_id)
+  end
 end

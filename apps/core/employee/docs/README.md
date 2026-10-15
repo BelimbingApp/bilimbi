@@ -188,7 +188,11 @@ People's follow-up contract:
    overwritten only by a later change to the same Employee fact. The synced
    dates pass through the affiliation's own validation: an employment date that
    would invert the affiliation's start/end range is refused on that employment
-   date field. Deleting an employee unlinks its mapped affiliation and sets its
+   date field. An Employee write takes the mapped person's and affiliation's row
+   locks first (the Core Person order: Company, Person, affiliation, then
+   Employee), so a concurrent Contacts edit queues instead of deadlocking, and an
+   employee that has no mapping yet gets one from its complete stored facts on
+   its next create or edit. Deleting an employee unlinks its mapped affiliation and sets its
    end date in the same transaction; the Core person stays.
 
 Core Person's retirement or affiliation unlink preserves legacy records and

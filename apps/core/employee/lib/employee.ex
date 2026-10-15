@@ -436,6 +436,8 @@ defmodule Bilimbi.Core.Employee do
         {:error, :invariant_violation}
       else
         Repo.transaction(fn ->
+          :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, employee.id)
+
           case Repo.delete(employee) do
             {:ok, _} ->
               :ok = Bilimbi.Core.Person.end_legacy_employee_affiliation(scope, employee.id)
@@ -956,9 +958,11 @@ defmodule Bilimbi.Core.Employee do
     facts = person_facts(changeset.changes)
 
     Repo.transaction(fn ->
+      :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, changeset.data.id)
+
       case Repo.update(changeset) do
         {:ok, employee} ->
-          case if(facts == %{}, do: :ok, else: sync_person(scope, employee, facts)) do
+          case sync_person(scope, employee, facts, person_facts(employee)) do
             :ok ->
               Summary.from_schema(employee)
 
@@ -972,8 +976,15 @@ defmodule Bilimbi.Core.Employee do
     end)
   end
 
-  defp sync_person(scope, %Schema{} = employee, facts),
-    do: Bilimbi.Core.Person.sync_legacy_employee(scope, employee.id, employee.company_id, facts)
+  defp sync_person(scope, %Schema{} = employee, facts, initial_facts \\ nil),
+    do:
+      Bilimbi.Core.Person.sync_legacy_employee(
+        scope,
+        employee.id,
+        employee.company_id,
+        facts,
+        initial_facts
+      )
 
   defp reject_person_sync(%Changeset{} = changeset, %Changeset{errors: errors}, action) do
     Enum.reduce(errors, %{changeset | action: action}, fn {fact, {message, _}}, acc ->
