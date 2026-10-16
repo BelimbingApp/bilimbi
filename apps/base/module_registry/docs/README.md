@@ -65,8 +65,17 @@ A non-null migration path has a mandatory `migration_dispositions` map whose
 positive version keys exactly equal the migration filenames and whose values
 are only `:compatible_baseline` or `:bilimbi_only`. Nil paths omit the field.
 Mix-time and runtime validation both fail closed on missing, extra, malformed,
-or duplicate versions. Descriptor and migration-file contents participate in
-the workspace fingerprint.
+or duplicate versions, and a clash names every owner of the version. Descriptor
+and migration-file contents participate in the workspace fingerprint.
+
+A module that moves one of its migrations to a new version declares the old one
+in an optional `renumbered_migrations` map, old version to a version it now
+ships. The old version is no longer that module's, so another owner may ship
+it; Core Compatibility moves an applied ledger row before it validates the
+ledger (`docs/architecture/database.md` "Ledger and execution").
+`MixDiscovery.validate_migration_versions!/1` checks version uniqueness alone;
+CI runs it with the public first-party Domains mounted at their default
+branches, because the Platform's own CI mounts none.
 
 Base and Core containers are direct children of `apps/`. Optional Domain and
 Extension repositories mount one level deeper, under `apps/domains/<id>/` and

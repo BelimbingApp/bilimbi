@@ -13,7 +13,9 @@ Code.require_file(
 defmodule Bilimbi.Core.CompatibilityTest do
   use ExUnit.Case, async: false
 
+  alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Core.Compatibility
+  alias Bilimbi.Core.Compatibility.MigrationProvenance
   alias Bilimbi.Core.Compatibility.MigrationTestRepo
   alias Ecto.Adapters.SQL
 
@@ -509,6 +511,75 @@ defmodule Bilimbi.Core.CompatibilityTest do
                """,
                []
              ).rows
+  end
+
+  test "a migration applied under a renumbered version moves to its new version", %{
+    schema: schema
+  } do
+    {owner_id, old, new} = renumbering!()
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    # The ledger as the module's earlier release left it: applied under the old number.
+    for table <- ["bilimbi_schema_migrations", "bilimbi_migration_provenance"] do
+      SQL.query!(
+        MigrationTestRepo,
+        ~s(UPDATE "#{schema}".#{table} SET version = $1 WHERE version = $2),
+        [old, new]
+      )
+    end
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == []
+
+    recorded = recorded_versions(MigrationTestRepo, schema)
+    assert new in recorded
+    refute old in recorded
+
+    provenance = MigrationProvenance.fetch(MigrationTestRepo, schema)
+    assert %{owner_id: ^owner_id} = provenance[new]
+    refute Map.has_key?(provenance, old)
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+  end
+
+  test "another owner's version at a renumbered module's old number stays its own", %{
+    schema: schema
+  } do
+    {owner_id, old, new} = renumbering!()
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    # An unmounted Domain applied the old number before the module renumbered,
+    # and the module's migration has not run here yet.
+    for table <- ["bilimbi_schema_migrations", "bilimbi_migration_provenance"] do
+      SQL.query!(
+        MigrationTestRepo,
+        ~s(DELETE FROM "#{schema}".#{table} WHERE version = $1),
+        [new]
+      )
+    end
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".bilimbi_schema_migrations (version, inserted_at)
+      VALUES ($1, now())
+      """,
+      [old]
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".bilimbi_migration_provenance
+        (version, owner_id, owner_layer, disposition, checksum, recorded_at)
+      VALUES ($1, 'unmounted/domain', 'domain', 'bilimbi_only', 'retained', now())
+      """,
+      [old]
+    )
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == [new]
+
+    provenance = MigrationProvenance.fetch(MigrationTestRepo, schema)
+    assert %{owner_id: "unmounted/domain"} = provenance[old]
+    assert %{owner_id: ^owner_id} = provenance[new]
   end
 
   test "adoption rejects a gap inside one owner's baselines and unknown ledger versions", %{
@@ -1082,6 +1153,17 @@ defmodule Bilimbi.Core.CompatibilityTest do
   defp relation(repo, schema, table) do
     [[relation]] = SQL.query!(repo, "SELECT to_regclass($1)::text", ["#{schema}.#{table}"]).rows
     relation
+  end
+
+  # The installed renumbering the ledger tests exercise, read from the
+  # descriptors rather than pinned here.
+  defp renumbering! do
+    [renumbering | _] =
+      for descriptor <- ModuleRegistry.migration_modules!(),
+          {old, new} <- Map.get(descriptor, :renumbered_migrations, %{}),
+          do: {descriptor.id, old, new}
+
+    renumbering
   end
 
   defp recorded_versions(repo, schema) do

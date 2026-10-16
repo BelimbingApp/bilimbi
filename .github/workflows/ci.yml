@@ -103,6 +103,41 @@ jobs:
       - name: Scan Phoenix security across all applications
         run: .github/scripts/sobelow_modules.sh
 
+  # Every other job builds the Platform alone, so a Platform migration that
+  # reuses a version a Domain already ships passes them and is refused only
+  # when a composition mounts both. This job mounts each public first-party
+  # Domain at its default branch and checks migration versions alone, so a
+  # Domain that is behind the Platform in other ways does not fail it. The
+  # daily schedule catches a Domain that takes a version the Platform ships.
+  domain_migration_versions:
+    name: First-party Domain migration versions
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "28.5"
+          elixir-version: "1.20.3"
+          version-type: strict
+
+      - name: Mount the public first-party Domains
+        run: |
+          for domain in factory finance people people_connector supply_chain; do
+            git clone --quiet --depth 1 \
+              "https://github.com/BelimbingApp/b-dom-${domain//_/-}.git" "apps/domains/$domain"
+          done
+
+      - name: Check migration versions are unique across the composition
+        run: >-
+          elixir -r mix/composition_lock.exs
+          -r apps/base/module_registry/mix/module_discovery.exs
+          -e 'Bilimbi.Base.ModuleRegistry.MixDiscovery.validate_migration_versions!(".")'
+
   types:
     name: Elixir types
     runs-on: ubuntu-26.04

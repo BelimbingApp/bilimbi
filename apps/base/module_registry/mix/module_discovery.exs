@@ -35,11 +35,13 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :dev_seed
   ]
   @migration_dispositions [:compatible_baseline, :bilimbi_only]
+  @migration_keys [:migration_dispositions, :renumbered_migrations]
 
   @type descriptor :: %{
           optional(:migration_dispositions) => %{
             pos_integer() => :compatible_baseline | :bilimbi_only
           },
+          optional(:renumbered_migrations) => %{pos_integer() => pos_integer()},
           id: String.t(),
           kind: :module,
           layer: :base | :core | :domain | :extension,
@@ -474,18 +476,32 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @doc "Discovers and validates all installed modules in a source workspace."
   @spec discover_workspace!(String.t()) :: [descriptor()]
   def discover_workspace!(workspace_root) do
-    modules =
-      workspace_root
-      |> discover_containers!()
-      |> Enum.flat_map(&discover_container_modules!/1)
-
-    modules
+    workspace_root
+    |> discover_modules!()
     |> validate_unique!(:id, "stable module ID")
     |> validate_unique!(:otp_app, "OTP application ID")
     |> validate_unique_migration_versions!()
     |> validate_container_membership!()
     |> validate_dependencies!()
     |> topological_sort!()
+  end
+
+  @doc """
+  Refuses a migration version that two installed modules ship, checking each
+  module's descriptor but not the dependency graph.
+
+  `discover_workspace!/1` runs the same check, so a clash stops every Mix
+  command of a composition that mounts both owners. CI calls this with the
+  public first-party Domains mounted at their default branches, so a Platform
+  or Domain change that reuses another owner's version fails there first.
+  """
+  @spec validate_migration_versions!(String.t()) :: :ok
+  def validate_migration_versions!(workspace_root) do
+    workspace_root
+    |> discover_modules!()
+    |> validate_unique_migration_versions!()
+
+    :ok
   end
 
   @doc "Finds a workspace root by walking upward from a path."
@@ -633,6 +649,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :ok
   end
 
+  defp discover_modules!(workspace_root) do
+    workspace_root
+    |> discover_containers!()
+    |> Enum.flat_map(&discover_container_modules!/1)
+  end
+
   defp discover_container_modules!(container) do
     container.path
     |> File.ls!()
@@ -752,11 +774,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       malformed!(path, "descriptor contains duplicate keys")
     end
 
+    # A renumbering is optional and only accompanies a migration path.
     expected_keys =
-      if Keyword.get(value, :migrations) do
-        [:migration_dispositions | @module_keys]
-      else
-        @module_keys
+      cond do
+        !Keyword.get(value, :migrations) -> @module_keys
+        Keyword.has_key?(value, :renumbered_migrations) -> @migration_keys ++ @module_keys
+        true -> [:migration_dispositions | @module_keys]
       end
 
     unless Enum.sort(keys) == Enum.sort(expected_keys) do
@@ -797,6 +820,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
 
     validate_migration_dispositions!(descriptor, path)
+    validate_renumbered_migrations!(descriptor, path)
 
     unless valid_relative_path?(descriptor.web) do
       malformed!(path, "web must be nil or a safe relative path")
@@ -840,6 +864,32 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         descriptor_path,
         "migration_dispositions versions #{inspect(declared_versions)} do not match migration files #{inspect(file_versions)}"
       )
+    end
+  end
+
+  # A version a module once shipped and now ships under another number: Core
+  # Compatibility moves an applied ledger row this module recorded under the
+  # old number to the new one before it validates the ledger. The old number
+  # is no longer this module's, so another owner may ship it.
+  defp validate_renumbered_migrations!(descriptor, descriptor_path) do
+    case Map.fetch(descriptor, :renumbered_migrations) do
+      :error ->
+        :ok
+
+      {:ok, renumbered} ->
+        dispositions = descriptor.migration_dispositions
+
+        unless is_map(renumbered) and map_size(renumbered) > 0 and
+                 Enum.all?(renumbered, fn {old, new} ->
+                   is_integer(old) and old > 0 and not Map.has_key?(dispositions, old) and
+                     Map.has_key?(dispositions, new)
+                 end) do
+          malformed!(
+            descriptor_path,
+            "renumbered_migrations must map a version this module no longer ships " <>
+              "to one of its migration_dispositions versions"
+          )
+        end
     end
   end
 
@@ -890,15 +940,23 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     duplicates =
       modules
       |> Enum.flat_map(fn descriptor ->
-        descriptor |> Map.get(:migration_dispositions, %{}) |> Map.keys()
+        descriptor
+        |> Map.get(:migration_dispositions, %{})
+        |> Map.keys()
+        |> Enum.map(&{&1, descriptor.id})
       end)
-      |> Enum.frequencies()
-      |> Enum.filter(fn {_version, count} -> count > 1 end)
-      |> Enum.map(&elem(&1, 0))
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Enum.filter(fn {_version, owners} -> length(owners) > 1 end)
       |> Enum.sort()
 
     if duplicates != [] do
-      raise ArgumentError, "duplicate migration versions: #{inspect(duplicates)}"
+      raise ArgumentError,
+            "duplicate migration versions: " <>
+              Enum.map_join(duplicates, "; ", fn {version, owners} ->
+                "#{version} (#{owners |> Enum.sort() |> Enum.join(", ")})"
+              end) <>
+              ". A version is unique across the whole composition; renumber the migration added " <>
+              "last and declare its old version in that descriptor's renumbered_migrations"
     end
 
     modules

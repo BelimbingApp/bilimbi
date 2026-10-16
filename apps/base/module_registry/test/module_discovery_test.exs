@@ -510,7 +510,57 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       File.write!(Path.join(migration_dir, "20260814120000_create_#{name}.exs"), "[]\n")
     end
 
-    assert_raise ArgumentError, ~r/duplicate migration versions.*20260814120000/, fn ->
+    assert_raise ArgumentError,
+                 ~r/duplicate migration versions: 20260814120000 \(base\/one, base\/two\)/,
+                 fn -> MixDiscovery.discover_workspace!(root) end
+
+    # The CI check sees the clash even when the graph is otherwise invalid.
+    put_module!(root, "base", "three", dependencies: ["base/missing"])
+
+    assert_raise ArgumentError, ~r/duplicate migration versions: 20260814120000/, fn ->
+      MixDiscovery.validate_migration_versions!(root)
+    end
+  end
+
+  test "a renumbered migration releases its old version to another owner", %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "core", :core)
+    put_migrating_module!(root, "base", "first", 20_260_814_120_000)
+
+    renumbered =
+      put_migrating_module!(root, "core", "second", 20_260_814_110_000,
+        renumbered_migrations: %{20_260_814_120_000 => 20_260_814_110_000}
+      )
+
+    assert :ok = MixDiscovery.validate_migration_versions!(root)
+
+    assert %{renumbered_migrations: %{20_260_814_120_000 => 20_260_814_110_000}} =
+             root
+             |> MixDiscovery.discover_workspace!()
+             |> Enum.find(&(&1.id == "core/second"))
+
+    for invalid <- [
+          # the old version is still shipped
+          %{20_260_814_110_000 => 20_260_814_110_000},
+          # the new version is not shipped
+          %{20_260_814_120_000 => 20_260_814_130_000},
+          %{}
+        ] do
+      File.rm_rf!(renumbered)
+
+      put_migrating_module!(root, "core", "second", 20_260_814_110_000,
+        renumbered_migrations: invalid
+      )
+
+      assert_raise ArgumentError, ~r/renumbered_migrations must map/, fn ->
+        MixDiscovery.discover_workspace!(root)
+      end
+    end
+
+    File.rm_rf!(renumbered)
+    put_module!(root, "core", "plain", renumbered_migrations: %{1 => 2})
+
+    assert_raise ArgumentError, ~r/expected keys/, fn ->
       MixDiscovery.discover_workspace!(root)
     end
   end
@@ -898,12 +948,36 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
         descriptor
       end
 
+    descriptor =
+      case Keyword.fetch(overrides, :renumbered_migrations) do
+        {:ok, renumbered} -> Keyword.put(descriptor, :renumbered_migrations, renumbered)
+        :error -> descriptor
+      end
+
     File.write!(
       Path.join(path, "bilimbi.module.exs"),
       inspect(descriptor, pretty: true, limit: :infinity) <> "\n"
     )
 
     path
+  end
+
+  defp put_migrating_module!(root, container, name, version, overrides \\ []) do
+    module_root =
+      put_module!(
+        root,
+        container,
+        name,
+        [
+          migrations: "priv/repo/migrations",
+          migration_dispositions: %{version => :bilimbi_only}
+        ] ++ overrides
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "#{version}_create_#{name}.exs"), "[]\n")
+    module_root
   end
 
   defp container_layer(root, container) do
