@@ -103,6 +103,7 @@ defmodule Bilimbi.Core.Compatibility do
     installed = installed_migrations()
     schema = Keyword.get(opts, :prefix, "public")
     _ = SchemaVerifier.quote_identifier!(schema)
+    renumber_ledger!(repo, schema)
     validate_ledger!(repo, schema, installed)
     run_and_record(repo, schema, installed, Keyword.put(opts, :all, true))
   end
@@ -338,6 +339,7 @@ defmodule Bilimbi.Core.Compatibility do
   defp adopt_ledger(repo, schema, absent) do
     installed = installed_migrations()
     adoptable = Enum.reject(installed, &(&1.owner_id in absent))
+    renumber_ledger!(repo, schema)
 
     case ledger_versions(repo, schema) do
       :missing ->
@@ -374,6 +376,49 @@ defmodule Bilimbi.Core.Compatibility do
 
   defp baseline_versions(installed) do
     for %{disposition: :compatible_baseline, version: version} <- installed, do: version
+  end
+
+  # A module that gave an applied migration a new version declares the old one
+  # in its descriptor's `renumbered_migrations`. The applied row moves to the
+  # new version only when its provenance names that module and the new version
+  # is not yet recorded, so another owner that now ships the old version keeps
+  # its own row. Any other state is left for `validate_ledger!/3` to refuse.
+  defp renumber_ledger!(repo, schema) do
+    renumbered =
+      for descriptor <- ModuleRegistry.migration_modules!(),
+          {old, new} <- Map.get(descriptor, :renumbered_migrations, %{}),
+          do: {descriptor.id, old, new}
+
+    with [_ | _] <- renumbered,
+         [_ | _] = versions <- ledger_versions(repo, schema) do
+      provenance = MigrationProvenance.fetch(repo, schema)
+
+      moves =
+        for {owner_id, old, new} <- renumbered,
+            old in versions and new not in versions,
+            match?(%{owner_id: ^owner_id}, provenance[old]),
+            do: {old, new}
+
+      if moves != [] do
+        {:ok, :ok} =
+          repo.transaction(fn ->
+            Enum.each(moves, fn {old, new} ->
+              move_ledger_version!(repo, schema, old, new)
+              MigrationProvenance.renumber!(repo, schema, old, new)
+            end)
+          end)
+      end
+    end
+
+    :ok
+  end
+
+  defp move_ledger_version!(repo, schema, old, new) do
+    ledger =
+      "#{SchemaVerifier.quote_identifier!(schema)}.#{SchemaVerifier.quote_identifier!(migration_source(repo))}"
+
+    %{num_rows: 1} =
+      SQL.query!(repo, "UPDATE #{ledger} SET version = $1 WHERE version = $2", [new, old])
   end
 
   defp validate_ledger!(repo, schema, installed) do

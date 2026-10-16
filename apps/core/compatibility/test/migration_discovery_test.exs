@@ -82,8 +82,34 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
   test "runtime rejects duplicate migration versions globally" do
     {_path, _descriptor} = put_test_migration!(20_260_811_093_950)
 
-    assert_raise ArgumentError, ~r/duplicate migration versions.*20260811093950/, fn ->
-      ModuleRegistry.migration_dispositions!()
+    assert_raise ArgumentError,
+                 ~r/duplicate migration versions: 20260811093950 \(.*core\/compatibility.*\)/,
+                 fn -> ModuleRegistry.migration_dispositions!() end
+  end
+
+  test "runtime accepts a renumbering only from an unshipped version to a shipped one" do
+    version = 20_260_814_120_000
+    {_path, descriptor} = put_test_migration!(version)
+    app = :bilimbi_core_compatibility
+
+    Application.put_env(
+      app,
+      :bilimbi_module,
+      Map.put(descriptor, :renumbered_migrations, %{20_260_814_110_000 => version})
+    )
+
+    assert Enum.any?(ModuleRegistry.migration_modules!(), &(&1.id == descriptor.id))
+
+    for invalid <- [%{version => version}, %{20_260_814_110_000 => 20_260_814_130_000}, %{}] do
+      Application.put_env(
+        app,
+        :bilimbi_module,
+        Map.put(descriptor, :renumbered_migrations, invalid)
+      )
+
+      assert_raise ArgumentError, ~r/invalid renumbered_migrations metadata/, fn ->
+        ModuleRegistry.installed_modules!()
+      end
     end
   end
 
