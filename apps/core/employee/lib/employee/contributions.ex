@@ -83,6 +83,10 @@ defmodule Bilimbi.Core.Employee.Contributions do
             core.employee.* is deprecated HR compatibility. Use core.person.* for
             contacts and affiliations without HR identifiers. Never import a namecard
             through core.employee.create.
+            When a domain that owns employment facts (People) is installed, it owns
+            the employee number, type, status and employment dates; prefer its
+            operations for HR changes. core.employee.create still works and the
+            owner records what it writes in the same transaction.
             An employee is a person employed by a company. It is separate from a
             login account. Confirm that an employee record matches the intended
             relationship; source contact details alone do not establish employment.

@@ -282,6 +282,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:can_manage?, can_manage?)
     |> assign(:can_delete?, can_delete?)
     |> assign(:company_archived?, company_archived?)
+    |> assign(:employment_owner, Employee.employment_ownership(scope, company_id, employee.id))
     |> assign(:company_name, company_name)
     |> assign(:departments, departments)
     |> assign(:department_map, department_map)
@@ -1008,7 +1009,23 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             role="region"
             aria-labelledby="employment-info-heading"
           >
-            <.section_heading id="employment-info-heading" title="Employment Information" />
+            <.section_heading id="employment-info-heading" title="Employment Information">
+              <:description :if={@employment_owner}>
+                <span id="employment-owner-note">
+                  {@employment_owner.name} owns the employee number, type, status and employment dates. A change made here is recorded there too.
+                </span>
+              </:description>
+              <:actions :if={@employment_owner && @employment_owner.path}>
+                <.action_link
+                  id="employment-owner-link"
+                  icon="forward"
+                  navigate={@employment_owner.path}
+                  title={"Open in #{@employment_owner.name}"}
+                >
+                  Open in {@employment_owner.name}
+                </.action_link>
+              </:actions>
+            </.section_heading>
 
             <.list id="employment-info">
               <:item title="Company" id="employee-view-company">

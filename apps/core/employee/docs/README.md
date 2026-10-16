@@ -205,5 +205,46 @@ never terminates HR employment, clears user links or changes permission grants.
 The mapping migration preserves null timestamps and advances the person sequence.
 The Person structure migration refuses rollback while identity rows exist, so
 rollback cannot erase contacts or their history; an empty installation can roll
-back normally. The mounted People repository is unchanged in this Bilimbi PR;
-its existing workforce compile/test contract continues to use the retained HR API.
+back normally.
+
+## Employment owner and HR handoff
+
+People owns employment facts once it claims them, but Core has no descriptor
+edge to People and must boot and behave the same without it. Three public
+contracts carry the handoff; with People absent none of them changes a
+result Core returned before.
+
+- **Runtime owner seam.** The owner calls
+  `register_employment_owner/1` from its application start and
+  `unregister_employment_owner/1` on stop; the registration lives in
+  `:persistent_term`, one owner at a time. While one is registered, every
+  write of a legacy row (`create_employee/3`, `update_employee/4`,
+  subordinate assignment and removal, `delete_employee/3` and
+  platform-orchestrator provisioning) calls its
+  `legacy_employee_written/2` inside the same transaction, after Core's
+  company, person/affiliation and employee locks and after Core's own write.
+  An owner refusal rolls the whole write back and reaches the caller. With
+  no owner registered, nothing is called and no extra lock is taken.
+  `Bilimbi.Core.Employee.EmploymentOwner` owns the callback contract.
+- **Batch, permission-neutral mapping.** `person_identities/2` resolves up
+  to 1,000 employee IDs to their person, affiliation and company IDs with a
+  query count that does not grow with the batch. It returns IDs only, so it asks the employee read
+  (`admin.employee.list`), not the contact view `person_identity/2` needs.
+  It sees the tenant's rows, archived companies included.
+- **Tenant-wide handoff read.** `hr_handoff_page/3` pages every retained
+  row of the tenant by ascending ID (archived companies, agents and the
+  platform orchestrator included) with the HR facts, metadata, clocks and
+  person mapping. It writes nothing. Register the owner before paging, so a
+  write after a page was read reaches the owner through its callback.
+
+The employee list and record page say who owns the employee number, type,
+status and employment dates when an owner is registered, and the record
+page links to the owner's page for that employee
+(`employment_ownership/3`). The facts stay editable there and every edit
+reaches the owner. Agent discovery is validated at boot and cannot follow a
+runtime registration, so the `core.employee` guide says it in words that
+hold whether People is installed or not.
+
+Foreign keys from People's employment table to `core_people` and
+`core_person_affiliations` sit on People's own table, so People declares them
+in its own schema contract; Core has nothing to add for them.
