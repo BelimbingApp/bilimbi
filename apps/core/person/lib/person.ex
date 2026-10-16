@@ -273,6 +273,28 @@ defmodule Bilimbi.Core.Person do
     end
   end
 
+  @doc """
+  The person and affiliation IDs mapped to legacy employee IDs, keyed by
+  employee ID; an ID with no mapping is absent. At most 1,000 IDs, under the
+  scope's tenant. It returns IDs only, never an identity or contact fact,
+  so it asks no contact permission: the caller authorizes its own read
+  (`Bilimbi.Core.Employee.person_identities/2`). `company_id` is the
+  affiliation's company.
+  """
+  def legacy_mappings(%Scope{}, []), do: %{}
+
+  def legacy_mappings(%Scope{} = scope, employee_ids)
+      when is_list(employee_ids) and length(employee_ids) <= 1_000 do
+    from(a in Tenancy.scope_query(Affiliation, scope),
+      where: a.legacy_employee_id in ^employee_ids,
+      select:
+        {a.legacy_employee_id,
+         %{person_id: a.person_id, affiliation_id: a.id, company_id: a.company_id}}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   @doc "The scoped compatibility mapping for an existing Employee ID. It is never a login or HR grant."
   def legacy_affiliation(%Scope{} = scope, employee_id) do
     with :ok <- authorize(scope, "admin.person.view") do
