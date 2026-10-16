@@ -229,9 +229,10 @@ result Core returned before.
   scope and one map of `employee_id`, `person_id` and `affiliation_id`
   (`nil` for both IDs when it has no mapping; for a delete, the mapping the
   deleted row had; owners ignore keys added later), so the owner needs no
-  list-capability read. An owner refusal rolls the whole write back and reaches the caller. With no owner
-  registered, nothing is called and no extra lock is taken. A Core write already
-  in flight when an owner registers may not call it. The owner therefore runs
+  list-capability read. An owner refusal rolls the whole write back and
+  reaches the caller. With no owner registered, nothing is called and no extra
+  lock is taken. A Core write already in flight when an owner registers may not
+  call it. The owner therefore runs
   its adoption pass over `hr_handoff_page/3` after registering, and a second
   pass after a grace period longer than any Core HR transaction (for example
   60 seconds) that compares `updated_at` and includes newly inserted IDs.
@@ -239,8 +240,9 @@ result Core returned before.
   `Bilimbi.Core.Employee.EmploymentOwner` owns the callback contract.
 - **Batch, permission-neutral mapping.** `person_identities/2` resolves up
   to 1,000 employee IDs to their person, affiliation and company IDs with a
-  query count that does not grow with the batch. It returns IDs only, so it asks the employee read
-  (`admin.employee.list`), not the contact view `person_identity/2` needs.
+  query count that does not grow with the batch. It returns IDs only, so it
+  asks the employee read (`admin.employee.list`), not the contact view
+  `person_identity/2` needs.
   It sees the tenant's rows, archived companies included.
 - **Tenant-wide handoff read.** `hr_handoff_page/3` pages every retained
   row of the tenant by ascending ID (archived companies, agents and the

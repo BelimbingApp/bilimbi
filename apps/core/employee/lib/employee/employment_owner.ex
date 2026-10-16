@@ -20,9 +20,9 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
   integer | nil}`, read in that transaction with no re-authorization (`nil`
   for both IDs when the row has no mapping), so the owner needs no
   list-capability read to store its mirror. The map may gain keys later;
-  an owner ignores keys it does not know. The owner re-reads the HR facts of the row through the
-  public Employee API and stores the result under that lock order, so Core's
-  deprecated HR path does not leave the owner behind. A deleted row is absent
+  an owner ignores keys it does not know. The owner re-reads the HR facts of
+  the row through the public Employee API and stores the result under that lock
+  order, so Core's deprecated HR path does not leave the owner behind. A deleted row is absent
   from that read, and the IDs passed for it are the mapping that existed for
   the deleted row.
 
