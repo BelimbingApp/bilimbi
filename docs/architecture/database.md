@@ -178,10 +178,10 @@ descriptor namespace.
 
 When a shipped version clashes, renumber the migration added last and record
 the old version in its descriptor's `renumbered_migrations` map. A database
-that applied the migration under the old version keeps working: `migrate`
-moves that ledger row and its provenance to the new version, but only when the
-provenance names the declaring module and the new version is not yet
-recorded, so another owner's row under the old version is never touched.
+that applied the migration under the old version keeps working: `migrate` and
+`schema.adopt` move that ledger row and its provenance to the new version, but
+only when the provenance names the declaring module and the new version is not
+yet recorded, so another owner's row under the old version is never touched.
 
 Migrations express a real state transition. Do not use broad
 `create_if_not_exists` or conditional DDL to conceal whether a database is

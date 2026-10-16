@@ -71,8 +71,9 @@ and migration-file contents participate in the workspace fingerprint.
 A module that moves one of its migrations to a new version declares the old one
 in an optional `renumbered_migrations` map, old version to a version it now
 ships. The old version is no longer that module's, so another owner may ship
-it; Core Compatibility moves an applied ledger row before it validates the
-ledger (`docs/architecture/database.md` "Ledger and execution").
+it; Core Compatibility's `migrate` and `schema.adopt` move an applied ledger
+row before they validate the ledger (`docs/architecture/database.md`
+"Migration contract").
 `MixDiscovery.validate_migration_versions!/1` checks version uniqueness alone;
 CI runs it with the public first-party Domains mounted at their default
 branches, because the Platform's own CI mounts none.
