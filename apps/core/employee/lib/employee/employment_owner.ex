@@ -11,12 +11,23 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
 
   When an owner is registered, every Core write of a legacy employee row
   (create, update, subordinate assignment, delete and platform-orchestrator
-  provisioning) calls `c:legacy_employee_written/2` inside the same Repo
+  provisioning) calls `c:legacy_employee_written/4` inside the same Repo
   transaction, after Core's own locks (company, then the mapped person and
-  affiliation, then the employee row) and after Core's write. The owner
-  re-reads the row through the public Employee API and stores the result
-  under that lock order, so Core's deprecated HR path can never leave the
-  owner behind. A deleted row is absent from that read.
+  affiliation, then the employee row) and after Core's write. Core reads the
+  owner inside that transaction, after those locks, so a write that finds none
+  registered takes no extra lock and calls nothing. Core passes the employee
+  ID with the `person_id` and `affiliation_id` it is mapped to (`nil` for both
+  when it has no mapping), so the owner needs no list-capability read to
+  store its mirror. The owner re-reads the HR facts of the row through the
+  public Employee API and stores the result under that lock order, so Core's
+  deprecated HR path does not leave the owner behind. A deleted row is absent
+  from that read, and the IDs passed for it are the mapping that existed for
+  the deleted row.
+
+  A row written before the owner registered, or while it registered, never
+  reaches the callback. The owner adopts that drift in its own registration
+  pass, by paging `Bilimbi.Core.Employee.hr_handoff_page/3` after it registers;
+  Core keeps no reconcile state for it.
 
   The callback must not authorize again: Core accepted the write and the
   actor in `scope` already passed Core's checks. Returning `{:error, reason}`
@@ -28,8 +39,12 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
   alias Bilimbi.Base.Tenancy.Scope
 
   @doc "Called inside Core's write transaction after the legacy employee row was written or deleted."
-  @callback legacy_employee_written(Scope.t(), employee_id :: pos_integer()) ::
-              :ok | {:error, term()}
+  @callback legacy_employee_written(
+              Scope.t(),
+              employee_id :: pos_integer(),
+              person_id :: pos_integer() | nil,
+              affiliation_id :: pos_integer() | nil
+            ) :: :ok | {:error, term()}
 
   @doc "The owner's name, as Core's employee pages say who owns the HR facts."
   @callback name() :: String.t()
@@ -78,7 +93,7 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
   end
 
   defp owner_module?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :legacy_employee_written, 2) and
+    Code.ensure_loaded?(module) and function_exported?(module, :legacy_employee_written, 4) and
       function_exported?(module, :name, 0)
   end
 end

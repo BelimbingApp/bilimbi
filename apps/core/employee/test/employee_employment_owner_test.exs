@@ -20,16 +20,16 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
     @moduledoc false
     @behaviour Bilimbi.Core.Employee.EmploymentOwner
 
-    # Reports what the owner reads back, from inside Core's transaction.
+    # Reports what Core passed and the owner reads back, from inside Core's
+    # transaction. It reads the mapping from the arguments, never a list read.
     @impl true
-    def legacy_employee_written(scope, employee_id) do
+    def legacy_employee_written(scope, employee_id, person_id, affiliation_id) do
       {:ok, employees} = Employee.get_tenant_employees(scope, [employee_id])
-      {:ok, identities} = Employee.person_identities(scope, [employee_id])
 
       send(
         :persistent_term.get({__MODULE__, :test}),
         {:written, employee_id, Repo.in_transaction?(), Map.get(employees, employee_id),
-         Map.get(identities, employee_id)}
+         %{person_id: person_id, affiliation_id: affiliation_id}}
       )
 
       :persistent_term.get({__MODULE__, :reply}, :ok)
@@ -45,7 +45,7 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
 
   defmodule OtherOwner do
     @moduledoc false
-    def legacy_employee_written(_scope, _employee_id), do: :ok
+    def legacy_employee_written(_scope, _employee_id, _person_id, _affiliation_id), do: :ok
     def name, do: "Other"
   end
 
@@ -116,9 +116,12 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
     id = employee.id
 
     assert_received {:written, ^id, true, %{employee_number: "E-1", status: "active"},
-                     %{person_id: person_id, company_id: 73}}
+                     %{person_id: person_id, affiliation_id: affiliation_id}}
 
-    assert is_integer(person_id)
+    assert is_integer(person_id) and is_integer(affiliation_id)
+
+    assert {:ok, %{^id => %{person_id: ^person_id, affiliation_id: ^affiliation_id}}} =
+             Employee.person_identities(scope, [id])
 
     {:ok, _} =
       Employee.update_employee(scope, 73, id, %{
@@ -134,7 +137,7 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
                        employee_type: "contractor",
                        employment_end: ~D[2027-01-31],
                        metadata: %{"grade" => "B"}
-                     }, %{person_id: ^person_id}}
+                     }, %{person_id: ^person_id, affiliation_id: ^affiliation_id}}
 
     {:ok, supervisor} = create(scope, "E-2")
     supervisor_id = supervisor.id
@@ -146,9 +149,12 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
     {:ok, _} = Employee.remove_subordinate(scope, 73, supervisor_id, id)
     assert_received {:written, ^id, true, %{supervisor_id: nil}, _}
 
-    # A deleted row is absent from the owner's read, and so is its mapping.
+    # A deleted row is absent from the owner's read; the mapping passed is the
+    # one the deleted row had.
     :ok = Employee.delete_employee(scope, 73, id)
-    assert_received {:written, ^id, true, nil, nil}
+
+    assert_received {:written, ^id, true, nil,
+                     %{person_id: ^person_id, affiliation_id: ^affiliation_id}}
   end
 
   test "provisioning the platform orchestrator reaches the owner" do
@@ -159,7 +165,9 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
     id = orchestrator.id
 
     assert_received {:written, ^id, true, %{employee_number: "SYS-001", employee_type: "agent"},
-                     %{company_id: 73}}
+                     %{person_id: person_id, affiliation_id: affiliation_id}}
+
+    assert is_integer(person_id) and is_integer(affiliation_id)
 
     assert {:ok, _, :existing} = Employee.ensure_platform_orchestrator()
     refute_received {:written, _, _, _, _}

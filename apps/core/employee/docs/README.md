@@ -221,10 +221,19 @@ result Core returned before.
   write of a legacy row (`create_employee/3`, `update_employee/4`,
   subordinate assignment and removal, `delete_employee/3` and
   platform-orchestrator provisioning) calls its
-  `legacy_employee_written/2` inside the same transaction, after Core's
+  `legacy_employee_written/4` inside the same transaction, after Core's
   company, person/affiliation and employee locks and after Core's own write.
-  An owner refusal rolls the whole write back and reaches the caller. With
-  no owner registered, nothing is called and no extra lock is taken.
+  Core reads the registered owner inside that transaction, after those
+  locks (an insert takes the company lock only when an owner is registered),
+  so a write that finds none takes no extra lock. The callback receives the
+  scope, the employee ID and the `person_id` and `affiliation_id` it is
+  mapped to (`nil` for both when it has none; for a delete, the mapping the
+  deleted row had), so the owner needs no list-capability read. An owner
+  refusal rolls the whole write back and reaches the caller. With no owner
+  registered, nothing is called and no extra lock is taken. A row written
+  before or while the owner registered never reaches the callback; the owner
+  adopts that drift in its own registration pass over `hr_handoff_page/3`,
+  and Core keeps no reconcile state for it.
   `Bilimbi.Core.Employee.EmploymentOwner` owns the callback contract.
 - **Batch, permission-neutral mapping.** `person_identities/2` resolves up
   to 1,000 employee IDs to their person, affiliation and company IDs with a
@@ -244,6 +253,15 @@ page links to the owner's page for that employee
 reaches the owner. Agent discovery is validated at boot and cannot follow a
 runtime registration, so the `core.employee` guide says it in words that
 hold whether People is installed or not.
+
+### Deprecation
+
+The `core.employee.*` agent operations and the Core Employee HR fields they
+write (employee number, type, status, employment dates and metadata) are
+deprecated as of Bilimbi 0.1.0, in favour of the owner's operations and
+`core.person.*` for contacts and affiliations. They keep working, with or
+without an owner. Removal comes only in a later, separately reviewed release,
+once integrations have an announced migration path.
 
 Foreign keys from People's employment table to `core_people` and
 `core_person_affiliations` sit on People's own table, so People declares them

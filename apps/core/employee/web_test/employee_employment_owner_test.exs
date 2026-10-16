@@ -15,7 +15,7 @@ defmodule BilimbiWeb.EmployeeEmploymentOwnerTest do
     @behaviour Bilimbi.Core.Employee.EmploymentOwner
 
     @impl true
-    def legacy_employee_written(scope, employee_id) do
+    def legacy_employee_written(scope, employee_id, _person_id, _affiliation_id) do
       {:ok, employees} = Employee.get_tenant_employees(scope, [employee_id])
       send(:persistent_term.get({__MODULE__, :test}), {:written, Map.get(employees, employee_id)})
       :ok

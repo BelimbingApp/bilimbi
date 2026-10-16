@@ -558,16 +558,16 @@ defmodule Bilimbi.Core.Employee do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
       else
-        owner = EmploymentOwner.registered()
-
         Repo.transaction(fn ->
           lock_company_or_rollback(scope, employee.company_id)
           :ok = Person.lock_legacy_employee(scope, employee.id)
+          owner = EmploymentOwner.registered()
+          mapping = owner && legacy_mapping(scope, employee.id)
 
           case Repo.delete(employee) do
             {:ok, _} ->
               :ok = Person.end_legacy_employee_affiliation(scope, employee.id)
-              notify_owner_or_rollback(owner, scope, employee.id)
+              notify_owner_or_rollback(owner, scope, employee.id, mapping)
 
             {:error, _} ->
               Repo.rollback(:invariant_violation)
@@ -1038,10 +1038,10 @@ defmodule Bilimbi.Core.Employee do
   end
 
   defp insert_orchestrator(company, changeset) do
-    owner = EmploymentOwner.registered()
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(company.tenant_id)
 
     Repo.transaction(fn ->
+      owner = EmploymentOwner.registered()
       if owner, do: lock_company_or_rollback(scope, company.id)
 
       case Repo.insert(changeset) do
@@ -1067,9 +1067,8 @@ defmodule Bilimbi.Core.Employee do
   defp persist_insert(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
 
   defp persist_insert(changeset, scope) do
-    owner = EmploymentOwner.registered()
-
     Repo.transaction(fn ->
+      owner = EmploymentOwner.registered()
       if owner, do: lock_company_or_rollback(scope, Changeset.get_field(changeset, :company_id))
 
       case Repo.insert(changeset) do
@@ -1093,11 +1092,11 @@ defmodule Bilimbi.Core.Employee do
 
   defp persist_update(changeset, scope) do
     facts = person_facts(changeset.changes)
-    owner = EmploymentOwner.registered()
 
     Repo.transaction(fn ->
       lock_company_or_rollback(scope, changeset.data.company_id)
       :ok = Person.lock_legacy_employee(scope, changeset.data.id)
+      owner = EmploymentOwner.registered()
 
       case Repo.update(changeset) do
         {:ok, employee} ->
@@ -1116,16 +1115,30 @@ defmodule Bilimbi.Core.Employee do
     end)
   end
 
-  # The owner is read once, before the transaction, so one write either calls
-  # it or does not. It runs after Core's locks and Core's own write.
+  # The owner is read inside the transaction, after Core's locks (a company
+  # lock first, for an insert, only when an owner is registered), so one write
+  # either calls it or does not. It runs after Core's own write.
   defp notify_owner_or_rollback(nil, _scope, _employee_id), do: :ok
 
-  defp notify_owner_or_rollback(owner, scope, employee_id) do
-    case owner.legacy_employee_written(scope, employee_id) do
+  defp notify_owner_or_rollback(owner, scope, employee_id),
+    do: notify_owner_or_rollback(owner, scope, employee_id, legacy_mapping(scope, employee_id))
+
+  defp notify_owner_or_rollback(nil, _scope, _employee_id, _mapping), do: :ok
+
+  defp notify_owner_or_rollback(owner, scope, employee_id, mapping) do
+    case owner.legacy_employee_written(
+           scope,
+           employee_id,
+           mapping[:person_id],
+           mapping[:affiliation_id]
+         ) do
       :ok -> :ok
       {:error, reason} -> Repo.rollback(reason)
     end
   end
+
+  defp legacy_mapping(scope, employee_id),
+    do: scope |> Person.legacy_mappings([employee_id]) |> Map.get(employee_id)
 
   defp identity_batch(employee_ids) when is_list(employee_ids) do
     employee_ids = Enum.uniq(employee_ids)
