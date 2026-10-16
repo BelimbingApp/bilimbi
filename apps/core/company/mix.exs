@@ -15,7 +15,9 @@ defmodule Bilimbi.Core.Company.MixProject do
   end
 
   def application do
-    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__)
+    Bilimbi.Base.ModuleRegistry.MixDiscovery.module_application(__DIR__,
+      env: [bilimbi_production_seed_provider: Bilimbi.Core.Company.ProductionSeeds]
+    )
   end
 
   defp deps do

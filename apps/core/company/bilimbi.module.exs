@@ -24,7 +24,8 @@
   migration_dispositions: %{
     20_260_811_093_956 => :compatible_baseline,
     20_260_811_093_957 => :compatible_baseline,
-    20_261_008_070_200 => :bilimbi_only
+    20_261_008_070_200 => :bilimbi_only,
+    20_261_014_060_000 => :bilimbi_only
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Company.SchemaContract,

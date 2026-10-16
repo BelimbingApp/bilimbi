@@ -8,11 +8,16 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
   def create_employee_tables! do
     apply(Bilimbi.Core.Company.TestFixtures, :create_company_identity_tables!, [])
     create_employees_table!()
+    create_employee_types_table!()
+  end
+
+  def create_employee_types_table!(opts \\ []) do
+    persistent = TestTables.persistent?(opts)
 
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE employee_types (
+      #{TestTables.create(persistent)} employee_types (
         id bigserial PRIMARY KEY,
         code varchar(255) NOT NULL,
         label varchar(255) NOT NULL,
@@ -21,7 +26,7 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         CONSTRAINT employee_types_system_company_check CHECK (NOT is_system OR (company_id IS NULL))
-      ) ON COMMIT PRESERVE ROWS
+      ) #{TestTables.on_commit(persistent)}
       """,
       []
     )
@@ -95,5 +100,7 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
       """,
       []
     )
+
+    apply(Bilimbi.Core.Person.TestFixtures, :create_person_tables!, [opts])
   end
 end

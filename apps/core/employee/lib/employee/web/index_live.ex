@@ -71,6 +71,10 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:columns, ListColumns.mount("employees", @builtins))
      |> assign(:department_map, %{})
      |> assign(:pending_delete, nil)
+     |> assign(
+       :employment_owner,
+       Employee.employment_ownership(socket.assigns.current_scope.scope, nil, nil)
+     )
      |> assign(:filters_form, ListState.filters_form(parse_list(%{})))}
   end
 
@@ -421,6 +425,14 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             </div>
           </:actions>
         </.header>
+        <.alert id="employee-hr-compatibility" kind={:info} class="mb-4">
+          These are legacy HR records, with employee numbers and employment facts.
+          <span :if={@employment_owner} id="employment-owner-note">
+            {@employment_owner.name} owns the employee number, type, status and employment dates; a change made here is recorded there too.
+          </span>
+          <.link :if={allowed?(@current_scope, "admin.person.list")} navigate={~p"/contacts"}>Use Contacts for namecards and general affiliations.</.link>
+          <span :if={!allowed?(@current_scope, "admin.person.list")}>For namecards, ask an operator for access to Contacts.</span>
+        </.alert>
 
         <.filter_toolbar id="employees-filters" form={@filters_form} event="filters">
           <:control

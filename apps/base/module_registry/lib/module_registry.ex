@@ -227,24 +227,32 @@ defmodule Bilimbi.Base.ModuleRegistry do
     duplicates =
       modules
       |> Enum.flat_map(fn descriptor ->
-        descriptor |> Map.get(:migration_dispositions, %{}) |> Map.keys()
+        descriptor
+        |> Map.get(:migration_dispositions, %{})
+        |> Map.keys()
+        |> Enum.map(&{&1, descriptor.id})
       end)
-      |> Enum.frequencies()
-      |> Enum.filter(fn {_version, count} -> count > 1 end)
-      |> Enum.map(&elem(&1, 0))
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Enum.filter(fn {_version, owners} -> length(owners) > 1 end)
       |> Enum.sort()
 
     if duplicates != [] do
-      raise ArgumentError, "duplicate migration versions: #{inspect(duplicates)}"
+      raise ArgumentError,
+            "duplicate migration versions: " <>
+              Enum.map_join(duplicates, "; ", fn {version, owners} ->
+                "#{version} (#{owners |> Enum.sort() |> Enum.join(", ")})"
+              end)
     end
 
     modules
   end
 
   defp validate_module_migrations!(%{migrations: nil} = descriptor) do
-    if Map.has_key?(descriptor, :migration_dispositions) do
+    if Map.has_key?(descriptor, :migration_dispositions) or
+         Map.has_key?(descriptor, :renumbered_migrations) do
       raise ArgumentError,
-            "module #{descriptor.id} must omit migration_dispositions when migrations is nil"
+            "module #{descriptor.id} must omit migration_dispositions and " <>
+              "renumbered_migrations when migrations is nil"
     end
   end
 
@@ -278,10 +286,29 @@ defmodule Bilimbi.Base.ModuleRegistry do
             "module #{descriptor.id} migration_dispositions versions #{inspect(declared_versions)} " <>
               "do not match migration files #{inspect(file_versions)}"
     end
+
+    validate_renumbered_migrations!(descriptor, dispositions)
   end
 
   defp validate_module_migrations!(descriptor) do
     raise ArgumentError, "module #{descriptor.id} has invalid migrations metadata"
+  end
+
+  defp validate_renumbered_migrations!(descriptor, dispositions) do
+    case Map.fetch(descriptor, :renumbered_migrations) do
+      :error ->
+        :ok
+
+      {:ok, renumbered} ->
+        unless is_map(renumbered) and map_size(renumbered) > 0 and
+                 Enum.all?(renumbered, fn {old, new} ->
+                   is_integer(old) and old > 0 and not Map.has_key?(dispositions, old) and
+                     Map.has_key?(dispositions, new)
+                 end) do
+          raise ArgumentError,
+                "module #{descriptor.id} has invalid renumbered_migrations metadata"
+        end
+    end
   end
 
   defp migration_versions!(module_id, migration_dir) do

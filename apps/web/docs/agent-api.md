@@ -14,7 +14,9 @@ The server name is that configured server's hostname.
    `agent_id=harness/model-ver-effort` returns a device code, user code,
    verification URI, ten-minute lifetime and polling interval.
 2. Show that code and URI to the person. They sign in, check the code and
-   stated agent, set an end date and approve or refuse on `/oauth/device`.
+   stated agent and the connection end time, then approve or refuse on `/oauth/device`.
+   The platform operator sets the connection length in Settings (90 days by default).
+   Approval or refusal stays on a finished screen; return to the agent or connect another device.
 3. Poll `POST /oauth/token` with `client_id`, `device_code`, and
    `grant_type=urn:ietf:params:oauth:grant-type:device_code`. Respect
    `authorization_pending` and the increasing interval on `slow_down`.

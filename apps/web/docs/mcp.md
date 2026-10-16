@@ -70,8 +70,9 @@ not provide a transport from ChatGPT's hosted connector to this machine.
    as a custom MCP server. Configure OAuth with the registered client ID and
    no client secret. Discovery supplies the authorization and token endpoints.
    Install the connection and sign into Bilimbi when prompted. Consent names
-   the app and callback, uses the person's current company, and asks for the
-   connection's end date. Opening consent never grants access.
+   the app and callback, uses the person's current company, and shows the
+   connection's end time, set by the platform operator in Settings (90 days by default).
+   Opening consent never grants access. Existing connections keep their end dates.
 5. To distribute skills and this installation's MCP configuration, run from
    the umbrella root:
 
@@ -110,7 +111,8 @@ Errors return `isError: true`; successful tools return text and structured data.
 
 POST handles JSON-RPC 2.0 initialization, ping, tools/list, tools/call,
 initialized and cancellation notifications. Supported versions are
-`2025-11-25`, `2025-06-18` and `2025-03-26`. Clients advertise both
+`2025-11-25` and `2025-06-18`. tools/list accepts the `_meta` envelope and
+rejects a cursor, because it returns all tools in one page. Clients advertise both
 `application/json` and `text/event-stream` in Accept. Requests get JSON;
 accepted notifications get empty 202 responses. There are no sessions or
 server-initiated events; GET and DELETE return 405. Present Origin headers

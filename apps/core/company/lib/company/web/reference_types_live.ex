@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.LegalEntityType
+  alias Bilimbi.Core.Company.RelationshipType
 
   @create_capability "admin.company.create"
   @update_capability "admin.company.update"
@@ -42,6 +43,10 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
       spec = spec(path)
       {:ok, types} = list_types(spec, "all")
 
+      catalogue_writable? =
+        spec.kind != :relationship_type or
+          Bilimbi.Base.Tenancy.Scope.platform_operator?(socket.assigns.current_scope.scope)
+
       {:noreply,
        socket
        |> assign(:page_title, spec.page_title)
@@ -49,9 +54,20 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
        |> assign(:reference_path, path)
        |> assign(:spec, spec)
        |> assign(:columns, ListColumns.mount(spec.dom.table, reference_columns(spec)))
-       |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
-       |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
-       |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
+       |> assign(:catalogue_writable?, catalogue_writable?)
+       |> assign(
+         :can_create?,
+         catalogue_writable? and allowed?(socket.assigns.current_scope, @create_capability)
+       )
+       |> assign(
+         :can_update?,
+         catalogue_writable? and allowed?(socket.assigns.current_scope, @update_capability)
+       )
+       |> assign(
+         :can_delete?,
+         spec.kind != :relationship_type and
+           allowed?(socket.assigns.current_scope, @delete_capability)
+       )
        |> assign(:selected_category, "all")
        |> assign(:modal_action, nil)
        |> assign(:editing_type, nil)
@@ -394,11 +410,19 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
 
   defp list_types(%{kind: :legal_entity_type}, _category), do: Company.list_legal_entity_types()
 
+  defp list_types(%{kind: :relationship_type}, _category), do: Company.list_relationship_types()
+
   defp reference_columns(spec) do
     base = [%{id: "code", label: "Code"}, %{id: "name", label: "Name"}]
     category = if spec.category?, do: [%{id: "category", label: "Category"}], else: []
 
+    inverse =
+      if spec.kind == :relationship_type,
+        do: [%{id: "inverse_name", label: "Inverse name"}],
+        else: []
+
     base ++
+      inverse ++
       category ++
       [%{id: "description", label: "Description"}, %{id: "is_active", label: "Status"}]
   end
@@ -413,8 +437,12 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
     Enum.map(types, fn type -> if type.id == updated_type.id, do: updated_type, else: type end)
   end
 
+  defp get_type(%{kind: :relationship_type}, id), do: Company.get_relationship_type(id)
   defp get_type(%{kind: :department_type}, id), do: Company.get_department_type(id)
   defp get_type(%{kind: :legal_entity_type}, id), do: Company.get_legal_entity_type(id)
+
+  defp create(%{kind: :relationship_type}, scope, attrs),
+    do: Company.create_relationship_type(scope, attrs)
 
   defp create(%{kind: :department_type}, scope, attrs),
     do: Company.create_department_type(scope, attrs)
@@ -422,11 +450,17 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
   defp create(%{kind: :legal_entity_type}, scope, attrs),
     do: Company.create_legal_entity_type(scope, attrs)
 
+  defp update(%{kind: :relationship_type}, scope, type, attrs),
+    do: Company.update_relationship_type(scope, type.id, attrs)
+
   defp update(%{kind: :department_type}, scope, type, attrs),
     do: Company.update_department_type(scope, type, attrs)
 
   defp update(%{kind: :legal_entity_type}, scope, type, attrs),
     do: Company.update_legal_entity_type(scope, type, attrs)
+
+  defp toggle(%{kind: :relationship_type}, scope, id),
+    do: Company.toggle_relationship_type_active(scope, id)
 
   defp toggle(%{kind: :department_type}, scope, id),
     do: Company.toggle_department_type_active(scope, id)
@@ -542,6 +576,47 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
     }
   end
 
+  defp spec("/companies/relationship-types") do
+    base = spec("/companies/legal-entity-types")
+
+    base =
+      Map.new(base, fn {key, value} ->
+        value =
+          if is_binary(value),
+            do:
+              String.replace(value, ["Legal Entity", "legal entity", "legal-entity"], fn
+                "Legal Entity" -> "Relationship"
+                "legal entity" -> "relationship"
+                "legal-entity" -> "relationship"
+              end),
+            else: value
+
+        {key, value}
+      end)
+
+    dom =
+      Map.new(base.dom, fn {k, v} -> {k, String.replace(v, "legal-entity", "relationship")} end)
+
+    Map.merge(base, %{
+      kind: :relationship_type,
+      schema: RelationshipType,
+      form_as: "relationship_type",
+      active_nav: "admin.company.relationship-type",
+      dom: dom,
+      page_title: "Relationship Roles",
+      subtitle:
+        "The related company has this role toward the source. Rename or retire roles; historical links stay. Roles grant no access.",
+      code_placeholder: "e.g. vendor",
+      name_placeholder: "e.g. Vendor / Supplier",
+      new_attrs: %{is_active: true},
+      new_struct: %{},
+      new_description: "Name the role and its inverse from the other company's perspective.",
+      edit_description: "Renaming or retiring a role preserves existing relationships.",
+      created: "Relationship role created successfully.",
+      updated: "Relationship role updated successfully."
+    })
+  end
+
   @impl true
   def render(assigns) do
     assigns =
@@ -569,6 +644,17 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
           </:actions>
         </.header>
 
+        <.empty_state
+          :if={!@can_create? and @catalogue_writable? and @spec.kind == :relationship_type}
+          id="relationship-roles-create-forbidden"
+          forbidden="create relationship roles"
+        />
+        <.empty_state
+          :if={!@catalogue_writable?}
+          id="relationship-roles-readonly"
+          title="Role catalogue is read-only"
+          reason="A platform operator manages these shared roles. Assign them on a company's Relationships page."
+        />
         <div :if={@spec.category?} class="mb-4 flex flex-wrap items-center gap-2">
           <span class="w-full text-xs font-semibold text-ink-subtle sm:w-auto">Category:</span>
           <.button
@@ -608,6 +694,9 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
             </:col>
             <:col :let={%{record: type}} id="name">
               <span class="font-medium text-ink-strong">{type.name}</span>
+            </:col>
+            <:col :let={%{record: type}} :if={@spec.kind == :relationship_type} id="inverse_name">
+              {RelationshipType.inverse_name(type)}
             </:col>
             <:col :let={%{record: type}} :if={@spec.category?} id="category">
               <.badge kind={:neutral} dot={false}>
@@ -691,6 +780,13 @@ defmodule Bilimbi.Core.Company.Web.ReferenceTypesLive do
               id={"#{@spec.dom.field}-name"}
               label="Name"
               placeholder={@spec.name_placeholder}
+              required
+            />
+            <.input
+              :if={@spec.kind == :relationship_type}
+              field={@form[:inverse_name]}
+              id="relationship-type-inverse-name"
+              label="Inverse name"
               required
             />
             <.input

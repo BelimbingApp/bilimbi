@@ -12,6 +12,7 @@ import InlineEdit from "./inline_edit"
 import InlineLongText from "./inline_long_text"
 import DashboardSort from "./dashboard_sort"
 import DisclosureDismiss from "./disclosure_dismiss"
+import CodeInput from "./code_input"
 import Combobox from "./combobox"
 import SecretReveal from "./secret_reveal"
 import SecretClear from "./secret_clear"
@@ -38,7 +39,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, SecretClear, SecretStored, Modal, FlashAutoDismiss, ClipboardCopy, TabStrip, Tiling, FlexTable},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, CodeInput, Combobox, SecretReveal, SecretClear, SecretStored, Modal, FlashAutoDismiss, ClipboardCopy, TabStrip, Tiling, FlexTable},
 })
 
 // The loading bar uses the orientation colour from the theme. Canvas cannot

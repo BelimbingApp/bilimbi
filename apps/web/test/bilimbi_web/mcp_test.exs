@@ -76,6 +76,17 @@ defmodule BilimbiWeb.MCPTest do
            |> get_in(["result", "tools"])
            |> length() == 6
 
+    tools =
+      for meta <- [%{}, %{"progressToken" => 17}] do
+        rpc(conn, "tools/list", %{"_meta" => meta})
+        |> json_response(200)
+        |> get_in(["result", "tools"])
+      end
+
+    assert [first, second] = tools
+    assert first == second
+    assert length(first) == 6
+
     refused =
       rpc(conn, "tools/call", %{"name" => "search", "arguments" => %{"query" => "company"}})
 
@@ -194,6 +205,26 @@ defmodule BilimbiWeb.MCPTest do
   test "transport rejects bad origins and versions, accepts notifications, and offers no SSE", %{
     conn: conn
   } do
+    for version <- Bilimbi.Base.AgentApi.MCP.versions() do
+      initialized =
+        conn
+        |> recycle()
+        |> put_req_header("accept", "application/json, text/event-stream")
+        |> put_req_header("mcp-protocol-version", version)
+        |> post("/mcp", %{
+          "jsonrpc" => "2.0",
+          "id" => 1,
+          "method" => "initialize",
+          "params" => %{
+            "protocolVersion" => version,
+            "capabilities" => %{},
+            "clientInfo" => %{"name" => "test", "version" => "1"}
+          }
+        })
+
+      assert json_response(initialized, 200)["result"]["protocolVersion"] == version
+    end
+
     assert conn
            |> put_req_header("origin", "https://attacker.test")
            |> put_req_header("accept", "application/json, text/event-stream")
@@ -203,6 +234,12 @@ defmodule BilimbiWeb.MCPTest do
     assert conn
            |> recycle()
            |> put_req_header("mcp-protocol-version", "wrong")
+           |> post("/mcp", %{})
+           |> json_response(400) == %{"error" => "unsupported_protocol_version"}
+
+    assert conn
+           |> recycle()
+           |> put_req_header("mcp-protocol-version", "2025-03-26")
            |> post("/mcp", %{})
            |> json_response(400) == %{"error" => "unsupported_protocol_version"}
 

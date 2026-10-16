@@ -149,8 +149,9 @@ defmodule BilimbiWeb.CompanyShowLiveTest do
       {:ok, scope} = Tenancy.scope(41)
 
       CompanyFixtures.insert_relationship_type!(11)
+      CompanyFixtures.insert_relationship_type!(12)
       CompanyFixtures.insert_relationship!(21, 73, 74)
-      CompanyFixtures.insert_relationship!(22, 73, 74)
+      CompanyFixtures.insert_relationship!(22, 73, 74, 12)
 
       {:ok, access1} =
         Company.create_external_access(scope, 73, %{

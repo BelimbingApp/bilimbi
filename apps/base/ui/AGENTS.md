@@ -70,6 +70,8 @@ not select session IDs or write session metadata.
 
 A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hook>.test.mjs`, with Node's own test runner and happy-dom. `mix precommit` runs them through `mix assets.test`; `npm test` in `apps/web/assets` runs them alone. Mount the hook with `test/support/hook.mjs` on the markup its component renders, carrying the JS commands the server really renders, and assert what a person meets: attributes, focus, events pushed. Compare focus by id with `focused()`, because a failed assertion on two DOM nodes never finishes printing.
 
+Inline edit activation keys and their guards belong to the shared `InlineEdit` hook and its Node behavior tests; do not add per-page key handlers. See `apps/web/assets/js/inline_edit.js`, `apps/web/assets/test/inline_edit.test.mjs` and `DESIGN.md` "Inline editing".
+
 happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`. Shell out only for what this runner cannot give: another host locale, the shipped LiveView bundle, or markup the server renders in the same test.
 
 ## Shell panels

@@ -82,7 +82,7 @@ defmodule Bilimbi.Web.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:dns_cluster, "~> 0.2"},
-      {:bandit, "~> 1.12"},
+      {:bandit, "~> 1.13"},
       {:swoosh, "~> 1.27"},
       {:gen_smtp, "~> 1.3"},
       {:req, "~> 0.7"},

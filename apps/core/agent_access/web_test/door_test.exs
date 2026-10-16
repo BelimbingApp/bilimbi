@@ -565,6 +565,52 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     refute has_element?(view, "#device-consent")
   end
 
+  test "device refusal finishes and another device resets the page", %{conn: conn} do
+    device = start()
+    {:ok, view, _} = live(log_in_as(conn), "/oauth/device?user_code=" <> device.user_code)
+    assert has_element?(view, "#device_user_code[value='#{device.user_code}']")
+    code = device.user_code |> String.replace("-", "") |> String.downcase()
+    view |> form("#device-code-form", device: %{user_code: code}) |> render_submit()
+    assert has_element?(view, "#device_user_code[value='#{device.user_code}']")
+    view |> element("#device-deny") |> render_click()
+    assert has_element?(view, "#device-completed", "Connection refused")
+    refute has_element?(view, "#device-code-form")
+    assert Repo.aggregate(Connection, :count) == 0
+    view |> element("#device-another") |> render_click()
+    assert has_element?(view, "#device-code-form")
+    refute has_element?(view, "#device-completed")
+    assert has_element?(view, "#device_user_code[value='']")
+  end
+
+  test "device approvals use the setting and reject submitted expiry", %{conn: conn, scope: scope} do
+    {:ok, _} = Bilimbi.Base.Settings.put("agent_access.connection_days", 7)
+    device = start()
+    {:ok, view, _} = live(log_in_as(conn), "/oauth/device")
+    view |> form("#device-code-form", device: %{user_code: device.user_code}) |> render_submit()
+    render_submit(view, "approve", %{"grant" => %{"end_date" => "2099-01-01"}})
+    assert has_element?(view, "#device-error")
+    assert Repo.aggregate(Connection, :count) == 0
+    view |> form("#device-approval-form") |> render_submit()
+    connection = Repo.one!(Connection)
+    assert DateTime.diff(connection.expires_at, now()) in (7 * 86_400 - 5)..(7 * 86_400)
+
+    {:ok, _} = Bilimbi.Base.Settings.put("agent_access.connection_days", 30)
+    {:ok, [existing]} = AgentAccess.list_connections(scope)
+    assert existing.expires_at == connection.expires_at
+  end
+
+  test "connection length is bounded by the setting definition" do
+    assert_raise ArgumentError, fn ->
+      Bilimbi.Base.Settings.put("agent_access.connection_days", 10_000_000)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Bilimbi.Base.Settings.put("agent_access.connection_days", 0)
+    end
+
+    assert {:ok, _} = Bilimbi.Base.Settings.put("agent_access.connection_days", 365)
+  end
+
   test "device consent requires an explicit action and connections can be revoked", %{conn: conn} do
     device = start()
     conn = log_in_as(conn)
@@ -574,11 +620,15 @@ defmodule Bilimbi.Core.AgentAccess.DoorTest do
     view |> form("#device-code-form", device: %{user_code: device.user_code}) |> render_submit()
     assert has_element?(view, "#device-consent")
 
-    view
-    |> form("#device-approval-form",
-      grant: %{end_date: Date.utc_today() |> Date.add(2) |> Date.to_iso8601()}
-    )
-    |> render_submit()
+    refute has_element?(view, "input[type=date]")
+    assert has_element?(view, "#device-connection-end")
+    view |> form("#device-approval-form") |> render_submit()
+    assert has_element?(view, "#device-completed")
+    assert has_element?(view, "#device-completed-agent", "codex/model-high")
+    assert has_element?(view, "#device-completed-end")
+    refute has_element?(view, "#device-code-form")
+    connection = Repo.one!(Connection)
+    assert DateTime.diff(connection.expires_at, now()) in (90 * 86_400 - 5)..(90 * 86_400)
 
     refute has_element?(view, "#device-consent")
     {:ok, view, _} = live(conn, "/settings/agent-connections")

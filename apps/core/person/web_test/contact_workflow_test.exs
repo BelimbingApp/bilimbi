@@ -1,0 +1,348 @@
+defmodule BilimbiWeb.ContactWorkflowTest do
+  use BilimbiWeb.ConnCase, async: true
+  import Phoenix.LiveViewTest
+  alias Bilimbi.Base.{AgentApi, Authz, Tenancy}
+  alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Core.Company.TestFixtures, as: Companies
+  alias Bilimbi.Core.Person
+
+  @caps ~w(admin.person.list admin.person.view admin.person.create admin.person.update admin.company.view admin.company.list admin.company.tenant-wide.manage)
+
+  setup do
+    signed_in_identity!()
+    Person.TestFixtures.create_person_tables!()
+    AgentApi.TestFixtures.create_plan_tables!()
+    Companies.insert_company!(%{id: 74, code: "vendor", name: "Vendor Ltd"})
+    Companies.insert_tenant!(%{id: 42, is_platform_operator: false})
+    Companies.insert_company!(%{id: 75, tenant_id: 42, code: "foreign", name: "Foreign Ltd"})
+    {:ok, system} = Tenancy.scope(41)
+    scope = Authentication.sign_in(system, 91, 73)
+    %{scope: scope, system: system}
+  end
+
+  test "UI namecard creates a vendor contact without HR, login or grants and supports in-place editing",
+       %{conn: conn, scope: scope} do
+    grant_capabilities!(@caps)
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/new")
+    refute has_element?(view, "[name='contact[employee_number]']")
+    refute has_element?(view, "[name='contact[status]']")
+    refute has_element?(view, "#contact-company option[value='75']")
+
+    view
+    |> form("#contact-form",
+      contact: %{
+        full_name: "Vendor Vera",
+        company_id: "74",
+        title: "Sales",
+        email: "vera@vendor.test",
+        phone: "+60123"
+      }
+    )
+    |> render_submit()
+
+    {:ok, %{entries: [p]}} = Person.list(scope)
+    assert_redirect(view, "/contacts/#{p.id}")
+    {:ok, details, _} = conn |> log_in_as() |> live(~p"/contacts/#{p.id}")
+    render_hook(details, "save_field", %{"id" => "#{p.id}", "full_name" => "Vera Vendor"})
+    assert {:ok, person} = Person.get(scope, p.id)
+    assert person.full_name == "Vera Vendor"
+    [a] = person.affiliations
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{a.id}",
+      "affiliation-#{a.id}-title" => "Director"
+    })
+
+    assert {:ok, %{affiliations: [%{title: "Director"}]}} = Person.get(scope, p.id)
+    assert {:ok, []} = Bilimbi.Core.Employee.list_employees(scope, 73)
+    assert {:ok, []} = Bilimbi.Core.Employee.list_employees(scope, 74)
+    assert {:ok, [%{id: 91}]} = Bilimbi.Core.User.list_users(scope)
+  end
+
+  test "UI records, edits and ends affiliation dates, keeping the unlinked row as history", %{
+    conn: conn,
+    scope: scope
+  } do
+    grant_capabilities!(@caps)
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/new")
+
+    view
+    |> form("#contact-form",
+      contact: %{full_name: "Dated Dan", company_id: "74", started_on: "2024-02-01"}
+    )
+    |> render_submit()
+
+    {:ok, %{entries: [p]}} = Person.list(scope)
+    {:ok, details, _} = conn |> log_in_as() |> live(~p"/contacts/#{p.id}")
+
+    assert {:ok, %{affiliations: [%{id: id, started_on: ~D[2024-02-01]}]}} =
+             Person.get(scope, p.id)
+
+    assert has_element?(details, "#affiliation-#{id}-started_on")
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-ended_on" => "2025-06-30"
+    })
+
+    assert {:ok, %{affiliations: [%{ended_on: ~D[2025-06-30]}]}} = Person.get(scope, p.id)
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-ended_on" => "2023-01-01"
+    })
+
+    assert {:ok, %{affiliations: [%{ended_on: ~D[2025-06-30]}]}} = Person.get(scope, p.id)
+
+    assert has_element?(
+             details,
+             "#affiliation-#{id}-ended_on-status",
+             "must be on or after the start date"
+           )
+
+    render_hook(details, "save_affiliation", %{
+      "id" => "#{id}",
+      "affiliation-#{id}-started_on" => "2026-01-01"
+    })
+
+    assert {:ok, %{affiliations: [%{started_on: ~D[2024-02-01]}]}} = Person.get(scope, p.id)
+
+    assert has_element?(
+             details,
+             "#affiliation-#{id}-started_on-status",
+             "must be on or before the end date"
+           )
+
+    details |> element("#unlink-affiliation-#{id}") |> render_click()
+    assert has_element?(details, "#contact-unlink-confirm")
+    details |> element("#contact-unlink-confirm-cancel") |> render_click()
+    refute has_element?(details, "#contact-unlink-confirm")
+    assert {:ok, %{affiliations: [%{unlinked_at: nil}]}} = Person.get(scope, p.id)
+    render_hook(details, "unlink", %{"id" => "#{id}"})
+    assert {:ok, %{affiliations: [%{unlinked_at: nil}]}} = Person.get(scope, p.id)
+    details |> element("#unlink-affiliation-#{id}") |> render_click()
+    details |> element("#contact-unlink-confirm-confirm") |> render_click()
+    refute has_element?(details, "#contact-unlink-confirm")
+
+    assert {:ok, %{affiliations: [%{unlinked_at: %NaiveDateTime{}, ended_on: ~D[2025-06-30]}]}} =
+             Person.get(scope, p.id)
+
+    refute has_element?(details, "#affiliation-#{id}-started_on")
+  end
+
+  test "forged UI cross-tenant target and revoked capability cannot create contacts", %{
+    conn: conn,
+    scope: scope
+  } do
+    grant_capabilities!(@caps)
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/new")
+    render_submit(view, "save", %{"contact" => %{"full_name" => "Stolen", "company_id" => "75"}})
+    assert {:ok, %{entries: []}} = Person.list(scope)
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(scope, 73, :user, 91, "admin.person.create", false)
+
+    render_submit(view, "save", %{"contact" => %{"full_name" => "Denied", "company_id" => "74"}})
+    assert {:ok, %{entries: []}} = Person.list(scope)
+  end
+
+  test "discovery schemas and bound plans expose contacts without manufacturing HR facts", %{
+    scope: scope
+  } do
+    grant_capabilities!(@caps)
+    assert {:ok, description} = AgentApi.describe(scope, "core.person.contact.create")
+    assert description
+
+    op = %{
+      "key" => "core.person.contact.create",
+      "input" => %{
+        "full_name" => "Vera",
+        "company_id" => 74,
+        "title" => "Sales",
+        "email" => "vera@vendor.test"
+      }
+    }
+
+    assert {:ok, plan} = AgentApi.plan(scope, [op])
+    assert plan["valid"]
+    assert {:ok, %{entries: []}} = Person.list(scope)
+    assert {:ok, result} = AgentApi.commit(scope, plan["plan_code"], [op])
+    assert result
+    assert {:ok, %{entries: [p]}} = Person.list(scope, search: "vera")
+
+    assert {:ok, %{affiliations: [%{company_id: 74, legacy_employee_id: nil}]}} =
+             Person.get(scope, p.id)
+
+    assert {:error, :plan_already_used} = AgentApi.commit(scope, plan["plan_code"], [op])
+    assert {:ok, []} = Bilimbi.Core.Employee.list_employees(scope, 73)
+    assert {:ok, []} = Bilimbi.Core.Employee.list_employees(scope, 74)
+  end
+
+  test "agent plans deny unauthorised and cross-tenant writes, including capability revocation before commit",
+       %{scope: scope} do
+    grant_capabilities!(@caps)
+
+    op = %{
+      "key" => "core.person.contact.create",
+      "input" => %{"full_name" => "Vera", "company_id" => 75}
+    }
+
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [op])
+    op = put_in(op, ["input", "company_id"], 74)
+    {:ok, plan} = AgentApi.plan(scope, [op])
+    assert plan["valid"]
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(scope, 73, :user, 91, "admin.person.create", false)
+
+    assert {:error, _} = AgentApi.commit(scope, plan["plan_code"], [op])
+    assert {:ok, %{"valid" => false}} = AgentApi.plan(scope, [op])
+    assert {:ok, %{entries: []}} = Person.list(scope)
+  end
+
+  test "affiliation updates and unlinks honor the stored target company's agent write switch", %{
+    scope: scope
+  } do
+    grant_capabilities!(@caps)
+
+    {:ok, %{person: person, affiliation: a}} =
+      Person.create_contact(scope, 74, %{full_name: "Vera"})
+
+    {:ok, _} =
+      Bilimbi.Base.Settings.put(
+        "authz.agent_writes_enabled",
+        false,
+        Bilimbi.Base.Settings.Scope.company(74, 41)
+      )
+
+    for key <- ~w(core.person.affiliation.update core.person.affiliation.unlink) do
+      input = %{"person_id" => person.id, "affiliation_id" => a.id}
+
+      input =
+        if String.ends_with?(key, "update"), do: Map.put(input, "title", "Director"), else: input
+
+      assert {:ok, %{"valid" => false}} =
+               AgentApi.plan(scope, [%{"key" => key, "input" => input}])
+    end
+
+    assert {:ok, %{affiliations: [%{unlinked_at: nil, title: nil}]}} =
+             Person.get(scope, person.id)
+  end
+
+  test "person-wide writes need authority over every affiliated company", %{
+    conn: conn,
+    scope: scope,
+    system: system
+  } do
+    grant_capabilities!(
+      ~w(admin.person.list admin.person.view admin.person.create admin.person.update admin.company.view admin.company.list)
+    )
+
+    {:ok, %{person: sibling_only}} =
+      Person.create_contact(system, 74, %{full_name: "Vera Sibling"})
+
+    {:ok, %{person: mixed}} = Person.create_contact(system, 73, %{full_name: "Mia Mixed"})
+    {:ok, _} = Person.link(system, mixed.id, 74, %{})
+    {:ok, %{person: own}} = Person.create_contact(system, 73, %{full_name: "Olive Own"})
+    {:ok, unaffiliated} = Person.create(system, %{full_name: "Una Unaffiliated"})
+
+    for person <- [sibling_only, mixed] do
+      assert {:error, :unauthorized} = Person.update(scope, person.id, %{full_name: "Taken"})
+      assert {:error, :unauthorized} = Person.retire(scope, person.id)
+      assert {:error, :unauthorized} = Person.preview(scope, :update, %{"person_id" => person.id})
+      assert {:error, :unauthorized} = Person.preview(scope, :retire, %{"person_id" => person.id})
+
+      for {key, input} <- [
+            {"core.person.update", %{"person_id" => person.id, "full_name" => "Taken"}},
+            {"core.person.retire", %{"person_id" => person.id}}
+          ] do
+        assert {:ok, %{"valid" => false}} =
+                 AgentApi.plan(scope, [%{"key" => key, "input" => input}])
+      end
+    end
+
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/#{sibling_only.id}")
+    render_hook(view, "save_field", %{"full_name" => "Forged"})
+    render_hook(view, "request_retire", %{})
+    render_hook(view, "retire", %{})
+
+    assert {:ok, %{full_name: "Vera Sibling", retired_at: nil}} =
+             Person.get(system, sibling_only.id)
+
+    assert {:ok, %{full_name: "Mia Mixed", retired_at: nil}} = Person.get(system, mixed.id)
+
+    assert {:ok, %{full_name: "Olive Updated"}} =
+             Person.update(scope, own.id, %{full_name: "Olive Updated"})
+
+    assert {:ok, %{full_name: "Una Updated"}} =
+             Person.update(scope, unaffiliated.id, %{full_name: "Una Updated"})
+
+    assert {:ok, %{retired_at: %NaiveDateTime{}}} = Person.retire(scope, own.id)
+  end
+
+  test "person-wide agent writes honor the agent switch of every affiliated company", %{
+    scope: scope,
+    system: system
+  } do
+    grant_capabilities!(@caps)
+    {:ok, %{person: person}} = Person.create_contact(system, 73, %{full_name: "Vera"})
+    {:ok, _} = Person.link(system, person.id, 74, %{})
+
+    {:ok, _} =
+      Bilimbi.Base.Settings.put(
+        "authz.agent_writes_enabled",
+        false,
+        Bilimbi.Base.Settings.Scope.company(74, 41)
+      )
+
+    for {key, input} <- [
+          {"core.person.update", %{"person_id" => person.id, "full_name" => "Taken"}},
+          {"core.person.retire", %{"person_id" => person.id}}
+        ] do
+      assert {:ok, %{"valid" => false}} =
+               AgentApi.plan(scope, [%{"key" => key, "input" => input}])
+    end
+
+    assert {:ok, %{full_name: "Vera", retired_at: nil}} = Person.get(system, person.id)
+  end
+
+  test "read-only contact viewers see facts and cannot forge updates or affiliation writes", %{
+    conn: conn,
+    system: system
+  } do
+    grant_capabilities!(~w(admin.person.list admin.person.view))
+
+    {:ok, %{person: person, affiliation: a}} =
+      Person.create_contact(system, 74, %{full_name: "Vera", title: "Sales"})
+
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts/#{person.id}")
+    assert has_element?(view, "#contact-update-forbidden")
+    refute has_element?(view, "#contact-edit-full_name")
+    refute has_element?(view, "#affiliation-form")
+    render_hook(view, "save_field", %{"full_name" => "Forged"})
+    render_hook(view, "unlink", %{"id" => "#{a.id}"})
+
+    assert {:ok, %{full_name: "Vera", affiliations: [%{unlinked_at: nil}]}} =
+             Person.get(system, person.id)
+  end
+
+  test "contact list uses shared catalog columns and URL search without losing tenant boundaries",
+       %{conn: conn, system: system} do
+    grant_capabilities!(@caps)
+
+    {:ok, _} =
+      Person.create_contact(system, 74, %{full_name: "Vendor Vera", email: "vera@vendor.test"})
+
+    {:ok, own} = Person.create(system, %{full_name: "Own Olive", email: "olive@own.test"})
+    {:ok, _} = Person.link(system, own.id, 74, %{email: "olive@work.test"})
+
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/contacts")
+    assert has_element?(view, "#contacts tbody a", "Vendor Vera")
+    assert has_element?(view, "#contact-#{own.id}", "olive@own.test")
+    refute has_element?(view, "#contact-#{own.id}", "olive@work.test")
+    assert has_element?(view, "#contacts tbody", "vera@vendor.test")
+    view |> form("#contacts-filters", filters: %{search: "missing"}) |> render_change()
+    assert_patch(view)
+    assert has_element?(view, "#contacts-empty")
+  end
+end

@@ -14,13 +14,15 @@
     "base/principal_directory",
     "base/tenancy",
     "base/ui",
-    "core/company"
+    "core/company",
+    "core/person"
   ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{
     20_260_812_112_641 => :compatible_baseline,
     20_260_817_173_000 => :bilimbi_only,
-    20_260_817_180_000 => :bilimbi_only
+    20_260_817_180_000 => :bilimbi_only,
+    20_261_014_050_500 => :bilimbi_only
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Employee.SchemaContract,

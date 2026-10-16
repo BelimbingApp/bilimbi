@@ -1,6 +1,9 @@
 defmodule Bilimbi.Core.Employee do
   @moduledoc """
-  Public API for tenant-scoped employment relationships.
+  Deprecated compatibility API for tenant-scoped legacy HR records.
+
+  New contacts and affiliations use Bilimbi.Core.Person. Existing HR columns
+  and durable Employee IDs remain intact until People claims them; see docs/README.md.
 
   Employee identity remains separate from authentication identity. Every
   operation runs under a `Bilimbi.Base.Tenancy.Scope`, so the tenant is proven
@@ -27,11 +30,15 @@ defmodule Bilimbi.Core.Employee do
   alias Bilimbi.Core.Employee.AffiliationLock
   alias Bilimbi.Core.Employee.AffiliationProof
   alias Bilimbi.Core.Employee.EmployeeType
+  alias Bilimbi.Core.Employee.EmploymentOwner
+  alias Bilimbi.Core.Employee.HrHandoffEntry
+  alias Bilimbi.Core.Employee.HrHandoffPage
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.Summary
   alias Bilimbi.Core.Employee.TypeAdministrationIndex
   alias Bilimbi.Core.Employee.TypeAdministrationPage
   alias Bilimbi.Core.Employee.TypeSummary
+  alias Bilimbi.Core.Person
   alias Ecto.Changeset
 
   @system_types [
@@ -55,6 +62,155 @@ defmodule Bilimbi.Core.Employee do
     status: "active"
   }
   @protected_orchestrator_fields [:employee_number, :employee_type]
+  @person_fact_fields [
+    full_name: :full_name,
+    designation: :title,
+    email: :email,
+    mobile_number: :phone,
+    employment_start: :started_on,
+    employment_end: :ended_on
+  ]
+
+  @identity_batch_limit 1_000
+  @handoff_page_size 500
+  @employee_read_capability "admin.employee.list"
+
+  @doc "Resolves the Core Person/affiliation mapping without exposing either module's private schemas."
+  def person_identity(%Scope{} = scope, employee_id) do
+    with {:ok, employees} <- get_tenant_employees(scope, [employee_id]),
+         true <- Map.has_key?(employees, employee_id),
+         {:ok, affiliation} <- Person.legacy_affiliation(scope, employee_id) do
+      {:ok,
+       %{
+         legacy_employee_id: affiliation.legacy_employee_id,
+         person_id: affiliation.person_id,
+         affiliation_id: affiliation.id,
+         company_id: affiliation.company_id
+       }}
+    else
+      false -> {:error, :employee_not_found}
+      error -> error
+    end
+  end
+
+  @doc """
+  Resolves the Core Person mapping of up to 1,000 legacy employees at once.
+
+  Returns `%{employee_id => %{person_id:, affiliation_id:, company_id:}}`,
+  where `company_id` is the affiliation's company. Employees outside the
+  scope's tenant and rows with no mapping yet are omitted. Visibility is the
+  tenant's, archived companies included, like `get_tenant_employees/2`.
+
+  The values are IDs only and reveal no identity or contact fact, so the
+  read asks the employee read capability (`admin.employee.list`), not the
+  contact view `person_identity/2` requires. An anonymous system actor
+  passes. A list that is not of positive integers or holds more than 1,000
+  distinct IDs is `:invalid_options`. The query count does not grow with the batch.
+  """
+  @spec person_identities(Scope.t(), [pos_integer()]) ::
+          {:ok,
+           %{
+             pos_integer() => %{
+               person_id: pos_integer(),
+               affiliation_id: pos_integer(),
+               company_id: pos_integer()
+             }
+           }}
+          | {:error, :forbidden | :invalid_options}
+  def person_identities(%Scope{} = scope, employee_ids) do
+    with :ok <- authorize(scope, @employee_read_capability),
+         {:ok, employee_ids} <- identity_batch(employee_ids) do
+      {:ok, Person.legacy_mappings(scope, tenant_employee_ids(scope, employee_ids))}
+    end
+  end
+
+  @doc """
+  Reads one page of every retained legacy HR row in the scope's tenant, for
+  the owner of employment facts to claim.
+
+  Unlike `list_employees/2`, the read is tenant-wide and includes the rows
+  of archived companies, agents and the platform orchestrator. It writes
+  nothing and is ordered by ascending employee ID. Pass `nil` to start and
+  the returned `next_cursor` to continue until it is `nil`. Each entry
+  carries the HR facts, metadata, created/updated clocks and the Core Person
+  mapping (`nil` IDs for a row that has none yet).
+
+  IDs only grow, so a row created while paging appears on a later page; a
+  row changed after its page was read is not delivered again. Register the
+  owner (`register_employment_owner/1`) before paging so writes that start
+  afterwards reach it through its callback. A write already in flight at
+  registration may not, so page again after a grace period longer than any
+  Core HR transaction (for example 60 seconds), comparing `updated_at`.
+
+  Asks `admin.employee.list` (an anonymous system actor passes). Option
+  `:limit` sets the page size, default 500, at most 1,000. A cursor that is
+  not `nil` or a positive integer, or a bad limit, is `:invalid_options`.
+  """
+  @spec hr_handoff_page(Scope.t(), pos_integer() | nil, keyword()) ::
+          {:ok, HrHandoffPage.t()} | {:error, :forbidden | :invalid_options}
+  def hr_handoff_page(%Scope{} = scope, cursor, options \\ []) do
+    with :ok <- authorize(scope, @employee_read_capability),
+         {:ok, cursor} <- handoff_cursor(cursor),
+         {:ok, limit} <- handoff_limit(options) do
+      {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+      rows =
+        from(employee in Schema,
+          where: employee.company_id in ^company_ids and employee.id > ^cursor,
+          order_by: [asc: employee.id],
+          limit: ^(limit + 1)
+        )
+        |> Repo.all()
+
+      {page, rest} = Enum.split(rows, limit)
+      mappings = Person.legacy_mappings(scope, Enum.map(page, & &1.id))
+
+      {:ok,
+       %HrHandoffPage{
+         entries: Enum.map(page, &HrHandoffEntry.from_schema(&1, Map.get(mappings, &1.id))),
+         next_cursor: if(rest == [], do: nil, else: List.last(page).id)
+       }}
+    end
+  end
+
+  @doc """
+  Registers the mounted owner of employment facts, from its application start.
+
+  The module implements `Bilimbi.Core.Employee.EmploymentOwner`, whose
+  moduledoc owns the contract. One owner at a time: registering the same
+  module again is `:ok`, another is `:already_registered`, and a module
+  without the callbacks is `:invalid_owner`. With none registered Core's
+  writes call nothing. A write already in flight at registration may not call
+  the owner, so the owner adopts existing rows with `hr_handoff_page/3` after
+  registering, and again after a grace period.
+  """
+  @spec register_employment_owner(module()) ::
+          :ok | {:error, :invalid_owner | :already_registered}
+  def register_employment_owner(module), do: EmploymentOwner.register(module)
+
+  @doc "Removes the employment owner when its application stops; another module is left registered."
+  @spec unregister_employment_owner(module()) :: :ok
+  def unregister_employment_owner(module), do: EmploymentOwner.unregister(module)
+
+  @doc "The registered owner of employment facts, or `nil` when none is mounted."
+  @spec employment_owner() :: module() | nil
+  def employment_owner, do: EmploymentOwner.registered()
+
+  @doc """
+  Who owns one employee's employment facts, for Core's pages to say so.
+
+  `nil` when no owner is registered; otherwise the owner's name and its page
+  for this employee (`nil` when it offers none). Pass `nil` IDs for a page
+  that shows no one employee, such as the list.
+  """
+  @spec employment_ownership(Scope.t(), pos_integer() | nil, pos_integer() | nil) ::
+          %{name: String.t(), path: String.t() | nil} | nil
+  def employment_ownership(%Scope{} = scope, company_id, employee_id) do
+    case EmploymentOwner.registered() do
+      nil -> nil
+      owner -> EmploymentOwner.ownership(owner, scope, company_id, employee_id)
+    end
+  end
 
   @type lookup_error ::
           :company_not_found
@@ -296,7 +452,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       end
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
@@ -317,7 +473,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       else
         {:ok, Summary.from_schema(subordinate)}
       end
@@ -332,8 +488,8 @@ defmodule Bilimbi.Core.Employee do
 
   The caller must already be inside the shared Repo transaction. The returned
   proof is valid only for that transaction and contains no Employee schema or
-  queryable. Callers that also lock User state must keep the global lock order:
-  Company, then Employee, then User, with ascending IDs within each module.
+  queryable. Callers that also lock another module's rows keep the order on
+  `Bilimbi.Core.Company.lock_writable_company/2`.
 
   Missing, cross-tenant, and company-mismatched identities all fail as
   `:not_found`; an archived company is `:company_archived`, since the lock is
@@ -353,7 +509,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
     with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
-      scope |> creation_changeset(company_id, attributes) |> persist_insert()
+      scope |> creation_changeset(company_id, attributes) |> persist_insert(scope)
     end
   end
 
@@ -390,7 +546,7 @@ defmodule Bilimbi.Core.Employee do
       |> protect_platform_orchestrator_identity(employee)
       |> reject_reserved_orchestrator_number(employee)
       |> validate_references(scope, company_id, employee_id)
-      |> persist_update()
+      |> persist_update(scope)
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
@@ -406,9 +562,24 @@ defmodule Bilimbi.Core.Employee do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
       else
-        case Repo.delete(employee) do
-          {:ok, _} -> :ok
-          {:error, _} -> {:error, :invariant_violation}
+        Repo.transaction(fn ->
+          lock_company_or_rollback(scope, employee.company_id)
+          :ok = Person.lock_legacy_employee(scope, employee.id)
+          owner = EmploymentOwner.registered()
+          mapping = owner && legacy_mapping(scope, employee.id)
+
+          case Repo.delete(employee) do
+            {:ok, _} ->
+              :ok = Person.end_legacy_employee_affiliation(scope, employee.id)
+              notify_owner_or_rollback(owner, scope, employee.id, mapping)
+
+            {:error, _} ->
+              Repo.rollback(:invariant_violation)
+          end
+        end)
+        |> case do
+          {:ok, :ok} -> :ok
+          {:error, reason} -> {:error, reason}
         end
       end
     else
@@ -857,7 +1028,7 @@ defmodule Bilimbi.Core.Employee do
 
     changeset = Schema.creation_changeset(company.id, attributes)
 
-    case Repo.insert(changeset) do
+    case insert_orchestrator(company, changeset) do
       {:ok, employee} ->
         {:ok, Summary.from_schema(employee), :created}
 
@@ -870,6 +1041,25 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  defp insert_orchestrator(company, changeset) do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(company.tenant_id)
+
+    Repo.transaction(fn ->
+      owner = EmploymentOwner.registered()
+      if owner, do: lock_company_or_rollback(scope, company.id)
+
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          :ok = sync_person(scope, employee, person_facts(employee))
+          notify_owner_or_rollback(owner, scope, employee.id)
+          employee
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
   defp platform_orchestrator_record?(%Schema{
          employee_number: @platform_orchestrator_number,
          employee_type: @platform_orchestrator_type
@@ -878,21 +1068,155 @@ defmodule Bilimbi.Core.Employee do
 
   defp platform_orchestrator_record?(%Schema{}), do: false
 
-  defp persist_insert(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp persist_insert(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
 
-  defp persist_insert(changeset) do
-    case Repo.insert(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
+  defp persist_insert(changeset, scope) do
+    Repo.transaction(fn ->
+      owner = EmploymentOwner.registered()
+      if owner, do: lock_company_or_rollback(scope, Changeset.get_field(changeset, :company_id))
+
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          case sync_person(scope, employee, person_facts(employee)) do
+            :ok ->
+              notify_owner_or_rollback(owner, scope, employee.id)
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :insert))
+          end
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp persist_update(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
+
+  defp persist_update(changeset, scope) do
+    facts = person_facts(changeset.changes)
+
+    Repo.transaction(fn ->
+      lock_company_or_rollback(scope, changeset.data.company_id)
+      :ok = Person.lock_legacy_employee(scope, changeset.data.id)
+      owner = EmploymentOwner.registered()
+
+      case Repo.update(changeset) do
+        {:ok, employee} ->
+          case sync_person(scope, employee, facts, person_facts(employee)) do
+            :ok ->
+              notify_owner_or_rollback(owner, scope, employee.id)
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :update))
+          end
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  # The owner is read inside the transaction, after Core's locks (a company
+  # lock first, for an insert, only when an owner is registered), so one write
+  # either calls it or does not. It runs after Core's own write.
+  defp notify_owner_or_rollback(nil, _scope, _employee_id), do: :ok
+
+  defp notify_owner_or_rollback(owner, scope, employee_id),
+    do: notify_owner_or_rollback(owner, scope, employee_id, legacy_mapping(scope, employee_id))
+
+  defp notify_owner_or_rollback(nil, _scope, _employee_id, _mapping), do: :ok
+
+  defp notify_owner_or_rollback(owner, scope, employee_id, mapping) do
+    case owner.legacy_employee_written(scope, %{
+           employee_id: employee_id,
+           person_id: mapping[:person_id],
+           affiliation_id: mapping[:affiliation_id]
+         }) do
+      :ok -> :ok
+      {:error, reason} -> Repo.rollback(reason)
     end
   end
 
-  defp persist_update(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp legacy_mapping(scope, employee_id),
+    do: scope |> Person.legacy_mappings([employee_id]) |> Map.get(employee_id)
 
-  defp persist_update(changeset) do
-    case Repo.update(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
+  defp identity_batch(employee_ids) when is_list(employee_ids) do
+    employee_ids = Enum.uniq(employee_ids)
+
+    if length(employee_ids) <= @identity_batch_limit and
+         Enum.all?(employee_ids, &(is_integer(&1) and &1 > 0)),
+       do: {:ok, employee_ids},
+       else: {:error, :invalid_options}
+  end
+
+  defp identity_batch(_employee_ids), do: {:error, :invalid_options}
+
+  defp tenant_employee_ids(_scope, []), do: []
+
+  defp tenant_employee_ids(scope, employee_ids) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    from(employee in Schema,
+      where: employee.id in ^employee_ids and employee.company_id in ^company_ids,
+      select: employee.id
+    )
+    |> Repo.all()
+  end
+
+  defp handoff_cursor(nil), do: {:ok, 0}
+  defp handoff_cursor(cursor) when is_integer(cursor) and cursor > 0, do: {:ok, cursor}
+  defp handoff_cursor(_cursor), do: {:error, :invalid_options}
+
+  defp handoff_limit(options) when is_list(options) do
+    case Keyword.get(options, :limit, @handoff_page_size) do
+      limit when is_integer(limit) and limit > 0 and limit <= @identity_batch_limit ->
+        {:ok, limit}
+
+      _ ->
+        {:error, :invalid_options}
+    end
+  end
+
+  defp handoff_limit(_options), do: {:error, :invalid_options}
+
+  defp sync_person(scope, %Schema{} = employee, facts, initial_facts \\ nil),
+    do:
+      Person.sync_legacy_employee(
+        scope,
+        employee.id,
+        employee.company_id,
+        facts,
+        initial_facts
+      )
+
+  # Re-prove writability inside the transaction, before Person/affiliation and Employee locks.
+  defp lock_company_or_rollback(scope, company_id) do
+    case normalize_company(Company.lock_writable_company(scope, company_id)) do
+      {:ok, _proof} -> :ok
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
+
+  defp reject_person_sync(%Changeset{} = changeset, %Changeset{errors: errors}, action) do
+    Enum.reduce(errors, %{changeset | action: action}, fn {fact, {message, _}}, acc ->
+      case Enum.find(@person_fact_fields, fn {_field, mapped} -> mapped == fact end) do
+        {field, _fact} ->
+          Changeset.add_error(acc, field, "conflicts with the Contacts affiliation: #{message}")
+
+        nil ->
+          acc
+      end
+    end)
+  end
+
+  defp person_facts(%Schema{} = employee), do: employee |> Map.from_struct() |> person_facts()
+
+  defp person_facts(fields) when is_map(fields) do
+    for {field, fact} <- @person_fact_fields, Map.has_key?(fields, field), into: %{} do
+      {fact, Map.fetch!(fields, field)}
     end
   end
 

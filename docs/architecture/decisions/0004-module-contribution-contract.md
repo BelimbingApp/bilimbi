@@ -179,6 +179,13 @@ parts. This is the exact grammar implemented by Belimbing
 validates the registered domain and final action/verb, matching the catalog
 checks (`app/Base/Authz/Capability/CapabilityCatalog.php:128-144`).
 
+Verbs form shared vocabulary, so providers declare the actions they need
+without coordinating an exclusive verb owner. Repeated valid declarations
+merge idempotently, both within a provider and across providers, and the
+snapshot exposes a sorted set of verb strings. Malformed verbs remain invalid.
+Complete capability keys retain exclusive module ownership; sharing a verb
+does not merge capability identities or change persisted grants.
+
 Keys already persist in `base_authz_role_capabilities` and
 `base_authz_principal_capabilities`; changing their grammar is a data migration,
 not a source rename. Provider validation therefore rejects incompatible keys

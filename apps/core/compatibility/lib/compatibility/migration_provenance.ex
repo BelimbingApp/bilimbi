@@ -152,6 +152,23 @@ defmodule Bilimbi.Core.Compatibility.MigrationProvenance do
     :ok
   end
 
+  @doc """
+  Moves an applied version's provenance to the number its owner now ships it
+  under, discarding a row left at that number by an earlier rollback.
+  """
+  @spec renumber!(Ecto.Repo.t(), String.t(), integer(), integer()) :: :ok
+  def renumber!(repo, schema, old, new) do
+    SQL.query!(repo, "DELETE FROM #{qualified(schema)} WHERE version = $1", [new])
+
+    %{num_rows: 1} =
+      SQL.query!(repo, "UPDATE #{qualified(schema)} SET version = $1 WHERE version = $2", [
+        new,
+        old
+      ])
+
+    :ok
+  end
+
   @spec checksum(String.t()) :: String.t()
   def checksum(path) do
     :sha256 |> :crypto.hash(File.read!(path)) |> Base.encode16(case: :lower)

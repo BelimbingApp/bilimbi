@@ -4,6 +4,13 @@
 decision evaluation, and decision-log persistence. Capability definitions are
 immutable module contributions; assignments remain database state.
 
+Verbs are shared vocabulary. Each provider declares the verbs its capabilities
+need; repeated valid verbs merge idempotently, including across independently
+installed Domains. The snapshot exposes one sorted list of verb strings with
+no verb owners. Malformed verbs still fail validation, and each complete
+capability key must have exactly one owner. Sharing `import`, for example,
+does not change capability keys, ownership, or role and principal grants.
+
 The module deliberately has no capabilities table. Unknown capability keys
 fail closed, while stale persisted grants remain intact and are reported by
 diagnostics. `mix bilimbi.seeds.run` reconciles configured system roles on

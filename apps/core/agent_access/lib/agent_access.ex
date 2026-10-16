@@ -41,6 +41,18 @@ defmodule Bilimbi.Core.AgentAccess do
     with :ok <- self_service(scope), do: PluginPackage.archive(origin, client_id)
   end
 
+  @doc "Computes the end time displayed for a new connection from the global operator setting."
+  def connection_expiry,
+    do: DateTime.add(now(), Settings.get("agent_access.connection_days") * 86_400)
+
+  @doc "Canonical eight-character Base32 user code, accepting an optional separator."
+  def normalize_user_code(code) when is_binary(code) do
+    case code |> String.trim() |> String.upcase() |> String.replace("-", "") do
+      <<first::binary-size(4), last::binary-size(4)>> -> first <> "-" <> last
+      other -> other
+    end
+  end
+
   @doc "Validates an operator-registered authorization-code request before displaying consent."
   defdelegate authorization_request(params, resource), to: OAuthClient, as: :request
 

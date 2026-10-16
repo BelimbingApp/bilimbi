@@ -196,10 +196,8 @@ cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`; an
 archived company is read-only and returns `{:error, :company_archived}`;
 calling outside an explicit transaction returns `{:error, :transaction_required}`.
 
-The proof remains valid only until that transaction commits or rolls back. A
-cross-module workflow acquires locks in this order: Company, then Employee,
-then User; within each record kind, ids ascend. It must not take an Employee or
-User lock before calling `lock_writable_company/2`.
+The proof remains valid only until that transaction commits or rolls back. The
+cross-module lock order is the contract on `lock_writable_company/2`.
 
 ## External access
 
@@ -238,3 +236,51 @@ and refuses an archived company before writing the setting. The company's
 Agent access fact exposes this switch, on by default. Turning it off stops
 agents signed in there and employee writes targeting it, including plans
 already reviewed. It does not change a person's ordinary screen permissions.
+
+## Relationship roles and headless administration
+
+The existing `company_relationship_types` catalogue describes relationships,
+not legal company types. The production seed `core/company/relationship-roles`
+adds vendor/supplier, customer, prospect and partner if missing; it never overwrites an
+operator's rename or retirement. Run it through `mix bilimbi.seeds.run`, not at
+boot. Operators manage defaults and custom roles at `/companies/relationship-types`
+using the same reference-type page as the other company catalogues. The catalogue
+is platform-wide, so writes require the operator tenant plus company create/update
+capabilities; other tenants can read and assign its active roles.
+
+For source A, related B, role vendor: **B supplies A**. A sees B as vendor;
+B sees A under the catalogue's inverse label, customer. For customer: **B buys
+from A**, inverse vendor/supplier. Partner is symmetric. Custom roles store the
+inverse label in their existing metadata. Stable codes and IDs survive renaming.
+Retiring a role excludes it from new assignments without deleting, rewriting or
+ending existing relationships. Multiple roles between the same organisations
+are separate concurrent links. For one source, target and role, live links
+may not overlap in time (inclusive dates, an absent date being open); create,
+update and the previews all refuse an overlap, on the role for a create and on
+the end date for an update. The check runs inside the write's transaction under
+a per-source/target/role advisory lock, next to the open-ended unique index. An
+exact repeat of a create (same dates) is a replay: it returns the existing link.
+Ending a link and starting the next one on a later date therefore never conflicts. Role and affiliation creation grants no portal
+access or permissions; external access is administered separately.
+
+A company-to-person role (an individual customer, prospect or lead) uses the
+same catalogue but is owned by Core Person (`core.person.relationship.*`; see its
+README), because Core Company cannot depend on Person. A role targets exactly one
+company or one person.
+
+Discover `core.company.relationship_role.list/get/create/update/retire` and
+`core.company.relationship.list/get/create/update/unlink`. Searches support role
+name/code duplicate checks; company lookup remains `core.company.list/get`.
+Writes use preview, review/approval and bound plan-code commit. Relationship
+writes use the same source-company authorization and writable-company rules as
+the UI, and validate that both organisations are in the tenant. Unlink sets the
+existing soft-delete clock and retains the link and effective dates.
+`relationship.get` can still read that link, and `relationship.list` with
+`include_unlinked: true` includes it in history. Dates can
+be updated without changing the relationship's role or organisations.
+`core.company.relationship.end` is the normal transition: it sets `effective_to`
+(default today) and keeps the row as dated history; a prospect becomes a customer
+by ending that link and creating the customer link. Unlink is only for removing
+a mistaken entry. The relationships page offers End relationship (editable date),
+Edit dates and Unlink. Catalogue
+retirement is distinct from unlinking one company's relationship.

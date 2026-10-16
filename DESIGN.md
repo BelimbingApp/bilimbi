@@ -152,7 +152,7 @@ Inline editing allows quick modifications to entity fields without leaving the
 surface they are read on — a table row or a detail page fact:
 
 - **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`). A blank value shows `—` in `text-ink-muted`.
-- **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
+- **Activation:** Clicking the cell or pressing Enter when focused activates edit mode. F2 opens with the current value and the caret at its end; typing a printable character replaces the value and starts the edit with the caret after that character. Modified, composing and already handled keys do not start an edit.
 - **Editing mode:** Replaces the cell with an inline `<input>` styled with
   `border-brand-strong`, autofocusing and selecting the text.
 - **Save & Cancel:** Pressing `Enter` or blurring commits the field; pressing `Escape` cancels editing and reverts to display mode. An unchanged value commits nothing, and an emptied value commits nothing unless the owner passes `allow_empty`, so a nullable fact has to say so. In a list the owner updates the LiveView stream item (`stream_insert/3`).
@@ -463,7 +463,8 @@ focus, ignored Escape and painted its Delete solid red.
 
 Every destructive control confirms this way: the reference-type deletes, the
 address unlinks and deletes, the company relationship and department removals,
-the business activity chip, the employee and employee type deletes, the
+the business activity chip, contact retirement, contact affiliation and person-role
+unlinks, the employee and employee type deletes, the
 subordinate removal, the user deletes, the employee unlink, the saved database
 query deletes, the session terminate, the settings restore and the schedule
 pause and disable. No `data-confirm` attribute remains in the product. The

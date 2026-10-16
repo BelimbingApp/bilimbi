@@ -24,14 +24,14 @@ defmodule Bilimbi.Core.Company.Relationship do
         }
 
   schema "company_relationships" do
-    field :effective_from, :date
-    field :effective_to, :date
-    field :metadata, Bilimbi.Base.Database.Json
-    field :deleted_at, :naive_datetime
+    field(:effective_from, :date)
+    field(:effective_to, :date)
+    field(:metadata, Bilimbi.Base.Database.Json)
+    field(:deleted_at, :naive_datetime)
 
-    belongs_to :company, Bilimbi.Core.Company.Schema, foreign_key: :company_id
-    belongs_to :related_company, Bilimbi.Core.Company.Schema, foreign_key: :related_company_id
-    belongs_to :type, Bilimbi.Core.Company.RelationshipType, foreign_key: :relationship_type_id
+    belongs_to(:company, Bilimbi.Core.Company.Schema, foreign_key: :company_id)
+    belongs_to(:related_company, Bilimbi.Core.Company.Schema, foreign_key: :related_company_id)
+    belongs_to(:type, Bilimbi.Core.Company.RelationshipType, foreign_key: :relationship_type_id)
 
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
@@ -40,7 +40,6 @@ defmodule Bilimbi.Core.Company.Relationship do
   def changeset(relationship, attrs) do
     relationship
     |> cast(attrs, [
-      :company_id,
       :related_company_id,
       :relationship_type_id,
       :effective_from,
@@ -54,6 +53,7 @@ defmodule Bilimbi.Core.Company.Relationship do
       [:company_id, :related_company_id, :relationship_type_id, :effective_from],
       name: :company_relationship_unique
     )
+    |> live_unique_constraint()
     |> foreign_key_constraint(:company_id, name: :company_relationships_company_id_foreign)
     |> foreign_key_constraint(:related_company_id,
       name: :company_relationships_related_company_id_foreign
@@ -68,6 +68,18 @@ defmodule Bilimbi.Core.Company.Relationship do
     relationship
     |> cast(attrs, [:effective_from, :effective_to, :metadata])
     |> validate_effective_dates()
+    |> live_unique_constraint(:effective_to)
+  end
+
+  @doc false
+  def live_duplicate_message,
+    do: "is already assigned between these companies for an overlapping period"
+
+  defp live_unique_constraint(changeset, field \\ :relationship_type_id) do
+    unique_constraint(changeset, field,
+      name: :company_relationship_live_unique,
+      message: live_duplicate_message()
+    )
   end
 
   defp validate_not_same_company(changeset) do
