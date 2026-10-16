@@ -11,23 +11,29 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
 
   When an owner is registered, every Core write of a legacy employee row
   (create, update, subordinate assignment, delete and platform-orchestrator
-  provisioning) calls `c:legacy_employee_written/4` inside the same Repo
+  provisioning) calls `c:legacy_employee_written/2` inside the same Repo
   transaction, after Core's own locks (company, then the mapped person and
   affiliation, then the employee row) and after Core's write. Core reads the
   owner inside that transaction, after those locks, so a write that finds none
-  registered takes no extra lock and calls nothing. Core passes the employee
-  ID with the `person_id` and `affiliation_id` it is mapped to (`nil` for both
-  when it has no mapping), so the owner needs no list-capability read to
-  store its mirror. The owner re-reads the HR facts of the row through the
+  registered takes no extra lock and calls nothing. Core passes the scope and
+  one map, `%{employee_id: integer, person_id: integer | nil, affiliation_id:
+  integer | nil}`, read in that transaction with no re-authorization (`nil`
+  for both IDs when the row has no mapping), so the owner needs no
+  list-capability read to store its mirror. The map may gain keys later;
+  an owner ignores keys it does not know. The owner re-reads the HR facts of the row through the
   public Employee API and stores the result under that lock order, so Core's
   deprecated HR path does not leave the owner behind. A deleted row is absent
   from that read, and the IDs passed for it are the mapping that existed for
   the deleted row.
 
-  A row written before the owner registered, or while it registered, never
-  reaches the callback. The owner adopts that drift in its own registration
-  pass, by paging `Bilimbi.Core.Employee.hr_handoff_page/3` after it registers;
-  Core keeps no reconcile state for it.
+  A Core write already in flight when an owner registers may not call it:
+  Core reads the owner once per write, and registration takes none of Core's
+  locks. The owner must therefore run its adoption pass over
+  `Bilimbi.Core.Employee.hr_handoff_page/3` after it registers, and a second
+  pass after a grace period longer than any Core HR transaction (for example
+  60 seconds). The second pass compares `updated_at` and includes newly
+  inserted IDs, which covers in-flight updates and inserts. One pass alone
+  does not close the race. Core keeps no reconcile state for it.
 
   The callback must not authorize again: Core accepted the write and the
   actor in `scope` already passed Core's checks. Returning `{:error, reason}`
@@ -41,9 +47,12 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
   @doc "Called inside Core's write transaction after the legacy employee row was written or deleted."
   @callback legacy_employee_written(
               Scope.t(),
-              employee_id :: pos_integer(),
-              person_id :: pos_integer() | nil,
-              affiliation_id :: pos_integer() | nil
+              %{
+                required(:employee_id) => pos_integer(),
+                required(:person_id) => pos_integer() | nil,
+                required(:affiliation_id) => pos_integer() | nil,
+                optional(atom()) => term()
+              }
             ) :: :ok | {:error, term()}
 
   @doc "The owner's name, as Core's employee pages say who owns the HR facts."
@@ -93,7 +102,7 @@ defmodule Bilimbi.Core.Employee.EmploymentOwner do
   end
 
   defp owner_module?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :legacy_employee_written, 4) and
+    Code.ensure_loaded?(module) and function_exported?(module, :legacy_employee_written, 2) and
       function_exported?(module, :name, 0)
   end
 end

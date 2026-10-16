@@ -137,8 +137,10 @@ defmodule Bilimbi.Core.Employee do
 
   IDs only grow, so a row created while paging appears on a later page; a
   row changed after its page was read is not delivered again. Register the
-  owner (`register_employment_owner/1`) before paging so every write from
-  then on reaches it through its callback.
+  owner (`register_employment_owner/1`) before paging so writes that start
+  afterwards reach it through its callback. A write already in flight at
+  registration may not, so page again after a grace period longer than any
+  Core HR transaction (for example 60 seconds), comparing `updated_at`.
 
   Asks `admin.employee.list` (an anonymous system actor passes). Option
   `:limit` sets the page size, default 500, at most 1,000. A cursor that is
@@ -178,7 +180,9 @@ defmodule Bilimbi.Core.Employee do
   moduledoc owns the contract. One owner at a time: registering the same
   module again is `:ok`, another is `:already_registered`, and a module
   without the callbacks is `:invalid_owner`. With none registered Core's
-  writes call nothing.
+  writes call nothing. A write already in flight at registration may not call
+  the owner, so the owner adopts existing rows with `hr_handoff_page/3` after
+  registering, and again after a grace period.
   """
   @spec register_employment_owner(module()) ::
           :ok | {:error, :invalid_owner | :already_registered}
@@ -1126,12 +1130,11 @@ defmodule Bilimbi.Core.Employee do
   defp notify_owner_or_rollback(nil, _scope, _employee_id, _mapping), do: :ok
 
   defp notify_owner_or_rollback(owner, scope, employee_id, mapping) do
-    case owner.legacy_employee_written(
-           scope,
-           employee_id,
-           mapping[:person_id],
-           mapping[:affiliation_id]
-         ) do
+    case owner.legacy_employee_written(scope, %{
+           employee_id: employee_id,
+           person_id: mapping[:person_id],
+           affiliation_id: mapping[:affiliation_id]
+         }) do
       :ok -> :ok
       {:error, reason} -> Repo.rollback(reason)
     end

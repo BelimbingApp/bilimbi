@@ -221,19 +221,21 @@ result Core returned before.
   write of a legacy row (`create_employee/3`, `update_employee/4`,
   subordinate assignment and removal, `delete_employee/3` and
   platform-orchestrator provisioning) calls its
-  `legacy_employee_written/4` inside the same transaction, after Core's
+  `legacy_employee_written/2` inside the same transaction, after Core's
   company, person/affiliation and employee locks and after Core's own write.
   Core reads the registered owner inside that transaction, after those
   locks (an insert takes the company lock only when an owner is registered),
   so a write that finds none takes no extra lock. The callback receives the
-  scope, the employee ID and the `person_id` and `affiliation_id` it is
-  mapped to (`nil` for both when it has none; for a delete, the mapping the
-  deleted row had), so the owner needs no list-capability read. An owner
-  refusal rolls the whole write back and reaches the caller. With no owner
-  registered, nothing is called and no extra lock is taken. A row written
-  before or while the owner registered never reaches the callback; the owner
-  adopts that drift in its own registration pass over `hr_handoff_page/3`,
-  and Core keeps no reconcile state for it.
+  scope and one map of `employee_id`, `person_id` and `affiliation_id`
+  (`nil` for both IDs when it has no mapping; for a delete, the mapping the
+  deleted row had; owners ignore keys added later), so the owner needs no
+  list-capability read. An owner refusal rolls the whole write back and reaches the caller. With no owner
+  registered, nothing is called and no extra lock is taken. A Core write already
+  in flight when an owner registers may not call it. The owner therefore runs
+  its adoption pass over `hr_handoff_page/3` after registering, and a second
+  pass after a grace period longer than any Core HR transaction (for example
+  60 seconds) that compares `updated_at` and includes newly inserted IDs.
+  One pass alone does not close the race, and Core keeps no reconcile state.
   `Bilimbi.Core.Employee.EmploymentOwner` owns the callback contract.
 - **Batch, permission-neutral mapping.** `person_identities/2` resolves up
   to 1,000 employee IDs to their person, affiliation and company IDs with a
@@ -244,7 +246,9 @@ result Core returned before.
   row of the tenant by ascending ID (archived companies, agents and the
   platform orchestrator included) with the HR facts, metadata, clocks and
   person mapping. It writes nothing. Register the owner before paging, so a
-  write after a page was read reaches the owner through its callback.
+  write that starts after registration reaches the owner through its
+  callback; a write in flight at registration needs the second, later pass
+  described above.
 
 The employee list and record page say who owns the employee number, type,
 status and employment dates when an owner is registered, and the record

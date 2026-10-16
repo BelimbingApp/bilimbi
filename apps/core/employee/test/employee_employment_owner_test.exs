@@ -23,13 +23,13 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
     # Reports what Core passed and the owner reads back, from inside Core's
     # transaction. It reads the mapping from the arguments, never a list read.
     @impl true
-    def legacy_employee_written(scope, employee_id, person_id, affiliation_id) do
+    def legacy_employee_written(scope, %{employee_id: employee_id} = written) do
       {:ok, employees} = Employee.get_tenant_employees(scope, [employee_id])
 
       send(
         :persistent_term.get({__MODULE__, :test}),
         {:written, employee_id, Repo.in_transaction?(), Map.get(employees, employee_id),
-         %{person_id: person_id, affiliation_id: affiliation_id}}
+         Map.take(written, [:person_id, :affiliation_id])}
       )
 
       :persistent_term.get({__MODULE__, :reply}, :ok)
@@ -45,7 +45,7 @@ defmodule Bilimbi.Core.EmployeeEmploymentOwnerTest do
 
   defmodule OtherOwner do
     @moduledoc false
-    def legacy_employee_written(_scope, _employee_id, _person_id, _affiliation_id), do: :ok
+    def legacy_employee_written(_scope, _written), do: :ok
     def name, do: "Other"
   end
 
