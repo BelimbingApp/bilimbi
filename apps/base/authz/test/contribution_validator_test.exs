@@ -6,6 +6,123 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
   alias Bilimbi.Base.Authz.ContributionValidator
   alias Bilimbi.Base.Authz.TestCompanyDirectory
 
+  describe "shared verb vocabulary" do
+    setup do
+      finance =
+        entry("finance/reconciliation", %{
+          domains: %{"finance" => "Finance operations"},
+          verbs: ["import"],
+          capabilities: ["finance.reconciliation.statements.import"],
+          roles: %{
+            "tenant_owner" => %{capabilities: ["finance.reconciliation.statements.import"]}
+          }
+        })
+
+      factory =
+        entry("factory/production_execution", %{
+          domains: %{"factory" => "Factory operations"},
+          verbs: ["import"],
+          capabilities: ["factory.production-execution.import"]
+        })
+
+      base = entry("base/authz", Bilimbi.Base.Authz.Contributions.contributions().authz)
+      %{base: base, finance: finance, factory: factory}
+    end
+
+    test "each provider can register its vocabulary alone", context do
+      for provider <- [context.finance, context.factory] do
+        snapshot = ContributionValidator.validate_contributions!([context.base, provider])
+        [capability] = provider.payload.capabilities
+
+        assert Enum.count(snapshot.verbs, &(&1 == "import")) == 1
+        assert snapshot.capability_owners[capability] == provider.descriptor.id
+      end
+    end
+
+    test "both provider orders merge verbs without changing capability owners or role grants",
+         context do
+      snapshots =
+        for providers <- [
+              [context.finance, context.factory],
+              [context.factory, context.finance]
+            ] do
+          snapshot = ContributionValidator.validate_contributions!([context.base | providers])
+
+          assert snapshot.verbs == Enum.sort(Enum.uniq(snapshot.verbs))
+          assert "import" in snapshot.verbs
+
+          assert snapshot.capability_owners["finance.reconciliation.statements.import"] ==
+                   "finance/reconciliation"
+
+          assert snapshot.capability_owners["factory.production-execution.import"] ==
+                   "factory/production_execution"
+
+          assert snapshot.roles["tenant_owner"].capabilities == [
+                   "admin.authz.field.manage",
+                   "finance.reconciliation.statements.import"
+                 ]
+
+          assert snapshot.roles["core_admin"].grant_all
+          snapshot
+        end
+
+      assert Enum.at(snapshots, 0) == Enum.at(snapshots, 1)
+    end
+
+    test "repeated vocabulary within a provider is idempotent", %{finance: finance} do
+      repeated = put_in(finance.payload.verbs, ["import", "import"])
+      repeated = put_in(repeated.payload.roles, %{})
+
+      assert ContributionValidator.validate_contributions!([repeated]).verbs == ["import"]
+    end
+
+    test "shared verbs do not allow duplicate capability ownership", context do
+      duplicate =
+        put_in(context.factory, [:payload, :capabilities], [
+          "finance.reconciliation.statements.import"
+        ])
+
+      for providers <- [[context.finance, duplicate], [duplicate, context.finance]] do
+        first_owner = hd(providers).descriptor.id
+
+        assert_raise ArgumentError,
+                     "authz contribution from #{List.last(providers).descriptor.id} " <>
+                       "capability finance.reconciliation.statements.import is already owned by #{first_owner}",
+                     fn ->
+                       ContributionValidator.validate_contributions!([context.base | providers])
+                     end
+      end
+    end
+
+    test "malformed verbs still fail after shared vocabulary was registered", context do
+      for verb <- [nil, :import, 1, "", "Import", "with space", "trailing-", "two.parts"] do
+        invalid = put_in(context.factory, [:payload, :verbs], ["import", verb])
+
+        assert_raise ArgumentError, ~r/invalid verb/, fn ->
+          ContributionValidator.validate_contributions!([context.base, context.finance, invalid])
+        end
+      end
+    end
+
+    test "verbs must be a list", context do
+      for verbs <- [nil, "import", %{"import" => true}] do
+        invalid = put_in(context.factory, [:payload, :verbs], verbs)
+
+        assert_raise ArgumentError, ~r/verbs must be a list/, fn ->
+          ContributionValidator.validate_contributions!([context.base, context.finance, invalid])
+        end
+      end
+    end
+
+    test "capabilities still require a registered verb", %{factory: factory} do
+      unregistered = put_in(factory.payload.verbs, [])
+
+      assert_raise ArgumentError, ~r/references unknown verb import/, fn ->
+        ContributionValidator.validate_contributions!([unregistered])
+      end
+    end
+  end
+
   test "merges role capabilities after validating the complete provider graph" do
     snapshot =
       ContributionValidator.validate_contributions!([

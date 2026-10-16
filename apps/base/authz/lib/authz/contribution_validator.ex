@@ -29,7 +29,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
     %{
       domains: %{},
       domain_owners: %{},
-      verbs: %{},
+      verbs: MapSet.new(),
       capabilities: %{},
       platform_capabilities: %{},
       roles: %{},
@@ -89,14 +89,13 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
   defp merge_domains!(_snapshot, owner, _domains), do: invalid!(owner, "domains must be a map")
 
   defp merge_verbs!(snapshot, owner, verbs) when is_list(verbs) do
+    # Verbs are shared vocabulary: independent providers must declare the
+    # actions they need even when another installed provider uses them too.
+    # Only complete capability keys have exclusive ownership.
     Enum.reduce(verbs, snapshot, fn verb, acc ->
       unless valid_segment?(verb), do: invalid!(owner, "invalid verb #{inspect(verb)}")
 
-      case Map.fetch(acc.verbs, verb) do
-        :error -> %{acc | verbs: Map.put(acc.verbs, verb, owner)}
-        {:ok, ^owner} -> invalid!(owner, "duplicates verb #{verb}")
-        {:ok, first_owner} -> invalid!(owner, "verb #{verb} is already owned by #{first_owner}")
-      end
+      %{acc | verbs: MapSet.put(acc.verbs, verb)}
     end)
   end
 
@@ -285,7 +284,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
 
     %{
       domains: snapshot.domains,
-      verbs: snapshot.verbs |> Map.keys() |> Enum.sort(),
+      verbs: snapshot.verbs |> MapSet.to_list() |> Enum.sort(),
       capabilities: snapshot.capabilities |> Map.keys() |> Enum.sort(),
       capability_owners: snapshot.capabilities,
       platform_capabilities: snapshot.platform_capabilities |> Map.keys() |> Enum.sort(),
@@ -308,7 +307,7 @@ defmodule Bilimbi.Base.Authz.ContributionValidator do
         invalid!(owner, "capability #{capability} references unknown domain #{parts.domain}")
       end
 
-      unless Map.has_key?(snapshot.verbs, parts.action) do
+      unless MapSet.member?(snapshot.verbs, parts.action) do
         invalid!(owner, "capability #{capability} references unknown verb #{parts.action}")
       end
     end)
