@@ -43,7 +43,12 @@ defmodule Bilimbi.Core.AgentAccess.Web.ConnectionsLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={nil}>
       <.page variant={:list}>
-        <.header>Agent connections</.header>
+        <.header>
+          Agent connections
+          <:actions>
+            <.button id="connections-chatgpt-plugin" navigate={~p"/settings/chatgpt-plugin"}>Plugin for ChatGPT</.button>
+          </:actions>
+        </.header>
         <.empty_state
           :if={@error}
           id="connections-error"

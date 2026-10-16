@@ -29,6 +29,8 @@ defmodule BilimbiWeb.RouteRulesTest do
     "/oauth/device",
     "/oauth/authorize",
     "/settings/agent-connections",
+    # Installing a plugin grants no authority; consent remains a separate personal action.
+    "/settings/chatgpt-plugin",
     "/notifications"
   ]
 

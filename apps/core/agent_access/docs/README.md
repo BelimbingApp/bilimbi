@@ -34,3 +34,10 @@ one-hour access-token lifetime are protocol contracts, not operator secrets.
 Deleting a person cascades their connections and credentials, while device
 receipts retain their spent state without a connection. The new grant tables
 therefore do not prevent the existing account-deletion workflow.
+
+The self-service **Plugin for ChatGPT** page is `/settings/chatgpt-plugin`. It
+uses `plugin_clients/1` and `plugin_download/3`, which preserve the same sealed
+person-only boundary as grant management. `plugin_files/2` exposes global,
+non-secret software configuration to the administrative Mix exporter. See the
+[host setup guide](../../../web/docs/mcp.md) for network and distribution
+instructions. Downloading software never creates or approves an OAuth grant.

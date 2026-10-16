@@ -10,7 +10,16 @@ defmodule Bilimbi.Core.AgentAccess do
   import Ecto.Query
   alias Bilimbi.Base.{Repo, Settings, Tenancy}
   alias Bilimbi.Base.Tenancy.Scope
-  alias Bilimbi.Core.AgentAccess.{AuthorizationCode, Connection, Device, OAuthClient, Token}
+
+  alias Bilimbi.Core.AgentAccess.{
+    AuthorizationCode,
+    Connection,
+    Device,
+    OAuthClient,
+    PluginPackage,
+    Token
+  }
+
   alias Bilimbi.Core.{Company, User}
 
   @client "bilimbi-native"
@@ -18,6 +27,19 @@ defmodule Bilimbi.Core.AgentAccess do
   @seen_limit 20
   def client_id, do: @client
   def device_grant, do: "urn:ietf:params:oauth:grant-type:device_code"
+
+  @doc "Lists public client choices for a person's ChatGPT installation instructions."
+  def plugin_clients(%Scope{} = scope) do
+    with :ok <- self_service(scope), do: {:ok, PluginPackage.clients()}
+  end
+
+  @doc "Exports global, non-secret installation configuration for the administrative Mix task."
+  defdelegate plugin_files(origin, client_id), to: PluginPackage, as: :files
+
+  @doc "Downloads software configuration, never an OAuth grant or a person's credentials."
+  def plugin_download(%Scope{} = scope, origin, client_id) do
+    with :ok <- self_service(scope), do: PluginPackage.archive(origin, client_id)
+  end
 
   @doc "Computes the end time displayed for a new connection from the global operator setting."
   def connection_expiry,

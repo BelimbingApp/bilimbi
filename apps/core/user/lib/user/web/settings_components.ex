@@ -59,6 +59,13 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
               Appearance
             </.link>
             <.link
+              id="settings-chatgpt-plugin"
+              navigate={~p"/settings/chatgpt-plugin"}
+              class="rounded-lg px-4 py-2 text-sm text-muted hover:bg-surface-muted hover:text-ink"
+            >
+              Plugin for ChatGPT
+            </.link>
+            <.link
               navigate={~p"/settings/agent-connections"}
               class="rounded-lg px-4 py-2 text-sm text-muted hover:bg-surface-muted hover:text-ink"
             >

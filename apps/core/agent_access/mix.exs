@@ -22,6 +22,8 @@ defmodule Bilimbi.Core.AgentAccess.MixProject do
   defp deps,
     do: [
       {:ecto_sql, "~> 3.14"},
+      {:jason, "~> 1.4"},
+      {:plug, "~> 1.20"},
       {:phoenix, "~> 1.8.9"},
       {:phoenix_live_view, "~> 1.2.0"}
     ]
