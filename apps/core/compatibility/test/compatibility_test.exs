@@ -540,6 +540,29 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
   end
 
+  test "adoption moves a migration applied under a renumbered version", %{schema: schema} do
+    {owner_id, old, new} = renumbering!()
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    for table <- ["bilimbi_schema_migrations", "bilimbi_migration_provenance"] do
+      SQL.query!(
+        MigrationTestRepo,
+        ~s(UPDATE "#{schema}".#{table} SET version = $1 WHERE version = $2),
+        [old, new]
+      )
+    end
+
+    assert {:ok, :already_adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    recorded = recorded_versions(MigrationTestRepo, schema)
+    assert new in recorded
+    refute old in recorded
+
+    provenance = MigrationProvenance.fetch(MigrationTestRepo, schema)
+    assert %{owner_id: ^owner_id} = provenance[new]
+    refute Map.has_key?(provenance, old)
+  end
+
   test "another owner's version at a renumbered module's old number stays its own", %{
     schema: schema
   } do

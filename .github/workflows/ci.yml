@@ -109,6 +109,9 @@ jobs:
   # Domain at its default branch and checks migration versions alone, so a
   # Domain that is behind the Platform in other ways does not fail it. The
   # daily schedule catches a Domain that takes a version the Platform ships.
+  # The Domain list is hard-coded because nothing in this repository names the
+  # remote first-party Domains: discovery sees only directories already mounted
+  # under apps/domains. A new public first-party Domain must be added to it.
   domain_migration_versions:
     name: First-party Domain migration versions
     runs-on: ubuntu-26.04

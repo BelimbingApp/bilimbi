@@ -339,6 +339,7 @@ defmodule Bilimbi.Core.Compatibility do
   defp adopt_ledger(repo, schema, absent) do
     installed = installed_migrations()
     adoptable = Enum.reject(installed, &(&1.owner_id in absent))
+    renumber_ledger!(repo, schema)
 
     case ledger_versions(repo, schema) do
       :missing ->
