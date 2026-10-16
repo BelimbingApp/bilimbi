@@ -90,4 +90,148 @@ defmodule Bilimbi.Core.BelimbingSchemaAdoptionE2ETest do
              ) =~ "Platform baseline public API smoke passed."
     end)
   end
+
+  test "person backfill preserves HR facts, user links, agent identities and sequences", %{
+    env: env
+  } do
+    BelimbingSchemaFixture.load!(PlatformBaselineTestRepo.config())
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      "INSERT INTO tenants(id, name, is_platform_operator) VALUES (947, 'Legacy operator', true)",
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      "INSERT INTO companies(id, tenant_id, name, code, status) VALUES (947, 947, 'Legacy company', 'legacy_947', 'active')",
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      "INSERT INTO tenant_primary_companies(tenant_id, company_id) VALUES (947, 947)",
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      """
+      INSERT INTO employees(id, company_id, employee_number, full_name, designation, email, mobile_number, employee_type, status, employment_start, employment_end, metadata)
+      VALUES (9470, 947, 'HR-947', 'Legacy Human', 'Engineer', 'legacy@work.test', '+60947', 'part_time', 'probation', '2020-01-02', '2027-03-04', '{"legacy":"preserved"}')
+      """,
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      """
+      INSERT INTO employees(id, company_id, supervisor_id, employee_number, full_name, employee_type, status)
+      VALUES (9471, 947, 9470, 'SYS-001', 'Legacy System Agent', 'agent', 'active')
+      """,
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      """
+      INSERT INTO users(id, company_id, employee_id, name, email, password)
+      VALUES (9472, 947, 9470, 'Legacy login', 'legacy947@example.test', 'retained-hash')
+      """,
+      []
+    )
+
+    SQL.query!(
+      PlatformBaselineTestRepo,
+      """
+      INSERT INTO employees(id, company_id, employee_number, full_name, employee_type, status, employment_start, employment_end, created_at, updated_at)
+      VALUES
+        (9473, 947, 'HR-947-CLOSED', 'Closed Before Recorded', 'full_time', 'inactive', NULL, '2020-01-01', '2024-06-01', '2024-06-01'),
+        (9474, 947, 'HR-947-UNDATED', 'Undated Record', 'full_time', 'active', NULL, NULL, '2024-06-01', '2024-06-01')
+      """,
+      []
+    )
+
+    before =
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "SELECT row_to_json(e) FROM employees e ORDER BY id",
+        []
+      ).rows
+
+    run_mix!("bilimbi.schema.adopt", [], env)
+    run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+    assert SQL.query!(
+             PlatformBaselineTestRepo,
+             "SELECT row_to_json(e) FROM employees e ORDER BY id",
+             []
+           ).rows == before
+
+    assert [[9470]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT employee_id FROM users WHERE id = 9472",
+               []
+             ).rows
+
+    assert [
+             [9470, 9470, 947, "Engineer"],
+             [9471, 9471, 947, nil],
+             [9473, 9473, 947, nil],
+             [9474, 9474, 947, nil]
+           ] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT legacy_employee_id, person_id, company_id, title FROM core_person_affiliations ORDER BY legacy_employee_id",
+               []
+             ).rows
+
+    assert [
+             [9470, ~D[2020-01-02], ~D[2027-03-04]],
+             [9471, nil, nil],
+             [9473, nil, ~D[2020-01-01]],
+             [9474, nil, nil]
+           ] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT legacy_employee_id, started_on, ended_on FROM core_person_affiliations ORDER BY legacy_employee_id",
+               []
+             ).rows
+
+    assert [["legacy@work.test", "+60947"]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT email, phone FROM core_person_affiliations WHERE legacy_employee_id = 9470",
+               []
+             ).rows
+
+    assert [[nil, nil]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT email, phone FROM core_people WHERE id = 9470",
+               []
+             ).rows
+
+    assert [
+             [9470, 947, "Legacy Human", nil],
+             [9471, 947, "Legacy System Agent", nil],
+             [9473, 947, "Closed Before Recorded", ~N[2024-06-01 00:00:00]],
+             [9474, 947, "Undated Record", ~N[2024-06-01 00:00:00]]
+           ] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT id, tenant_id, full_name, created_at FROM core_people ORDER BY id",
+               []
+             ).rows
+
+    assert [[true]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT nextval('core_people_id_seq') > 9474",
+               []
+             ).rows
+
+    assert run_mix!("bilimbi.schema.verify", [], env) =~ "Bilimbi compatibility schema verified."
+  end
 end

@@ -112,7 +112,7 @@ defmodule BilimbiWeb.CompanyRelationshipsLiveTest do
       assert has_element?(
                view,
                "#delete-rel-confirm-description",
-               "Both companies are kept. The relationship's dates are lost and it would have to be added again."
+               "Both companies and the historical relationship are kept."
              )
 
       # Cancelling keeps the relationship.
@@ -133,6 +133,79 @@ defmodule BilimbiWeb.CompanyRelationshipsLiveTest do
       refute has_element?(view, "#delete-rel-confirm")
       assert has_element?(view, "#flash-success", "Relationship removed.")
       assert has_element?(view, "#company-relationships-empty")
+    end
+
+    test "End relationship dates the end, defaults to today and keeps the row", %{conn: conn} do
+      CompanyFixtures.insert_relationship_type!(11)
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, rel} =
+        Company.create_relationship(scope, 73, %{
+          "related_company_id" => "74",
+          "relationship_type_id" => "11",
+          "effective_from" => "2026-01-01"
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/relationships")
+      view |> element("#end-rel-#{rel.id}") |> render_click()
+      assert has_element?(view, "#relationship-modal")
+      refute has_element?(view, "#relationship-effective-from")
+      today = Date.to_iso8601(Date.utc_today())
+      assert has_element?(view, "#relationship-effective-to[value='#{today}']")
+
+      view
+      |> form("#relationship-form", %{"relationship" => %{"effective_to" => "2026-03-31"}})
+      |> render_submit()
+
+      refute has_element?(view, "#relationship-modal")
+      assert has_element?(view, "#flash-success", "Relationship ended")
+      assert has_element?(view, "#company-relationships", "2026-03-31")
+
+      render_hook(view, "save", %{"relationship" => %{"effective_to" => "2026-02-01"}})
+      kept = Repo.get!(Relationship, rel.id)
+      assert {kept.effective_to, kept.deleted_at} == {~D[2026-03-31], nil}
+    end
+
+    test "reopening an ended relationship beside an open one shows the refusal on the dialog", %{
+      conn: conn
+    } do
+      CompanyFixtures.insert_relationship_type!(11)
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, ended} =
+        Company.create_relationship(scope, 73, %{
+          "related_company_id" => "74",
+          "relationship_type_id" => "11",
+          "effective_from" => "2025-01-01",
+          "effective_to" => "2025-12-31"
+        })
+
+      {:ok, _open} =
+        Company.create_relationship(scope, 73, %{
+          "related_company_id" => "74",
+          "relationship_type_id" => "11",
+          "effective_from" => "2026-01-01"
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/relationships")
+
+      view |> element("#edit-rel-#{ended.id}") |> render_click()
+
+      view
+      |> form("#relationship-form", %{"relationship" => %{"effective_to" => ""}})
+      |> render_submit()
+
+      assert has_element?(view, "#relationship-modal")
+
+      assert has_element?(
+               view,
+               "#relationship-modal",
+               "is already assigned between these companies for an overlapping period"
+             )
+
+      assert Repo.get!(Relationship, ended.id).effective_to == ~D[2025-12-31]
     end
 
     test "hides write controls and rejects direct write events without update capability", %{

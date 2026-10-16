@@ -532,6 +532,11 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
             <.back_link id="employee-form-back" navigate={~p"/employees"} title="Back to employees" />
           </:actions>
         </.header>
+        <.alert id="employee-hr-compatibility" kind={:info} class="mb-4">
+          These are legacy HR records, with employee numbers and employment facts.
+          <.link :if={allowed?(@current_scope, "admin.person.list")} navigate={~p"/contacts"}>Use Contacts for namecards and general affiliations.</.link>
+          <span :if={!allowed?(@current_scope, "admin.person.list")}>For namecards, ask an operator for access to Contacts.</span>
+        </.alert>
 
         <.form
           for={@form}

@@ -1,6 +1,9 @@
 defmodule Bilimbi.Core.Employee do
   @moduledoc """
-  Public API for tenant-scoped employment relationships.
+  Deprecated compatibility API for tenant-scoped legacy HR records.
+
+  New contacts and affiliations use Bilimbi.Core.Person. Existing HR columns
+  and durable Employee IDs remain intact until People claims them; see docs/README.md.
 
   Employee identity remains separate from authentication identity. Every
   operation runs under a `Bilimbi.Base.Tenancy.Scope`, so the tenant is proven
@@ -55,6 +58,32 @@ defmodule Bilimbi.Core.Employee do
     status: "active"
   }
   @protected_orchestrator_fields [:employee_number, :employee_type]
+  @person_fact_fields [
+    full_name: :full_name,
+    designation: :title,
+    email: :email,
+    mobile_number: :phone,
+    employment_start: :started_on,
+    employment_end: :ended_on
+  ]
+
+  @doc "Resolves the Core Person/affiliation mapping without exposing either module's private schemas."
+  def person_identity(%Scope{} = scope, employee_id) do
+    with {:ok, employees} <- get_tenant_employees(scope, [employee_id]),
+         true <- Map.has_key?(employees, employee_id),
+         {:ok, affiliation} <- Bilimbi.Core.Person.legacy_affiliation(scope, employee_id) do
+      {:ok,
+       %{
+         legacy_employee_id: affiliation.legacy_employee_id,
+         person_id: affiliation.person_id,
+         affiliation_id: affiliation.id,
+         company_id: affiliation.company_id
+       }}
+    else
+      false -> {:error, :employee_not_found}
+      error -> error
+    end
+  end
 
   @type lookup_error ::
           :company_not_found
@@ -296,7 +325,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       end
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
@@ -317,7 +346,7 @@ defmodule Bilimbi.Core.Employee do
         |> protect_platform_orchestrator_identity(subordinate)
         |> reject_reserved_orchestrator_number(subordinate)
         |> validate_references(scope, company_id, subordinate.id)
-        |> persist_update()
+        |> persist_update(scope)
       else
         {:ok, Summary.from_schema(subordinate)}
       end
@@ -332,8 +361,8 @@ defmodule Bilimbi.Core.Employee do
 
   The caller must already be inside the shared Repo transaction. The returned
   proof is valid only for that transaction and contains no Employee schema or
-  queryable. Callers that also lock User state must keep the global lock order:
-  Company, then Employee, then User, with ascending IDs within each module.
+  queryable. Callers that also lock another module's rows keep the order on
+  `Bilimbi.Core.Company.lock_writable_company/2`.
 
   Missing, cross-tenant, and company-mismatched identities all fail as
   `:not_found`; an archived company is `:company_archived`, since the lock is
@@ -353,7 +382,7 @@ defmodule Bilimbi.Core.Employee do
           {:ok, Summary.t()} | {:error, :company_not_found | :company_archived | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do
     with {:ok, _company} <- normalize_company(Company.require_writable_company(scope, company_id)) do
-      scope |> creation_changeset(company_id, attributes) |> persist_insert()
+      scope |> creation_changeset(company_id, attributes) |> persist_insert(scope)
     end
   end
 
@@ -390,7 +419,7 @@ defmodule Bilimbi.Core.Employee do
       |> protect_platform_orchestrator_identity(employee)
       |> reject_reserved_orchestrator_number(employee)
       |> validate_references(scope, company_id, employee_id)
-      |> persist_update()
+      |> persist_update(scope)
     else
       {:error, reason} = error when reason in [:company_not_found, :company_archived] -> error
       nil -> {:error, :employee_not_found}
@@ -406,9 +435,21 @@ defmodule Bilimbi.Core.Employee do
       if platform_orchestrator_record?(employee) do
         {:error, :invariant_violation}
       else
-        case Repo.delete(employee) do
-          {:ok, _} -> :ok
-          {:error, _} -> {:error, :invariant_violation}
+        Repo.transaction(fn ->
+          lock_company_or_rollback(scope, employee.company_id)
+          :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, employee.id)
+
+          case Repo.delete(employee) do
+            {:ok, _} ->
+              :ok = Bilimbi.Core.Person.end_legacy_employee_affiliation(scope, employee.id)
+
+            {:error, _} ->
+              Repo.rollback(:invariant_violation)
+          end
+        end)
+        |> case do
+          {:ok, :ok} -> :ok
+          {:error, reason} -> {:error, reason}
         end
       end
     else
@@ -857,7 +898,7 @@ defmodule Bilimbi.Core.Employee do
 
     changeset = Schema.creation_changeset(company.id, attributes)
 
-    case Repo.insert(changeset) do
+    case insert_orchestrator(company, changeset) do
       {:ok, employee} ->
         {:ok, Summary.from_schema(employee), :created}
 
@@ -870,6 +911,20 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  defp insert_orchestrator(company, changeset) do
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          {:ok, scope} = Bilimbi.Base.Tenancy.scope(company.tenant_id)
+          :ok = sync_person(scope, employee, person_facts(employee))
+          employee
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
   defp platform_orchestrator_record?(%Schema{
          employee_number: @platform_orchestrator_number,
          employee_type: @platform_orchestrator_type
@@ -878,21 +933,86 @@ defmodule Bilimbi.Core.Employee do
 
   defp platform_orchestrator_record?(%Schema{}), do: false
 
-  defp persist_insert(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp persist_insert(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
 
-  defp persist_insert(changeset) do
-    case Repo.insert(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
+  defp persist_insert(changeset, scope) do
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, employee} ->
+          case sync_person(scope, employee, person_facts(employee)) do
+            :ok ->
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :insert))
+          end
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp persist_update(%Changeset{valid?: false} = changeset, _scope), do: {:error, changeset}
+
+  defp persist_update(changeset, scope) do
+    facts = person_facts(changeset.changes)
+
+    Repo.transaction(fn ->
+      lock_company_or_rollback(scope, changeset.data.company_id)
+      :ok = Bilimbi.Core.Person.lock_legacy_employee(scope, changeset.data.id)
+
+      case Repo.update(changeset) do
+        {:ok, employee} ->
+          case sync_person(scope, employee, facts, person_facts(employee)) do
+            :ok ->
+              Summary.from_schema(employee)
+
+            {:error, person_cs} ->
+              Repo.rollback(reject_person_sync(changeset, person_cs, :update))
+          end
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp sync_person(scope, %Schema{} = employee, facts, initial_facts \\ nil),
+    do:
+      Bilimbi.Core.Person.sync_legacy_employee(
+        scope,
+        employee.id,
+        employee.company_id,
+        facts,
+        initial_facts
+      )
+
+  # Re-prove writability inside the transaction, before Person/affiliation and Employee locks.
+  defp lock_company_or_rollback(scope, company_id) do
+    case normalize_company(Company.lock_writable_company(scope, company_id)) do
+      {:ok, _proof} -> :ok
+      {:error, reason} -> Repo.rollback(reason)
     end
   end
 
-  defp persist_update(%Changeset{valid?: false} = changeset), do: {:error, changeset}
+  defp reject_person_sync(%Changeset{} = changeset, %Changeset{errors: errors}, action) do
+    Enum.reduce(errors, %{changeset | action: action}, fn {fact, {message, _}}, acc ->
+      case Enum.find(@person_fact_fields, fn {_field, mapped} -> mapped == fact end) do
+        {field, _fact} ->
+          Changeset.add_error(acc, field, "conflicts with the Contacts affiliation: #{message}")
 
-  defp persist_update(changeset) do
-    case Repo.update(changeset) do
-      {:ok, employee} -> {:ok, Summary.from_schema(employee)}
-      {:error, changeset} -> {:error, changeset}
+        nil ->
+          acc
+      end
+    end)
+  end
+
+  defp person_facts(%Schema{} = employee), do: employee |> Map.from_struct() |> person_facts()
+
+  defp person_facts(fields) when is_map(fields) do
+    for {field, fact} <- @person_fact_fields, Map.has_key?(fields, field), into: %{} do
+      {fact, Map.fetch!(fields, field)}
     end
   end
 

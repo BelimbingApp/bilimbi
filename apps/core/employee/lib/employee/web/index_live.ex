@@ -421,6 +421,11 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             </div>
           </:actions>
         </.header>
+        <.alert id="employee-hr-compatibility" kind={:info} class="mb-4">
+          These are legacy HR records, with employee numbers and employment facts.
+          <.link :if={allowed?(@current_scope, "admin.person.list")} navigate={~p"/contacts"}>Use Contacts for namecards and general affiliations.</.link>
+          <span :if={!allowed?(@current_scope, "admin.person.list")}>For namecards, ask an operator for access to Contacts.</span>
+        </.alert>
 
         <.filter_toolbar id="employees-filters" form={@filters_form} event="filters">
           <:control

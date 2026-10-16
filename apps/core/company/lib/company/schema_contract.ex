@@ -241,6 +241,14 @@ defmodule Bilimbi.Core.Company.SchemaContract do
             true
           )
       },
+      optional_indexes: %{
+        "company_relationship_live_unique" =>
+          index(
+            ["company_id", "related_company_id", "relationship_type_id"],
+            true,
+            "deleted_at IS NULL AND effective_to IS NULL"
+          )
+      },
       foreign_keys: %{
         "company_relationships_company_id_foreign" => foreign_key("company_id", "companies"),
         "company_relationships_related_company_id_foreign" =>
@@ -378,7 +386,8 @@ defmodule Bilimbi.Core.Company.SchemaContract do
     %{type: type, nullable: nullable, default: default}
   end
 
-  defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
+  defp index(columns, unique \\ false, where \\ nil),
+    do: %{columns: columns, unique: unique, where: where}
 
   defp foreign_key(column, table, on_delete \\ :cascade) do
     foreign_key(List.wrap(column), table, ["id"], on_delete)

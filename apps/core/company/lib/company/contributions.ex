@@ -24,6 +24,14 @@ defmodule Bilimbi.Core.Company.Contributions do
       ],
       menu: [
         %{
+          id: "admin.company.relationship-type",
+          label: "Relationship Roles",
+          parent: "admin.company",
+          route: "/companies/relationship-types",
+          capability: "admin.company.list",
+          order: 30
+        },
+        %{
           id: "admin.company",
           label: "Companies",
           icon: "building-office-2",
@@ -55,7 +63,9 @@ defmodule Bilimbi.Core.Company.Contributions do
       settings: %{definitions: %{}, runtime_claims: []},
       grid: Bilimbi.Core.Company.GridTables.tables(),
       agent_api: %{
-        operations: Bilimbi.Core.Company.AgentOperations.declarations(),
+        operations:
+          Bilimbi.Core.Company.AgentOperations.declarations() ++
+            Bilimbi.Core.Company.RelationshipOperations.declarations(),
         guides: [
           %{
             key: "core.company",
@@ -70,7 +80,14 @@ defmodule Bilimbi.Core.Company.Contributions do
 
             Before creating, search by company name, legal name and email with
             `core.company.list`. Reuse the existing company rather than making
-            a duplicate. A person's employer must exist as a company first: reuse
+            a duplicate. Company roles are relationships, never legal entity types or access grants.
+            A related company assigned vendor supplies the source; viewed from the
+            vendor the source is its customer. Assign customer too when both roles
+            apply, using distinct links. Discover core.company.relationship.* and
+            core.company.relationship_role.* for list/read and reviewed writes.
+            Catalogue writes are platform-operator administration; retirement keeps
+            historical links. Contacts use core.person.contact.create, never HR
+            employee creation. A person's employer must exist as a company first: reuse
             it, or create it before recording the person. Use
             `core.company.create` through a dry run,
             local review and plan-code commit. A missing code is generated from

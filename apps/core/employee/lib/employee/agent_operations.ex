@@ -24,8 +24,23 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
     [
       create_declaration(),
       %{
+        key: "core.employee.person_identity",
+        title: "Read legacy identity mapping",
+        summary:
+          "Resolve a retained legacy employee to its Core Person and affiliation IDs. Requires contact read permission too.",
+        kind: :read,
+        capability: "admin.employee.list",
+        handler: __MODULE__,
+        input: %{
+          "type" => "object",
+          "required" => ["employee_id"],
+          "properties" => %{"employee_id" => %{"type" => "integer", "minimum" => 1}}
+        },
+        output: %{"type" => "object"}
+      },
+      %{
         key: "core.employee.list",
-        title: "List employees",
+        title: "List legacy HR records (deprecated)",
         summary:
           "Find employees of the company you signed in at by name, number, email, " <>
             "designation or job description, one page at a time.",
@@ -68,9 +83,9 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
 
     %{
       key: "core.employee.create",
-      title: "Create a person at a company",
+      title: "Create legacy HR record (deprecated)",
       summary:
-        "Record a person as an employee of their employer, including an external company. Search first.",
+        "Deprecated HR compatibility. Requires confirmed employment and an HR number; use core.person.contact.create for namecards.",
       keywords: ["add", "person", "people", "employer"],
       kind: :write,
       safe_write: true,
@@ -154,6 +169,9 @@ defmodule Bilimbi.Core.Employee.AgentOperations do
   end
 
   @impl true
+  def call("core.employee.person_identity", scope, input),
+    do: Employee.person_identity(scope, input["employee_id"])
+
   def call("core.employee.list", %Scope{} = scope, input) do
     %Actor{company_id: signed_in_company_id} = Scope.actor(scope)
     company_id = Map.get(input, "employer_company_id", signed_in_company_id)

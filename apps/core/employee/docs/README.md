@@ -53,8 +53,9 @@ through this generic affiliation seam with `:invariant_violation`; a non-agent
 legacy `SYS-001` row remains an ordinary affiliation under Employee's existing
 invariant.
 
-Cross-module writers use one strict lock order: **Company → Employee → User**.
-Within each module they lock ascending IDs. A returned proof is useful only
+Cross-module writers follow the lock order on
+`Bilimbi.Core.Company.lock_writable_company/2`. Within each module they lock
+ascending IDs. A returned proof is useful only
 inside the transaction that created it and must not be cached or treated as a
 capability after commit or rollback.
 
@@ -130,3 +131,79 @@ agent-write switches, and the dispatcher asks `admin.employee.create` afresh.
 An external employment report links to `/employees/:id?employer_company_id=...`.
 The record page authorizes that employer through the same Company target API;
 every page write rechecks the target permission, including tenant-wide reach.
+
+## Deprecated HR compatibility and People handoff (issue 947)
+
+Use `Bilimbi.Core.Person` and `core.person.*` for identity, contacts and general
+person–company affiliations. `/contacts/new` and `core.person.contact.create`
+accept a namecard without an employee number. `core.employee.create` and
+`core.employee.list` are deprecated HR compatibility operations, explicitly
+labelled that way in discovery and guides. Their input/output contracts remain
+available for integrations and the mounted People workforce until its separate
+migration. Never invent an employee number or use their legacy full_time/active
+defaults to import a contact. The existing HR UI is compatibility administration;
+it is not the contact creation workflow.
+
+This Bilimbi change does not move or delete employment numbers, types, statuses,
+dates, department/supervisor fields, job descriptions or metadata. With People
+absent they remain readable through the existing Employee API and administration
+pages. It changes no existing employee ID, company FK, user.employee_id,
+department-head/supervisor FK, polymorphic Employee identity, principal grant or
+system-agent reference. It also creates a Core Person/affiliation mapping for
+each pre-existing row. `Employee.person_identity/2` and the discovered
+`core.employee.person_identity` operation resolve that mapping (contact view
+permission is required as well as the operation's employee read capability).
+Mappings are tenant-scoped and their legacy IDs remain durable. No automatic
+identity merge follows equal names or emails.
+
+People's follow-up contract:
+
+1. People owns employment numbers, employment type/status/dates and other HR
+   facts. Its employment record references the returned Core Person ID and
+   affiliation ID, with the employer from that affiliation; it does not copy
+   mutable identity/contact facts into a second identity model.
+2. Migrate every retained legacy row, including agent rows and HR metadata, with
+   an explicit legacy-employee-to-People-employment mapping. Preserve legacy
+   identifiers wherever integrations/FKs require them. Retain old user and
+   principal references until their consumers deliberately adopt the mapping.
+   Keep platform-orchestrator provisioning and system-agent resolution in Core,
+   independent of People installation; publish a neutral Core identity mapping
+   before retiring the protected SYS-001/agent compatibility lookup. A display
+   name or coincident numeric ID must never become its runtime identity.
+3. Claim existing data through a separately reviewed migration and schema
+   ownership transition. Do not drop legacy columns or records when People is
+   absent. Unmounting People must preserve its employment data and provenance.
+4. After People reads identity through Core Person and ports its write workflows,
+   redirect/deprecate the HR operations in a versioned compatibility release.
+   Keep the old operations until integrations have an announced migration path.
+5. Core Employee keeps the Core mapping in step while the HR rows stay here:
+   `create_employee/3` and `update_employee/4` (and so `core.employee.create`
+   and the Employee pages; there is no headless update operation) write the
+   employee and its Core person and affiliation in one transaction. A new employee gets a person
+   and an affiliation with its employer company, `legacy_employee_id` being the
+   mapping; an edit carries only the facts that changed (name to the person;
+   designation, work email, mobile number and employment start/end to the
+   affiliation's title, email, phone and dates). Work email and phone live on the
+   affiliation only. No HR field is copied, so People reads employment from the
+   employee row and identity and contact from Core. A later Contacts edit is
+   overwritten only by a later change to the same Employee fact. The synced
+   dates pass through the affiliation's own validation: an employment date that
+   would invert the affiliation's start/end range is refused on that employment
+   date field. An employee update or delete first locks and rechecks the writable
+   company inside the transaction (`Company.lock_writable_company/2`), then locks
+   the mapped person and affiliation before the employee row
+   (`Person.lock_legacy_employee/2`), so a
+   concurrent Contacts edit queues instead of deadlocking. A retired person or
+   an unlinked affiliation is only read. An employee that has no mapping yet
+   gets one from its complete stored facts on its next create or edit. Contacts owns retire and unlink: the sync leaves a retired
+   person and an unlinked affiliation untouched, and the employee write still
+   succeeds. Deleting an employee unlinks its mapped affiliation and sets its
+   end date in the same transaction; the Core person stays.
+
+Core Person's retirement or affiliation unlink preserves legacy records and
+never terminates HR employment, clears user links or changes permission grants.
+The mapping migration preserves null timestamps and advances the person sequence.
+The Person structure migration refuses rollback while identity rows exist, so
+rollback cannot erase contacts or their history; an empty installation can roll
+back normally. The mounted People repository is unchanged in this Bilimbi PR;
+its existing workforce compile/test contract continues to use the retained HR API.

@@ -3,7 +3,6 @@ defmodule Bilimbi.Core.Company.Relationships do
 
   import Ecto.Query
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
@@ -18,17 +17,23 @@ defmodule Bilimbi.Core.Company.Relationships do
 
   @spec list_relationships(Scope.t(), pos_integer(), keyword()) ::
           {:ok, [map()]} | {:error, :company_not_found}
-  def list_relationships(%Scope{} = scope, company_id, _opts \\ []) do
+  def list_relationships(%Scope{} = scope, company_id, opts \\ []) do
     case live_company(scope, company_id) do
       {:error, :company_not_found} ->
         {:error, :company_not_found}
 
       {:ok, _company} ->
+        include_unlinked? = Keyword.get(opts, :include_unlinked, false) == true
+        scoped_companies = Tenancy.scope_query(Schema, scope)
+
         outgoing =
           from(r in Relationship,
-            join: rc in assoc(r, :related_company),
+            join: rc in ^scoped_companies,
+            on: rc.id == r.related_company_id,
             join: t in assoc(r, :type),
-            where: r.company_id == ^company_id and is_nil(r.deleted_at) and is_nil(rc.deleted_at),
+            where:
+              r.company_id == ^company_id and (^include_unlinked? or is_nil(r.deleted_at)) and
+                is_nil(rc.deleted_at),
             preload: [type: t],
             select: {r, rc}
           )
@@ -36,10 +41,11 @@ defmodule Bilimbi.Core.Company.Relationships do
 
         incoming =
           from(r in Relationship,
-            join: c in assoc(r, :company),
+            join: c in ^scoped_companies,
+            on: c.id == r.company_id,
             join: t in assoc(r, :type),
             where:
-              r.related_company_id == ^company_id and is_nil(r.deleted_at) and
+              r.related_company_id == ^company_id and (^include_unlinked? or is_nil(r.deleted_at)) and
                 is_nil(c.deleted_at),
             preload: [type: t],
             select: {r, c}
@@ -67,9 +73,12 @@ defmodule Bilimbi.Core.Company.Relationships do
       direction: direction,
       relationship: r,
       type: r.type,
+      role_label:
+        if(direction == :outgoing, do: r.type.name, else: RelationshipType.inverse_name(r.type)),
       other_company: Map.fetch!(summaries, other.id),
       effective_from: r.effective_from,
       effective_to: r.effective_to,
+      unlinked_at: r.deleted_at,
       is_active: Relationship.active?(r)
     }
   end
@@ -138,18 +147,14 @@ defmodule Bilimbi.Core.Company.Relationships do
           nil
       end
 
-    with :ok <- authorize(scope, @update_capability),
+    with :ok <- authorize_target(scope, company_id),
          {:ok, _company} <- WritableCompany.fetch_parent(scope, company_id) do
       if related_id != nil do
         case WritableCompany.fetch_parent(scope, related_id) do
           {:ok, _related} ->
-            %Relationship{company_id: company_id}
-            |> Relationship.changeset(attrs)
-            |> Repo.insert()
-            |> case do
-              {:ok, rel} -> {:ok, Repo.preload(rel, [:type])}
-              {:error, changeset} -> {:error, changeset}
-            end
+            company_id
+            |> create_changeset(attrs)
+            |> insert_serialized()
 
           {:error, :company_not_found} = error ->
             error
@@ -158,9 +163,9 @@ defmodule Bilimbi.Core.Company.Relationships do
             {:error, :related_company_archived}
         end
       else
-        %Relationship{company_id: company_id}
-        |> Relationship.changeset(attrs)
-        |> Repo.insert()
+        company_id
+        |> create_changeset(attrs)
+        |> insert_serialized()
       end
     end
   end
@@ -175,7 +180,7 @@ defmodule Bilimbi.Core.Company.Relationships do
              | :not_found
              | Ecto.Changeset.t()}
   def update_relationship(%Scope{} = scope, company_id, relationship_id, attrs) do
-    with :ok <- authorize(scope, @update_capability) do
+    with :ok <- authorize_target(scope, company_id) do
       update_relationship_record(scope, company_id, relationship_id, attrs)
     end
   end
@@ -202,10 +207,23 @@ defmodule Bilimbi.Core.Company.Relationships do
           rel ->
             with :ok <- other_side_writable(scope, rel, company_id) do
               rel
-              |> Relationship.update_changeset(attrs)
-              |> Repo.update()
+              |> update_changeset(attrs)
+              |> update_serialized()
             end
         end
+    end
+  end
+
+  @spec end_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, Relationship.t()} | {:error, term()}
+  def end_relationship(%Scope{} = scope, company_id, relationship_id, attrs \\ %{}),
+    do: update_relationship(scope, company_id, relationship_id, ending_attrs(attrs))
+
+  @doc false
+  def ending_attrs(attrs) do
+    case Map.get(attrs, "effective_to") || Map.get(attrs, :effective_to) do
+      blank when blank in [nil, ""] -> %{"effective_to" => Date.to_iso8601(Date.utc_today())}
+      date -> %{"effective_to" => date}
     end
   end
 
@@ -218,7 +236,7 @@ defmodule Bilimbi.Core.Company.Relationships do
              | :related_company_archived
              | :not_found}
   def delete_relationship(%Scope{} = scope, company_id, relationship_id) do
-    with :ok <- authorize(scope, @update_capability) do
+    with :ok <- authorize_target(scope, company_id) do
       delete_relationship_record(scope, company_id, relationship_id)
     end
   end
@@ -280,20 +298,208 @@ defmodule Bilimbi.Core.Company.Relationships do
 
   defp live_company(%Scope{}, _company_id), do: {:error, :company_not_found}
 
-  # Type and relationship screens already ask for these capabilities. Seeds,
-  # mix tasks, and `Tenancy.scope/1` pass the anonymous system actor, which
-  # holds no grants; a person and a named system principal are decided by Authz.
-  defp authorize(%Scope{} = scope, capability) do
+  @doc "Validates the same relationship rules without mutation; lifecycle previews are clock independent."
+  def preview(scope, company_id, id, action, attrs) do
+    with :ok <- authorize_target(scope, company_id),
+         {:ok, _} <- WritableCompany.fetch_parent(scope, company_id) do
+      if action == "create" do
+        with {:ok, _} <- WritableCompany.fetch_parent(scope, attrs["related_company_id"]) do
+          company_id
+          |> create_changeset(attrs)
+          |> preview_changes()
+        end
+      else
+        with {:ok, rows} <- list_relationships(scope, company_id),
+             %{relationship: row} <- Enum.find(rows, &(&1.id == id)),
+             :ok <- other_side_writable(scope, row, company_id) do
+          if action == "unlink" do
+            {:ok,
+             %{
+               summary: "Unlink company relationship",
+               changes: [%{field: "deleted_at", from: nil, to: "recorded at commit"}]
+             }}
+          else
+            row |> update_changeset(attrs) |> preview_changes()
+          end
+        else
+          nil -> {:error, :not_found}
+          error -> error
+        end
+      end
+    end
+  end
+
+  defp preview_changes(cs) do
+    with {:ok, _} <- Ecto.Changeset.apply_action(cs, :validate) do
+      {:ok,
+       %{
+         summary: "Change company relationship",
+         changes:
+           [%{field: "company_id", from: nil, to: cs.data.company_id}] ++
+             Enum.map(cs.changes, fn {k, v} ->
+               %{field: to_string(k), from: Map.get(cs.data, k), to: v}
+             end)
+       }}
+    end
+  end
+
+  defp authorize_target(scope, company_id) do
     actor = Scope.actor(scope)
 
     if TenancyActor.system?(actor) and is_nil(TenancyActor.system_principal(actor)) do
       :ok
     else
-      case Authz.can(scope, capability) do
-        %{allowed: true} -> :ok
-        %{allowed: false} -> {:error, :forbidden}
+      case Bilimbi.Core.Company.authorize_company_target(scope, company_id, @update_capability) do
+        {:ok, _} -> :ok
+        {:error, :unauthorized} -> {:error, :forbidden}
+        {:error, :not_found} -> {:error, :company_not_found}
       end
     end
+  end
+
+  defp create_changeset(company_id, attrs) do
+    %Relationship{company_id: company_id}
+    |> Relationship.changeset(Map.drop(attrs, [:company_id, "company_id"]))
+    |> validate_active_type()
+    |> validate_no_overlap()
+  end
+
+  # A role between the same source, target and type may not overlap another
+  # live link's dates (inclusive, an absent bound being open). An exact repeat
+  # of a create is a replay, not a conflict: `insert_serialized/1` returns the
+  # existing link.
+  defp validate_no_overlap(%Ecto.Changeset{valid?: false} = cs), do: cs
+
+  defp validate_no_overlap(cs) do
+    case classify_overlap(cs) do
+      :overlap ->
+        Ecto.Changeset.add_error(
+          cs,
+          if(cs.data.id, do: :effective_to, else: :relationship_type_id),
+          Relationship.live_duplicate_message()
+        )
+
+      _free_or_replay ->
+        cs
+    end
+  end
+
+  defp classify_overlap(cs) do
+    from_date = Ecto.Changeset.get_field(cs, :effective_from)
+    to_date = Ecto.Changeset.get_field(cs, :effective_to)
+
+    overlap = dynamic(true)
+
+    overlap =
+      if from_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_to) or r.effective_to >= ^from_date)),
+        else: overlap
+
+    overlap =
+      if to_date,
+        do: dynamic([r], ^overlap and (is_nil(r.effective_from) or r.effective_from <= ^to_date)),
+        else: overlap
+
+    live =
+      from(r in Relationship,
+        where:
+          r.company_id == ^Ecto.Changeset.get_field(cs, :company_id) and
+            r.related_company_id == ^Ecto.Changeset.get_field(cs, :related_company_id) and
+            r.relationship_type_id == ^Ecto.Changeset.get_field(cs, :relationship_type_id) and
+            is_nil(r.deleted_at),
+        where: ^overlap
+      )
+
+    live = if cs.data.id, do: where(live, [r], r.id != ^cs.data.id), else: live
+
+    case Repo.all(live) do
+      [] ->
+        :free
+
+      rows ->
+        replay = Enum.find(rows, &(&1.effective_from == from_date and &1.effective_to == to_date))
+        if replay && is_nil(cs.data.id), do: {:replay, replay}, else: :overlap
+    end
+  end
+
+  defp lock_pair(cs) do
+    key =
+      "company_relationship:#{Ecto.Changeset.get_field(cs, :company_id)}:" <>
+        "#{Ecto.Changeset.get_field(cs, :related_company_id)}:" <>
+        "#{Ecto.Changeset.get_field(cs, :relationship_type_id)}"
+
+    Ecto.Adapters.SQL.query!(Repo, "SELECT pg_advisory_xact_lock(hashtext($1))", [key])
+  end
+
+  defp insert_serialized(%Ecto.Changeset{valid?: false} = cs),
+    do: {:error, %{cs | action: :insert}}
+
+  defp insert_serialized(cs) do
+    Repo.transaction(fn ->
+      lock_pair(cs)
+
+      case classify_overlap(cs) do
+        {:replay, existing} ->
+          Repo.preload(existing, [:type])
+
+        :overlap ->
+          Repo.rollback(
+            Ecto.Changeset.add_error(
+              %{cs | action: :insert},
+              :relationship_type_id,
+              Relationship.live_duplicate_message()
+            )
+          )
+
+        :free ->
+          case Repo.insert(cs) do
+            {:ok, rel} -> Repo.preload(rel, [:type])
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+      end
+    end)
+  end
+
+  defp update_serialized(%Ecto.Changeset{valid?: false} = cs),
+    do: {:error, %{cs | action: :update}}
+
+  defp update_serialized(cs) do
+    Repo.transaction(fn ->
+      lock_pair(cs)
+
+      case classify_overlap(cs) do
+        :free ->
+          case Repo.update(cs) do
+            {:ok, rel} -> rel
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+
+        _overlap ->
+          Repo.rollback(
+            Ecto.Changeset.add_error(
+              %{cs | action: :update},
+              :effective_to,
+              Relationship.live_duplicate_message()
+            )
+          )
+      end
+    end)
+  end
+
+  defp update_changeset(rel, attrs) do
+    rel
+    |> Relationship.update_changeset(attrs)
+    |> validate_no_overlap()
+  end
+
+  defp validate_active_type(%Ecto.Changeset{valid?: false} = cs), do: cs
+
+  defp validate_active_type(cs) do
+    id = Ecto.Changeset.get_field(cs, :relationship_type_id)
+
+    if Repo.exists?(from(t in RelationshipType, where: t.id == ^id and t.is_active)),
+      do: cs,
+      else: Ecto.Changeset.add_error(cs, :relationship_type_id, "is retired or unavailable")
   end
 
   defp now do

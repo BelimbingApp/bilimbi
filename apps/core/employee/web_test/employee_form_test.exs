@@ -51,6 +51,37 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert still_linked.employee_id == incumbent.id
   end
 
+  test "an employee added in the UI is mapped to a Core person and found by contacts search", %{
+    conn: conn
+  } do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    render_submit(view, "save", %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-MAPPED",
+        "full_name" => "Mapped Mina",
+        "designation" => "Buyer",
+        "email" => "mina@work.test",
+        "employee_type" => "full_time",
+        "status" => "active"
+      }
+    })
+
+    assert {:ok, [%{id: employee_id}]} =
+             Employee.list_employees(scope, 73)
+             |> then(fn {:ok, rows} ->
+               {:ok, Enum.filter(rows, &(&1.employee_number == "EMP-MAPPED"))}
+             end)
+
+    assert {:ok, %{person_id: person_id}} = Employee.person_identity(scope, employee_id)
+
+    assert {:ok, %{entries: [%{id: ^person_id, email: nil}]}} =
+             Bilimbi.Core.Person.list(scope, search: "mina@work.test")
+  end
+
   test "an agent employee is saved without a user account", %{conn: conn} do
     grant_capabilities!(["admin.employee.create", "admin.employee.view"])
     {:ok, scope} = Tenancy.scope(41)

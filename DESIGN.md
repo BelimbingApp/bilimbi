@@ -463,7 +463,8 @@ focus, ignored Escape and painted its Delete solid red.
 
 Every destructive control confirms this way: the reference-type deletes, the
 address unlinks and deletes, the company relationship and department removals,
-the business activity chip, the employee and employee type deletes, the
+the business activity chip, contact retirement, contact affiliation and person-role
+unlinks, the employee and employee type deletes, the
 subordinate removal, the user deletes, the employee unlink, the saved database
 query deletes, the session terminate, the settings restore and the schedule
 pause and disable. No `data-confirm` attribute remains in the product. The

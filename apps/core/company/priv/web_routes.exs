@@ -1,5 +1,11 @@
 [
   %{
+    path: "/companies/relationship-types",
+    live: Bilimbi.Core.Company.Web.ReferenceTypesLive,
+    session: :auth,
+    capability: "admin.company.list"
+  },
+  %{
     path: "/companies/legal-entity-types",
     live: Bilimbi.Core.Company.Web.ReferenceTypesLive,
     session: :auth,
